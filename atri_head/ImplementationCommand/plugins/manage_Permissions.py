@@ -1,0 +1,105 @@
+from .example_plugin import example_plugin as example
+
+class manage_Permissions(example):
+    """用于管理权限"""
+    register_order = ["/manage","/管理"]
+    authority_level = 2
+    people = None
+
+    action_map = {
+        "添加": "添加",
+        "append": "添加",
+        "add": "添加",
+        "删除": "删除",
+        "del": "删除",
+        "delete": "删除",
+        "查询": "查询",
+        "query": "查询",
+        "check": "查询"
+    }
+
+    role_map = {
+        "管理": "管理员",
+        "管理员": "管理员",
+        "administrator": "管理员",
+        "admin": "管理员",
+        "黑名单": "黑名单",
+        "blacklist": "黑名单",
+        "black": "黑名单"
+    }
+
+    async def manage_Permissions(self, user_input, qq_TestGroup, data):
+        self.store(user_input, qq_TestGroup, data)
+        argument1, _, argument2, _ = self.basics.Command.verifyParameter(
+            self.argument,
+            parameter_quantity_max_1=1,
+            parameter_quantity_min_1=1,
+            parameter_quantity_max_2=2,
+            parameter_quantity_min_2=1,
+        )
+        self.people = data["user_id"]
+    
+        action = None
+        role = None
+        Be_operated_qq = None
+
+        if argument1[0] in self.action_map:
+            action = self.action_map[argument1[0]]
+            if action in ["添加", "删除"]:
+                Be_operated_qq = int(argument2[1])
+
+        if argument2[0] in self.role_map:
+            role = self.role_map[argument2[0]]
+
+        # 执行操作
+        self.handle_operation(action, role, Be_operated_qq)
+
+        if action == "添加":
+
+            self.basics.Command.synchronous_database(Be_operated_qq,role)
+            await self.basics.QQ_send_message.send_group_message(qq_TestGroup, f"已将QQ:{Be_operated_qq}\n添加为{role}")
+            
+        elif action == "删除":
+
+            self.basics.Command.synchronous_database(Be_operated_qq,role,add=False)
+            await self.basics.QQ_send_message.send_group_message(qq_TestGroup, f"已将QQ:{Be_operated_qq}\n移除{role}")
+        
+        return "ok"
+
+    async def query_admin(self,_, __):
+        await self.basics.QQ_send_message.send_group_message(
+            self.qq_TestGroup,
+            f"管理员列表:\n{self.basics.Command.administrator}"
+        )
+
+    async def query_blacklist(self,_, __):
+        await self.basics.QQ_send_message.send_group_message(
+            self.qq_TestGroup,
+            f"黑名单列表:\n{self.basics.Command.blacklist}"
+        )
+
+    
+    async def handle_operation(self,action, role, qq_id):
+        """执行权限操作"""
+        operations = {
+            "添加": {
+                "管理员": self.basics.Command.administrator_add,
+                "黑名单": self.basics.Command.blacklist_add,
+            },
+            "删除": {
+                "管理员": self.basics.Command.administrator_delete,
+                "黑名单": self.basics.Command.blacklist_delete,
+            },
+            "查询": {
+                "管理员": self.query_admin,
+                "黑名单": self.query_blacklist,
+            },
+        }
+        
+        if action not in operations:
+            raise ValueError("不支持的操作类型! 仅支持: 添加, 删除, 查询")
+        if role not in operations[action]:
+            raise ValueError(f"不支持的权限类型 '{role}'! 仅支持: 管理员, 黑名单")
+
+        # 执行对应操作
+        operations[action][role](qq_id, self.people)
