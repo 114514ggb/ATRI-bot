@@ -1,6 +1,5 @@
 from .example_plugin import example_plugin
 from ...ai_chat.bigModel_api import bigModel_api
-import aiohttp
 import base64
 
 class visual_recognition(example_plugin):
@@ -8,6 +7,7 @@ class visual_recognition(example_plugin):
     register_order = ["/visual","/识图"]
 
     model="glm-4v-flash"
+    messages = []
 
     def __init__(self):
         super().__init__()
@@ -15,7 +15,7 @@ class visual_recognition(example_plugin):
 
     def Request_answer(self):
         """请求回答"""
-        return self.openai.generate_text(self.model, self.openai.messages)
+        return self.openai.generate_text(self.model, self.messages)
     
     async def main(self,qq_TestGroup,user_input,data):
         self.store(user_input,qq_TestGroup,data)
@@ -28,23 +28,30 @@ class visual_recognition(example_plugin):
         for message in data["message"]:
 
             if message["type"] == "image":
-                async with aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=64,verify_ssl=False)) as session:
-                    async with session.get(message["data"]['url']) as response:
-                        if response.status == 200:
-                            data = await response.read()
-                            img_base = base64.b64encode(data.read()).decode('utf-8')
 
-                            self.openai.append_message_image(
-                                img_base,
-                                ' '.join(self.argument[1])
-                            )
+                img_path = (await self.basics.QQ_send_message.send_img_details(message["data"]['file_id']))["data"]["file"]
 
-                            assistant_output = self.Request_answer()
+                with open(img_path, 'rb') as img_file:
+                    img_base = base64.b64encode(img_file.read()).decode('utf-8')
 
-                            await self.basics.QQ_send_message.send_group_message(qq_TestGroup, assistant_output)
-                            return
-                        else:
-                            raise Exception("无法下载图片，状态码: {response.status}")
+                string = ' '.join(self.argument[1])
+                if string == "":
+                    string = "请描述这个图片"
+                    
+                self.messages = []
+                self.openai.append_message_image(
+                    messages = self.messages,
+                    image_url = img_base,
+                    text = string,
+                )
+
+                assistant_output = self.Request_answer()
+
+                text = assistant_output['choices'][0]['message']['content']
+
+                await self.basics.QQ_send_message.send_group_message(qq_TestGroup, text)
+                return
+
 
         raise Exception("未找到图片")
 

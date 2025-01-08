@@ -1,5 +1,5 @@
-import json,requests
-import asyncio,httpx
+import json
+import httpx
 
 class QQ_send_message():
     access_token = ""
@@ -14,10 +14,6 @@ class QQ_send_message():
             'Authorization': 'Bearer '+self.access_token,
         }
 
-    # def change_token(self,token):
-    #     """修改token"""
-    #     self.access_token = token
-
     # def send(self, url, payload):
     #     """发送请求"""
     #     try:
@@ -30,7 +26,7 @@ class QQ_send_message():
     #         print("请求失败:", e)
         
     async def async_send(self, url, payload):
-        """发送请求"""
+        """发送异步请求,返回json"""
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.post(url, data=payload, headers=self.headers)

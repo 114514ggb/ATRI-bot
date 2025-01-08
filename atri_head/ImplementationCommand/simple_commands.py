@@ -157,7 +157,7 @@ async def audio(user_input,qq_TestGroup,data):
 async def sing(user_input,qq_TestGroup,data):
     """唱歌"""
     sing_list ={
-        "インドア系ならトラックメイカ":"インドア系ならトラックメイカ.mp4",
+        "インドア系ならトラックメイカ":"室内系_TrackMaker.mp3",
         "我的悲伤是水做的":"我的悲伤是水做的.mp4",
         "Eastof Eden":"EastofEden.mp4",
         "running up that hill":"runningupthathill.mp4",
@@ -192,6 +192,7 @@ async def sing(user_input,qq_TestGroup,data):
         "恭喜发财":"恭喜发财.mp3",
         "喀秋莎":"喀秋莎.mp3",
         "晚安喵":"晚安喵.mp3",
+        "室内系_TrackMaker":"室内系_TrackMaker.mp3",
     }
 
     argument= basics.Command.processingParameter(user_input)

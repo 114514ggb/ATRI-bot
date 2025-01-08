@@ -1,5 +1,4 @@
-import requests,json,aiohttp
-from aiohttp import ClientError
+import requests,json
 from gradio_client import Client
 import asyncio
 from ..ai_chat.open_ai import OpenAI_api
@@ -75,15 +74,6 @@ class AI_interaction():
                 del self.messages[-3]
                 self.messages.append(self.playRole)
         return self.messages
-        
-    async def send(self,json):
-        """发送请求"""
-        async with aiohttp.ClientSession(url=self.api_url) as session:
-            try:
-                async with session.post(json=json) as response:
-                    return await response.json()
-            except ClientError as e:
-                Exception(f"聊天请求失败:{e}")
 
     def chat(self,messages):
         """与AI聊天 非流式输出"""

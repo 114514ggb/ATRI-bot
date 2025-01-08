@@ -1,7 +1,8 @@
 from zhipuai import ZhipuAI
+from .api_key_bigModel import api_key
 
 class bigModel_api:
-    """智谱AI大模型API"""
+    """智谱AI大模型API"""    
     model_parameters = {
         'stream': False,#是否流式输出
         'frequency_penalty': 1.5,#一个介于-2.0和2.0之间的数字。正值会根据文本中至今出现的频率对新令牌进行惩罚，降低模型重复同一行文字的可能性。
@@ -17,7 +18,7 @@ class bigModel_api:
     messages = []
     '''交互消息列表,上下文'''
 
-    def __init__(self, api_key = "fc57c8c15fe94a83a56aaa1f9401be6b.kALSJcRdCTn87TdO", tools = [None]):
+    def __init__(self,tools = [None]):
         self.client = ZhipuAI(
             api_key=api_key, 
         )
@@ -33,14 +34,14 @@ class bigModel_api:
         self.messages = []
         return True
     
-    def append_message_text(self,role,content):
+    def append_message_text(self,messages,role,content):
         """添加文本消息,role为角色,content为内容"""
-        self.messages.append({"role": role,"content": content})
+        messages.append({"role": role,"content": content})
         return True
     
-    def append_message_image(self,image_url, text="请描述这个图片", role = "user"):
+    def append_message_image(self,messages:list,image_url, text="请描述这个图片", role = "user"):
         """添加带图片消息,role为角色,image_url为图片链接,text为问题文字"""
-        self.messages.append({
+        messages.append({
             "role": role,
             "content": [
                 {"type": "image_url","image_url": {"url": image_url}},
@@ -87,5 +88,36 @@ class bigModel_api:
             response_format = response_format,
             tools = self.tools,
         )
+
+        return completion.model_dump()
+    
+    def vincennes_video(self,prompt,my_model = "CogVideoX-Flash"):
+        """文生视频"""
+        completion = self.client.videos.generations(
+            model = my_model,
+            prompt = prompt,
+            quality="quality", 
+        )
+
+        return completion.model_dump()
+    
+    def tucson_video(self,prompt,image_url,my_model = "CogVideoX-Flash"):
+        """图生视频"""
+        completion = self.client.videos.generations(
+            model = my_model,
+            prompt = prompt,
+            image_url=image_url,
+            quality="quality",  # 输出模式，"quality"为质量优先，"speed"为速度优先
+            with_audio=False, #是否生成 AI 音频
+            size="1920x1080",  # 视频分辨率，支持最高4K（如: "3840x2160"）
+            duration=10,  # 视频时长，可选5秒或10秒
+            fps=30,  # 帧率，可选为30或60
+        )
+
+        return completion.model_dump()
+    
+    def video_result_query(self,video_id):
+        """查询视频生成结果"""
+        completion = self.client.videos.retrieve_videos_result(id=video_id)
 
         return completion.model_dump()
