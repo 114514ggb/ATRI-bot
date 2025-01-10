@@ -65,7 +65,7 @@ class zhipu_video(example_plugin):
         if id == None:
             id = self.request_video(prompt)["id"]
 
-        await self.basics.QQ_send_message.send_group_message(qq_TestGroup,f"正在生成视频，请稍后...\n任务ID:{id}")
+        await self.basics.QQ_send_message.send_group_message(qq_TestGroup,f"正在生成视频，请稍后...\n任务ID:{id}\n注意这个模型的效果不佳！不要预期太高！")
 
         image_url,total_wait_time = await self.acquire_video(id)
 

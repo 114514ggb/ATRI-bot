@@ -53,7 +53,7 @@ class group_message_processing():
             try:
 
                 if self.basics.Command.blacklist_intercept(data['user_id']):
-                    await self.at_chat(qq_TestGroup,message)#聊天处理
+                    await self.at_chat(qq_TestGroup,message,data)#聊天处理
                 else:
                     raise Exception("检测到黑名单内人员")
                     
@@ -71,7 +71,7 @@ class group_message_processing():
             await self.textMonitoring.monitoring(message,qq_TestGroup,data)
             
                     
-    async def at_chat(self,qq_TestGroup,message):
+    async def at_chat(self,qq_TestGroup,message,data):
         """与用户聊天"""
         await self.basics.QQ_send_message.send_group_message(qq_TestGroup,"该功能正在施工中！谢谢您的耐心等待！")
         return "ok"

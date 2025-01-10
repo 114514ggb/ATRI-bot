@@ -30,9 +30,8 @@ async def help(user_input,qq_TestGroup,data):
 
 async def kill(user_input,qq_TestGroup,data):
     """清除记忆"""
-    if len(basics.AI_interaction.messages) > 1:
-        basics.AI_interaction.messages = []
-        basics.AI_interaction.renewalPlayRole()
+    if len(basics.AI_interaction.chat.messages) > 1:
+        basics.AI_interaction.chat.reset_chat()
         await basics.QQ_send_message.send_group_message(qq_TestGroup,"ATRI的记忆已经被清除,重新开始对话吧!😊")
         return "ok"
     else:
@@ -44,7 +43,7 @@ async def Random_fortune(user_input,qq_TestGroup,data):
     """运势"""
     fortunes = ["大吉", "吉", "吉", "中吉", "中吉", "中吉", "小吉", "小吉", "小吉", "小吉","凶", "凶", "大凶"]
     fortune = random.choice(fortunes)
-    content = f"你今天的运势是: {fortune}\n\n" + basics.AI_interaction.chat([basics.AI_interaction.playRole,{"role": "user", "content": f"我刚刚测试了一下我的运势是{fortune}你可以写一些祝福的话吗？"}])[0]
+    content = f"你今天的运势是: {fortune}"
     await basics.QQ_send_message.send_group_message(qq_TestGroup,content)
     return "ok"
 
@@ -93,37 +92,20 @@ async def random_img(user_input,qq_TestGroup,data):
     return "ok"
 
 async def toggleModel(user_input,qq_TestGroup,data):
-    """切换模型,可指定模型人物,none无人物"""
+    """切换模型人物,none无人物"""
     argument = basics.Command.processingParameter(user_input)
-    argument1,argument1_len,argument2,argument2_len = basics.Command.verifyParameter(argument,parameter_quantity_max_1=1, parameter_quantity_min_1=0, parameter_quantity_max_2=2, parameter_quantity_min_2=1)
-    key = "none"
+    basics.Command.verifyParameter(
+        argument,parameter_quantity_max_1=0, parameter_quantity_min_1=0, 
+        parameter_quantity_max_2=1, parameter_quantity_min_2=1
+    )
+    playRole = argument[1]
 
-    if argument1_len == 0 and argument2_len == 1 and argument2[0] in basics.AI_interaction.model_list:
-
-        basics.AI_interaction.messages = []
-        basics.AI_interaction.changeModel(argument2[0])
-
-    elif argument1_len == 1 and argument2_len == 2 and argument2[0] in basics.AI_interaction.model_list and argument2[1] in basics.AI_interaction.playRole_list and argument1[0] in ["appoint","指定","人物","角色"]:
-
-        key = argument2[1]
-
-        basics.AI_interaction.changeModel(argument2[0])
-
-        if key in basics.AI_interaction.playRole_list:
-
-            basics.AI_interaction.messages = []
-            if key != "none":
-                basics.AI_interaction.playRole = {"role":"system","content":basics.AI_interaction.playRole_list[key]}
-                basics.AI_interaction.messages.append(basics.AI_interaction.playRole)
-            else:
-                basics.AI_interaction.playRole = {}
-            
-        else:
-            raise Exception("没有这个角色")
+    if playRole in basics.AI_interaction.chat.playRole_list:
+        basics.AI_interaction.chat.Default_playRole = basics.AI_interaction.chat.playRole_list[playRole]
     else:
-        raise Exception("参数错误")
+        raise Exception("没有这个角色")
 
-    await basics.QQ_send_message.send_group_message(qq_TestGroup,f"已切换为{argument2[0]}模型\n人物:{key}")
+    await basics.QQ_send_message.send_group_message(qq_TestGroup,f"已切换为人物:{playRole}")
 
     return "ok"
 
@@ -193,6 +175,9 @@ async def sing(user_input,qq_TestGroup,data):
         "喀秋莎":"喀秋莎.mp3",
         "晚安喵":"晚安喵.mp3",
         "室内系_TrackMaker":"室内系_TrackMaker.mp3",
+        "HandClap":"HandClap.mp3",
+        "Not_Angry":"Not_Angry.mp3",
+        "bury_the_light":"bury_the_light.mp3",
     }
 
     argument= basics.Command.processingParameter(user_input)

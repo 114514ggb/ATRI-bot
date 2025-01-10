@@ -15,9 +15,6 @@ class bigModel_api:
     tools = []
     '''工具列表，用于指定模型可以使用的工具'''
 
-    messages = []
-    '''交互消息列表,上下文'''
-
     def __init__(self,tools = [None]):
         self.client = ZhipuAI(
             api_key=api_key, 
@@ -29,17 +26,18 @@ class bigModel_api:
         self.model_parameters[parameters] = value
         return self.model_parameters
     
-    def del_messages(self):
-        """删除消息"""
-        self.messages = []
-        return True
+    def append_playRole(self,content,messages:list):
+        """添加扮演的角色，固定为列表的第一个元素"""
+        if content != "":
+            messages.append({"role": "system","content": content})
+        return messages
     
-    def append_message_text(self,messages,role,content):
+    def append_message_text(self,messages:list,role,content):
         """添加文本消息,role为角色,content为内容"""
         messages.append({"role": role,"content": content})
-        return True
+        return messages
     
-    def append_message_image(self,messages:list,image_url, text="请描述这个图片", role = "user"):
+    def append_message_image(self,messages:list,image_url, text="请详细描述这个图片，如果上面有文字也要详细说清楚", role = "user"):
         """添加带图片消息,role为角色,image_url为图片链接,text为问题文字"""
         messages.append({
             "role": role,
@@ -49,7 +47,7 @@ class bigModel_api:
             ]  
         })
 
-        return True
+        return messages
 
     def generate_text(self, my_model, my_messages):
         """请求生成文本,全部默认。"""
@@ -110,7 +108,7 @@ class bigModel_api:
             quality="quality",  # 输出模式，"quality"为质量优先，"speed"为速度优先
             with_audio=False, #是否生成 AI 音频
             size="1920x1080",  # 视频分辨率，支持最高4K（如: "3840x2160"）
-            duration=10,  # 视频时长，可选5秒或10秒
+            duration=5,  # 视频时长，可选5秒或10秒
             fps=30,  # 帧率，可选为30或60
         )
 

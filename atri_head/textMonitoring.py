@@ -22,7 +22,7 @@ class textMonitoring():
         """精确匹配，匹配字段一样就反应"""
         if text in self.monitoring_alike_list.keys():
 
-            if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(33):#有在常用词列表里，并且随机到33%的概率不反应
+            if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(50):#有在常用词列表里，并且随机到33%的概率不反应
                 return True
             
             await self.sendHandle(qq_TestGroup,self.monitoring_alike_list[text])
@@ -57,6 +57,27 @@ class textMonitoring():
             await self.basics.QQ_send_message.send_group_audio(qq_TestGroup, document, True)
 
     monitoring_alike_list = {
+            "佛祖保佑": ["text",["""
+               _ooOoo_               
+              o8888888o              
+              88" . "88              
+              (| -_- |)              
+              O\  =  /O              
+           ____/`---'\____           
+         .'  \\|     |//  `.         
+        /  \\|||  :  |||//  \        
+       /  _||||| -:- |||||-  \       
+       |   | \\\  -  /// |   |       
+       | \_|  ''\---/''  |   |       
+       \  .-\__  `-`  ___/-. /       
+     ___`. .'  /--.--\  `. . __      
+  ."" '<  `.___\_<|>_/___.'  >'"".   
+ | | :  `- \`.;`\ _ /`;.`/ - ` : | | 
+ \  \ `-.   \_ __\ /__ _/   .-` /  / 
+==`-.____`-.___\_____/___.-`____.-'==
+               `=---='               
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        佛祖保佑        永无BUG"""]],
         "?": ["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg"]],
         "草": ["text",["草"]],
         "艹": ["text",["艹"]],
@@ -84,6 +105,9 @@ class textMonitoring():
         "早安": ["text",["早上好！","早上好呀！","早上好，今天也要元气满满哦！"]],
         "出警":["img",["ATRI_出警.jpg"]],
         "支持":["text",["支持"]],
+        "憨批":["img",["ATRI_憨批.gif"]],
+        "确实":["text",["确实"]],
+        "亚门":["img",["ATRI_亚门.jpg"]],
     }
     '''精确匹配列表'''
 
@@ -103,10 +127,16 @@ class textMonitoring():
         "有意思": ["img",["ATRI_有点意思.gif"]],
         "嘲讽": ["img",["ATRI_嘲笑.jpg","ATRI_下蹲.gif"]],
         "哈基米": ["audio",["哈基米.mp3"]],
+        "吃饭": ["ing",["ATRI_吃饭高兴.jpg"]],
+        "好吃": ["img",["ATRI_吃饭高兴.jpg"]],
+        "学习": ["img",["ATRI_学习.jpg"]],
+        "哼哼": ["img",["ATRI_恶臭.jpg"]],
+        "qwq": ["img",["ATRI_qwq.jpg"]],
+        "galgame": ["img",["ATRI_galgame.jpg"]],
     }
     '''模糊匹配列表'''
 
     Frequently_used_words_list = [
         "草","😡","?"
     ]
-    "常用词汇列表,66%几率回复"
+    "常用词汇列表,50%几率回复"

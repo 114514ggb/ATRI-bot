@@ -52,34 +52,20 @@ class manage_Permissions(example):
             role = self.role_map[argument2[0]]
 
         # 执行操作
-        self.handle_operation(action, role, Be_operated_qq)
+        text = self.handle_operation(action, role, Be_operated_qq,qq_TestGroup)
 
-        if action == "添加":
-
-            self.basics.Command.synchronous_database(Be_operated_qq,role)
-            await self.basics.QQ_send_message.send_group_message(qq_TestGroup, f"已将QQ:{Be_operated_qq}\n添加为{role}")
-            
-        elif action == "删除":
-
-            self.basics.Command.synchronous_database(Be_operated_qq,role,add=False)
-            await self.basics.QQ_send_message.send_group_message(qq_TestGroup, f"已将QQ:{Be_operated_qq}\n移除{role}")
+        await self.basics.QQ_send_message.send_group_message(qq_TestGroup, text)
         
         return "ok"
 
-    async def query_admin(self,_, __):
-        await self.basics.QQ_send_message.send_group_message(
-            self.qq_TestGroup,
-            f"管理员列表:\n{self.basics.Command.administrator}"
-        )
+    def query_admin(self):
+        return f"管理员列表:\n{self.basics.Command.administrator}"
 
-    async def query_blacklist(self,_, __):
-        await self.basics.QQ_send_message.send_group_message(
-            self.qq_TestGroup,
-            f"黑名单列表:\n{self.basics.Command.blacklist}"
-        )
+    def query_blacklist(self):
+        return f"黑名单列表:\n{self.basics.Command.blacklist}"
 
     
-    async def handle_operation(self,action, role, qq_id):
+    def handle_operation(self,action, role, qq_id,qq_TestGroup):
         """执行权限操作"""
         operations = {
             "添加": {
@@ -93,7 +79,7 @@ class manage_Permissions(example):
             "查询": {
                 "管理员": self.query_admin,
                 "黑名单": self.query_blacklist,
-            },
+            }
         }
         
         if action not in operations:
@@ -101,5 +87,11 @@ class manage_Permissions(example):
         if role not in operations[action]:
             raise ValueError(f"不支持的权限类型 '{role}'! 仅支持: 管理员, 黑名单")
 
-        # 执行对应操作
-        operations[action][role](qq_id, self.people)
+        if action in ["添加", "删除"]:
+            operations[action][role](qq_id, self.people)
+            self.basics.Command.synchronous_database(qq_id, role, add=(action == "添加"))#同步数据库
+            return f"已将QQ:{qq_id}\n{action}为{role}"
+
+        elif action == "查询":
+            return operations[action][role]()
+            

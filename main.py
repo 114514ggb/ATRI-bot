@@ -6,16 +6,16 @@ app = FastAPI()
 
 base_url = "http://localhost:8080"
 token = "ATRI114514"
-model = "ATRI"
+playRole = "ATRI"
 # model = "gemma2:9b"
 # model = "gemma2:27b"
 # model = "qwen2.5:32b"
 
 qq_white_list = [1062704755,984466158] # qq群白名单
-qq_white_list.append(235984211) #形形色色的群
+# qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(946533123) #狗熊岭
 
-ATRI = group_message_processing(base_url, token, model)
+ATRI = group_message_processing(base_url, token, playRole)
 
 @app.post("/")
 async def receive_event(data: dict): 

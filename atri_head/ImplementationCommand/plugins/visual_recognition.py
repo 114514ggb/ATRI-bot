@@ -36,7 +36,7 @@ class visual_recognition(example_plugin):
 
                 string = ' '.join(self.argument[1])
                 if string == "":
-                    string = "请描述这个图片"
+                    string = "请详细描述这个图片，如果上面有文字也要详细说清楚"
                     
                 self.messages = []
                 self.openai.append_message_image(
