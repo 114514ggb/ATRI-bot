@@ -53,7 +53,7 @@ class group_message_processing():
             try:
 
                 if self.basics.Command.blacklist_intercept(data['user_id']):
-                    await self.at_chat(qq_TestGroup,message,data)#聊天处理
+                    await self.basics.AI_interaction.chat.main(qq_TestGroup, message, data) #聊天处理
                 else:
                     raise Exception("检测到黑名单内人员")
                     
@@ -71,24 +71,4 @@ class group_message_processing():
             await self.textMonitoring.monitoring(message,qq_TestGroup,data)
             
                     
-    async def at_chat(self,qq_TestGroup,message,data):
-        """与用户聊天"""
-        await self.basics.QQ_send_message.send_group_message(qq_TestGroup,"该功能正在施工中！谢谢您的耐心等待！")
-        return "ok"
-
-        message = self.basics.AI_interaction.prompt_model(message)#prompt提示词处理
-
-        self.basics.AI_interaction.Update_message("user",message)
-
-        response_message, response_entirety = self.basics.AI_interaction.chat(self.basics.AI_interaction.messages)#请求模型响应
-
-        argument = f"模型: {response_entirety['model']}\n总耗时:{response_entirety['total_duration']/1000000000}s\n加载模型耗时:{response_entirety['load_duration']/1000000000}s\n提示词评估耗时:{response_entirety['prompt_eval_duration']/1000000000}s"
-
-        self.basics.QQ_send_message.send_group_message(qq_TestGroup,response_message)#发送文字信息
-
-        self.basics.QQ_send_message.send_group_message(qq_TestGroup, argument)#发送模型信息 
-
-        self.basics.QQ_send_message.send_group_audio(qq_TestGroup,self.basics.AI_interaction.speech_synthesis(response_message))#发送语音信息
-        
-        self.basics.AI_interaction.Update_message("assistant",message)
 

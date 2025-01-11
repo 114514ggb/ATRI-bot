@@ -90,7 +90,7 @@ class manage_Permissions(example):
         if action in ["添加", "删除"]:
             operations[action][role](qq_id, self.people)
             self.basics.Command.synchronous_database(qq_id, role, add=(action == "添加"))#同步数据库
-            return f"已将QQ:{qq_id}\n{action}为{role}"
+            return f"已将QQ:{qq_id}\n{action}{role}"
 
         elif action == "查询":
             return operations[action][role]()

@@ -108,19 +108,20 @@ class textMonitoring():
         "憨批":["img",["ATRI_憨批.gif"]],
         "确实":["text",["确实"]],
         "亚门":["img",["ATRI_亚门.jpg"]],
+        "悲": ["text",["悲"]],
     }
     '''精确匹配列表'''
 
     monitoring_have_list = {
         "不是哥们": ["text",["不是哥们?"]],
         "喵": ["text",["喵","喵喵!","喵喵喵!","喵泥格咪的！","我喵","喵？","我喵喵喵!","猫ですよ","你是猫吗？喵!"]],
-        "逆天": ["text",["逆天!","逆天"]],
+        "逆天": ["text",["逆天!","逆天","逆天了","你在逆什么呢,ATRI有大大的疑惑？"]],
         "难蚌": ["text",["难蚌"]],
         "好耶": ["img", ["ATRI_好耶.jpg"]],
         "高性能": ["img",["ATRI_高性能.png","ATRI_得意.gif","ATRI_自我陶醉.gif"]],
         "Ciallo": ["img",["ATRI_Ciallo.jpg"]],
         "废物":["img",["ATRI_欺负我你能得到什么.jpg","ATRI_ 气鼓鼓.gif","ATRI_生气到爆.gif","ATRI_怎么你了.jpg","ATRI_违反机器人保护法.jpg"]],
-        "亚托莉": ["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif","ATRI_探头.png"]],
+        "亚托莉": ["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif"]],
         "变态": ["img",["ATRI_变态.gif","你太变态.jpg"]],
         "哼哼啊": ["img",["ATRI_恶臭1145.jpg"]],
         "圣诞": ["img",["ATRI_过圣诞.gif"]],
@@ -133,6 +134,7 @@ class textMonitoring():
         "哼哼": ["img",["ATRI_恶臭.jpg"]],
         "qwq": ["img",["ATRI_qwq.jpg"]],
         "galgame": ["img",["ATRI_galgame.jpg"]],
+        "ATRI": ["img",["ATRI_探头.png","ATRI_左右摆头.gif"]],
     }
     '''模糊匹配列表'''
 

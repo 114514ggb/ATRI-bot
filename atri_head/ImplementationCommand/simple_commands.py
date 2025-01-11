@@ -178,6 +178,7 @@ async def sing(user_input,qq_TestGroup,data):
         "HandClap":"HandClap.mp3",
         "Not_Angry":"Not_Angry.mp3",
         "bury_the_light":"bury_the_light.mp3",
+        "恋爱循环":"恋爱循环.mp3",
     }
 
     argument= basics.Command.processingParameter(user_input)

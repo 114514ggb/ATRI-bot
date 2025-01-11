@@ -2,17 +2,25 @@ import json
 import httpx
 
 class QQ_send_message():
+    _instance = None
     access_token = ""
     base_url = "" # API地址
     File_root_directory = "E:/程序文件/python/ATRI/document/"
 
-    def __init__(self,token,base_url):
-        self.access_token = token
-        self.base_url = base_url
-        self.headers = {
-            'Content-Type':'application/json',
-            'Authorization': 'Bearer '+self.access_token,
-        }
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(QQ_send_message, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self,token = "ATRI114514",base_url = "http://localhost:8080"):
+        if not hasattr(self, "_initialized"):
+            self.access_token = token
+            self.base_url = base_url
+            self.headers = {
+                'Content-Type':'application/json',
+                'Authorization': 'Bearer '+self.access_token,
+            }
+            self._initialized = True
 
     # def send(self, url, payload):
     #     """发送请求"""
