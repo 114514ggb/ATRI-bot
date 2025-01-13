@@ -98,10 +98,11 @@ async def toggleModel(user_input,qq_TestGroup,data):
         argument,parameter_quantity_max_1=0, parameter_quantity_min_1=0, 
         parameter_quantity_max_2=1, parameter_quantity_min_2=1
     )
-    playRole = argument[1]
+    playRole = argument[1][0]
 
     if playRole in basics.AI_interaction.chat.playRole_list:
         basics.AI_interaction.chat.Default_playRole = basics.AI_interaction.chat.playRole_list[playRole]
+        basics.AI_interaction.chat.reset_chat()
     else:
         raise Exception("没有这个角色")
 
@@ -168,7 +169,7 @@ async def sing(user_input,qq_TestGroup,data):
         "fly me to the moon":"flymetothemoon.mp4",
         "bite me":"bite_me.mp4",
         "More One Night":"MoreOneNight.mp3",
-        "One Last Kiss":"OneLastKiss.mp3",
+        "One Last Kiss":"One_Last_Kiss.mp3",
         "ROVE":"ROVE.mp3",
         "小小恋歌":"小小恋歌.mp3",
         "恭喜发财":"恭喜发财.mp3",
@@ -179,6 +180,7 @@ async def sing(user_input,qq_TestGroup,data):
         "Not_Angry":"Not_Angry.mp3",
         "bury_the_light":"bury_the_light.mp3",
         "恋爱循环":"恋爱循环.mp3",
+        "恭喜你苏卡不列":"恭喜你苏卡不列.mp3",
     }
 
     argument= basics.Command.processingParameter(user_input)

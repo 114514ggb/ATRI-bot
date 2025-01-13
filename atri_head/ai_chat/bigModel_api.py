@@ -85,6 +85,14 @@ class bigModel_api:
 
         return completion.model_dump()
     
+    def generate_image(self, prompt, my_model = "CogView-3-Flash"):
+        """文生图"""
+        response = self.client.images.generations(
+            model = my_model, 
+            prompt = prompt
+        )
+        return response.model_dump()
+    
     def vincennes_video(self,prompt,my_model = "CogVideoX-Flash"):
         """文生视频"""
         completion = self.client.videos.generations(

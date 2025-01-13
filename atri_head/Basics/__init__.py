@@ -14,7 +14,7 @@ class Basics:
             cls._instance = super(Basics, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, base_url  = "http://localhost:8080", token = "ATRI114514", playRole = "ATRI"):
+    def __init__(self, base_url  = "http://localhost:8088", token = "ATRI114514", playRole = "ATRI"):
 
         if not hasattr(self, "_initialized"):
             self.QQ_send_message = QQ_send_message(token, base_url) #QQ 发送消息等交互

@@ -4,7 +4,7 @@ from atri_head.Message_processing import group_message_processing
 
 app = FastAPI()
 
-base_url = "http://localhost:8080"
+base_url = "http://localhost:8088"
 token = "ATRI114514"
 playRole = "ATRI"
 # model = "gemma2:9b"
@@ -12,7 +12,7 @@ playRole = "ATRI"
 # model = "qwen2.5:32b"
 
 qq_white_list = [1062704755,984466158] # qq群白名单
-# qq_white_list.append(235984211) #形形色色的群
+qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(946533123) #狗熊岭
 
 ATRI = group_message_processing(base_url, token, playRole)

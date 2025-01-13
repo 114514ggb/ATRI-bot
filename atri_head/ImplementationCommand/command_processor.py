@@ -23,7 +23,7 @@ class command_processor():
     def_list ={
         "1001":help,
         "1002":kill,
-        # "1003":Random_fortune,
+        "1003":Random_fortune,
         "1004":random_img,
         "3005":test,
         "0006":permissions_my,
