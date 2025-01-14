@@ -1,13 +1,13 @@
 from .ImplementationCommand import *
-from .Basics import *
 from .textMonitoring import textMonitoring
+from .Basics import Basics
 import time
 
 class group_message_processing():
     """群消息处理类"""
     
-    def __init__(self,base_url, token, model):
-        self.basics = Basics(base_url, token, model)
+    def __init__(self,base_url, token, playRole):
+        self.basics = Basics(base_url, token, playRole)
         self.command_processor = command_processor()
         self.textMonitoring = textMonitoring()
         self.basics.Command.syncing_locally()#同步数据库

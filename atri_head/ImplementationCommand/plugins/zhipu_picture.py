@@ -8,12 +8,11 @@ class zhipu_picture(example_plugin):
     register_order = ["/画图","/draw"]
 
     def __init__(self):
-        super().__init__()
         self.client = ZhipuAI(api_key=api_key)
     
-    async def main(self,user_input,qq_TestGroup,data):
+    async def main(self,user_input,qq_TestGroup,data, basics):
         """画图主函数"""
-        self.store(user_input,qq_TestGroup,data)
+        self.store(user_input,qq_TestGroup,data,basics)
         self.basics.Command.verifyParameter(
             self.argument,
             parameter_quantity_max_1=0, parameter_quantity_min_1=0, 

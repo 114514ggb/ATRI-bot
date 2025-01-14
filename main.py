@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-import uvicorn
+import uvicorn,asyncio,threading
 from atri_head.Message_processing import group_message_processing
 
 app = FastAPI()
@@ -15,15 +15,41 @@ qq_white_list = [1062704755,984466158] # qq群白名单
 qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(946533123) #狗熊岭
 
+
 ATRI = group_message_processing(base_url, token, playRole)
+
+
+def run_atrib_main(data, qq_white_list):
+    asyncio.run(ATRI.main(data, qq_white_list))
 
 @app.post("/")
 async def receive_event(data: dict): 
     print("Received event:", data)
 
-    await ATRI.main(data, qq_white_list)
+    threading.Thread(target=run_atrib_main, args=(data, qq_white_list)).start()
 
     return "OK", 200
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=3000)
+
+#                _ooOoo_               
+#               o8888888o              
+#               88" . "88              
+#               (| -_- |)              
+#               O\  =  /O              
+#            ____/`---'\____           
+#          .'  \\|     |//  `.         
+#         /  \\|||  :  |||//  \        
+#        /  _||||| -:- |||||-  \       
+#        |   | \\\  -  /// |   |       
+#        | \_|  ''\---/''  |   |       
+#        \  .-\__  `-`  ___/-. /       
+#      ___`. .'  /--.--\  `. . __      
+#   ."" '<  `.___\_<|>_/___.'  >'"".   
+#  | | :  `- \`.;`\ _ /`;.`/ - ` : | | 
+#  \  \ `-.   \_ __\ /__ _/   .-` /  / 
+# ==`-.____`-.___\_____/___.-`____.-'==
+#                `=---='               
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#         佛祖保佑        永无BUG

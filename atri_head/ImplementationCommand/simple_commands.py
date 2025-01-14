@@ -2,9 +2,8 @@ from ..Basics import *
 import random
 # import hashlib
 
-basics = Basics()
 
-async def test(user_input,qq_TestGroup,data):
+async def test(user_input,qq_TestGroup,data,basics:Basics):
     """测试参数等"""
     [argument_1, argument_2] = basics.Command.processingParameter(user_input)
 
@@ -15,7 +14,7 @@ async def test(user_input,qq_TestGroup,data):
 
     return "ok"
 
-async def help(user_input,qq_TestGroup,data):
+async def help(user_input,qq_TestGroup,data,basics:Basics):
     """帮助"""
     message ='''我有什么可以帮助你的吗?😀\n@我,后面接消息,我可以回答你的问题,或者与你聊天,或者为你提供一些帮助(聊天消息中不能出现/)🤔\n
 发送/kill,我可以清除我的记忆,重新开始对话😰\n           
@@ -28,7 +27,7 @@ async def help(user_input,qq_TestGroup,data):
     await basics.QQ_send_message.send_group_pictures(qq_TestGroup,default = True)
     return "ok"
 
-async def kill(user_input,qq_TestGroup,data):
+async def kill(user_input,qq_TestGroup,data,basics:Basics):
     """清除记忆"""
     if len(basics.AI_interaction.chat.messages) > 1:
         basics.AI_interaction.chat.reset_chat()
@@ -39,7 +38,7 @@ async def kill(user_input,qq_TestGroup,data):
         return "no"
 
 
-async def Random_fortune(user_input,qq_TestGroup,data):
+async def Random_fortune(user_input,qq_TestGroup,data,basics:Basics):
     """运势"""
     fortunes = ["大吉", "吉", "吉", "中吉", "中吉", "中吉", "小吉", "小吉", "小吉", "小吉","凶", "凶", "大凶"]
     fortune = random.choice(fortunes)
@@ -47,13 +46,13 @@ async def Random_fortune(user_input,qq_TestGroup,data):
     await basics.QQ_send_message.send_group_message(qq_TestGroup,content)
     return "ok"
 
-async def permissions_my(user_input,qq_TestGroup,data):
+async def permissions_my(user_input,qq_TestGroup,data,basics:Basics):
     """查看自己的权限"""
     message = "你现在的权限等级是: " + basics.Command.my_permissions(data['user_id'])
     await basics.QQ_send_message.send_group_message(qq_TestGroup,message)
     return True
 
-async def random_img(user_input,qq_TestGroup,data):
+async def random_img(user_input,qq_TestGroup,data,basics:Basics):
     """随机图片,可指定的格式为png,jpg,gif"""
     argument= basics.Command.processingParameter(user_input)
 
@@ -91,7 +90,7 @@ async def random_img(user_input,qq_TestGroup,data):
 
     return "ok"
 
-async def toggleModel(user_input,qq_TestGroup,data):
+async def toggleModel(user_input,qq_TestGroup,data,basics:Basics):
     """切换模型人物,none无人物"""
     argument = basics.Command.processingParameter(user_input)
     basics.Command.verifyParameter(
@@ -110,7 +109,7 @@ async def toggleModel(user_input,qq_TestGroup,data):
 
     return "ok"
 
-async def audio(user_input,qq_TestGroup,data):
+async def audio(user_input,qq_TestGroup,data,basics:Basics):
     """合成指定音频"""
     argument= basics.Command.processingParameter(user_input)
     basics.Command.verifyParameter(
@@ -125,7 +124,7 @@ async def audio(user_input,qq_TestGroup,data):
     await basics.QQ_send_message.send_group_audio(qq_TestGroup,url_audio=url)
     return "ok"
 
-# async def encryptedMessage(user_input,qq_TestGroup,data):
+# async def encryptedMessage(user_input,qq_TestGroup,data,basics:Basics):
 #     """MD5加密消息"""
 #     argument = basics.Command.processingParameter(user_input)
 #     basics.Command.verifyParameter(argument,parameter_quantity_max_1=0, parameter_quantity_min_1=0, parameter_quantity_max_2=1, parameter_quantity_min_2=1)
@@ -137,7 +136,7 @@ async def audio(user_input,qq_TestGroup,data):
 
 #     await basics.QQ_send_message.send_group_message(qq_TestGroup,f"MD5加密后的消息为:{myMd5_Digest}")
 
-async def sing(user_input,qq_TestGroup,data):
+async def sing(user_input,qq_TestGroup,data,basics:Basics):
     """唱歌"""
     sing_list ={
         "インドア系ならトラックメイカ":"室内系_TrackMaker.mp3",
@@ -162,7 +161,7 @@ async def sing(user_input,qq_TestGroup,data):
         "Don't be so serious":"别那么认真了.mp4",
         "一路生花":"一路生花.mp4",
         "Humble":"Humble.mp4",
-        "春日影":"春日影.mp4",
+        "春日影":"春日影.mp3",
         "Humble":"Humble.mp4",
         "Fairlane":"Fairlane.mp3",
         "Lo Fi":"Lo-Fi.mp4",
@@ -181,6 +180,7 @@ async def sing(user_input,qq_TestGroup,data):
         "bury_the_light":"bury_the_light.mp3",
         "恋爱循环":"恋爱循环.mp3",
         "恭喜你苏卡不列":"恭喜你苏卡不列.mp3",
+        "Mystic_Light_Quest":"Mystic_Light_Quest.mp3",
     }
 
     argument= basics.Command.processingParameter(user_input)

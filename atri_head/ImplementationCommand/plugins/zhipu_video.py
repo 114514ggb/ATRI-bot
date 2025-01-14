@@ -8,7 +8,6 @@ class zhipu_video(example_plugin):
     register_order = ["/视频","/video"]
 
     def __init__(self):
-        super().__init__()
         self.client = bigModel_api()
 
     def request_video(self,prompt,image_url = None):
@@ -40,8 +39,8 @@ class zhipu_video(example_plugin):
         raise ValueError("超过最大请求次数，仍未请求到视频!")
 
 
-    async def main(self,user_input,qq_TestGroup,data):
-        self.store(user_input,qq_TestGroup,data)
+    async def main(self,user_input,qq_TestGroup,data,basics):
+        self.store(user_input,qq_TestGroup,data,basics)
         self.basics.Command.verifyParameter(
             self.argument,
             parameter_quantity_max_1=0, parameter_quantity_min_1=0, 

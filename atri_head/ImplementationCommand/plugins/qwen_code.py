@@ -55,7 +55,6 @@ class qwen_code(example_plugin):
     """聊天记录"""
 
     def __init__(self):
-        super().__init__()
         self.OpenAI_api = OpenAI_api(self.api_key, self.base_url, self.tools)
 
     def append_message(self,role,content):
@@ -88,9 +87,9 @@ class qwen_code(example_plugin):
         return f"当前时间：{formatted_time}。"
 
     
-    async def main(self,qq_TestGroup,user_input,data):
+    async def main(self,qq_TestGroup,user_input,data,basics):
         """可调用python的ai"""
-        self.store(user_input,qq_TestGroup,data)
+        self.store(user_input,qq_TestGroup,data,basics)
         self.basics.Command.verifyParameter(
             self.argument,
             parameter_quantity_max_1=1, parameter_quantity_min_1=0, 

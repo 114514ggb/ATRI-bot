@@ -1,10 +1,14 @@
 from .simple_commands import *
+from ..Basics import Basics
 import multiprocessing
 import asyncio
 import os
 
 class command_processor():
     """指令处理器"""
+    def __init__(self):
+        self.basics = Basics()
+
     # "/manage""/管理"添加管理员权限或黑名单
     command_list = {
         "/help":"1001","/帮助":"1001",
@@ -52,12 +56,12 @@ class command_processor():
     async def command_processing(self,user_input,qq_id,data):
         """处理执行用户输入指令"""
         try:
-            def_id ,command = basics.Command.receive_command(user_input, data['user_id'], self.command_list)
+            def_id ,command = self.basics.Command.receive_command(user_input, data['user_id'], self.command_list)
 
             try:
                 if def_id in self.def_list:
 
-                    await self.def_list[def_id](user_input=user_input, qq_TestGroup=qq_id, data=data)
+                    await self.def_list[def_id](user_input=user_input, qq_TestGroup=qq_id, data=data, basics=self.basics)
                     print(f"ATRI:指令:{command},执行成功!")
                     return "ok"
 
@@ -65,11 +69,11 @@ class command_processor():
                     raise Exception("该指令已经注册,但是没有实现")
 
             except Exception as e:
-                await basics.QQ_send_message.send_group_message(qq_id,"执行指令出错了，请稍后再试!😰\nType Error:"+str(e))
+                await self.basics.QQ_send_message.send_group_message(qq_id,"执行指令出错了，请稍后再试!😰\nType Error:"+str(e))
                 return "no"
 
         except Exception as e:
-            await basics.QQ_send_message.send_group_message(qq_id,"ATRI用手挠了挠脑袋,表示不理解这个指令😕\nType Error:"+str(e))
+            await self.basics.QQ_send_message.send_group_message(qq_id,"ATRI用手挠了挠脑袋,表示不理解这个指令😕\nType Error:"+str(e))
             return "no"
 
     def Load_additional_commands(self):

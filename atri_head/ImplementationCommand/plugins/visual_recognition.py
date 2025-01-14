@@ -10,15 +10,14 @@ class visual_recognition(example_plugin):
     messages = []
 
     def __init__(self):
-        super().__init__()
         self.openai = bigModel_api()
 
     def Request_answer(self):
         """请求回答"""
         return self.openai.generate_text(self.model, self.messages)
     
-    async def main(self,qq_TestGroup,user_input,data):
-        self.store(user_input,qq_TestGroup,data)
+    async def main(self,qq_TestGroup,user_input,data,basics):
+        self.store(user_input,qq_TestGroup,data,basics)
         self.basics.Command.verifyParameter(
             self.argument,
             parameter_quantity_max_1=0, parameter_quantity_min_1=0, 

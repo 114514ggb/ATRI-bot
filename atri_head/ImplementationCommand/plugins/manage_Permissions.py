@@ -28,8 +28,8 @@ class manage_Permissions(example):
         "black": "黑名单"
     }
 
-    async def manage_Permissions(self, user_input, qq_TestGroup, data):
-        self.store(user_input, qq_TestGroup, data)
+    async def manage_Permissions(self, user_input, qq_TestGroup, data, basics):
+        self.store(user_input, qq_TestGroup, data, basics)
         argument1, _, argument2, _ = self.basics.Command.verifyParameter(
             self.argument,
             parameter_quantity_max_1=1,

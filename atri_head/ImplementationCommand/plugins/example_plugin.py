@@ -12,10 +12,9 @@ class example_plugin():
     data = None
     argument = None
 
-    def __init__(self):
-        self.basics = Basics()
-
-    def store(self,user_input,qq_TestGroup,data):
+    def store(self,user_input,qq_TestGroup,data,basics:Basics):
+        """插件初始化"""
+        self.basics = basics
         self.user_input = user_input
         self.qq_TestGroup = qq_TestGroup
         self.data = data

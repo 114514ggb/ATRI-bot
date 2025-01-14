@@ -48,7 +48,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_image_message",
-            "description": "当你想画画时非常有用,可以按照你的描述生成一张图片，然后发送出去。",
+            "description": "这是你的画板,当你想画画时非常有用,可以按照你的描述生成一张图片，然后发送出去。",
             "parameters": {            
                 "type": "object",
                 "properties": {
