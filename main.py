@@ -12,8 +12,9 @@ playRole = "ATRI"
 # model = "qwen2.5:32b"
 
 qq_white_list = [1062704755,984466158] # qq群白名单
-qq_white_list.append(235984211) #形形色色的群
+# qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(946533123) #狗熊岭
+qq_white_list.append(936819059) #真爱协会
 
 
 ATRI = group_message_processing(base_url, token, playRole)
@@ -21,6 +22,7 @@ ATRI = group_message_processing(base_url, token, playRole)
 
 def run_atrib_main(data, qq_white_list):
     asyncio.run(ATRI.main(data, qq_white_list))
+
 
 @app.post("/")
 async def receive_event(data: dict): 
