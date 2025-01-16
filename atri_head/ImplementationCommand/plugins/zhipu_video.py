@@ -39,15 +39,12 @@ class zhipu_video(example_plugin):
         raise ValueError("超过最大请求次数，仍未请求到视频!")
 
 
+    @example_plugin.store_verify_parameters(
+        parameter_quantity_max_2=10,parameter_quantity_min_2=1,
+    )
     async def main(self,user_input,qq_TestGroup,data,basics):
-        self.store(user_input,qq_TestGroup,data,basics)
-        self.basics.Command.verifyParameter(
-            self.argument,
-            parameter_quantity_max_1=0, parameter_quantity_min_1=0, 
-            parameter_quantity_max_2=10, parameter_quantity_min_2=1,
-        )
 
-        prompt = " ".join(self.argument[1])
+        prompt = " ".join(self.other_argument)
         id = None
 
         for message in data["message"]:

@@ -86,16 +86,12 @@ class qwen_code(example_plugin):
 
         return f"当前时间：{formatted_time}。"
 
-    
+    @example_plugin.store_verify_parameters(
+        parameter_quantity_max_1=0,parameter_quantity_min_1=0,
+        parameter_quantity_max_2=100,parameter_quantity_min_2=1,
+    )
     async def main(self,qq_TestGroup,user_input,data,basics):
         """可调用python的ai"""
-        self.store(user_input,qq_TestGroup,data,basics)
-        self.basics.Command.verifyParameter(
-            self.argument,
-            parameter_quantity_max_1=1, parameter_quantity_min_1=0, 
-            parameter_quantity_max_2=100, parameter_quantity_min_2=1,
-        )
-
         self.append_message("user",' '.join(self.argument[1]))
         back_message = self.Request_answer()
         print(back_message)

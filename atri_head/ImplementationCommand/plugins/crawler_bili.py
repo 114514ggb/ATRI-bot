@@ -15,13 +15,10 @@ class crawler_bili(example):
     }
     """bilibili请求头"""
 
+    @example.store_verify_parameters(
+        parameter_quantity_max_2=10, parameter_quantity_min_2 = 1,
+    )
     async def crawler_bili(self, user_input, qq_TestGroup, data, basics):
-        self.store(user_input, qq_TestGroup, data, basics)
-        self.basics.Command.verifyParameter(
-            self.argument,
-            parameter_quantity_max_1=0, parameter_quantity_min_1=0, 
-            parameter_quantity_max_2=1, parameter_quantity_min_2=1,
-        )
 
         url = self.argument[1][0]
 

@@ -157,7 +157,7 @@ async def sing(user_input,qq_TestGroup,data,basics:Basics):
         "永远不会放弃你":"永远不会放弃你.mp4",
         "这么可爱真是抱歉":"这么可爱真是抱歉.mp4",
         "蓝书签之歌":"蓝书签之歌.mp4",
-        "隐形的翅膀":"隐形的翅膀.mp4",
+        "隐形的翅膀":"隐形的翅膀.mp3",
         "Don't be so serious":"别那么认真了.mp4",
         "一路生花":"一路生花.mp4",
         "Humble":"Humble.mp4",
@@ -182,6 +182,9 @@ async def sing(user_input,qq_TestGroup,data,basics:Basics):
         "恭喜你苏卡不列":"恭喜你苏卡不列.mp3",
         "Mystic_Light_Quest":"Mystic_Light_Quest.mp3",
         "520AM":"520AM.mp3",
+        "stay":"stay.mp3",
+        "晴天":"晴天.mp3",
+        "Dear_Moments":"Dear_Moments.wav",
     }
 
     argument= basics.Command.processingParameter(user_input)

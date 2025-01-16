@@ -15,14 +15,12 @@ class visual_recognition(example_plugin):
     def Request_answer(self):
         """请求回答"""
         return self.openai.generate_text(self.model, self.messages)
-    
+
+    @example_plugin.store_verify_parameters(
+        parameter_quantity_max_1=0,parameter_quantity_min_1=0,
+        parameter_quantity_max_2=100,parameter_quantity_min_2=0,
+    )
     async def main(self,qq_TestGroup,user_input,data,basics):
-        self.store(user_input,qq_TestGroup,data,basics)
-        self.basics.Command.verifyParameter(
-            self.argument,
-            parameter_quantity_max_1=0, parameter_quantity_min_1=0, 
-            parameter_quantity_max_2=100, parameter_quantity_min_2=0,
-        )
 
         for message in data["message"]:
 
@@ -33,7 +31,7 @@ class visual_recognition(example_plugin):
                 with open(img_path, 'rb') as img_file:
                     img_base = base64.b64encode(img_file.read()).decode('utf-8')
 
-                string = ' '.join(self.argument[1])
+                string = ' '.join(self.other_argument)
                 if string == "":
                     string = "请详细描述这个图片，如果上面有文字也要详细说清楚"
                     

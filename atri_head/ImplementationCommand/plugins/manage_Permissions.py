@@ -28,28 +28,25 @@ class manage_Permissions(example):
         "black": "黑名单"
     }
 
+    @example.store_verify_parameters(
+        parameter_quantity_max_1=1,parameter_quantity_min_1=1,
+        parameter_quantity_max_2=2,parameter_quantity_min_2=1,
+    )
     async def manage_Permissions(self, user_input, qq_TestGroup, data, basics):
-        self.store(user_input, qq_TestGroup, data, basics)
-        argument1, _, argument2, _ = self.basics.Command.verifyParameter(
-            self.argument,
-            parameter_quantity_max_1=1,
-            parameter_quantity_min_1=1,
-            parameter_quantity_max_2=2,
-            parameter_quantity_min_2=1,
-        )
         self.people = data["user_id"]
     
+        print(self.minus_argument,self.other_argument)
         action = None
         role = None
         Be_operated_qq = None
 
-        if argument1[0] in self.action_map:
-            action = self.action_map[argument1[0]]
+        if self.minus_argument[0] in self.action_map:
+            action = self.action_map[self.minus_argument[0]]
             if action in ["添加", "删除"]:
-                Be_operated_qq = int(argument2[1])
+                Be_operated_qq = int(self.other_argument[1])
 
-        if argument2[0] in self.role_map:
-            role = self.role_map[argument2[0]]
+        if self.other_argument[0] in self.role_map:
+            role = self.role_map[self.other_argument[0]]
 
         # 执行操作
         text = self.handle_operation(action, role, Be_operated_qq,qq_TestGroup)

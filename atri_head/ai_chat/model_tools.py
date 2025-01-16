@@ -31,13 +31,13 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "可以将文本内容转换为语音并发送出去，让你可以发出声音。",
+            "description": "可以将文本内容转换为语音并发送出去，让你可以发出声音。只支持中文和英文日语。",
             "parameters": {            
                 "type": "object",
                 "properties": {
                     "message": {
                         "type": "string",
-                        "description": "需要发送消息的文本内容",
+                        "description": "需要发送消息的文本内容，只支持中文和英文日语",
                     }
                 }
             },
@@ -72,6 +72,7 @@ import json
 
 class tool_calls:
     code_url = "document\code.py"
+    """python代码运行路径"""
 
     def __init__(self):
         self.passing_message = QQ_send_message()
@@ -97,7 +98,6 @@ class tool_calls:
                 return self.tool_functions[tool_name](**json.loads(arguments_str))
             
         else:
-            print("Unknown tool")
             Exception("Unknown tool")
                 
     def get_python_code_result(self,code:str):

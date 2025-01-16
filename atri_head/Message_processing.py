@@ -17,6 +17,7 @@ class group_message_processing():
         """主消息处理函数"""
         if 'group_id' in data and data['group_id'] in qq_white_list: # 判断是否在白名单中
 
+            print("Received event:", data)
             qq_TestGroup = data['group_id']
             message = ""
 

@@ -9,17 +9,14 @@ class zhipu_picture(example_plugin):
 
     def __init__(self):
         self.client = ZhipuAI(api_key=api_key)
-    
+
+    @example_plugin.store_verify_parameters(
+        parameter_quantity_max_2=10,parameter_quantity_min_2=1,
+    )
     async def main(self,user_input,qq_TestGroup,data, basics):
         """画图主函数"""
-        self.store(user_input,qq_TestGroup,data,basics)
-        self.basics.Command.verifyParameter(
-            self.argument,
-            parameter_quantity_max_1=0, parameter_quantity_min_1=0, 
-            parameter_quantity_max_2=10, parameter_quantity_min_2=1,
-        )
 
-        prompt = " ".join(self.argument[1])
+        prompt = " ".join(self.other_argument)
 
         response = self.client.images.generations(
             model="CogView-3-Flash", 
