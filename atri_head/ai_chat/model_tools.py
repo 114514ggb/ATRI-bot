@@ -3,28 +3,17 @@ tools = [
         "type": "function",
         "function": {
             "name": "get_python_code_result",
-            "description": "当你想知道python代码运行结果时非常有用。但是不要使用这个工具来运行恶意代码,或者运行需要大量计算资源的代码,如果有数学问题请用这个工具来计算一下",
+            "description": "当你想知道python代码运行结果时非常有用。如果有数学问题或编程能解决的问题请写一段代码来获取正确结果。返回给你终端的结果,记得print结果不然你什么也得不到。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "需要运行的python代码,记得print输出结果",
+                        "description": "需要运行的python代码,记得print结果",
                     }
                 }
             },
             "required": ["code"]
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_time",
-            "description": "当你想知道现在的时间时非常有用。",
-            "parameters": {            
-                "type": "None",
-                "properties": "None"
-            },
         }
     },
     {
@@ -68,39 +57,107 @@ from datetime import datetime
 from ..Basics.qq_send_message import QQ_send_message
 from gradio_client import Client
 from .bigModel_api import bigModel_api
+import importlib.util
+import os
 import json
 
 class tool_calls:
     code_url = "document\code.py"
     """python代码运行路径"""
+    tools = tools
 
     def __init__(self):
         self.passing_message = QQ_send_message()
-        self.model = bigModel_api(tools=tools)
-        self.tool_functions = {
+        self.tools_functions_dict = {
             'get_python_code_result': self.get_python_code_result,
-            'get_current_time': self.get_current_time,
         }
-        self.tool_functions_async = {
+        self.tools_functions_dict_qq = {
             'send_speech_message': self.send_speech_message,
             'send_image_message': self.send_image_message,
         }
+        self.load_additional_tools() # 加载额外工具
+        self.model = bigModel_api(tools=self.tools)
 
     async def calls(self, tool_name, arguments_str, qq_TestGroup):
         """调用工具"""
-        if tool_name in self.tool_functions|self.tool_functions_async:
+        if tool_name in self.tools_functions_dict|self.tools_functions_dict_qq:
 
             if arguments_str == "{}":   
-                return self.tool_functions[tool_name]()
-            elif tool_name in self.tool_functions_async: 
-                return await self.tool_functions_async[tool_name](**(json.loads(arguments_str)|{"qq_TestGroup":qq_TestGroup})) #异步调用
+                return await self.tools_functions_dict[tool_name]()
+            elif tool_name in self.tools_functions_dict_qq: 
+                return await self.tools_functions_dict_qq[tool_name](**(json.loads(arguments_str)|{"qq_TestGroup":qq_TestGroup}))
             else:
-                return self.tool_functions[tool_name](**json.loads(arguments_str))
+                return await self.tools_functions_dict[tool_name](**json.loads(arguments_str))
             
         else:
             Exception("Unknown tool")
+
+    def load_additional_tools(self):
+        """加载额外工具"""
+        tools_functions_dict, tools_json = self.get_files_in_folder()
+        self.tools_functions_dict.update(tools_functions_dict)
+        self.tools = tools_json + self.tools
+
+
+    def get_files_in_folder(self):
+        """获取返回文件夹中的所有工具函数和工具json"""
+
+        folder_path = "atri_head\\ai_chat\\tools\\"
+        module_name = "main"
+        tools_functions_dict = {}
+        tools_json = []
+
+        for name in os.listdir(folder_path):
+            if os.path.isdir(os.path.join(folder_path, name)):
+
+                file_path = f"atri_head\\ai_chat\\tools\\{name}\\__init__.py"
+
+                spec = importlib.util.spec_from_file_location(module_name, file_path)
                 
-    def get_python_code_result(self,code:str):
+                if spec is None:
+                    raise Exception(f"导入模块{file_path} 失败！")
+
+                module = importlib.util.module_from_spec(spec)
+
+                spec.loader.exec_module(module)
+
+                func = getattr(module, module_name, None)
+                if func is None:
+                    raise Exception(f"获取模块{file_path}中的函数{module_name} 失败！")
+                
+                tool_json = getattr(module, "tool_json", None)
+                if tool_json is None:
+                    raise Exception(f"获取模块{file_path}中的函数tool_json 失败！")
+                
+                tools_json.append(self.generate_integrity_tools_json(tool_json))
+
+                tools_functions_dict[name] = func
+
+        return tools_functions_dict,tools_json
+
+    def generate_integrity_tools_json(self,tool_json):
+        """生成工具完整json"""
+
+        tool_json_integrity = {
+            "type": "function",
+            "function": {
+                "name": tool_json["name"],
+                "description": tool_json["description"],
+                "parameters": {
+                    "type": "object",
+                    "properties": tool_json["properties"],
+                }
+            }
+        }
+
+        if tool_json["properties"] is None:
+            tool_json_integrity["function"]["parameters"] = {"type": "None","properties": "None"}
+        else:
+            tool_json_integrity["function"]["required"] = list(tool_json["properties"].keys())
+
+        return tool_json_integrity
+    
+    async def get_python_code_result(self,code:str):
         """获取python代码运行结果"""
         with open(self.code_url, "w", encoding='utf-8') as f:
             f.write(code)
@@ -112,28 +169,19 @@ class tool_calls:
         else:
             return {"command_line_interface":result.stdout}
     
-    def get_current_time(self):
-        """获取当前时间"""
-
-        current_datetime = datetime.now()
-
-        formatted_time = current_datetime.strftime('%Y-%m-%d %H:%M:%S')
-
-        return {"北京_time":formatted_time}
-    
     async def send_speech_message(self, message, qq_TestGroup):
         """发送语音消息"""
         url = self.text_to_speech(message)
         await self.passing_message.send_group_audio(qq_TestGroup, url)
 
-        return {"message": "语音消息已发送"}
+        return {"speech_message": "语音消息已发送"}
     
     async def send_image_message(self, prompt, qq_TestGroup):
         """生成发送图片消息"""
         url = self.model.generate_image(prompt)['data'][0]['url']
         await self.passing_message.send_group_pictures(qq_TestGroup,url,local_Path_type=False)
         print("图片发送成功")
-        return {"message": "图片消息已发送"}
+        return {"image_message": "图片消息已发送"}
     
     def text_to_speech(self, text):
         """文本转语音,返回语音路径"""

@@ -7,7 +7,7 @@ class example_plugin():
     authority_level = 1
     """执行需求的权限等级,0为所有人,1为游客,2为管理员,3为root"""
     register_order = ["/plugin","/插件"]
-    """注册的命令"""
+    """插件注册的触发命令"""
     user_input = None
     """用户输入（纯文本）"""
     qq_TestGroup = None

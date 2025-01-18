@@ -10,11 +10,11 @@ class textMonitoring():
 
     async def monitoring(self, text, qq_TestGroup,data):
         """监控并产生对应的反映"""
-        if await self.alikeRespond(text, qq_TestGroup):
+        if await self.monitoringItem(qq_TestGroup,data):
             return True
         elif await self.haveRespond(text, qq_TestGroup):
             return True
-        elif await self.monitoringItem(qq_TestGroup,data):
+        elif await self.alikeRespond(text, qq_TestGroup):
             return True
         return False
 
@@ -56,7 +56,7 @@ class textMonitoring():
             await self.basics.QQ_send_message.send_group_audio(qq_TestGroup, document, True)
 
     monitoring_alike_list = {
-        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg"]],["text",["?"]]],
+        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png"]],["text",["?"]]],
         "草": [["text",["草"]]],
         "艹": [["text",["艹"]]],
         "怪了": [["text",["怪了"]]],
@@ -92,8 +92,10 @@ class textMonitoring():
         "好看": [["text",["好看!"]]],
         "出拳": [["img",["ATRI_吃我一拳.gif"]]],
         "也是": [["text",["也是"]]],
+        "我的天": [["text",["我的天!"]]],
         "true": [["img",["ATRI_正确的.jpg"]]],
         "原神": [["text",["启动喵！","启动","玩原玩的？喵！"]]],
+        "抱抱": [["text",["抱抱~","只有夏生才能哦！喵！","阔咩！不行哦！"]]],
     }
     '''精确匹配列表'''
 
@@ -106,7 +108,7 @@ class textMonitoring():
         "高性能": [["img",["ATRI_高性能.png","ATRI_得意.gif","ATRI_自我陶醉.gif"]]],
         "Ciallo": [["img",["ATRI_Ciallo.jpg"]]],
         "废物":[["img",["ATRI_欺负我你能得到什么.jpg","ATRI_ 气鼓鼓.gif","ATRI_生气到爆.gif","ATRI_怎么你了.jpg","ATRI_违反机器人保护法.jpg"]]],
-        "亚托莉": [["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif"]]],
+        "亚托莉": [["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif","ATRI_惊讶.gif"]]],
         "变态": [["img",["ATRI_变态.gif","你太变态.jpg"]]],
         "哼哼啊": [["img",["ATRI_恶臭1145.jpg"]]],
         "圣诞": [["img",["ATRI_过圣诞.gif"]]],
@@ -126,9 +128,11 @@ class textMonitoring():
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
         "无敌了":[["text",["无敌了!","无敌了"]]],
         "让世界感受痛苦":[["img",["ATRI_地爆天星.jpg"]]],
-        "阿这":[["img",["ATRI_没办法给你解释.jpg"]],["text",["啊这?"]]],
+        "阿这":[["img",["ATRI_没办法给你解释.jpg","ATRI_惊讶.gif"]],["text",["啊这?"]]],
         "我来":[["img",["ATRI_放心交给我吧.gif"]]],
         "正确": [["img",["ATRI_正确的.jpg"]]],
+        "笑死我了":[["text",["你死了？乐死我了"]]],
+        "二次元":[["img",["ATRI_和我一起去二次元.jpg"]]],
     }
     '''模糊匹配列表'''
 

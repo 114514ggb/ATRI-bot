@@ -185,6 +185,9 @@ async def sing(user_input,qq_TestGroup,data,basics:Basics):
         "stay":"stay.mp3",
         "晴天":"晴天.mp3",
         "Dear_Moments":"Dear_Moments.wav",
+        "亲爱的你":"亲爱的你.mp3",
+        "ツバサ":"ツバサ.mp3",
+        "我爱你上海蟹":"我爱你上海蟹.mp3",
     }
 
     argument= basics.Command.processingParameter(user_input)

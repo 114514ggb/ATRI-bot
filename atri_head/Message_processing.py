@@ -70,6 +70,7 @@ class group_message_processing():
         if  data['user_id'] != data['self_id']: #排除自己发送的消息
 
             await self.textMonitoring.monitoring(message,qq_TestGroup,data)
+
             
                     
 
