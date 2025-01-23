@@ -5,17 +5,19 @@ import time
 
 class group_message_processing():
     """群消息处理类"""
-    
-    def __init__(self,base_url, token, playRole):
-        self.basics = Basics(base_url, token, playRole)
+    qq_white_list = [] #qq白名单
+
+    def __init__(self, playRole, http_base_url = None, token= None, connection_type = "http",qq_white_list = []):
+        self.qq_white_list = qq_white_list
+        self.basics = Basics(http_base_url, token, playRole, connection_type)
         self.command_processor = command_processor()
         self.textMonitoring = textMonitoring()
         self.basics.Command.syncing_locally()#同步数据库
         self.command_processor.Load_additional_commands()#加载额外指令
 
-    async def main(self,data,qq_white_list):
+    async def main(self,data):
         """主消息处理函数"""
-        if 'group_id' in data and data['group_id'] in qq_white_list: # 判断是否在白名单中
+        if 'group_id' in data and data['group_id'] in self.qq_white_list: # 判断是否在白名单中
 
             print("Received event:", data)
             qq_TestGroup = data['group_id']
@@ -36,13 +38,13 @@ class group_message_processing():
                 await self.receive_event(data,qq_TestGroup,message) #非at@事件处理
 
         elif 'self_id' in data:
-            print("其他消息")
+            pass
+            # print("其他消息")
 
     async def receive_event_at(self,data,qq_TestGroup,message):
         """at@事件处理"""  
 
-        if "/" in message:#命令处理
-
+        if message[0:2] == " /":#命令处理
             # await self.command_processor.main(message,qq_TestGroup,data)#测试，执行指令时创建一个新进程
 
             start_time = time.perf_counter()

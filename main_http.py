@@ -2,9 +2,11 @@ from fastapi import FastAPI
 import uvicorn,asyncio,threading
 from atri_head.Message_processing import group_message_processing
 
+
 app = FastAPI()
 
-base_url = "http://localhost:8088"
+
+http_base_url = "http://localhost:8088"
 token = "ATRI114514"
 playRole = "ATRI"
 # model = "gemma2:9b"
@@ -17,11 +19,11 @@ qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(936819059) #真爱协会
 
 
-ATRI = group_message_processing(base_url, token, playRole)
+ATRI = group_message_processing(http_base_url=http_base_url, token=token, playRole=playRole, connection_type="http", qq_white_list = qq_white_list)
 
 
 def run_atrib_main(data, qq_white_list):
-    asyncio.run(ATRI.main(data, qq_white_list))
+    asyncio.run(ATRI.main(data))
 
 
 @app.post("/")

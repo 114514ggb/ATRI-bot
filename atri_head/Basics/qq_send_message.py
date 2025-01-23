@@ -1,25 +1,36 @@
 import json
 import httpx
+import uuid
+import asyncio
+from ..Basics.WebSocketClient import WebSocketClient
 
 class QQ_send_message():
     _instance = None
-    access_token = ""
-    base_url = "" # API地址
     File_root_directory = "E:/程序文件/python/ATRI/document/"
-
+    
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(QQ_send_message, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self,token = "ATRI114514",base_url = "http://localhost:8080"):
+    def __init__(self,token = "ATRI114514",http_base_url = "http://localhost:8080",connection_type = "http"):
         if not hasattr(self, "_initialized"):
-            self.access_token = token
-            self.base_url = base_url
-            self.headers = {
-                'Content-Type':'application/json',
-                'Authorization': 'Bearer '+self.access_token,
-            }
+            if connection_type == "http":
+
+                self.access_token = token
+                self.http_base_url = http_base_url
+                self.headers = {
+                    'Content-Type':'application/json',
+                    'Authorization': 'Bearer '+self.access_token,
+                }
+
+            elif connection_type == "WebSocket":
+                self.websocketClient = WebSocketClient()
+            else:
+                print("连接类型错误")
+                raise Exception("连接类型错误")
+                
+            self.connection_type = connection_type # 连接类型
             self._initialized = True
 
     # def send(self, url, payload):
@@ -33,27 +44,47 @@ class QQ_send_message():
     #     except requests.RequestException as e:
     #         print("请求失败:", e)
         
-    async def async_send(self, url, payload):
+    async def async_send(self, url, payload, echo = None):
         """发送异步请求,返回json"""
-        try:
-            async with httpx.AsyncClient() as client:
-                response = await client.post(url, data=payload, headers=self.headers)
-                if response.status_code == 200:
-                    print("消息发送成功")
-                    return response.json()
-                else:
-                    print(f"发送消息失败 {response.status_code} {response.text}")
-        except httpx.HTTPError as e:
-            print("请求失败:", e)
+        if self.connection_type == "http":
+            url = f"{self.http_base_url}/{url}"
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(url, data=json.dumps(payload), headers=self.headers)
+                    if response.status_code == 200:
+                        print("消息发送成功")
+                        return response.json()
+                    else:
+                        print(f"发送消息失败 {response.status_code} {response.text}")
+            except httpx.HTTPError as e:
+                print("请求失败:", e)
+        else:
+
+            message = {
+                "action": url,
+                 # 'access_token': self.access_token,
+                "params": payload
+            }
+
+            if echo != None:
+                message["echo"] = echo
+
+            try:
+
+                await self.websocketClient.websocket.send(json.dumps(message))
+                print("消息发送成功")
+                
+            except Exception as e:
+                print("发送消息失败:", e)
 
     async def send_group_message(self,group_id, message):
         """发送群聊文字消息"""
-        url = f"{self.base_url}/send_group_msg"
+        url = "send_group_msg"
         
-        params = json.dumps({
+        params = {
             "group_id": group_id,
             "message": message,
-        })
+        }
 
         await self.async_send(url,params)
         # self.send(url,params)
@@ -90,8 +121,8 @@ class QQ_send_message():
             Path_type = "file://"
             
 
-        url = f"{self.base_url}/send_group_msg"
-        payload =json.dumps({
+        url = "send_group_msg"
+        payload ={
             "group_id": qq_TestGroup,
             "message": [
                 {
@@ -101,20 +132,27 @@ class QQ_send_message():
                     }
                 }
             ],
-        })
+        }
         
         await self.async_send(url=url,payload=payload)
         # self.send(url,payload)
 
     async def send_img_details(self,file_id):
         """获取图片消息详情"""
-        url = f"{self.base_url}/get_image"
+        url = "get_image"
 
-        payload = json.dumps({
-            "file": file_id,
-        })
+        payload = {
+            "file_id": file_id,
+        }
 
-        return await self.async_send(url=url,payload=payload)
+        if self.connection_type == "http":
+            return await self.async_send(url=url,payload=payload)
+        else:
+            request_id = str(uuid.uuid4())
+            await self.async_send(url=url,payload=payload,echo = request_id)
+
+            return await self.websocketClient.gain_echo(request_id)
+            
         
 
     async def group_message_request(self,group_id,type,file_url,Path_type = True):
@@ -125,8 +163,8 @@ class QQ_send_message():
         else:
             Path_type = ""
 
-        url = f"{self.base_url}/send_group_msg"
-        payload =json.dumps({
+        url = "send_group_msg"
+        payload ={
             "group_id": group_id,
             "message": [
                 {
@@ -136,15 +174,15 @@ class QQ_send_message():
                     }
                 }
             ],
-        })
+        }
 
         await self.async_send(url=url,payload = payload)
         # self.send(url,payload)
 
     async def Send_personal_message(self,qq_id, data,type):
         """发送私聊消息"""
-        url = f"{self.base_url}/send_private_msg"
-        payload = json.dumps({
+        url = "send_private_msg"
+        payload = {
             "user_id": qq_id,
             "message": [
                 {
@@ -152,7 +190,7 @@ class QQ_send_message():
                     "data": data,
                 }
             ],
-        })
+        }
 
         await self.async_send(url=url,params=payload)
         # self.send(url,payload)
