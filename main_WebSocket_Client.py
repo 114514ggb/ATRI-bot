@@ -13,15 +13,15 @@ qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(936819059) #真爱协会
 
 async def client():
+    # 创建一个WebSocket客户端实例，传入WebSocket的URL和访问令牌
     my_client = WebSocketClient(uri = ws_url, access_token = access_token)
     ATRI = group_message_processing(playRole = playRole, connection_type = "WebSocket", qq_white_list = qq_white_list)
 
-    while True:
-        await my_client.connect()
+    await my_client.connect()
 
-        my_client.add_listener(ATRI.main)
+    my_client.add_listener(ATRI.main)
 
-        await my_client.start_while()
+    await my_client.start_while()
 
         # def run_atrib_main(data, qq_white_list):
         #     asyncio.run(ATRI.main(data, qq_white_list))

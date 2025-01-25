@@ -65,7 +65,7 @@ class bigModel_api:
             messages = my_messages,
             stream = self.model_parameters['stream'],
             top_p = self.model_parameters['top_p'],
-            temperature = self.model_parameters['temperature'],
+            # temperature = self.model_parameters['temperature'],
         )
 
         return completion.model_dump()
@@ -77,7 +77,7 @@ class bigModel_api:
             messages = my_messages,
             stream = self.model_parameters['stream'],
             top_p = self.model_parameters['top_p'],
-            temperature = self.model_parameters['temperature'],
+            # temperature = self.model_parameters['temperature'],
             stop= self.model_parameters['stop'],
             response_format= response_format,
             tools = self.tools,

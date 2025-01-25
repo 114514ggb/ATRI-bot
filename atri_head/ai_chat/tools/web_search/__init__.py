@@ -16,8 +16,7 @@ tool_json = {
 
 async def main(key_word):
     print(key_word)
-    search_result = await web_search(key_word)
-    return {"web_search": search_result}
+    return {"web_search": await web_search(key_word)}
 
 async def web_search(key_word):
     """分条返回关键词的搜索结果"""

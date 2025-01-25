@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket
 import uvicorn,asyncio,threading
 from atri_head.Message_processing import group_message_processing
 
@@ -22,7 +22,7 @@ qq_white_list.append(235984211) #形形色色的群
 ATRI = group_message_processing(http_base_url=http_base_url, token=token, playRole=playRole, connection_type="http", qq_white_list = qq_white_list)
 
 
-def run_atrib_main(data, qq_white_list):
+def run_atrib_main(data):
     asyncio.run(ATRI.main(data))
 
 
@@ -30,9 +30,35 @@ def run_atrib_main(data, qq_white_list):
 async def receive_event(data: dict): 
     # print("Received event:", data)
 
-    threading.Thread(target=run_atrib_main, args=(data, qq_white_list)).start()
+    threading.Thread(target=run_atrib_main, args=(data)).start()
 
     return "OK", 200
+
+
+@app.websocket("/websocket")
+async def websocket_endpoint(websocket: WebSocket):
+
+    access_token = websocket.query_params.get("access_token")
+    
+    if not access_token:
+        await websocket.close(code=1008)  # 1008 表示权限错误
+        return
+    elif access_token != token:
+        await websocket.close(code=1008)
+        return
+    
+    await websocket.accept()
+    
+    try:
+        while True:
+
+            data = await websocket.receive_text()
+            await websocket.send_text(f"Message received: {data}")
+
+    except Exception as e:
+        print(f"WebSocket 错误: {e}")
+    finally:
+        await websocket.close()
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=3000)
