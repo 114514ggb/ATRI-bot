@@ -56,7 +56,7 @@ class textMonitoring():
             await self.basics.QQ_send_message.send_group_audio(qq_TestGroup, document, True)
 
     monitoring_alike_list = {
-        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png"]],["text",["?"]]],
+        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg"]],["text",["?"]]],
         "草": [["text",["草"]]],
         "艹": [["text",["艹"]]],
         "怪了": [["text",["怪了"]]],
@@ -126,7 +126,7 @@ class textMonitoring():
         "废物":[["img",["ATRI_欺负我你能得到什么.jpg","ATRI_ 气鼓鼓.gif","ATRI_生气到爆.gif","ATRI_怎么你了.jpg","ATRI_违反机器人保护法.jpg","ATRI_别骂了.jpg"]]],
         "晚安":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚上好，晚安！我也要睡觉啦~"]]],
         "早安": [["text",["早上好！","早上好呀！","早上好，今天也要元气满满哦！"]]],
-        "亚托莉": [["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif","ATRI_惊讶.gif","ATRI_加载0%.jpg"]]],
+        "亚托莉": [["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif","ATRI_惊讶.gif","ATRI_加载失败.jpg"]]],
         "变态": [["img",["ATRI_变态.jpg","你太变态.jpg"]]],
         "哼哼啊": [["img",["ATRI_恶臭1145.jpg"]]],
         "圣诞": [["img",["ATRI_过圣诞.gif"]]],
@@ -147,7 +147,7 @@ class textMonitoring():
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
         "无敌了":[["text",["无敌了!","无敌了"]]],
         "让世界感受痛苦":[["img",["ATRI_地爆天星.jpg"]]],
-        "阿这":[["img",["ATRI_没办法给你解释.jpg","ATRI_惊讶.gif"]],["text",["啊这?"]]],
+        "啊这":[["img",["ATRI_没办法给你解释.jpg","ATRI_惊讶.gif"]],["text",["啊这?"]]],
         "我来":[["img",["ATRI_放心交给我吧.gif","ATRI_敬礼.gif"]]],
         "正确": [["img",["ATRI_正确的.jpg"]]],
         "笑死我了":[["text",["笑死你了？"]]],
@@ -161,6 +161,9 @@ class textMonitoring():
         "yes": [["img",["ATRI_yes.jpg"]]],
         "蚌埠": [["text",["难蚌"]]],
         "鬼": [["img",["ATRI_当鬼.gif"]]],
+        "不信": [["img",["ATRI_不相信你的鬼话.jpg"]]],
+        "猫咪": [["img",["ATRI_猫咪爪子.gif"]]],
+        "失败": [["img",["ATRI_加载失败.jpg"]]],
     }
     '''模糊匹配列表'''
 

@@ -53,7 +53,16 @@ class OpenAI_api:
         )
 
         return completion.model_dump()
-    
+
+    def generate_text(self, my_model, my_messages):
+        """请求生成文本,全部默认。"""
+        completion = self.client.chat.completions.create(
+            model = my_model, 
+            messages = my_messages,
+        )
+
+        return completion.model_dump()
+
     def generate_text_argument(self, my_model, my_messages):
         """请求生成文本，带自定义参数"""
         completion = self.client.chat.completions.create(
@@ -68,17 +77,17 @@ class OpenAI_api:
 
         return completion.model_dump()
     
-    def generate_text_tools(self, my_model, my_messages, response_format  = None):
+    def generate_text_tools(self, my_model, my_messages):
         """请求生成文本,带工具,可带格式，带自定义参数"""
         completion = self.client.chat.completions.create(
             model = my_model, 
             messages = my_messages,
-            stream = self.model_parameters['stream'],
-            frequency_penalty = self.model_parameters['frequency_penalty'],
-            top_p = self.model_parameters['top_p'],
-            temperature = self.model_parameters['temperature'],
-            max_tokens = self.model_parameters['max_tokens'],
-            response_format = response_format,
+            # stream = self.model_parameters['stream'],
+            # frequency_penalty = self.model_parameters['frequency_penalty'],
+            # top_p = self.model_parameters['top_p'],
+            # temperature = self.model_parameters['temperature'],
+            # max_tokens = self.model_parameters['max_tokens'],
+            # response_format = response_format,
             tools = self.tools,
         )
 

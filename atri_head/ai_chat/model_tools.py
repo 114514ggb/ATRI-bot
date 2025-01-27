@@ -37,7 +37,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_text_message",
-            "description": "发送文本消息，可以发送任何文本内容,并且不会结束你的当次响应机会，应用场景：一次响应可以发送多条消息，比如说有人跟你打招呼你可以先回他一句招呼，然后再说其他的，可以分成两段话发送出去",
+            "description": "如果你想发送不止一条文本消息可以调用这个工具，调用可以发送任何文本内容,并且不会结束你的当次响应机会,可以继续调用工具",
             "parameters": {            
                 "type": "object",
                 "properties": {
@@ -190,7 +190,7 @@ class tool_calls:
         """发送文本消息"""
         await self.passing_message.send_group_message(qq_TestGroup,message)
 
-        return {"send_text_message": "文字消息已发送"}
+        return {"send_text_message": "文本消息已发送"}
     
     async def send_speech_message(self, message, qq_TestGroup):
         """发送语音消息"""
