@@ -1,6 +1,6 @@
 from atri_head.Message_processing import group_message_processing
 from atri_head.Basics.WebSocketClient import WebSocketClient
-import asyncio,threading
+import asyncio
 
 playRole = "ATRI"
 access_token = "ATRI114514"
@@ -13,7 +13,7 @@ qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(936819059) #真爱协会
 
 async def client():
-    # 创建一个WebSocket客户端实例，传入WebSocket的URL和访问令牌
+
     my_client = WebSocketClient(uri = ws_url, access_token = access_token)
     ATRI = group_message_processing(playRole = playRole, connection_type = "WebSocket", qq_white_list = qq_white_list)
 
@@ -22,17 +22,6 @@ async def client():
     my_client.add_listener(ATRI.main)
 
     await my_client.start_while()
-
-        # def run_atrib_main(data, qq_white_list):
-        #     asyncio.run(ATRI.main(data, qq_white_list))
-
-        # print("连接成功!")
-        # while True:
-        #     data = await websocket.recv()
-        #     data = json.loads(data)
-            # print("Received event:", data)
-
-            # threading.Thread(target=run_atrib_main, args=(data, qq_white_list)).start()
 
 
 

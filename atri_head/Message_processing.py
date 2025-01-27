@@ -47,10 +47,10 @@ class group_message_processing():
         if message[0:2] == " /":#命令处理
             # await self.command_processor.main(message,qq_TestGroup,data)#测试，执行指令时创建一个新进程
 
-            start_time = time.perf_counter()
+            # start_time = time.perf_counter()
             await self.command_processor.command_processing(message,qq_TestGroup,data)
-            end_time = time.perf_counter()
-            print("指令耗时：", end_time - start_time, "秒")
+            # end_time = time.perf_counter()
+            # print("指令耗时：", end_time - start_time, "秒")
 
         else:
             try:

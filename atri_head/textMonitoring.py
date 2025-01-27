@@ -10,11 +10,11 @@ class textMonitoring():
 
     async def monitoring(self, text, qq_TestGroup,data):
         """监控并产生对应的反映"""
-        if await self.monitoringItem(qq_TestGroup,data):
+        if await self.alikeRespond(text, qq_TestGroup):
             return True
         elif await self.haveRespond(text, qq_TestGroup):
             return True
-        elif await self.alikeRespond(text, qq_TestGroup):
+        elif await self.monitoringItem(qq_TestGroup,data):
             return True
         return False
 
@@ -63,6 +63,8 @@ class textMonitoring():
         "贴贴": [["text",["贴贴～","贴贴！","不给你贴","亚达哟,不给","我贴"]]],
         "🤔": [["text",["🤔"]],["img",["ATRI_思考.jpg","ATRI_思考1.jpg"]]],
         "😡": [["text",["😡"]]],
+        "😰": [["text",["😰"]]],
+        "😨": [["text",["😨"]]],
         "诶": [["text",["诶","为什么叹气呢？"]]],
         "哎": [["text",["哎"]]],
         "乐": [["text",["乐"]]],
@@ -73,7 +75,7 @@ class textMonitoring():
         "早": [["audio",["早上好.mp3","唔......吧唧......早上.......哈啊啊~~......早上好......夏生先.......mp3"]],["text",["早哦！","早上好！", "早上好呀！", "早上好，今天也要元气满满哦~","おはようございます!"]]],
         "睡觉":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚安！我也要睡觉啦~"]]],
         "睡了":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚安！我也要睡觉啦~"]]],        
-        "投食":[["img",["ATRI_吃瓜.gif"]]],
+        # "投食":[["img",["ATRI_吃瓜.gif"]]],
         "骂我":[["img",["你太变态.jpg","ATRI_不行.gif"]]],
         "踩我":[["text",["请不要这样！"]]],
         "爱你":[["img",["ATRI_得意.gif","ATRI_抛星星眼.gif","ATRI_ 亲亲.gif","ATRI_ 啊？.gif","ATRI_自我陶醉.gif","ATRI_爱心.gif"]]],
@@ -88,7 +90,6 @@ class textMonitoring():
         "确实":[["text",["确实"]]],
         "亚门":[["img",["ATRI_亚门.jpg","ATRI_亚门1.jpg"]]],
         "悲": [["text",["悲"]]],
-        "😭": [["text",["怎么啦怎么啦，不要伤心嘛，来，亚托莉抱抱就好啦！","呜呜呜，不要难过啦!ATRI会一直陪在你身边哒！","不要哭泣，亚托利会一直支持你的,不要伤心了!","不要伤心了，亚托利在这里陪着你，一切都会好起来的！"]]],
         "好看": [["text",["好看!"]]],
         "出拳": [["img",["ATRI_吃我一拳.gif"]]],
         "也是": [["text",["也是"]]],
@@ -110,6 +111,7 @@ class textMonitoring():
         "是这样": [["text",["是这样"]]],
         "少壮不努力": [["text",["少壮不努力，老大亚托莉"]]],
         "摸摸头":[["text",["呜呜呜，摸头会长不高的！"]]],
+        "爬": [["text",["爬"]]],
     }
     '''精确匹配列表'''
 
@@ -119,7 +121,7 @@ class textMonitoring():
         "逆天": [["text",["逆天!","逆天","逆天了","你在逆什么呢,ATRI有大大的疑惑？","逆逆逆逆天"]]],
         "难蚌": [["text",["难蚌"]]],
         "好耶": [["img", ["ATRI_好耶.jpg"]]],
-        "高性能": [["img",["ATRI_高性能.png","ATRI_得意.gif","ATRI_自我陶醉.gif"]]],
+        "高性能": [["img",["ATRI_高性能.png","ATRI_得意.gif","ATRI_自我陶醉.gif","ATRI_机智如我.jpg","ATRI_我是高性能.jpg"]]],
         "Ciallo": [["img",["ATRI_Ciallo.jpg"]]],
         "废物":[["img",["ATRI_欺负我你能得到什么.jpg","ATRI_ 气鼓鼓.gif","ATRI_生气到爆.gif","ATRI_怎么你了.jpg","ATRI_违反机器人保护法.jpg","ATRI_别骂了.jpg"]]],
         "晚安":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚上好，晚安！我也要睡觉啦~"]]],
@@ -139,8 +141,9 @@ class textMonitoring():
         "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
         "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif"]]],
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],
-        "哭": [["img",["ATRI_哭.gif"]]],
+        "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif"]]],
         "👍": [["text",["👍"]]],
+        "😭": [["text",["怎么啦怎么啦，不要伤心嘛，来，亚托莉抱抱就好啦！","呜呜呜，不要难过啦!ATRI会一直陪在你身边哒！","不要哭泣，亚托利会一直支持你的,不要伤心了!","不要伤心了，亚托利在这里陪着你，一切都会好起来的！"]]],
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
         "无敌了":[["text",["无敌了!","无敌了"]]],
         "让世界感受痛苦":[["img",["ATRI_地爆天星.jpg"]]],
@@ -152,10 +155,12 @@ class textMonitoring():
         "期待": [["img",["ATRI_期待.gif"]]],
         "冒泡":[["text",["戳，嘿嘿嘿，被我捉住了呢！"]]],
         "😋": [["text",["😋"]]],
-        "香草":[["text",["香草?色色是不行的!"]]],
+        "好强":[["text",["好强"]]],
         "盯着你": [["img",["ATRI_盯着你.jpg"]]],
         "厉害": [["img",["ATRI_厉害.jpg"]]],
         "yes": [["img",["ATRI_yes.jpg"]]],
+        "蚌埠": [["text",["难蚌"]]],
+        "鬼": [["img",["ATRI_当鬼.gif"]]],
     }
     '''模糊匹配列表'''
 

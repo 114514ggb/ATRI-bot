@@ -6,7 +6,7 @@ class bigModel_api:
     model_parameters = {
         'stream': False,#是否流式输出
         'temperature': 0.95,#采样温度，控制输出的随机性，必须为正数取值范围是：[0.0, 1.0]，默认值为0.95。
-        'top_p': 0.7,#温度取样的另一种方法，取值范围是：[0.0, 1.0]，默认值为0.7。
+        'top_p': 0.5,#温度取样的另一种方法，取值范围是：[0.0, 1.0]，默认值为0.7。
         'max_tokens': 4095,#控制生成的响应的最大 token 数量
         'stop': [],#模型遇到stop指定的字符时会停止生成。目前仅支持单个stop词，格式为["stop_word1"]。
     }
@@ -31,7 +31,7 @@ class bigModel_api:
             messages.append({"role": "system","content": content})
         return messages
     
-    def append_message_text(self,messages:list,role,content):
+    def append_message_text(self,messages:list,role:str,content:str):
         """添加文本消息,role为角色,content为内容"""
         messages.append({"role": role,"content": content})
         return messages

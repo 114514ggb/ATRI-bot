@@ -5,7 +5,7 @@ api_key="fc57c8c15fe94a83a56aaa1f9401be6b.kALSJcRdCTn87TdO"
 
 tool_json = {
     "name": "web_search",
-    "description": "当你有不认识的东西或想知道你认知之外的信息时可以调用进行网络搜索,注意甄别消息内容",
+    "description": "当你有不认识的东西或想知道你认知之外的信息时可以调用进行网络搜索,主要是搜索新闻类的信息",
     "properties": {
         "key_word": {
             "type": "string",

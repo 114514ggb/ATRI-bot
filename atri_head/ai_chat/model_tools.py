@@ -20,13 +20,30 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "可以将文本内容转换为语音并发送出去，让你可以发出声音。只支持中文和英文日语。",
+            "description": "可以将文本内容转换为语音并发送出去，让你可以发出声音。只支持中文和英文日语。最好不要包含代码什么的",
             "parameters": {            
                 "type": "object",
                 "properties": {
                     "message": {
                         "type": "string",
                         "description": "需要发送消息的文本内容，只支持中文和英文日语",
+                    }
+                }
+            },
+            "required": ["message"]
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_text_message",
+            "description": "发送文本消息，可以发送任何文本内容,并且不会结束你的当次响应机会，应用场景：一次响应可以发送多条消息，比如说有人跟你打招呼你可以先回他一句招呼，然后再说其他的，可以分成两段话发送出去",
+            "parameters": {            
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "需要发送消息的文本内容",
                     }
                 }
             },
@@ -63,7 +80,6 @@ import json
 class tool_calls:
     code_url = "document\code.py"
     """python代码运行路径"""
-    tools = tools
 
     def __init__(self):
         self.passing_message = QQ_send_message()
@@ -73,7 +89,9 @@ class tool_calls:
         self.tools_functions_dict_qq = {
             'send_speech_message': self.send_speech_message,
             'send_image_message': self.send_image_message,
+            'send_text_message': self.send_text_message,
         }
+        self.tools = tools
         self.load_additional_tools() # 加载额外工具
         self.model = bigModel_api(tools=self.tools)
 
@@ -168,6 +186,12 @@ class tool_calls:
         else:
             return {"command_line_interface":result.stdout}
     
+    async def send_text_message(self, message, qq_TestGroup):
+        """发送文本消息"""
+        await self.passing_message.send_group_message(qq_TestGroup,message)
+
+        return {"send_text_message": "文字消息已发送"}
+    
     async def send_speech_message(self, message, qq_TestGroup):
         """发送语音消息"""
         url = self.text_to_speech(message)
@@ -186,7 +210,7 @@ class tool_calls:
         """文本转语音,返回语音路径"""
         client = Client("http://localhost:9872/")
         result = client.predict(
-                        "E:\\ffmpeg\.......我为了夏生先生行动需要理由吗.mp3",	# str (filepath on your computer (or URL) of file) in '请上传3~10秒内参考音频，超过会报错！' Audio component
+                        "E:\\ffmpeg\\.......我为了夏生先生行动需要理由吗.mp3",	# str (filepath on your computer (or URL) of file) in '请上传3~10秒内参考音频，超过会报错！' Audio component
                         "あ，私です夏生さんのために動く理由が必要なんですか",	# str in '参考音频的文本' Textbox component
                         "日文",	# str (Option from: ['中文', '英文', '日文', '中英混合', '日英混合', '多语种混合']) in '参考音频的语种' Dropdown component
                         text,	# str in '需要合成的文本' Textbox component

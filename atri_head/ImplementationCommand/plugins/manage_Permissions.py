@@ -15,7 +15,7 @@ class manage_Permissions(example):
         "delete": "删除",
         "查询": "查询",
         "query": "查询",
-        "check": "查询"
+        "que": "查询"
     }
 
     role_map = {
@@ -35,7 +35,7 @@ class manage_Permissions(example):
     async def manage_Permissions(self, user_input, qq_TestGroup, data, basics):
         self.people = data["user_id"]
     
-        print(self.minus_argument,self.other_argument)
+        # print(self.minus_argument,self.other_argument)
         action = None
         role = None
         Be_operated_qq = None

@@ -4,7 +4,7 @@ memory_path = "assets/memory.json"
 
 tool_json = {
     "name": "memory__read_memory",
-    "description": "每当你想要获取更多有关某人的信息的时候，请调用这个函数,建议聊天前记得看看哦~",
+    "description": "获取曾经你对用户行为喜好等记录的工具,建议输出前先调用这个函数,以提供更个性化的回答。",
     "properties": {
         "user_id": {
             "type": "string",
