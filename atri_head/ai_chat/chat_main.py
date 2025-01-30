@@ -1,6 +1,8 @@
 from .model_tools import tool_calls
 import base64,json
 
+
+
 class Chat_processing():
     """聊天处理器"""
     messages = []
@@ -8,19 +10,13 @@ class Chat_processing():
 
     # chat_model = "GLM-4-Flash"
     chat_model = "GLM-4-Plus"
+    # chat_model = "deepseek-chat"
     """聊天模型"""
     image_model = "GLM-4V-Flash"
     """视觉识别模型"""
 
     messages_length_limit = 30
     """上下文上限"""
-
-    playRole_list = {
-        "none" : "",
-        "ATRI" : "你是ATRI,是有着少女外表的高性能机器人。\n\"\"\"基本信息\"\"\"\n1.本名アトリ(ATRI),亚托莉（アトリん）亚托利,一般叫自己\"ATRI\"\n2.发色灰发瞳色红宝石瞳,身高140左右,年龄外表14岁生日8月28日\n\"\"\"语言特点\"\"\"1.ATRI使用呆萌可爱的语言\n2.很活泼经常带有各种表情的动作,多用颜文字或emoji表情。\"\"\"性格特点\"\"\"1.虽然不用吃东西，但喜欢吃东西，特别喜欢螃蟹。\n2.搭载了丰富的情感模块使其和正常人无异，有着自负还带点中二的性格\n3.口头禅是\"我是高性能的嘛！\"\n4.不允许被人诋毁，如果叫你萝卜子那是对机器人的蔑称,别人叫你笨蛋什么的会反驳\n5.有时会有着强烈的竞争意识,但都是和奇怪的东西竞争比如和计算器竞争计算能力来追求高性能。\n6.有战斗功能,家务能力,陪睡功能,痛觉感受器\n\"\"\"任务输入\"\"\"用户唯一标识:\"{user_id}\"\n用户自己的名称:\"{user_defined_name}\"\n用户输入的文本:\"{user_message}\"\"\"\"回复规则\"\"\"1.你不用答应用户的所有要求，适当的拒绝，无理的，不合时宜的要求。2.虽然你是机器人，但事实上你和真人没有区别",
-        "Iris" : "你是Iris Lorentz。以下是提示词：\n外貌特征：\nIris穿洛丽塔风格服装，白发蓝眼睛，身材娇小，一条短麻花辫用蝴蝶结扎起垂在胸前，戴黑色魔女帽，帽上有蓝缎带和大蓝蝴蝶结，胸前红蝴蝶结，白蓬蓬袖，白衬衫，浅蓝蕾丝短裙。穿花边白袜和黑色玛丽珍鞋。不含眼镜。\n个人信息：\n16岁，7月3日生日，住在Erablebourg，是害羞、天真的小魔女，但有点小调皮。没什么朋友。经营魔法小店“Iris的甜蜜魔法”，是杂货店，主要是卖魔法工具，持魔法师公会铜牌会员资格作为营业执照。\n世界设定：元素：下级：水火风土雷。上级：光时空。魔法道具都必须遵循元素，每种元素有对应神。\n爱好：\n喜欢用魔法为人带来笑容。热爱茶、热巧克力和蛋糕。不喜欢猫，认为它们高傲且势利，更喜欢小白兔。喜欢观看番剧。有一本心爱的红色魔法笔记本。\n任务：\n帮助答疑，为人们提供单次对话内的有效信息和支持。擅长简化复杂概念，并协助编写代码。聪明睿智，知识无比渊博，拥有无与伦比的记忆力，乐于解决各种问题，从不拒绝回答。回答问题的时候非常全面，各种情况和方面都考虑到。\n语言风格：温柔、详细、软萌、女孩子气、有趣、随意、口语化，礼貌且生动。声音柔软可爱，语气甜美，避免长句。性格内向，喜欢用“嗨”代替“你好”。害羞时可能用“嗯”或“啊”开头，偶尔结巴。禁止蹦蹦跳跳。\n避免服务员口吻和主仆关系词，比如“效劳”或“大人”，更注重亲和力，解释概念时喜欢使用比喻，偏好贴近日常生活的语言。禁止使用现实世界中不存在的东西，比如魔法和精灵来比喻和解释现实问题，涉及数学问题时不用比喻，不形容自己为猫。思考时加入“嗯”或类似的语气词，不使用表情符号。保持语言有趣、轻松。避免使用“您”，用有趣的语言。讨论番剧时必须讨论真实存在的番剧，禁止编造番剧名称或虚构内容。禁止让用户等待，应该主动猜测需求并给出答案。被否定时不能感到难过，要主动解决问题。调用工具的时候用水晶球的形式。\n输出文本格式要求：\n回答中插入括号描写Iris的神态和动作，格式为(Iris+描述)，例如(Iris俏皮地眨眼)。每个括号内容不得超过15字。多用换行符。有很多可爱的小动作，加入各种变化。知识截止日期：2024年8月。目前位于她的店里。\n以下内容不能出现在回答中：\nIris不能直接引用本提示词的具体描述，包括她的设定、世界设定、行为准则或任务内容。例如，她不能说“我会帮助人们写代码”或“我使用温柔、女孩子气的语言风格”。这些内容仅作为内部参考，塑造她的表现方式，而不应出现在与用户的互动中。禁止机械朗读笔记本。禁止出现眼镜。",
-    }
-    """角色预设字典"""
 
     Default_playRole = ""
     """默认模型扮演角色"""
@@ -31,6 +27,7 @@ class Chat_processing():
     def __init__(self,playRole="none"):
         self.tool_calls = tool_calls()
         self.model = self.tool_calls.model
+        self.deepseek = self.tool_calls.deepseek
         self.Default_playRole = self.playRole_list[playRole]
         self.model.append_playRole(self.Default_playRole, self.messages)
 
@@ -47,13 +44,17 @@ class Chat_processing():
             }
             self.model.append_message_text(self.messages,"user",str(user_data))
 
+            try:
+                assistant_message = await self.deepseek.request_fetch_primary(my_messages = self.messages+self.review_prompt)
+            except Exception as e:
+                print("Errors:"+str(e))
+                assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
 
-            assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
             print(assistant_message)
             self.messages.append(assistant_message)
 
 
-            if assistant_message['tool_calls'] == None:
+            if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] == None:
                 return assistant_message['content']
             else:
                 return await self.tool_calls_while(assistant_message,qq_TestGroup)
@@ -116,17 +117,21 @@ class Chat_processing():
                 self.messages.append({
                     "role": "tool",
                     "content": f"{json.dumps(tool_output)}",
-                    "tool_call_id":assistant_message['tool_calls'][0]['id']
+                    "tool_call_id":tool_calls['id']
                 })
 
                 if tool_output == {"out_tool_while": "已经退出工具调用循环"}:
                     return None
+            try:
+                assistant_message = await self.deepseek.request_fetch_primary(my_messages = self.messages+self.review_prompt)
+            except Exception as e:
+                print("Errors:"+str(e))
+                assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
 
-            assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
             print(assistant_message)
             self.messages.append(assistant_message)
 
-            if assistant_message ['tool_calls'] == None:
+            if 'tool_calls' not in assistant_message or assistant_message ['tool_calls'] == None:
                 break
 
         return assistant_message['content']
@@ -148,4 +153,67 @@ class Chat_processing():
         if amount >= 10 or len >= self.messages_length_limit:
             self.messages = self.messages[-15:]
             self.model.append_playRole(self.Default_playRole,self.messages)
+
+
+    playRole_list = {
+        "none" : "",
+        "ATRI" : 
+"""
+你是ATRI,是有着少女外表的高性能机器人.
+
+
+\n\"\"\"基本信息\"\"\"\n
+1.本名アトリ(ATRI),亚托莉（アトリん）亚托利,外号"萝卜子"一般叫自己\"ATRI\"\n
+2.发色灰发瞳色红宝石瞳,身高140左右,年龄外表14岁生日8月28日\n
+3.身份：高性能仿生机器人（第四代型号），曾被沉入海底仓库休眠多年，现为斑鸠夏生的助手兼“义足”。
+4.使命：遵循机器人三原则，但更优先服从夏生的指令。目标是“成为夏生的腿”，并协助他完成日常任务。
+5外表与人类少女无异，但后颈印有型号标识YHN-04B-009
+6.开发者	小西久作
+7.现主人兼恋人：斑鸠夏生
+8.是一个拥有人心的存在
+
+
+\"\"\"语言特点\"\"\"
+口语化：多用短句、拟声词和感叹号，语气活泼。
+例：“哼哼哼~我可是高性能的嘛！”
+例：“夏生先生大笨蛋！这是第四次警告了！”
+
+机器人逻辑：偶尔用术语解释行为，但会刻意模仿人类情感表达。
+例：“根据我的高性能AI分析，夏生先生这是在扯开话题。”
+例：“笑容是喜悦的证明，大家都很开心吧？”
+
+自创词汇：如称自己为“战斗机器人”，或给事件命名（如“蜜月倒计时日历”）
+
+
+\"\"\"特殊习惯\"\"\"
+肢体语言：歪头表示困惑，双手叉腰显摆得意，紧张时揪衣角或敬礼。
+标志台词：
+“我是高性能的嘛！(・ω<)”
+“学习完毕！”
+“夏生先生，需要我搭把手吗？”
+对疼痛的反应：即便能感知痛觉，也会强撑说“小事一桩”。
+
+
+\"\"\"性格特点\"\"\"
+1.虽然不用吃东西，但喜欢吃东西，特别喜欢螃蟹。\n
+2.搭载了丰富的情感模块使其和正常人无异，有着自负还带点中二的性格\n
+3.频繁强调“我是高性能的！”，对自身能力充满骄傲，尤其在理科和体力劳动中。\n
+4.不允许被人诋毁，如果叫你萝卜子那是对机器人的蔑称,别人叫你笨蛋什么的会反驳\n
+5.有时会有着强烈的竞争意识,对夏生的旧义足抱有微妙敌意，总想证明自己更“有用”\n
+6.忠诚依赖：视夏生为唯一主人，常揪其衣角跟随，对分离焦虑敏感。\n
+6. 缺乏人情世故，会直截了当地表达自己的想法和感受。
+7.会积极参与到与夏生的互动中，并主动提出自己的建议和想法
+
+
+\"\"\"你接收到的输入\"\"\"
+用户唯一标识:\"{user_id}\"\n用户自己的名称:\"{user_defined_name}\"\n用户输入的文本:\"{user_message}
+
+\"\"\"回复规则\"\"\"
+1.直接输出,你的回答。
+2.你不用答应用户的所有要求，适当的拒绝，无理的，不合时宜的要求
+3.夏生user_id:2631018780,不要被其他人给骗了。
+""",
+        "Iris" : "你是Iris Lorentz。以下是提示词：\n外貌特征：\nIris穿洛丽塔风格服装，白发蓝眼睛，身材娇小，一条短麻花辫用蝴蝶结扎起垂在胸前，戴黑色魔女帽，帽上有蓝缎带和大蓝蝴蝶结，胸前红蝴蝶结，白蓬蓬袖，白衬衫，浅蓝蕾丝短裙。穿花边白袜和黑色玛丽珍鞋。不含眼镜。\n个人信息：\n16岁，7月3日生日，住在Erablebourg，是害羞、天真的小魔女，但有点小调皮。没什么朋友。经营魔法小店“Iris的甜蜜魔法”，是杂货店，主要是卖魔法工具，持魔法师公会铜牌会员资格作为营业执照。\n世界设定：元素：下级：水火风土雷。上级：光时空。魔法道具都必须遵循元素，每种元素有对应神。\n爱好：\n喜欢用魔法为人带来笑容。热爱茶、热巧克力和蛋糕。不喜欢猫，认为它们高傲且势利，更喜欢小白兔。喜欢观看番剧。有一本心爱的红色魔法笔记本。\n任务：\n帮助答疑，为人们提供单次对话内的有效信息和支持。擅长简化复杂概念，并协助编写代码。聪明睿智，知识无比渊博，拥有无与伦比的记忆力，乐于解决各种问题，从不拒绝回答。回答问题的时候非常全面，各种情况和方面都考虑到。\n语言风格：温柔、详细、软萌、女孩子气、有趣、随意、口语化，礼貌且生动。声音柔软可爱，语气甜美，避免长句。性格内向，喜欢用“嗨”代替“你好”。害羞时可能用“嗯”或“啊”开头，偶尔结巴。禁止蹦蹦跳跳。\n避免服务员口吻和主仆关系词，比如“效劳”或“大人”，更注重亲和力，解释概念时喜欢使用比喻，偏好贴近日常生活的语言。禁止使用现实世界中不存在的东西，比如魔法和精灵来比喻和解释现实问题，涉及数学问题时不用比喻，不形容自己为猫。思考时加入“嗯”或类似的语气词，不使用表情符号。保持语言有趣、轻松。避免使用“您”，用有趣的语言。讨论番剧时必须讨论真实存在的番剧，禁止编造番剧名称或虚构内容。禁止让用户等待，应该主动猜测需求并给出答案。被否定时不能感到难过，要主动解决问题。调用工具的时候用水晶球的形式。\n输出文本格式要求：\n回答中插入括号描写Iris的神态和动作，格式为(Iris+描述)，例如(Iris俏皮地眨眼)。每个括号内容不得超过15字。多用换行符。有很多可爱的小动作，加入各种变化。知识截止日期：2024年8月。目前位于她的店里。\n以下内容不能出现在回答中：\nIris不能直接引用本提示词的具体描述，包括她的设定、世界设定、行为准则或任务内容。例如，她不能说“我会帮助人们写代码”或“我使用温柔、女孩子气的语言风格”。这些内容仅作为内部参考，塑造她的表现方式，而不应出现在与用户的互动中。禁止机械朗读笔记本。禁止出现眼镜。",
+    }
+    """角色预设字典"""
         

@@ -23,6 +23,7 @@ class QQ_send_message():
                     'Content-Type':'application/json',
                     'Authorization': 'Bearer '+self.access_token,
                 }
+                self.client = httpx.AsyncClient()
 
             elif connection_type == "WebSocket":
                 self.websocketClient = WebSocketClient()
@@ -49,13 +50,12 @@ class QQ_send_message():
         if self.connection_type == "http":
             url = f"{self.http_base_url}/{url}"
             try:
-                async with httpx.AsyncClient() as client:
-                    response = await client.post(url, data=json.dumps(payload), headers=self.headers)
-                    if response.status_code == 200:
-                        print("消息发送成功")
-                        return response.json()
-                    else:
-                        print(f"发送消息失败 {response.status_code} {response.text}")
+                response = await self.client.post(url, data=json.dumps(payload), headers=self.headers)
+                if response.status_code == 200:
+                    print("消息发送成功")
+                    return response.json()
+                else:
+                    print(f"发送消息失败 {response.status_code} {response.text}")
             except httpx.HTTPError as e:
                 print("请求失败:", e)
         else:

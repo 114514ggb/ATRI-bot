@@ -73,6 +73,7 @@ import subprocess
 from ..Basics.qq_send_message import QQ_send_message
 from gradio_client import Client
 from .bigModel_api import bigModel_api
+from .universal_async_ai_api import universal_ai_api
 import importlib.util
 import os
 import json
@@ -94,6 +95,7 @@ class tool_calls:
         self.tools = tools
         self.load_additional_tools() # 加载额外工具
         self.model = bigModel_api(tools=self.tools)
+        self.deepseek = universal_ai_api(tools=self.tools)
 
     async def calls(self, tool_name, arguments_str, qq_TestGroup):
         """调用工具"""
@@ -168,7 +170,7 @@ class tool_calls:
         }
 
         if tool_json["properties"] is None:
-            tool_json_integrity["function"]["parameters"] = {"type": "None","properties": "None"}
+            tool_json_integrity["function"]["parameters"]  = {"type": "object", "properties": {}}
         else:
             tool_json_integrity["function"]["required"] = list(tool_json["properties"].keys())
 

@@ -10,7 +10,7 @@ tool_json = {
 }
 
 async def main(formula):
-    return {"python_calculator":eval(formula)}
+    return {"python_calculator":f"{formula} == {eval(formula)}"}
 
 
 
