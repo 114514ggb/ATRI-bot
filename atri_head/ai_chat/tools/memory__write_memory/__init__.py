@@ -8,7 +8,7 @@ tool_json = {
     "properties": {
         "memory": {
             "type": "string",
-            "description": "你想记住的内容，概括并保留关键内容,不用带称呼或ID"
+            "description": "你想记住的内容，概括并保留关键内容,最好带上日期"
         },
         "user_id": {
             "type": "string",

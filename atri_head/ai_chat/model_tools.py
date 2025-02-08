@@ -9,7 +9,7 @@ tools = [
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "需要运行的python代码,记得print结果",
+                        "description": "需要运行的完整python代码,记得print结果",
                     }
                 }
             },
@@ -37,7 +37,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_text_message",
-            "description": "如果你想发送不止一条文本消息可以调用这个工具，调用可以发送任何文本内容,并且不会结束你的当次响应机会,可以继续调用工具",
+            "description": "调用可以发送一次文本内容,并且不会结束你的当次响应机会,可以继续调用工具",
             "parameters": {            
                 "type": "object",
                 "properties": {
@@ -122,31 +122,48 @@ class tool_calls:
         """获取返回文件夹中的所有工具函数和工具json"""
 
         folder_path = "atri_head\\ai_chat\\tools\\"
-        module_name = "main"
+        default_module_name = "main"
         tools_functions_dict = {}
         tools_json = []
 
         for name in os.listdir(folder_path):
-            if os.path.isdir(os.path.join(folder_path, name)):
+            dir_path = os.path.join(folder_path, name)
+            if os.path.isdir(dir_path):
 
-                file_path = f"atri_head\\ai_chat\\tools\\{name}\\__init__.py"
+                file_path = os.path.join(dir_path, "__init__.py")
+                if not os.path.exists(file_path):
+                    print(f"文件夹{dir_path}中没有__init__.py文件")
+                    continue 
 
-                spec = importlib.util.spec_from_file_location(module_name, file_path)
+                # module_name = f"tools.{name}"
+
+                spec = importlib.util.spec_from_file_location(name, file_path)
                 
                 if spec is None:
-                    raise Exception(f"导入模块{file_path} 失败！")
+                    print(f"导入模块{file_path} 失败！")
+                    continue
 
                 module = importlib.util.module_from_spec(spec)
 
-                spec.loader.exec_module(module)
+                if module is None:
+                    print(f"获取模块{file_path}中的loader 失败！")
+                    continue
 
-                func = getattr(module, module_name, None)
+                try:
+                    spec.loader.exec_module(module)
+                except Exception as e:
+                    print(f"加载模块时发生错误：{e}")
+                    continue
+
+                func = getattr(module, default_module_name, None)
                 if func is None:
-                    raise Exception(f"获取模块{file_path}中的函数{module_name} 失败！")
+                    print(f"获取模块{file_path}中的函数{default_module_name} 失败！")
+                    continue
                 
                 tool_json = getattr(module, "tool_json", None)
                 if tool_json is None:
-                    raise Exception(f"获取模块{file_path}中的函数tool_json 失败！")
+                    print(f"获取模块{file_path}中的函数tool_json 失败！")
+                    continue
                 
                 tools_json.append(self.generate_integrity_tools_json(tool_json))
 
@@ -212,8 +229,12 @@ class tool_calls:
         """文本转语音,返回语音路径"""
         client = Client("http://localhost:9872/")
         result = client.predict(
-                        "E:\\ffmpeg\\.......我为了夏生先生行动需要理由吗.mp3",	# str (filepath on your computer (or URL) of file) in '请上传3~10秒内参考音频，超过会报错！' Audio component
-                        "あ，私です夏生さんのために動く理由が必要なんですか",	# str in '参考音频的文本' Textbox component
+                        "E:\\ffmpeg\\.......我为了夏生先生行动需要理由吗.mp3",
+                        # "E:\\ffmpeg\\啊我真是太高性能了.mp3",	
+                        # str (filepath on your computer (or URL) of file) in '请上传3~10秒内参考音频，超过会报错！' Audio component
+                        "あ，私です夏生さんのために動く理由が必要なんですか",
+                        # "あ、なんて高性能なの、私は！",	
+                        # str in '参考音频的文本' Textbox component
                         "日文",	# str (Option from: ['中文', '英文', '日文', '中英混合', '日英混合', '多语种混合']) in '参考音频的语种' Dropdown component
                         text,	# str in '需要合成的文本' Textbox component
                         "多语种混合",	# str (Option from: ['中文', '英文', '日文', '中英混合', '日英混合', '多语种混合']) in '需要合成的语种' Dropdown component

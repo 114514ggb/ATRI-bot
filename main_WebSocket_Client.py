@@ -21,7 +21,7 @@ async def client():
 
     my_client.add_listener(ATRI.main)
 
-    await my_client.start_while()
+
 
 
 

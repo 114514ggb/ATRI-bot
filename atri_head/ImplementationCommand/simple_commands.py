@@ -139,6 +139,7 @@ async def audio(user_input,qq_TestGroup,data,basics:Basics):
 async def sing(user_input,qq_TestGroup,data,basics:Basics):
     """唱歌"""
     sing_list ={
+        "测试音频":"test.wav",
         "インドア系ならトラックメイカ":"室内系_TrackMaker.mp3",
         "我的悲伤是水做的":"我的悲伤是水做的.mp4",
         "Eastof Eden":"EastofEden.mp4",
@@ -146,7 +147,7 @@ async def sing(user_input,qq_TestGroup,data,basics:Basics):
         "千本桜":"千本桜.mp4",
         "但（电棍）":"但.mp3",
         "呐呐呐":"呐呐呐.mp4",
-        "打上花火":"打上花火.mp4",
+        "lemon":"lemon.mp4",
         "要来段bassline吗？笑":"要来段bassline吗？笑.mp3",
         "自伤无色":"自伤无色.mp4",
         "群星闪烁的夜晚":"群星闪烁的夜晚.mp4",
@@ -195,6 +196,16 @@ async def sing(user_input,qq_TestGroup,data,basics:Basics):
         "铃芽":"铃芽.mp3",
         "病名为爱":"病名为爱.mp3",
         "我和你":"我和你.mp3",
+        "没什么大不了的":"没什么大不了的.mp3",
+        "俄罗斯方块":"俄罗斯方块.mp3",
+        "琪露诺的完美算数教室":"琪露诺的完美算数教室.mp3",
+        "unravel":"unravel.mp3",
+        "I_Don't_Want_to_Be_an_Engineer":"I_Don't_Want_to_Be_an_Engineer.mp3",
+        "影色舞":"影色舞.mp3",
+        "深海少女":"深海少女.mp3",
+        "白金DISCO":"白金DISCO.mp3",
+        "欢迎来到互联网":"欢迎来到互联网.mp3",
+        "拼凑的断音":"拼凑的断音.mp3",
     }
 
     argument= basics.Command.processingParameter(user_input)

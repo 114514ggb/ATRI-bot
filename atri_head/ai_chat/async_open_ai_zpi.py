@@ -1,7 +1,7 @@
-from openai import OpenAI
+from openai import AsyncOpenAI
 
-class OpenAI_api:
-    """OpenAI API"""
+class async_openAI:
+    """async OpenAI API"""
     model_parameters = {
         'stream': False,#是否流式输出
         'frequency_penalty': 1.5,#一个介于-2.0和2.0之间的数字。正值会根据文本中至今出现的频率对新令牌进行惩罚，降低模型重复同一行文字的可能性。
@@ -17,7 +17,7 @@ class OpenAI_api:
     messages = []
 
     def __init__(self, api_key, base_url, tools = [None]):
-        self.client = OpenAI(
+        self.client = AsyncOpenAI(
             api_key=api_key, 
             base_url=base_url,
         )
@@ -45,27 +45,27 @@ class OpenAI_api:
 
         return True
 
-    def generate_text(self, my_model, my_messages):
+    async def generate_text(self, my_model, my_messages):
         """请求生成文本,全部默认。"""
-        completion = self.client.chat.completions.create(
+        completion = await self.client.chat.completions.create(
             model = my_model, 
             messages = my_messages,
         )
 
         return completion.model_dump()
 
-    def generate_text(self, my_model, my_messages):
+    async def generate_text(self, my_model, my_messages):
         """请求生成文本,全部默认。"""
-        completion = self.client.chat.completions.create(
+        completion = await self.client.chat.completions.create(
             model = my_model, 
             messages = my_messages,
         )
 
         return completion.model_dump()
 
-    def generate_text_argument(self, my_model, my_messages):
+    async def generate_text_argument(self, my_model, my_messages):
         """请求生成文本，带自定义参数"""
-        completion = self.client.chat.completions.create(
+        completion = await self.client.chat.completions.create(
             model = my_model, 
             messages = my_messages,
             frequency_penalty = self.model_parameters['frequency_penalty'],
@@ -76,16 +76,23 @@ class OpenAI_api:
 
         return completion.model_dump()
     
-    def generate_text_tools(self, my_model, my_messages):
+    async def generate_text_tools(self, my_model, my_messages, response_format= {"type": "text"}):
         """请求生成文本,带工具,可带格式，带自定义参数"""
-        completion = self.client.chat.completions.create(
+        completion = await self.client.chat.completions.create(
             model = my_model, 
             messages = my_messages,
             frequency_penalty = self.model_parameters['frequency_penalty'],
             top_p = self.model_parameters['top_p'],
             temperature = self.model_parameters['temperature'],
             max_tokens = self.model_parameters['max_tokens'],
+            response_format = response_format,
             tools = self.tools,
         )
 
         return completion.model_dump()
+    
+    async def request_fetch_primary(self, my_messages:list ,my_model = "gemini-2.0-flash-exp-search",response_format= {"type": "text"}):
+        """请求生成文本，返回主要内容"""
+        data = await self.generate_text_tools(my_model, my_messages,response_format)
+        # print(data)
+        return data['choices'][0]['message']

@@ -95,6 +95,6 @@ class universal_ai_api:
     async def request_fetch_primary(self, my_messages:list ,my_model = "deepseek-chat",response_format= {"type": "text"}):
         """请求生成文本，返回主要内容"""
         data = await self.generate_text_tools(my_model, my_messages,response_format)
-        print(data)
+        # print(data)
         return data['choices'][0]['message']
 
