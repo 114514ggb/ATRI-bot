@@ -20,10 +20,10 @@ async def client():
     await my_client.connect()
 
     my_client.add_listener(ATRI.main)
-
-
-
-
+    
+    await my_client.start_while()
+    
+    
 
 if __name__ == '__main__':
     asyncio.run(client())
