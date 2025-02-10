@@ -113,9 +113,11 @@ class tool_calls:
 
     def load_additional_tools(self):
         """加载额外工具"""
+        print("加载模型tools...")
         tools_functions_dict, tools_json = self.get_files_in_folder()
         self.tools_functions_dict.update(tools_functions_dict)
         self.tools = tools_json + self.tools
+        print("加载模型tools完成!")
 
 
     def get_files_in_folder(self):

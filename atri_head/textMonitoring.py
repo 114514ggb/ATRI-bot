@@ -1,6 +1,7 @@
 from .Basics import *
 from .itemAction.action_main import itemAction
 import random
+import time
 
 class textMonitoring():
     """监控指定文本或者字段"""
@@ -8,20 +9,24 @@ class textMonitoring():
         self.itemAction = itemAction()
         self.basics = Basics()
 
+    last_time = 0 #上次反应时间
+    cooldown = 1 #反应间隔时间
+    
     async def monitoring(self, text, qq_TestGroup,data):
         """监控并产生对应的反映"""
-        if await self.alikeRespond(text, qq_TestGroup):
+        if await self.monitoringItem(qq_TestGroup,data): #监控指定的字段
             return True
-        elif await self.haveRespond(text, qq_TestGroup):
+        # elif self.response_cooldown(): #反应间隔时间
+        elif await self.alikeRespond(text, qq_TestGroup): #精确匹配
             return True
-        elif await self.monitoringItem(qq_TestGroup,data):
+        elif await self.haveRespond(text, qq_TestGroup): #模糊匹配
             return True
         return False
 
     async def alikeRespond(self, text, qq_TestGroup):
         """精确匹配，匹配字段一样就反应"""
         if text in self.monitoring_alike_list.keys():
-
+            
             if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(50):#有在常用词列表里，并且随机到50%的概率不反应
                 return True
             
@@ -54,6 +59,14 @@ class textMonitoring():
             await self.basics.QQ_send_message.send_group_pictures(qq_TestGroup, document, True)
         elif type == "audio":
             await self.basics.QQ_send_message.send_group_audio(qq_TestGroup, document, True)
+            
+    def response_cooldown(self):
+        """冷却时间"""
+        if time.time() - self.last_time < self.cooldown:
+            return False
+        else:
+            self.last_time = time.time()
+        return True
 
     monitoring_alike_list = {
         "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg"]],["text",["?"]]],
@@ -112,7 +125,8 @@ class textMonitoring():
         "摸摸头":[["text",["呜呜呜，摸头会长不高的！"]],["img",["ATRI_晃脑.gif"]]],
         "爬": [["text",["爬"]]],
         "谢谢": [["img",["ATRI_谢谢.jpg"]]],
-        "叫哥哥": [["text",["欧尼～酱"]]],
+        "叫哥哥": [["text",["欧尼～酱","欧尼酱","哥哥","哥哥～"]]],
+        "唱歌": [["img",["ATRI_唱片.gif"]]],
         "6": [["text",["6"]]],
         "ok": [["text",["ok","好的"]]],
         "no": [["img",["ATRI_no.jpg"]]],
@@ -138,7 +152,7 @@ class textMonitoring():
         "废物":[["img",["ATRI_欺负我你能得到什么.jpg","ATRI_ 气鼓鼓.gif","ATRI_生气到爆.gif","ATRI_怎么你了.jpg","ATRI_违反机器人保护法.jpg","ATRI_别骂了.jpg"]]],
         "晚安":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚上好，晚安！我也要睡觉啦~"]]],
         "早安": [["text",["早上好！","早上好呀！","早上好，今天也要元气满满哦！"]]],
-        "亚托莉": [["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif","ATRI_惊讶.gif","ATRI_小虎牙咬面包.jpg","ATRI_看你.gif","ATRI_闪亮登场.jpg"]]],
+        "亚托莉": [["img",["ATRI_左右摆头.gif","ATRI_抛星星眼.gif","ATRI_惊讶.gif","ATRI_小虎牙咬面包.jpg","ATRI_看你.gif","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],
         "变态": [["img",["ATRI_变态.jpg","你太变态.jpg","ATRI_变态先生.jpg"]]],
         "哼哼啊": [["img",["ATRI_恶臭1145.jpg"]]],
         "圣诞": [["img",["ATRI_过圣诞.gif"]]],
@@ -151,7 +165,7 @@ class textMonitoring():
         "哼哼": [["img",["ATRI_恶臭1145.jpg"]]],
         "qwq": [["img",["ATRI_qwq.jpg"]],["text",["QWQ"]]],
         "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
-        "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg"]]],
+        "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],
         "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_大哭.gif","ATRI_哇哇大哭.jpg"]]],
         "👍": [["text",["👍"]]],
@@ -188,7 +202,10 @@ class textMonitoring():
         "少壮不努力": [["text",["少壮不努力，老大亚托莉"]]],
         "死机":[["img",["ATRI_宕机.jpg"]]],
         "死了":[["img",["ATRI_死了.gif"]]],
-        "锤子":[["img",["ATRI_被锤了.gif"]]],        
+        "锤子":[["img",["ATRI_被锤了.gif"]]],
+        "头疼":[["img",["ATRI_头疼.gif"]]],
+        "还想睡":[["img",["ATRI_你快醒一醒.gif"]]],
+        "警告":[["img",["ATRI_吹哨.gif"]]],        
     }
     '''模糊匹配列表'''
 
