@@ -2,8 +2,9 @@ from .AI_interaction import AI_interaction
 from .chance import Chance
 from .qq_send_message import QQ_send_message
 from .command import Command #还有一个Permissions_management继承在里面
+from .Command_information import Command as Command_information
 
-__all__ = ["Basics"]
+__all__ = ["Basics","Command_information"]
 
 class Basics:
     """基础功能类"""

@@ -1,14 +1,15 @@
-from .example_plugin import example_plugin
-from ...ai_chat.bigModel_api import bigModel_api
+from atri_head.Basics import Basics,Command_information
+from atri_head.ai_chat import bigModel_api
 import asyncio
 import base64
 
-class zhipu_video(example_plugin):
+class zhipu_video():
     """zhipu视频生成API"""
     register_order = ["/视频","/video"]
 
     def __init__(self):
-        self.client = bigModel_api()
+        self.basics = Basics()
+        self.client = bigModel_api.bigModel_api()
 
     def request_video(self,prompt,image_url = None):
         """请求视频"""
@@ -39,12 +40,9 @@ class zhipu_video(example_plugin):
         raise ValueError("超过最大请求次数，仍未请求到视频!")
 
 
-    @example_plugin.store_verify_parameters(
-        parameter_quantity_max_2=10,parameter_quantity_min_2=1,
-    )
-    async def main(self,user_input,qq_TestGroup,data,basics):
+    async def main(self,argument,qq_TestGroup,data):
 
-        prompt = " ".join(self.other_argument)
+        prompt = " ".join(argument[1])
         id = None
 
         for message in data["message"]:
@@ -68,9 +66,18 @@ class zhipu_video(example_plugin):
         await self.basics.QQ_send_message.send_group_message(qq_TestGroup,f"视频生成完成，耗时{total_wait_time}秒\nurl:{image_url}")
 
         await self.basics.QQ_send_message.send_group_video(qq_TestGroup, image_url,local_Path_type=False)
+        
+        return True
+    
 
-    async def zhipu_video(self, user_input, qq_TestGroup, data):
+video = zhipu_video()
 
-        await self.main(user_input, qq_TestGroup, data)
+command_main = Command_information(
+    name="zhipu_video",
+    aliases=["视频","video"],
+    handler=video.main,
+    description="生成视频,支持图片生成视频\n语法: /视频 [prompt]\n",
+    authority_level=1,
+    parameter=[[0,0],[1, 10]]
+)
 
-        return "ok"

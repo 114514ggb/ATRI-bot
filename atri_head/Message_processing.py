@@ -1,4 +1,4 @@
-from .ImplementationCommand import *
+from .ImplementationCommand.command_processor import command_processor
 from .textMonitoring import textMonitoring
 from .Basics import Basics
 import time
@@ -13,7 +13,6 @@ class group_message_processing():
         self.command_processor = command_processor()
         self.textMonitoring = textMonitoring()
         self.basics.Command.syncing_locally()#同步数据库
-        self.command_processor.Load_additional_commands()#加载额外指令
 
     async def main(self,data):
         """主消息处理函数"""
@@ -48,7 +47,7 @@ class group_message_processing():
             # await self.command_processor.main(message,qq_TestGroup,data)#测试，执行指令时创建一个新进程
 
             # start_time = time.perf_counter()
-            await self.command_processor.command_processing(message,qq_TestGroup,data)
+            await self.command_processor.main(message,qq_TestGroup,data)
             # end_time = time.perf_counter()
             # print("指令耗时：", end_time - start_time, "秒")
 

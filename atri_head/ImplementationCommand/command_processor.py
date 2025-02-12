@@ -1,109 +1,151 @@
-from .simple_commands import *
-from ..Basics import Basics
-import multiprocessing
-import asyncio
+from ..Basics import Basics,Command_information
+import importlib.util
 import os
+import re
 
 class command_processor():
     """指令处理器"""
     def __init__(self):
         self.basics = Basics()
+        self.command_list:list[Command_information] = [
+            Command_information(
+                name="help",
+                aliases=["帮助", "help"],
+                handler= self.helper,
+                description="查看帮助",
+                authority_level=0,
+                parameter=[[0, 1], [0, 1]]
+            ),
+        ]
+        """命令列表"""
+        print("初始化指令处理器\n正在加载指令...")
+        self.command_load()
+        print("指令加载完成!\n")
 
-    # "/manage""/管理"添加管理员权限或黑名单
-    command_list = {
-        "/help":"1001","/帮助":"1001",
-        "/kill":"1002","/清除上下文":"1002",
-        "/fortune":"1003","/今日运势":"1003",
-        "/img":"1004","/图片":"1004",
-        "/test":"3005",#测试指令
-        "/Permissions":"0006","/查看权限":"0006",
-        "/sing":"3007","/唱歌":"3007",
-        "/role":"3008","/角色":"3008",
-        "/voice":"1009","/说话":"1009",
-        # "/MD5":"1010","/加密":"1010",
-    }
-    """命令列表，格式为{命令:命令编号}，命令编号第一位是权限等级，后三位是命令编号一般是按照注册顺序来的"""
-    
-    def_list ={
-        "1001":help,
-        "1002":kill,
-        "1003":Random_fortune,
-        "1004":random_img,
-        "3005":test,
-        "0006":permissions_my,
-        "3007":sing,
-        "3008":toggleModel,
-        "1009":audio,
-        # "1010":encryptedMessage,
-    }
-    """命令列表，格式为{命令编号:函数}"""
-
-    async def main(self, user_input, qq_id, data):
-        """主函数,创建进程执行指令"""
-        process = multiprocessing.Process(
-            target=self.subroutine, 
-            args=(user_input, qq_id, data),
-            name="command_processing"
-        )
-        process.start()
-        
-        return "ok"
-    
-    def subroutine(self, *args, **kwargs):
-        """子函数,创建进程执行指令"""
-        asyncio.run(self.command_processing(*args, **kwargs))
-
-    async def command_processing(self,user_input,qq_id,data):
-        """处理执行用户输入指令"""
+    async def main(self, user_input: str, qq_id: int, data: dict) -> bool:
         try:
-            def_id ,command = self.basics.Command.receive_command(user_input, data['user_id'], self.command_list)
+            command, parameter = self.verify_command(user_input, data['user_id'])
 
             try:
-                if def_id in self.def_list:
-
-                    await self.def_list[def_id](user_input=user_input, qq_TestGroup=qq_id, data=data, basics=self.basics)
-                    print(f"ATRI:指令:{command},执行成功!")
-                    return "ok"
-
-                else:
-                    raise Exception("该指令已经注册,但是没有实现")
+                await command(parameter, qq_id, data) #执行指令
+                return True
 
             except Exception as e:
-                await self.basics.QQ_send_message.send_group_message(qq_id,"执行指令出错了，请稍后再试!😰\nType Error:"+str(e))
-                return "no"
+                await self.basics.QQ_send_message.send_group_message(qq_id,"指令执行异常，请稍后再试!😰\nType Error:"+str(e))
+                return False
 
         except Exception as e:
             await self.basics.QQ_send_message.send_group_message(qq_id,"ATRI用手挠了挠脑袋,表示不理解这个指令😕\nType Error:"+str(e))
-            return "no"
+            return False
 
-    def Load_additional_commands(self):
-        """加载额外指令"""
+    def verify_command(self, user_input: str, user_qq_id: int):
+        """验证指令,用来判断命令是否存在，是否具有权限,参数数量是否正确,成功后返回命令主函数和提取的参数列表"""
         
-        folder_path = "atri_head\ImplementationCommand\plugins"
-        finally_key = int(list(self.def_list.keys())[-1][-3:])
+        pattern_command = r'^\s*/(\S+)'
 
-        # print("正在加载插件...")
-        for dirpath, __, filenames in os.walk(folder_path):
-            if dirpath == folder_path:
-                for Class in filenames:
-                    if Class.endswith(".py") and Class != "example_plugin.py":
+        if my_command := re.findall(pattern_command, user_input):
 
-                        finally_key += 1
-                        dirname = Class[:-3]
-                        namespace = {'finally_key': finally_key, 'dirname': dirname, "def_list": self.def_list}
-                        # print("加载插件文件：" + dirname)
-                        exec("from .plugins." + dirname + " import "+ dirname,globals(),namespace)
-                        exec("plugin ="+dirname+"()",globals(),namespace)
-                        exec("Command_id = str(plugin.authority_level) + str(finally_key).rjust(3, '0')",globals(),namespace)
-                        exec("register_order = plugin.register_order",globals(),namespace)
+            my_command = my_command[0]
 
-                        register_order = namespace['register_order']
-                        Command_id = namespace['Command_id']
-
-                        for order in register_order:
-                            self.command_list[order] = Command_id
+            for command in self.command_list:
+                if my_command in command.aliases:
+                    if self.basics.Command.permissions(user_qq_id, command.authority_level):
                         
-                        exec("def_list[Command_id] = plugin."+dirname,globals(),namespace)
-        # print("插件加载完成！")
-        # print("已注册指令列表："+str(self.command_list))
-        return "ok"
+                        parameter = self.basics.Command.processingParameter(user_input)
+                        self.basics.Command.verifyParameter(parameter,command.parameter)
+                        
+                        return command.handler,parameter
+                    
+                    else:
+                        raise Exception("权限不足")
+
+            raise Exception("命令不存在")
+        else:
+            raise Exception("格式错误")
+
+    def command_load(self):
+        """加载命令到command_list"""
+        folder_path = "atri_head\\ImplementationCommand\\command_realize"
+        default_module_name = "command_main"
+        
+        for name in os.listdir(folder_path):
+            dir_path = os.path.join(folder_path, name)
+            if os.path.isdir(dir_path):
+
+                file_path = os.path.join(dir_path, "__init__.py")
+                if not os.path.exists(file_path):
+                    print(f"文件夹{dir_path}中没有__init__.py文件")
+                    continue 
+
+                spec = importlib.util.spec_from_file_location(name, file_path)
+                
+                if spec is None:
+                    print(f"导入模块{file_path} 失败！")
+                    continue
+
+                module = importlib.util.module_from_spec(spec)
+
+                if module is None:
+                    print(f"获取模块{file_path}中的loader 失败！")
+                    continue
+
+                try:
+                    spec.loader.exec_module(module)
+                except Exception as e:
+                    print(f"加载模块时发生错误：{e}")
+                    continue
+
+                func = getattr(module, default_module_name, None)
+                if func is None:
+                    print(f"获取模块{file_path}中的主处理函数失败！")
+                    continue
+                
+                self.command_list.append(func)
+    
+    async def helper(self,parameter, qq_id, data):
+        """帮助指令"""
+
+        help_text = """GNU atri，版本 1.14.0.96(1)-release (x86_64-pe-Lwinux-gnu)
+这些 atri 命令是内部定义的。输入 "/help" 以获取本列表。
+输入 "/help 名称" 以得到有关函数 "名称" 的更多信息。
+使用 "/help atri" 来获得关于 ATRI 的更多一般性信息。
+使用 "/help -all" 或 "/help -fuck" 来获取不在本列表中的命令的更多信息
+
+warn :所有命令以开头要@bot再接一个"/"才能使用
+
+/manage -[controls] [list] [be_operated_qq_id] -管理指令
+/kill -清除记忆
+/test -[at_will] [at_will] -测试用命令
+/role [role_name] -切换聊天角色
+/permissions -查看自己当前权限
+"""
+        if parameter == [[],[]]:
+            await self.basics.QQ_send_message.send_group_message(qq_id,help_text)
+        elif parameter == [["all",],[]] or parameter == [["fuck",],[]]:
+            
+            list_text = "当前可用的命令:\n"
+            for command in self.command_list:
+                list_text += f"{command.name} : {command.description}\n\n"
+            await self.basics.QQ_send_message.send_group_message(qq_id,list_text)
+            return True
+            
+        elif parameter == [[],["atri"]]:
+            
+            introduce ="ATRI 是一个基于 NapCat 编写的 QQ 机器人。\n基本功能:\n1,@机器人后接文字就可以聊天\n2,@机器人后接/[命令]即可触发命令.\n3,会对群里的文字里一些词由反应。"
+            await self.basics.QQ_send_message.send_group_message(qq_id,introduce)
+            return True
+        
+        elif parameter[0] == [] and len(parameter[1]) == 1:
+            
+            for command in self.command_list:
+                if command.name == parameter[1][0]:
+                    command_text = f"指令名称: {command.name}\n调用名: {command.aliases}\n功能描述: {command.description}\n执行所需权限等级: {command.authority_level}级\n指令可接受参数数量范围: {command.parameter}"
+                    await self.basics.QQ_send_message.send_group_message(qq_id,command_text)
+                    return True
+            
+            raise ValueError("该命令不存在")
+                
+        else:
+            raise ValueError(f"不支持的参数:{parameter}")
+
+

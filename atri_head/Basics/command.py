@@ -3,46 +3,31 @@ from .permissions_management import Permissions_management
 
 class Command(Permissions_management):
     
-    def receive_command(self, command, people, command_list):
-        """命令处理,用来判断命令是否存在，是否具有权限,并返回布尔类型或命令编号和命令"""
+    def verifyParameter(self, parameter_list, quantity_list):
+        """
+        验证参数长度。
 
-        pattern_command = r'^\s(/\S+)' #只匹配开头命令
+        :param parameter_list: 参数列表，应包含两个子列表。
+        :param quantity_list: 参数数量限制列表，每个元素是一个包含最小值和最大值的元组。
+        :return: 验证通过的参数及其长度的两个list。
+        """
+        (min_appoint, max_appoint), (min_other, max_other) = quantity_list
+        
+        appointed_params = parameter_list[0]
+        other_params = parameter_list[1]
+        appointed_length = len(appointed_params)
+        other_length = len(other_params)
 
-        if "/" in command:
-
-            if my_command := re.findall(pattern_command, command):
-
-                my_command = my_command[0]
-
-                if my_command in command_list:
-
-                    if self.permissions(people, command_list[my_command][0]):
-
-                        return command_list[my_command],my_command
-                    
-                    else:
-                        raise Exception("权限不足")
-                else:
-                    raise Exception("命令不存在") 
-            else:
-                raise Exception("格式错误")
-        else:
-            raise Exception("不是命令")
-    
-    def verifyParameter(self,Parameter_list,parameter_quantity_min_1 = 0, parameter_quantity_max_1 = 0, parameter_quantity_min_2 = 0, parameter_quantity_max_2 = 0):
-        """验证参数长度"""
-        parameter_appoint = Parameter_list[0]
-        parameter_other = Parameter_list[1]
-        parameter_appoint_length = len(parameter_appoint)
-        parameter_other_length = len(parameter_other)
-
-        if parameter_quantity_min_1 <= parameter_appoint_length <= parameter_quantity_max_1 and parameter_quantity_min_2 <= parameter_other_length <= parameter_quantity_max_2:
-            return parameter_appoint,parameter_appoint_length,parameter_other,parameter_other_length
-        else:
-            raise Exception("参数数量错误")
+        if not (min_appoint <= appointed_length <= max_appoint):
+            raise ValueError(f"指定参数数量应在{min_appoint}到{max_appoint}之间，实际为{appointed_length}")
+        if not (min_other <= other_length <= max_other):
+            raise ValueError(f"其他参数数量应在{min_other}到{max_other}之间，实际为{other_length}")
+        
+        # 如果所有参数都符合要求，则返回参数及其长度
+        return [appointed_params, appointed_length], [other_params, other_length]
         
     def processingParameter(self,command):
-        """处理参数"""
+        """提取参数"""
         pattern_command_argumrnts = r'-([^\s-]+)' #匹配参数'-'开头
         pattern_command_other_argumrnts = r'(?<=\s)([^/\s-]\S*)' #匹配命令其他参数
 

@@ -71,13 +71,13 @@ class Permissions_management():
 
     def permissions(self, people, permission_level):
         """判断是否有权限"""
-        if permission_level <= "3" and people in self.root:
+        if people in self.root:
             return True
-        elif permission_level <= "2" and people in self.administrator:
+        elif permission_level <= 2 and people in self.administrator:
             return True
-        elif permission_level <= "1" and people not in self.blacklist:
+        elif permission_level <= 1 and people not in self.blacklist:
             return True
-        elif permission_level == "0":
+        elif permission_level == 0:
             return True
         else:
             Exception("你没有这个权限")

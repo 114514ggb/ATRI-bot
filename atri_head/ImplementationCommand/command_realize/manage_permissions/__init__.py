@@ -1,10 +1,11 @@
-from .example_plugin import example_plugin as example
+from atri_head.Basics import Basics,Command_information
 
-class manage_Permissions(example):
+
+class manage_Permissions():
     """用于管理权限"""
-    register_order = ["/manage","/管理"]
-    authority_level = 2
-    people = None
+    
+    def __init__(self):
+        self.basics = Basics()
 
     action_map = {
         "添加": "添加",
@@ -28,11 +29,9 @@ class manage_Permissions(example):
         "black": "黑名单"
     }
 
-    @example.store_verify_parameters(
-        parameter_quantity_max_1=1,parameter_quantity_min_1=1,
-        parameter_quantity_max_2=2,parameter_quantity_min_2=1,
-    )
-    async def manage_Permissions(self, user_input, qq_TestGroup, data, basics):
+    async def manage_Permissions(self, argument, qq_TestGroup, data):
+        
+        minus_argument,other_argument = argument
         self.people = data["user_id"]
     
         # print(self.minus_argument,self.other_argument)
@@ -40,16 +39,16 @@ class manage_Permissions(example):
         role = None
         Be_operated_qq = None
 
-        if self.minus_argument[0] in self.action_map:
-            action = self.action_map[self.minus_argument[0]]
+        if minus_argument[0] in self.action_map:
+            action = self.action_map[minus_argument[0]]
             if action in ["添加", "删除"]:
-                Be_operated_qq = int(self.other_argument[1])
+                Be_operated_qq = int(other_argument[1])
 
-        if self.other_argument[0] in self.role_map:
-            role = self.role_map[self.other_argument[0]]
+        if other_argument[0] in self.role_map:
+            role = self.role_map[other_argument[0]]
 
         # 执行操作
-        text = self.handle_operation(action, role, Be_operated_qq,qq_TestGroup)
+        text = self.handle_operation(action, role, Be_operated_qq)
 
         await self.basics.QQ_send_message.send_group_message(qq_TestGroup, text)
         
@@ -62,7 +61,7 @@ class manage_Permissions(example):
         return f"黑名单列表:\n{self.basics.Command.blacklist}"
 
     
-    def handle_operation(self,action, role, qq_id,qq_TestGroup):
+    def handle_operation(self,action, role, qq_id):
         """执行权限操作"""
         operations = {
             "添加": {
@@ -82,7 +81,7 @@ class manage_Permissions(example):
         if action not in operations:
             raise ValueError("不支持的操作类型! 仅支持: 添加, 删除, 查询")
         if role not in operations[action]:
-            raise ValueError(f"不支持的权限类型 '{role}'! 仅支持: 管理员, 黑名单")
+            raise ValueError(f"不支持的名单类型 '{role}'! 仅支持: 管理员, 黑名单")
 
         if action in ["添加", "删除"]:
             operations[action][role](qq_id, self.people)
@@ -91,4 +90,15 @@ class manage_Permissions(example):
 
         elif action == "查询":
             return operations[action][role]()
-            
+        
+
+manage = manage_Permissions()
+
+command_main = Command_information(
+    name="manage_Permissions",
+    aliases=["管理", "manage"],
+    handler=manage.manage_Permissions,
+    description="用于管理权限,支持增删改查黑名单和管理员\n语法: /管理 -[操作] [名单] [被操作QQ号]\n[操作]: append, delete, query\n[名单]: administrator, blacklist",
+    authority_level=2, 
+    parameter=[[1, 1], [1, 2]]
+)

@@ -1,11 +1,13 @@
-from .example_plugin import example_plugin as example
+from atri_head.Basics import Basics,Command_information
 import re
 from lxml import etree
 import aiohttp
 
-class crawler_bili(example):
+
+class crawler_bili():
     """用于爬取bilibili视频信息"""
-    register_order = ["/B站", "/爬虫"]
+    def __init__(self):
+        self.basics = Basics()
 
     BILIBILI_HEADER = {
         'User-Agent':
@@ -15,12 +17,10 @@ class crawler_bili(example):
     }
     """bilibili请求头"""
 
-    @example.store_verify_parameters(
-        parameter_quantity_max_2=10, parameter_quantity_min_2 = 1,
-    )
-    async def crawler_bili(self, user_input, qq_TestGroup, data, basics):
 
-        url = self.argument[1][0]
+    async def main(self, argument, qq_TestGroup, data):
+
+        url = argument[1][0]
 
         if re.match(r'^BV[1-9a-zA-Z]{10}$', url):
             url = 'https://www.bilibili.com/video/' + url
@@ -45,3 +45,15 @@ class crawler_bili(example):
 
                 else:
                     Exception("请求失败")
+
+
+
+crawler = crawler_bili()
+
+command_main = Command_information(
+    name="crawler",
+    aliases=["爬虫", "crawler", "b站"],
+    handler=crawler.main,
+    description="爬取bilibili视频信息",
+    parameter=[[0, 0], [1, 10]]
+)
