@@ -50,11 +50,12 @@ class Chat_processing():
             }
             self.model.append_message_text(self.messages,"user",str(user_data))
 
-            # try:
-            #     assistant_message = await self.deepseek.request_fetch_primary(my_messages = self.messages+self.review_prompt)
-            # except Exception as e:
-            #     print("Errors:"+str(e))
-            assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
+            try:
+                my_messages = self.messages
+                assistant_message = await self.deepseek.request_fetch_primary(my_model = "claude-3-5-haiku-20241022",my_messages = my_messages)
+            except Exception as e:
+                print("Errors:"+str(e))
+                assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
 
             print(assistant_message)
             self.messages.append(assistant_message)
@@ -71,9 +72,9 @@ class Chat_processing():
         """主函数"""
         chat_text =  await self.chat(message, data, qq_TestGroup)
         if chat_text != None:
-            for message in chat_text.split("\\"):
-                await asyncio.sleep(0.8)
-                await self.tool_calls.passing_message.send_group_message(qq_TestGroup,message)
+            # for message in chat_text.split("\\"):
+            #     await asyncio.sleep(0.8)
+            await self.tool_calls.passing_message.send_group_message(qq_TestGroup,chat_text)
 
     async def image_processing(self,data):
         """图片处理"""
@@ -106,6 +107,9 @@ class Chat_processing():
         """工具调用"""
         while True:
             
+            if assistant_message['content'] != None:
+                await self.tool_calls.passing_message.send_group_message(qq_TestGroup,assistant_message['content'])
+                
             for tool_calls in assistant_message['tool_calls']:
                 function = tool_calls['function']
                 # print("工具",function)
@@ -130,11 +134,11 @@ class Chat_processing():
 
                 if tool_output == {"out_tool_while": "已经退出工具调用循环"}:
                     return None
-            # try:
-            #     assistant_message = await self.deepseek.request_fetch_primary(my_messages = self.messages+self.review_prompt)
-            # except Exception as e:
-            #     print("Errors:"+str(e))
-            assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
+            try:
+                assistant_message = await self.deepseek.request_fetch_primary(my_model = "claude-3-5-haiku-20241022",my_messages = self.messages)
+            except Exception as e:
+                print("Errors:"+str(e))
+                assistant_message = self.model.generate_text_tools(self.chat_model,self.messages+self.review_prompt)['choices'][0]['message']
 
             print(assistant_message)
             self.messages.append(assistant_message)

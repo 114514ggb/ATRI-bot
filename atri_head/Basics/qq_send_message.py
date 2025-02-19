@@ -52,10 +52,10 @@ class QQ_send_message():
             try:
                 response = await self.client.post(url, data=json.dumps(payload), headers=self.headers)
                 if response.status_code == 200:
-                    print("消息发送成功")
+                    print("请求发送成功")
                     return response.json()
                 else:
-                    print(f"发送消息失败 {response.status_code} {response.text}")
+                    print(f"发送请求失败 {response.status_code} {response.text}")
             except httpx.HTTPError as e:
                 print("请求失败:", e)
         else:
@@ -72,10 +72,21 @@ class QQ_send_message():
             try:
 
                 await self.websocketClient.websocket.send(json.dumps(message))
-                print("消息发送成功")
+                print("请求发送成功")
                 
             except Exception as e:
-                print("发送消息失败:", e)
+                print("发送请求失败:", e)
+                
+    async def requests_require_return(self, url: str, payload: dict) -> dict:
+        """请求而且需要返回值"""
+        if self.connection_type == "http":
+            return await self.async_send(url=url,payload=payload)
+        else:
+            request_id = str(uuid.uuid4())
+            await self.async_send(url=url,payload=payload,echo = request_id)
+
+            return await self.websocketClient.gain_echo(request_id)
+
 
     async def send_group_message(self,group_id, message):
         """发送群聊文字消息"""
@@ -145,13 +156,17 @@ class QQ_send_message():
             "file_id": file_id,
         }
 
-        if self.connection_type == "http":
-            return await self.async_send(url=url,payload=payload)
-        else:
-            request_id = str(uuid.uuid4())
-            await self.async_send(url=url,payload=payload,echo = request_id)
-
-            return await self.websocketClient.gain_echo(request_id)
+        return await self.requests_require_return(url=url,payload=payload)
+    
+    async def get_group_info(self,group_id:int)->dict:
+        """获取群信息"""
+        
+        url = "get_group_info"
+        payload = {
+            "group_id": group_id,
+        }
+        
+        return await self.requests_require_return(url=url ,payload=payload)
             
         
 

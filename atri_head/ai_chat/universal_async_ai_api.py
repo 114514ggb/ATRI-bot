@@ -3,6 +3,7 @@ import httpx
 
 class universal_ai_api:
     """通用异步AI API"""
+
     
     model_parameters = {
         'stream': False,#是否流式输出如果设置为 True，将会以 SSE（server-sent events）的形式以流式发送消息增量。消息流以 data: [DONE] 结尾。
@@ -54,7 +55,7 @@ class universal_ai_api:
         self.base_url = base_url
         self.tools = tools
         """模型可能会调用的 tool 的列表。最多支持 128 个 function。"""
-        self.client = httpx.AsyncClient()
+        self.client = httpx.AsyncClient(timeout=httpx.Timeout(120.0))
 
     def alter_parameters(self, parameters:str, value):
         """修改模型参数"""

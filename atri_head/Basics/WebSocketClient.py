@@ -8,7 +8,6 @@ class WebSocketClient:
     """最大重连次数"""
     message_queue = Queue(10)
     """消息队列"""
-
     pending_requests_echos = {}
     """获取的回声列表"""
 
@@ -36,7 +35,7 @@ class WebSocketClient:
         while True:
             try:
                 self.websocket = await websockets.connect(self.uri)
-                print("连接成功")
+                print("NapCat连接成功!\n")
                 self.maximum_retry = 10
                 return self.websocket
             except Exception as e:

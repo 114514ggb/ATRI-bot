@@ -139,7 +139,7 @@ warn :所有命令以开头要@bot再接一个"/"才能使用
             
             for command in self.command_list:
                 if command.name == parameter[1][0]:
-                    command_text = f"指令名称: {command.name}\n调用名: {command.aliases}\n功能描述: {command.description}\n执行所需权限等级: {command.authority_level}级\n指令可接受参数数量范围: {command.parameter}"
+                    command_text = f"指令名称: {command.name}\n调用名: {command.aliases}\n功能描述: {command.description}\n执行所需最低权限等级: {command.authority_level}级\n指令可接受参数数量范围: {command.parameter}"
                     await self.basics.QQ_send_message.send_group_message(qq_id,command_text)
                     return True
             

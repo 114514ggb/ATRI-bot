@@ -6,6 +6,8 @@ import base64
 class zhipu_video():
     """zhipu视频生成API"""
     register_order = ["/视频","/video"]
+    model = "CogVideoX-Flash"
+    # model = "CogVideoX-2" 
 
     def __init__(self):
         self.basics = Basics()
@@ -14,13 +16,13 @@ class zhipu_video():
     def request_video(self,prompt,image_url = None):
         """请求视频"""
         if image_url:
-            return self.client.tucson_video(prompt, image_url) #图生视频
+            return self.client.tucson_video(prompt, image_url, self.model) #图生视频
         else:
-            return self.client.vincennes_video(prompt) #文生视频
+            return self.client.vincennes_video(prompt, self.model) #文生视频
 
     async def acquire_video(self,video_id):
         """获取视频"""
-        max_wait_times = 300     # 最大等待次数
+        max_wait_times = 6000     # 最大等待次数
         wait_interval = 1   # 每次等待间隔时间（秒）
         total_wait_time = 0
         image_url = None
@@ -49,7 +51,7 @@ class zhipu_video():
 
             if message["type"] == "image":
 
-                img_path = (await self.basics.QQ_send_message.send_img_details(message["data"]['file_id']))["data"]["file"]
+                img_path = (await self.basics.QQ_send_message.send_img_details(message["data"]['file']))["data"]["file"]
 
                 with open(img_path, 'rb') as img_file:
                     img_base = base64.b64encode(img_file.read()).decode('utf-8')
@@ -76,7 +78,7 @@ command_main = Command_information(
     name="zhipu_video",
     aliases=["视频","video"],
     handler=video.main,
-    description="生成视频,支持图片生成视频\n语法: /视频 [prompt]\n",
+    description="生成视频,支持文生和图片生成视频\n语法: /视频 [prompt] [picture]\n",
     authority_level=1,
     parameter=[[0,0],[1, 10]]
 )

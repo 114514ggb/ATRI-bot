@@ -111,7 +111,7 @@ class bigModel_api:
             image_url=image_url,
             quality="quality",  # 输出模式，"quality"为质量优先，"speed"为速度优先
             with_audio=False, #是否生成 AI 音频
-            size="1920x1080",  # 视频分辨率，支持最高4K（如: "3840x2160"）
+            size="3840x2160",  # 视频分辨率，支持最高4K（如: "3840x2160"）
             duration=5,  # 视频时长，可选5秒或10秒
             fps=30,  # 帧率，可选为30或60
         )

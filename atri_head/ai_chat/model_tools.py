@@ -74,6 +74,7 @@ from ..Basics.qq_send_message import QQ_send_message
 from gradio_client import Client
 from .bigModel_api import bigModel_api
 from .universal_async_ai_api import universal_ai_api
+from .async_open_ai_api import async_openAI
 import importlib.util
 import os
 import json
@@ -95,7 +96,13 @@ class tool_calls:
         self.tools = tools
         self.load_additional_tools() # 加载额外工具
         self.model = bigModel_api(tools=self.tools)
-        self.deepseek = universal_ai_api(tools=self.tools)
+        
+        # self.deepseek = universal_ai_api(tools=self.tools)
+        self.deepseek = async_openAI(
+            api_key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4",
+            base_url = "https://aihubmix.com/v1",
+            tools=self.tools
+        )
 
     async def calls(self, tool_name, arguments_str, qq_TestGroup):
         """调用工具"""

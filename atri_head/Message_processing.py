@@ -1,18 +1,21 @@
 from .ImplementationCommand.command_processor import command_processor
 from .textMonitoring import textMonitoring
 from .Basics import Basics
+import asyncio
 import time
+
 
 class group_message_processing():
     """群消息处理类"""
     qq_white_list = [] #qq白名单
+    first_connect_database = False #是否第一次连接数据库
 
     def __init__(self, playRole, http_base_url = None, token= None, connection_type = "http",qq_white_list = []):
         self.qq_white_list = qq_white_list
         self.basics = Basics(http_base_url, token, playRole, connection_type)
         self.command_processor = command_processor()
         self.textMonitoring = textMonitoring()
-        self.basics.Command.syncing_locally()#同步数据库
+        self.basics.Command.syncing_locally()#同步管理员名单数据库
 
     async def main(self,data):
         """主消息处理函数"""
@@ -35,15 +38,14 @@ class group_message_processing():
             elif self.basics.Command.blacklist_intercept(data["user_id"]): #黑名单检测
 
                 await self.receive_event(data,qq_TestGroup,message) #非at@事件处理
-
-        elif 'self_id' in data:
-            pass
-            # print("其他消息")
+        
+        await self.data_store(data) #数据存储
+            
 
     async def receive_event_at(self,data,qq_TestGroup,message):
         """at@事件处理"""  
 
-        if message[0:2] == " /":#命令处理
+        if message[0:2] == " /" or message[0] == "/":#命令处理
             # await self.command_processor.main(message,qq_TestGroup,data)#测试，执行指令时创建一个新进程
 
             # start_time = time.perf_counter()
@@ -71,6 +73,49 @@ class group_message_processing():
         if  data['user_id'] != data['self_id']: #排除自己发送的消息
 
             await self.textMonitoring.monitoring(message,qq_TestGroup,data)
+        
+    async def receive_event_private(self,data):
+        """私聊消息处理"""
+        pass
+    
+    async def data_store(self,data):
+        """数据存储"""
+        if self.first_connect_database == False:
+            await self.basics.link_async_database("127.0.0.1","root","180710")
+            self.first_connect_database = True
+            
+        if "post_type" in data and data["post_type"] == "message":
+            text = ""
+            for message in data["message"]:
+                if message["type"] == "text":
+                    text += message["data"]["text"]
+                else:
+                    text += "["+str(message["type"])+"]"
+            
+            group_name = (await self.basics.QQ_send_message.get_group_info(data["group_id"]))["data"]["group_name"]
+            
+            try:
+                users = {"user_id":data["user_id"],"nickname":data['sender']['nickname']}
+                message ={"message_id":data["message_id"],"content":text,"timestamp":data["time"],"group_id":data["group_id"],"user_id":data["user_id"]}
+                user_group = {"group_id":data["group_id"],"group_name":group_name}
+            except Exception as e:
+                print("获取参数失败:",e)
+                return "ok"
+            
+            try:
+                await self.basics.async_database.found_cursor()
+                await self.basics.async_database.add_user(**users)
+                await self.basics.async_database.add_group(**user_group)
+                await self.basics.async_database.add_message(**message)
+                await self.basics.async_database.close_cursor()
+            except Exception as e:
+                print("数据存储失败:",e)
+                await self.basics.async_database.close_cursor()
+                return "ok"
+
+            print("数据存储信息成功")
+            
+                        
 
             
                     

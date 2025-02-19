@@ -167,7 +167,7 @@ class textMonitoring():
         "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
         "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],
-        "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_大哭.gif","ATRI_哇哇大哭.jpg"]]],
+        "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_大哭.gif","ATRI_哇哇大哭.jpg","ATRI_呜哇.jpg"]]],
         "👍": [["text",["👍"]]],
         "😭": [["text",["怎么啦怎么啦，不要伤心嘛，来，亚托莉抱抱就好啦！","呜呜呜，不要难过啦!ATRI会一直陪在你身边哒！","不要哭泣，亚托莉会一直支持你的,不要伤心了!","不要伤心了，亚托莉在这里陪着你，一切都会好起来的！"]]],
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
@@ -205,7 +205,8 @@ class textMonitoring():
         "锤子":[["img",["ATRI_被锤了.gif"]]],
         "头疼":[["img",["ATRI_头疼.gif"]]],
         "还想睡":[["img",["ATRI_你快醒一醒.gif"]]],
-        "警告":[["img",["ATRI_吹哨.gif"]]],        
+        "警告":[["img",["ATRI_吹哨.gif"]]],
+        "没救了":[["img",["ATRI_这波没救了.jpg"]]],       
     }
     '''模糊匹配列表'''
 
