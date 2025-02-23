@@ -19,7 +19,7 @@ class group_message_processing():
 
     async def main(self,data):
         """主消息处理函数"""
-        if 'group_id' in data and data['group_id'] in self.qq_white_list: # 判断是否在白名单中
+        if 'group_id' in data and data['group_id'] in self.qq_white_list or ('user_id' in data and data['user_id'] == 2631018780): # 判断是否在白名单中
 
             print("Received event:", data)
             qq_TestGroup = data['group_id']
@@ -45,7 +45,7 @@ class group_message_processing():
     async def receive_event_at(self,data,qq_TestGroup,message):
         """at@事件处理"""  
 
-        if message[0:2] == " /" or message[0] == "/":#命令处理
+        if message.startswith(("/", " /")):#命令处理
             # await self.command_processor.main(message,qq_TestGroup,data)#测试，执行指令时创建一个新进程
 
             # start_time = time.perf_counter()

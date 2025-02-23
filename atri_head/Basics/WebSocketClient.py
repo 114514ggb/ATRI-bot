@@ -63,10 +63,16 @@ class WebSocketClient:
 
     async def queue_get(self):
         while True:
-            data = await self.message_queue.get()
-            for callback in self._listeners:
-                asyncio.create_task(callback(data))  # 异步回调
-                # callback(data)  # 同步回调
+            try:
+                data = await self.message_queue.get()
+                for callback in self._listeners:
+                    try:
+                        asyncio.create_task(callback(data))  # 异步回调
+                        # callback(data)  # 同步回调
+                    except Exception as e:
+                        print(f"回调错误: {e}")
+            except Exception as e:
+                print(f"队列处理错误: {e}")
             
     def add_listener(self, callback):
         """添加消息监听器"""

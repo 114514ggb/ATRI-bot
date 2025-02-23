@@ -4,11 +4,11 @@ import httpx,asyncio
 key = "S-6FTxYf0YMfqlS2d"
 tool_json = {
     "name": "get_region_weather",
-    "description": "获取指定地区的天气情况",
+    "description": "查询指定地区的实时天气数据，支持地名/IP地址/经纬度三种定位方式",
     "properties": {
         "location": {
             "type": "string",
-            "description": "位置名称，可以是地区，如北京上海或者是一个IP地址，经纬度,直接输入‘ip’,即可获取本地天气情况。",
+            "description": "输入格式：1) 地名（如北京） 2) IP地址 3) 经纬度坐标（如39.90,116.40）直接输入'ip'自动获取本地天气",
         }
     }
 }

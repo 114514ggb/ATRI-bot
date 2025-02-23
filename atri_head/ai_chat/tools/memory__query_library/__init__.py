@@ -3,11 +3,11 @@ from atri_head.ai_chat.tools.memory__query_library.inverted_index import inverte
 
 tool_json = {
     "name": "memory__query_library",
-    "description": "获取你记忆中的相关内容的工具,通过一个词或一句话来查询相关内容,你想回忆一个名字或一个词一句话可以调用这个,如果返回的是ID建议你去查看那个人的完整信息",
+    "description": "关键词记忆检索工具。当需要回忆特定名称、事件或细节时触发，返回结果若包含id可考虑调用memory__read_memory获取更多详情",
     "properties": {
         "word": {
             "type": "string",
-            "description": "你想查询的关键词语或是一句话。"
+            "description": "记忆检索的关键词或短语"
         }
     }
 }

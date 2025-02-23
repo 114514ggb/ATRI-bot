@@ -1,10 +1,12 @@
+import math
+
 tool_json = {
     "name": "python_calculator",
-    "description": "你想计算简单数学公式时非常有用",
+    "description": "执行数学表达式计算的工具，支持四则运算/幂运算/三角函数等基础运算",
     "properties": {
         "formula": {
             "type": "string",
-            "description": "放入需要计算的数学公式，例如：1+1，2*3，3/4，2**3等,要是Python环境能直接计算出来的",
+            "description": "Python可解析的数学表达式（示例：2*(3+5)、math.sqrt(4)、pow(2,3)），须包含完整运算符且符合Python语法规范",
         }
     }
 }

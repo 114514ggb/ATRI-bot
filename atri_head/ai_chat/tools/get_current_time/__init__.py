@@ -2,7 +2,7 @@ from datetime import datetime
 
 tool_json = {
     "name": "get_current_time",
-    "description": "当你想知道现在的北京时间时非常有用",
+    "description": "获取当前的北京时间（UTC+8时区）",
     "properties": None
 }
 

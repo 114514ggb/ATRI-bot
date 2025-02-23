@@ -1,4 +1,5 @@
 assets/
 document/
 abandoned/
+.vscode/
 __pycache__

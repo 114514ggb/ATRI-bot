@@ -5,11 +5,11 @@ api_key="fc57c8c15fe94a83a56aaa1f9401be6b.kALSJcRdCTn87TdO"
 
 tool_json = {
     "name": "web_search",
-    "description": "当你有不认识的东西或想知道你认知之外的信息时可以调用进行网络搜索,主要是搜索新闻类的信息",
+    "description": "实时网络信息检索工具,适用于需要需要时效性信息（新闻/事件/数据）的场景",
     "properties": {
         "key_word": {
             "type": "string",
-            "description": "你想搜索的关键词",
+            "description": "搜索的关键词组合",
         }
     }
 }

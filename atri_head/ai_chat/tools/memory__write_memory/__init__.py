@@ -4,15 +4,15 @@ memory_path = "assets/memory.json"
 
 tool_json = {
     "name": "memory__write_memory",
-    "description": "如果在上下中你看见并觉得应该记住的人的行为与事件，请调用这个函数，并将记忆内容写入。请尽量每次都调用，总结ta的习惯、爱好和性格,以及你对ta的印象",
+    "description": "存储用户长期记忆的工具，当检测到用户的新特征、行为模式变化或重要事件时建议记录,也可以用于存储用一些琐事",
     "properties": {
         "memory": {
             "type": "string",
-            "description": "你想记住的内容，概括并保留关键内容,最好带上日期"
+            "description": "格式：[今天日期] [分类] 具体内容，分类为habit/preference/persona/event"
         },
         "user_id": {
             "type": "string",
-            "description": "你想记住的人的user_id"
+            "description": "对话用户的唯一标识id"
         }
     }
 }

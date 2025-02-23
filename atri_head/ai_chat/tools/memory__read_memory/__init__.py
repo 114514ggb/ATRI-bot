@@ -4,11 +4,11 @@ memory_path = "assets/memory.json"
 
 tool_json = {
     "name": "memory__read_memory",
-    "description": "获取曾经你对用户行为喜好等记录的工具,建议输出前先调用这个函数,以提供更个性化的回答。",
+    "description": "获取一个用户完整记忆工具,返回对一个人的全部记忆,建议在需要用户历史习惯、偏好或重要事件信息时优先调用",
     "properties": {
         "user_id": {
             "type": "string",
-            "description": "你想获取的人的user_id"
+            "description": "对应的用户的id"
         }
     }
 }

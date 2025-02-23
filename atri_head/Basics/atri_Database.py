@@ -1,6 +1,7 @@
 import pymysql
 
 class AtriDB:
+    """数据库操作类"""
     def __init__(self, host, user, password):
         print("Connecting to database...\n")
         try:

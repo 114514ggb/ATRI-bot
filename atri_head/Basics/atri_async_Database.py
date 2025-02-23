@@ -1,35 +1,42 @@
 import aiomysql
-from aiomysql import IntegrityError
+from aiomysql import IntegrityError, Pool
+from threading import Lock
 import asyncio
 
 
 class AtriDB_Async:
+    """异步数据库操作类(连接池)"""
+    _pool: Pool = None
+    _lock = asyncio.Lock()
+    _thread_lock = Lock()
+    
     def __init__(self):
         self.conn = None
         self.cursor = None
         
     @classmethod
-    async def create(cls, host, user, password):
+    async def create(cls, host, user, password, pool_minsize=2, pool_maxsize=8):
         """异步初始化方法"""
-        print("初始化数据库连接...")
-        self = cls()
-        self.conn = await aiomysql.connect(
-            host=host,
-            user=user,
-            password=password,
-            db='atri',
-            autocommit=True  # 开启自动提交
-        )
-        print("数据库连接完成!")
+        async with cls._lock:  # 异步锁
+            print("初始化数据库连接...")
+            self = cls()
+            self.conn = await aiomysql.connect(
+                host=host,
+                user=user,
+                password=password,
+                db='atri',
+                autocommit=True  # 开启自动提交
+            )
+            print("数据库连接完成!")
         return self
     
     async def __aenter__(self):
-        """异步上下文管理器入口"""
+        """进入上下文时获取游标"""
         self.cursor = await self.conn.cursor()
         return self
      
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """异步上下文管理器出口"""
+        """退出上下文时关闭游标（不关闭连接）"""
         if self.cursor:
             await self.cursor.close()
             
@@ -73,7 +80,7 @@ class AtriDB_Async:
                     INSERT INTO users (user_id, nickname) 
                     VALUES (%s, %s) AS new
                     ON DUPLICATE KEY UPDATE 
-                        nickname = new.VALUES(nickname),
+                        nickname = new.nickname,
                         last_updated = CURRENT_TIMESTAMP
                 """,
                 (user_id, nickname)
@@ -99,7 +106,7 @@ class AtriDB_Async:
                     INSERT INTO user_group (group_id, group_name) 
                     VALUES (%s, %s) AS new
                     ON DUPLICATE KEY UPDATE 
-                        group_name = new.VALUES(group_name)
+                        group_name = new.group_name
                 """,
                 (group_id, group_name)
             )
@@ -115,8 +122,15 @@ class AtriDB_Async:
             (group_id,)
         )
         return await self.cursor.fetchone()
+
+    async def get_all_group(self)->dict:
+        """查询所有群组"""
+        await self.cursor.execute(
+            "SELECT * FROM user_group",
+        )
+        return await self.cursor.fetchall()
     
-    async def add_message(self, message_id, user_id, group_id, timestamp, content):
+    async def add_message(self, message_id:int, user_id:int, group_id:int, timestamp:int, content:str)->bool:
         """
         添加消息
         :param timestamp: 支持datetime对象或时间戳（整数）

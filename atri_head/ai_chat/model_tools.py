@@ -3,13 +3,13 @@ tools = [
         "type": "function",
         "function": {
             "name": "get_python_code_result",
-            "description": "当你想知道python代码运行结果时非常有用。如果有数学问题或编程能解决的问题请写一段代码来获取正确结果。返回给你终端的结果,记得print结果不然你什么也得不到。",
+            "description": "执行Python代码并返回标准输出结果，适用于数学计算、数据处理及算法验证等场景。请确保代码包含完整的执行逻辑并通过print()输出结果。",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "code": {
                         "type": "string",
-                        "description": "需要运行的完整python代码,记得print结果",
+                        "description": "需要执行的完整Python代码，必须包含print语句输出目标结果（如：print(1+1)）",
                     }
                 }
             },
@@ -20,13 +20,13 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "可以将文本内容转换为语音并发送出去，让你可以发出声音。只支持中文和英文日语。最好不要包含代码什么的",
+            "description": "将文本内容转换为语音消息并进行发送，支持发送中文、英文、日语。适用于需要语音输出的交互场景，建议使用口语化表达并避免代码等特殊符号。",
             "parameters": {            
                 "type": "object",
                 "properties": {
                     "message": {
                         "type": "string",
-                        "description": "需要发送消息的文本内容，只支持中文和英文日语",
+                        "description": "需转换为语音的文本内容（支持中文/英文/日语）",
                     }
                 }
             },
@@ -37,13 +37,13 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_text_message",
-            "description": "调用可以发送一次文本内容,并且不会结束你的当次响应机会,可以继续调用工具",
+            "description": "用来在单次交互中发送文本消息,但是后仍可继续使用其他功能，适用于需要连续操作的多步骤场景。消息内容将直接发送给用户。",
             "parameters": {            
                 "type": "object",
                 "properties": {
                     "message": {
                         "type": "string",
-                        "description": "需要发送消息的文本内容",
+                        "description": "需要直接呈现给用户的文本内容",
                     }
                 }
             },
@@ -54,7 +54,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_image_message",
-            "description": "这是你的画板,当你想画画时非常有用,可以按照你的描述生成一张图片，然后发送出去。",
+            "description": "这是你的画板,图像生成工具，能够根据文字描述自动生成对应的图片，并将生成的图片发送给用户。适用于需要将文本转化为视觉内容的场景。",
             "parameters": {            
                 "type": "object",
                 "properties": {

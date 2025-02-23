@@ -11,6 +11,9 @@ async def test(argument,qq_TestGroup,data):
     await basics.QQ_send_message.send_group_message(qq_TestGroup,"ATRI接收到的参数有:\n"+message+"\n要exec语句为:"+argument_2[0])
 
     # exec(argument_2[0])
+    await basics.async_database.found_cursor()
+    print(await basics.async_database.get_all_group())
+    await basics.async_database.close_cursor()
 
     return "ok"
 

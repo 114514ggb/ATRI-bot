@@ -129,7 +129,7 @@ class textMonitoring():
         "唱歌": [["img",["ATRI_唱片.gif"]]],
         "6": [["text",["6"]]],
         "ok": [["text",["ok","好的"]]],
-        "no": [["img",["ATRI_no.jpg"]]],
+        "no": [["img",["ATRI_no.gif"]]],
         "不要": [["img",["ATRI_摆手.gif","ATRI_不要1.gif"]]],
         "300颗": [["text",["够吗?又是这个难的过分的..."]]],
         "不行": [["img",["ATRI_垂头丧气.gif","ATRI_不要1.gif"]]],
