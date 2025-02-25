@@ -5,25 +5,25 @@ import asyncio
 
 class Chat_processing():
     """聊天处理器"""
-    messages = []
+    messages:list[dict] = []
     """当前消息列表"""
 
-    all_group_messages_list = {}
+    all_group_messages_list:dict[str, list] = {}
     """所有群消息列表"""
     
-    temporary_messages = []
+    temporary_messages:list[dict] = []
     """临时消息列表"""
 
-
+    chat_model:str = "claude-3-5-haiku-20241022"
     # chat_model = "GLM-4-Flash"
-    chat_model = "GLM-4-Plus"
+    # chat_model = "GLM-4-Plus"
     # chat_model = "deepseek-chat"
     """聊天模型"""
     
     image_model = "GLM-4V-Flash"
     """视觉识别模型"""
 
-    messages_length_limit = 20
+    messages_length_limit:int = 20
     """单个群上下文消息上限"""
 
     playRole_list = {
@@ -64,10 +64,10 @@ class Chat_processing():
             self.append_message_review(user_data) #审查
             
             try:
-                assistant_message = await self.deepseek.request_fetch_primary(my_model = "claude-3-5-haiku-20241022",my_messages = self.messages + self.temporary_messages)
+                assistant_message = await self.deepseek.request_fetch_primary(my_model = self.chat_model,my_messages = self.messages + self.temporary_messages)
             except Exception as e:
                 print("Errors:"+str(e))
-                assistant_message = self.model.generate_text_tools(self.chat_model,my_messages = self.messages + self.temporary_messages)['choices'][0]['message']
+                assistant_message = self.model.generate_text_tools("GLM-4-Flash",my_messages = self.messages + self.temporary_messages)['choices'][0]['message']
 
             print(assistant_message)
 
@@ -96,12 +96,17 @@ class Chat_processing():
 
     async def main(self,qq_TestGroup,message,data):
         """主函数"""
+        group_id = str(data["group_id"])
+        self.get_group_chat(group_id) #获取群聊消息
+        
         chat_text =  await self.chat(message, data, qq_TestGroup)
         if chat_text != None:
             # for message in chat_text.split("\\"):
             #     await asyncio.sleep(0.8)
             await self.tool_calls.passing_message.send_group_message(qq_TestGroup,chat_text)
         # print(self.messages)
+        
+        self.store_group_chat(group_id) #储存群聊消息
 
     async def image_processing(self,data):
         """图片处理"""
@@ -163,10 +168,10 @@ class Chat_processing():
                     return None
                 
             try:
-                assistant_message = await self.deepseek.request_fetch_primary(my_model = "claude-3-5-haiku-20241022",my_messages = self.messages + self.temporary_messages)
+                assistant_message = await self.deepseek.request_fetch_primary(my_model = self.chat_model,my_messages = self.messages + self.temporary_messages)
             except Exception as e:
                 print("Errors:"+str(e))
-                assistant_message = self.model.generate_text_tools(self.chat_model,my_messages = self.messages + self.temporary_messages)['choices'][0]['message']
+                assistant_message = self.model.generate_text_tools("GLM-4-Flash",my_messages = self.messages + self.temporary_messages)['choices'][0]['message']
 
             print(assistant_message)
             self.temporary_messages.append(assistant_message)
@@ -176,10 +181,9 @@ class Chat_processing():
 
         return assistant_message['content']
     
-    def reset_chat(self):
+    def reset_chat(self,group_id:str):
         """重置聊天记录"""
-        self.messages = []
-        self.model.append_playRole(self.Default_playRole,self.messages)
+        self.all_group_messages_list[group_id] = self.model.append_playRole(self.Default_playRole,[])
 
     def restrictions_messages_length(self):
         """限制消息长度"""
@@ -194,14 +198,19 @@ class Chat_processing():
             self.messages = self.messages[-35:]
             self.model.append_playRole(self.Default_playRole,self.messages)
 
-    def get_group_chat(self,data:dict)->None:
+    def get_group_chat(self,group_id:str)->None:
         """获取群聊天"""
-        self.messages = self.all_group_messages_list[str(data['group_id'])]
-        pass
-    
-    def initialize_group_chat(self)->None:
-        """初始化群聊天记录"""
-        pass
+        if group_id in self.all_group_messages_list:
+            self.messages = self.all_group_messages_list[group_id]
+        else:
+            self.messages = []
+            self.model.append_playRole(self.Default_playRole,self.messages)
+            self.all_group_messages_list[group_id] = self.messages
+        
+
+    def store_group_chat(self,group_id:str)->None:
+        """存储群聊天"""
+        self.all_group_messages_list[group_id] = self.messages
 
     def append_message_review(self,content:dict):
         """添加带审查的消息,添加于临时消息列表"""

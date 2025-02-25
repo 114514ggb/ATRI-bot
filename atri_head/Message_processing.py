@@ -17,7 +17,7 @@ class group_message_processing():
         self.textMonitoring = textMonitoring()
         self.basics.Command.syncing_locally()#同步管理员名单数据库
 
-    async def main(self,data):
+    async def main(self,data:dict)-> bool:
         """主消息处理函数"""
         if 'group_id' in data and data['group_id'] in self.qq_white_list or ('user_id' in data and data['user_id'] == 2631018780): # 判断是否在白名单中
 
@@ -39,10 +39,10 @@ class group_message_processing():
 
                 await self.receive_event(data,qq_TestGroup,message) #非at@事件处理
         
-        await self.data_store(data) #数据存储
+        return await self.data_store(data) #数据存储
             
 
-    async def receive_event_at(self,data,qq_TestGroup,message):
+    async def receive_event_at(self,data:dict,qq_TestGroup:int,message:str)-> bool:
         """at@事件处理"""  
 
         if message.startswith(("/", " /")):#命令处理
@@ -52,36 +52,48 @@ class group_message_processing():
             await self.command_processor.main(message,qq_TestGroup,data)
             # end_time = time.perf_counter()
             # print("指令耗时：", end_time - start_time, "秒")
+            return True
 
         else:
             try:
 
                 if self.basics.Command.blacklist_intercept(data['user_id']):
+                    
                     await self.basics.AI_interaction.chat.main(qq_TestGroup, message, data) #聊天处理
+                    return True
+                
                 else:
                     raise Exception("检测到黑名单内人员")
                     
 
             except Exception as e:
                 await self.basics.QQ_send_message.send_group_message(qq_TestGroup,"聊天出错了，请稍后再试!\nType Error:"+str(e))
+                return False
 
-        return "ok"
+        
 
-    async def receive_event(self,data,qq_TestGroup,message):
+    async def receive_event(self, data:dict, qq_TestGroup:int, message:str):
         """非at@事件处理"""
 
         if  data['user_id'] != data['self_id']: #排除自己发送的消息
 
             await self.textMonitoring.monitoring(message,qq_TestGroup,data)
+            
+            return True
+        
+        return False
         
     async def receive_event_private(self,data):
         """私聊消息处理"""
         pass
     
-    async def data_store(self,data):
+    async def data_store(self, data:dict) -> bool:
         """数据存储"""
         if self.first_connect_database == False:
+            
             await self.basics.link_async_database("127.0.0.1","root","180710")
+            await self.exit_save() #退出时处理
+            
             self.first_connect_database = True
             
         if "post_type" in data and data["post_type"] == "message":
@@ -100,20 +112,29 @@ class group_message_processing():
                 user_group = {"group_id":data["group_id"],"group_name":group_name}
             except Exception as e:
                 print("获取参数失败:",e)
-                return "ok"
+                return None
             
             try:
-                await self.basics.async_database.found_cursor()
-                await self.basics.async_database.add_user(**users)
-                await self.basics.async_database.add_group(**user_group)
-                await self.basics.async_database.add_message(**message)
-                await self.basics.async_database.close_cursor()
+                async with self.basics.async_database as db:
+                    await db.add_user(**users)
+                    await db.add_group(**user_group)
+                    await db.add_message(**message)
+                    
+                print("数据存储信息成功!")
+                return True
+                
             except Exception as e:
                 print("数据存储失败:",e)
-                await self.basics.async_database.close_cursor()
-                return "ok"
+                await self.basics.async_database.error_close()
+                return None
 
-            print("数据存储信息成功")
+    async def exit_save(self):
+        """退出时保存数据"""
+        db_quit= self.basics.async_database.close_pool
+        
+        self.basics.exiter_save.register_async(db_quit)
+        
+            
             
                         
 

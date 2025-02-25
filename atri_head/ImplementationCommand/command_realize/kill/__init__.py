@@ -6,8 +6,10 @@ basics = Basics()
 
 async def kill(argument,qq_TestGroup,data):
     """清除记忆"""
-    if len(basics.AI_interaction.chat.messages) > 1:
-        basics.AI_interaction.chat.reset_chat()
+    group_id = data[group_id]
+    message_list:list = basics.AI_interaction.chat.all_group_messages_list[group_id]
+    if len(message_list) >= 2:
+        message_list = []
         await basics.QQ_send_message.send_group_message(qq_TestGroup,"ATRI的记忆已经被清除,重新开始对话吧!😊")
         return "ok"
     else:

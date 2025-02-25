@@ -2,23 +2,6 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "get_python_code_result",
-            "description": "执行Python代码并返回标准输出结果，适用于数学计算、数据处理及算法验证等场景。请确保代码包含完整的执行逻辑并通过print()输出结果。",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "code": {
-                        "type": "string",
-                        "description": "需要执行的完整Python代码，必须包含print语句输出目标结果（如：print(1+1)）",
-                    }
-                }
-            },
-            "required": ["code"]
-        }
-    },
-    {
-        "type": "function",
-        "function": {
             "name": "send_speech_message",
             "description": "将文本内容转换为语音消息并进行发送，支持发送中文、英文、日语。适用于需要语音输出的交互场景，建议使用口语化表达并避免代码等特殊符号。",
             "parameters": {            
@@ -69,7 +52,6 @@ tools = [
     },    
 ]
 
-import subprocess
 from ..Basics.qq_send_message import QQ_send_message
 from gradio_client import Client
 from .bigModel_api import bigModel_api
@@ -86,7 +68,6 @@ class tool_calls:
     def __init__(self):
         self.passing_message = QQ_send_message()
         self.tools_functions_dict = {
-            'get_python_code_result': self.get_python_code_result,
         }
         self.tools_functions_dict_qq = {
             'send_speech_message': self.send_speech_message,
@@ -201,19 +182,7 @@ class tool_calls:
             tool_json_integrity["function"]["required"] = list(tool_json["properties"].keys())
 
         return tool_json_integrity
-    
-    async def get_python_code_result(self,code:str):
-        """获取python代码运行结果"""
-        with open(self.code_url, "w", encoding='utf-8') as f:
-            f.write(code)
-
-        result = subprocess.run(["python", self.code_url], capture_output=True, text=True)
-
-        if result.returncode != 0:
-            return {"error": result.stderr}
-        else:
-            return {"command_line_interface":result.stdout}
-    
+     
     async def send_text_message(self, message, qq_TestGroup):
         """发送文本消息"""
         await self.passing_message.send_group_message(qq_TestGroup,message)

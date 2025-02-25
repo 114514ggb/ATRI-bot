@@ -7,10 +7,11 @@ basics = Basics()
 async def toggleModel(argument,qq_TestGroup,data):
     """切换模型人物"""
     playRole = argument[1][0]
+    group_id = str(data["group_id"])
 
     if playRole in basics.AI_interaction.chat.playRole_list:
         basics.AI_interaction.chat.Default_playRole = basics.AI_interaction.chat.playRole_list[playRole]
-        basics.AI_interaction.chat.reset_chat()
+        basics.AI_interaction.chat.reset_chat(group_id)
     else:
         raise Exception("没有这个角色")
 

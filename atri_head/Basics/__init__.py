@@ -5,6 +5,7 @@ from .chance import Chance
 from .qq_send_message import QQ_send_message
 from .command import Command #还有一个Permissions_management继承在里面
 from .Command_information import Command as Command_information
+from .exit_save import graceful_exiter
 from threading import Lock
 import asyncio
 
@@ -29,6 +30,7 @@ class Basics:
             self.AI_interaction = AI_interaction(playRole) #AI 交互
             self.Command = Command() #命令还有权限管理
             self.Chance = Chance() #随机事件
+            self.exiter_save = graceful_exiter() #退出保存
             # self.database = AtriDB("localhost", "root", "180710") #数据库
             self.async_database = None #异步数据库
             self._initialized = True  # 标记为已初始化 

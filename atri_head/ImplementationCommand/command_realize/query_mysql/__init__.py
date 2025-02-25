@@ -8,9 +8,9 @@ async def query_mysql(argument,qq_TestGroup,data):
     minus_argument,other_argument = argument
     if basics.Command.isQQ(other_argument[0]):
         
-        await basics.async_database.found_cursor()
-        my_tuple = (await basics.async_database.get_user(other_argument[0]))
-        await basics.async_database.close_cursor()
+        async with basics.async_database as db:
+            my_tuple = (await basics.async_database.get_user(other_argument[0]))
+        
         
         if my_tuple:
             name = my_tuple[1]
