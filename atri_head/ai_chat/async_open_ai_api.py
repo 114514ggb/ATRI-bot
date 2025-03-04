@@ -45,7 +45,7 @@ class async_openAI:
 
         return True
 
-    async def generate_text(self, my_model, my_messages):
+    async def generate_text(self, my_model:str, my_messages:list)->dict:
         """请求生成文本,全部默认。"""
         completion = await self.client.chat.completions.create(
             model = my_model, 
@@ -54,14 +54,6 @@ class async_openAI:
 
         return completion.model_dump()
 
-    async def generate_text(self, my_model, my_messages):
-        """请求生成文本,全部默认。"""
-        completion = await self.client.chat.completions.create(
-            model = my_model, 
-            messages = my_messages,
-        )
-
-        return completion.model_dump()
 
     async def generate_text_argument(self, my_model, my_messages):
         """请求生成文本，带自定义参数"""

@@ -5,7 +5,7 @@ api_key="fc57c8c15fe94a83a56aaa1f9401be6b.kALSJcRdCTn87TdO"
 
 tool_json = {
     "name": "web_search",
-    "description": "实时网络信息检索工具,适用于需要需要时效性信息（新闻/事件/数据）的场景",
+    "description": "实时网络信息检索工具,适用于需要需要时效性信息（新闻/事件/数据）的场景,这个工具会返回关键词的搜索结果",
     "properties": {
         "key_word": {
             "type": "string",

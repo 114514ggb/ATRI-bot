@@ -3,7 +3,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "将文本内容转换为语音消息并进行发送，支持发送中文、英文、日语。适用于需要语音输出的交互场景，建议使用口语化表达并避免代码等特殊符号。",
+            "description": "将文本内容转换为语音消息并进行发送，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。",
             "parameters": {            
                 "type": "object",
                 "properties": {
@@ -20,7 +20,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_text_message",
-            "description": "用来在单次交互中发送文本消息,但是后仍可继续使用其他功能，适用于需要连续操作的多步骤场景。消息内容将直接发送给用户。",
+            "description": "用来发送文本消息,发送然后不会结束你的这次响应机会，适用于需要连续发多条消息的多步场景。",
             "parameters": {            
                 "type": "object",
                 "properties": {
@@ -78,24 +78,30 @@ class tool_calls:
         self.load_additional_tools() # 加载额外工具
         self.model = bigModel_api(tools=self.tools)
         
-        # self.deepseek = universal_ai_api(tools=self.tools)
-        self.deepseek = async_openAI(
-            api_key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4",
-            base_url = "https://aihubmix.com/v1",
-            tools=self.tools
-        )
+        self.deepseek = universal_ai_api(tools=self.tools)
+        
+        # self.deepseek = async_openAI(
+        #     api_key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4",
+        #     base_url = "https://aihubmix.com/v1",
+        #     tools=self.tools
+        # )
 
     async def calls(self, tool_name, arguments_str, qq_TestGroup):
         """调用工具"""
         if tool_name in self.tools_functions_dict|self.tools_functions_dict_qq:
-
-            if arguments_str == "{}":   
-                return await self.tools_functions_dict[tool_name]()
-            elif tool_name in self.tools_functions_dict_qq: 
-                return await self.tools_functions_dict_qq[tool_name](**(json.loads(arguments_str)|{"qq_TestGroup":qq_TestGroup}))
-            else:
-                return await self.tools_functions_dict[tool_name](**json.loads(arguments_str))
-            
+            try:
+                
+                if arguments_str == "{}":   
+                    return await self.tools_functions_dict[tool_name]()
+                elif tool_name in self.tools_functions_dict_qq: 
+                    return await self.tools_functions_dict_qq[tool_name](**(json.loads(arguments_str)|{"qq_TestGroup":qq_TestGroup}))
+                else:
+                    return await self.tools_functions_dict[tool_name](**json.loads(arguments_str))
+                
+            except TypeError as e:
+                print(f"函数调用参数错误: {e}")
+            except KeyError as e:
+                print(f"工具函数未实现: {e}")
         else:
             Exception("Unknown tool")
 
@@ -187,21 +193,21 @@ class tool_calls:
         """发送文本消息"""
         await self.passing_message.send_group_message(qq_TestGroup,message)
 
-        return {"send_text_message": "文本消息已发送"}
+        return {"send_text_message": f"已发送:{message}"}
     
     async def send_speech_message(self, message, qq_TestGroup):
         """发送语音消息"""
         url = self.text_to_speech(message)
         await self.passing_message.send_group_audio(qq_TestGroup, url)
 
-        return {"speech_message": "语音消息已发送"}
+        return {"send_speech_message": f"已发送语音内容：{message}"}
     
     async def send_image_message(self, prompt, qq_TestGroup):
         """生成发送图片消息"""
         url = self.model.generate_image(prompt)['data'][0]['url']
         await self.passing_message.send_group_pictures(qq_TestGroup,url,local_Path_type=False)
         print("图片发送成功")
-        return {"image_message": "图片消息已发送"}
+        return {"send_image_message": "图片消息已发送"}
     
     def text_to_speech(self, text):
         """文本转语音,返回语音路径"""

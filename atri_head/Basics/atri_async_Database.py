@@ -157,7 +157,7 @@ class AtriDB_Async:
         )
         return await self.cursor.fetchone()
 
-    async def get_all_group(self)->dict:
+    async def get_all_group(self)->tuple:
         """查询所有群组"""
         await self._auto_connect()
         await self.cursor.execute(
@@ -183,7 +183,7 @@ class AtriDB_Async:
             print(f"添加消息失败，请检查外键约束: {e}")
             return False
         
-    async def get_messages_by_user(self, user_id, limit=50)-> dict:
+    async def get_messages_by_user(self, user_id, limit=50)-> tuple:
         """查询用户最近消息"""
         await self._auto_connect()
         await self.cursor.execute(
@@ -195,7 +195,7 @@ class AtriDB_Async:
         )
         return await self.cursor.fetchall()
     
-    async def get_messages_by_group(self, group_id, limit=50)-> dict:
+    async def get_messages_by_group(self, group_id, limit=50)-> tuple:
         """查询群组最近消息"""
         await self._auto_connect()
         await self.cursor.execute(
@@ -207,7 +207,7 @@ class AtriDB_Async:
         )
         return await self.cursor.fetchall()
     
-    async def execute_SQL(self, sql:str, argument:tuple)-> dict:
+    async def execute_SQL(self, sql:str, argument:tuple)-> tuple:
         """执行SQL语句"""
         await self._auto_connect()
         await self.cursor.execute(sql, argument)
@@ -221,3 +221,11 @@ if __name__ == "__main__":
             print(await db.get_user(123))
     
     asyncio.run(main())
+    
+"""
+SELECT *
+FROM meassage
+WHERE group_id = group_id_value
+ORDER BY time DESC
+LIMIT 20;
+"""

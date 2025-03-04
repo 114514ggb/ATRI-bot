@@ -35,3 +35,19 @@ class Command(Permissions_management):
         command_other_argumrnts = re.findall(pattern_command_other_argumrnts, command)
 
         return [command_argumrnts,command_other_argumrnts]
+
+    def data_processing_text(self,data:dict)->str:
+        """处理原data成纯text"""
+        text = ""
+        for message in data["message"]:
+            my_type = message["type"]
+            if my_type == "text":
+                text += message["data"]["text"]
+            elif my_type == "image":
+                summary = message["data"]["summary"]
+                text += summary if summary != "" else "[image]"
+            elif my_type == "at":
+                text = "[@"+message["data"]["qq"]+"]"
+            else:
+                text += "["+message["type"]+"]"
+        return text

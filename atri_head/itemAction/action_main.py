@@ -7,7 +7,9 @@ class itemAction():
         self.basics = Basics()
         self.listeners = [
             self.poke, #戳一戳
+            # self.initiative_chat, #自动回复
         ]
+        """监听器list"""
 
     async def main(self,qq_TestGroup, data):
         """反射主函数"""
@@ -27,6 +29,21 @@ class itemAction():
             return True
         
         return False
+    
+    async def initiative_chat(self,qq_TestGroup, data):
+        """自动判断回复群消息"""
+        if qq_TestGroup == 984466158 and "message" in data:
+            ai_response = await self.basics.AI_interaction.auto_response.chat_main(
+                data=data,
+                user_text = self.basics.Command.data_processing_text(data)
+                )
+            print("AI回复",ai_response)
+            if ai_response:
+                await self.basics.QQ_send_message.send_group_message(qq_TestGroup,ai_response)
+                return True
+                
+        return False
+
 
     def add_listener(self, callback):
         """添加监听器"""

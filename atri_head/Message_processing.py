@@ -97,12 +97,8 @@ class group_message_processing():
             self.first_connect_database = True
             
         if "post_type" in data and data["post_type"] == "message":
-            text = ""
-            for message in data["message"]:
-                if message["type"] == "text":
-                    text += message["data"]["text"]
-                else:
-                    text += "["+str(message["type"])+"]"
+            
+            text = self.basics.Command.data_processing_text(data=data)
             
             group_name = (await self.basics.QQ_send_message.get_group_info(data["group_id"]))["data"]["group_name"]
             
