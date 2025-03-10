@@ -27,7 +27,7 @@ class textMonitoring():
         """精确匹配，匹配字段一样就反应"""
         if text in self.monitoring_alike_list.keys():
             
-            if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(50):#有在常用词列表里，并且随机到50%的概率不反应
+            if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(30):#有在常用词列表里，并且随机到50%的概率不反应
                 return True
             
             await self.sendHandle(qq_TestGroup,self.monitoring_alike_list[text])
@@ -69,7 +69,7 @@ class textMonitoring():
         return True
 
     monitoring_alike_list = {
-        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg"]],["text",["?"]]],
+        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg"]],["text",["?"]]],
         "草": [["text",["草"]]],
         "艹": [["text",["艹"]]],
         "怪了": [["text",["怪了"]]],
@@ -78,16 +78,17 @@ class textMonitoring():
         "😨": [["text",["😨"]]],
         "😱": [["text",["😱"]]],
         "🌿": [["text",["🌿"]]],
+        "哇": [["img",["ATRI_哇.jpg"]]],
         "诶": [["text",["诶","为什么叹气呢？"]]],
         "哎": [["text",["哎"]]],
         "乐": [["text",["乐","乐！"]]],
         "233": [["text",["233"]]],
         # "萝卜子": [["img",['ATRI_鸭子走.gif','ATRI_左右.gif',"ATRI_呆望.jpg","ATRI_不要1.gif"]]],
-        "螃蟹": [["img",["ATRI_见到螃蟹.gif"]],["text",["亚托莉最喜欢吃螃蟹了~"]]],
-        "摸头": [["img",["ATRI_摸头.gif","ATRI_摸头1.gif","ATRI_摸头2.gif","ATRI_摸头.jpg"]]],
+        "螃蟹": [["img",["ATRI_见到螃蟹.gif","ATRI_是螃蟹.jpg"]],["text",["亚托莉最喜欢吃螃蟹了~"]]],
+        "摸头": [["img",["ATRI_摸头.gif","ATRI_摸头1.gif","ATRI_摸头2.gif","ATRI_摸头.jpg","ATRI_摸头3.gif"]]],
         "早": [["audio",["早上好.mp3","唔......吧唧......早上.......哈啊啊~~......早上好......夏生先.......mp3"]],["text",["早哦！","早上好！", "早上好呀！", "早上好，今天也要元气满满哦~","おはようございます!"]]],
         "睡了":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚安！我也要睡觉啦~"]],["img",["ATRI_睡觉.gif"]]],        
-        "投食":[["img",["ATRI_吃瓜.gif","ATRI_小虎牙咬面包.jpg"]]],
+        "投食":[["img",["ATRI_吃瓜.gif","ATRI_小虎牙咬面包.jpg","ATRI_叼着面包探头.jpg"]]],
         "骂我":[["img",["你太变态.jpg","ATRI_不行.gif"]]],
         "踩我":[["text",["请不要这样！"]]],
         "爱你":[["img",["ATRI_得意.gif","ATRI_抛星星眼.gif","ATRI_ 亲亲.gif","ATRI_ 啊？.gif","ATRI_自我陶醉.gif","ATRI_爱心.gif"]]],
@@ -123,7 +124,7 @@ class textMonitoring():
         "确信": [["text",["确信"]]],
         "是这样": [["text",["是这样","雀食是这样"]]],
         "摸摸头":[["text",["呜呜呜，摸头会长不高的！"]],["img",["ATRI_晃脑.gif"]]],
-        "爬": [["text",["爬"]]],
+        "爬": [["text",["爬"]],["img",["ATRI_爬.jpg"]]],
         "谢谢": [["img",["ATRI_谢谢.jpg"]]],
         "叫哥哥": [["text",["欧尼～酱","欧尼酱","哥哥","哥哥～"]]],
         "唱歌": [["img",["ATRI_唱片.gif"]]],
@@ -142,7 +143,7 @@ class textMonitoring():
     '''精确匹配列表'''
 
     monitoring_have_list = {
-        "🤔": [["text",["🤔"]],["img",["ATRI_思考.jpg","ATRI_思考1.jpg","ATRI_思考2.jpg"]]],
+        "🤔": [["text",["🤔"]],["img",["ATRI_思考.jpg","ATRI_思考1.jpg","ATRI_思考2.jpg","ATRI_思考3.jpg"]]],
         "😡": [["text",["😡","诶诶诶，不要生气嘛，要和睦相处哒~","亚托莉也生气了！","你怎么脸红了？😡"]]],
         "不是哥们": [["text",["不是哥们?"]]],
         "喵": [["text",["喵","喵喵!","喵喵喵!","喵泥格咪的！","我喵","喵？","我喵喵喵!","猫ですよ","你是猫吗？喵!"]]],
@@ -171,14 +172,14 @@ class textMonitoring():
         "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
         # "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],
-        "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_大哭.gif","ATRI_哇哇大哭.jpg","ATRI_呜哇.jpg"]]],
+        "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_哭3.jpg","ATRI_大哭.gif","ATRI_哇哇大哭.jpg","ATRI_呜哇.jpg"]]],
         "👍": [["text",["👍"]]],
         "😭": [["text",["怎么啦怎么啦，不要伤心嘛，来，亚托莉抱抱就好啦！","呜呜呜，不要难过啦!ATRI会一直陪在你身边哒！","不要哭泣，亚托莉会一直支持你的,不要伤心了!","不要伤心了，亚托莉在这里陪着你，一切都会好起来的！"]]],
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
         "无敌了":[["text",["无敌了!","无敌了"]]],
         "让世界感受痛苦":[["img",["ATRI_地爆天星.jpg"]]],
         "啊这":[["img",["ATRI_没办法给你解释.jpg","ATRI_惊讶.gif","ATRI_眨眼1.gif"]],["text",["啊这?"]]],
-        "我来":[["img",["ATRI_放心交给我吧.gif","ATRI_敬礼.gif"]]],
+        "我来":[["img",["ATRI_交给我把.gif","ATRI_敬礼.gif"]]],
         "正确": [["img",["ATRI_正确的.jpg"]]],
         "笑死我了":[["text",["笑死你了？","笑死我了!","我也笑死了"]]],
         "二次元":[["img",["ATRI_和我一起去二次元.jpg"]]],
@@ -190,6 +191,7 @@ class textMonitoring():
         "厉害": [["img",["ATRI_厉害.jpg"]]],
         "yes": [["img",["ATRI_yes.jpg","ATRI_YES1.jpg"]]],
         "YES": [["img",["ATRI_yes.jpg","ATRI_YES1.jpg"]]],
+        "杂鱼": [["img",["ATRI_杂鱼.jpg"]]],
         "蚌埠": [["text",["难蚌"]]],
         "星期四":[["img",["ATRI_V我50.jpg"]]],
         "鬼": [["img",["ATRI_当鬼.gif","ATRI_鬼脸.gif"]]],
@@ -213,6 +215,8 @@ class textMonitoring():
         "摸鱼":[["img",["ATRI_摸鱼.png"]]],
         "还想睡":[["img",["ATRI_你快醒一醒.gif"]]],
         "警告":[["img",["ATRI_吹哨.gif"]]],
+        "祈祷中":[["img",["ATRI_希望人没事.jpg"]]],
+        "人没事": [["img",["ATRI_希望人没事.jpg"]]],
         "没救了":[["img",["ATRI_这波没救了.jpg"]]],       
     }
     '''模糊匹配列表'''

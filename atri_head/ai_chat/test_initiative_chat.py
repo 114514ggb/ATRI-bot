@@ -19,53 +19,63 @@ class initiative_chat():
     async def chat_main(self, data:dict, user_text:str)->str:
         """测试主动回复聊天"""
         
-        user_data = str({
-            "id":data['user_id'], #qq号
-            "nick_name":data['sender']['nickname'],#qq昵称
-            "message":user_text #消息内容
-        })
-
-        # self.messages.append({"role": "user","content": user_data})
-        self.chat_messages.append(user_data)
+        if data['user_id'] == 168238719:
+            self.chat_messages.append(str({"ATRI_reply":user_text}))
+            return None
+        else:
+            
+            user_data = str({
+                "id":data['user_id'], #qq号
+                "nick_name":data['sender']['nickname'],#qq昵称
+                "message":user_text #消息内容
+            })
+            context = f"\"historical_record\":{str(list(self.chat_messages))},\"latest_news\":{user_data}"
         
-        if await self.message_classification():
-            print("需要回复")
-            ai_text = await self.reply_group_chat()
+        if await self.message_classification(context):
+            ai_text = await self.reply_group_chat(context)
             if ai_text == "none":
                 return None
-            else:
-                self.messages.append({"role": "assistant","content": ai_text})
-
-        print("不要回复",self.messages)
+            self.chat_messages.append(user_data)
+            return ai_text
+        self.chat_messages.append(user_data)
         return None
         
     async def request_fetch_primary(self,alone_message)->str:
         """请求回复,直接返回回复内容"""
-        return (await self.chat_api.generate_text(self.model,alone_message))['choices'][0]['message']
+        return (await self.chat_api.generate_text(self.model,alone_message))['choices'][0]['message']['content']
         
-    async def message_classification(self)->str:
+    async def message_classification(self,context:str)->str:
         """消息分类,判断是否需要回复"""
+        n = 1
         while True:
+            
+            grout_chat = {
+                "role": "user", 
+                "content": f"{{{context},\"prompt\":\"分类主要看最新的消息\"latest_news\"字段,内容格式是字典,解释用户唯一标识:\"id\"用户自己的名称:\"nick_name\"用户输入的文本:\"message\"\"名称： 提到或包含带有这个人名アトリ(ATRI),亚托莉,外号\"萝卜子\"这个人,而且下面可能需要她接话或回话（优先级最高）\n- 闲聊：日常对话、问候、情感表达、无关紧要的讨论等。\n- 其他：广告、无关链接、无法识别的内容如[img][json][动画表情][语音]或肯定无需ATRI回应的信息,还有看起来话没说完的。仅要输出分类结果，分类完的结果不是“其他”的话输出单词“true”，否则输出单词“false”}}"
+            }
+            
             alone_message = [{
                 "role": "system",
-                "content": "###任务###你需要分析群聊中的上一条或几条消息，判断在上文中其所属类型。分类标准如下：\n- 名称： 提到或包含アトリ(ATRI),亚托莉,外号\"萝卜子\"这个人,而且下面需要她接话. - 提问：包含明确的问题或请求，需要回答或解决方案。\n- 闲聊：日常对话、问候、情感表达、无关紧要的讨论等。\n- 其他：广告、无关链接、无法识别的内容或无需回应的信息,还有看起来话没说完的。\n###输出要求###仅输出分类结果，从[名称, 提问, 闲聊, 其他]中选择，只用输出分类选择中一个词语不要其他内容。"
-            }] + str(list(self.chat_messages)+["分类上文,从[名称, 提问, 闲聊, 其他]这个几个词中选择，只用输出给出的分类中一个词语不要其他内容。"])
+                "content": "###任务###你需要分析群聊中的最新消息，判断最一个叫ATRI的人是否应该回复。分类标准如下：\n- 名称： 提到或包含带有这个人名アトリ(ATRI),亚托莉,外号\"萝卜子\"这个人,而且下面可能需要她接话或回话.- 闲聊：日常对话、问候、情感表达、无关紧要的讨论等。\n- 其他：广告、无关链接、无法识别的内容或无需回应的信息,还有看起来话没说完的。\n###输出要求###仅要输出分类结果，分类完的结果不是“其他”的话就是需要回复，就直接输出单词“true”，否则输出单词“false”。"
+            },grout_chat]
             
-            print(alone_message)
-            # text_type = (await self.request_fetch_primary(alone_message))
-            text_type = "其他"
-            
-            print(text_type)
-            if text_type in ["提问","闲聊","其他"]:
-                break
-        
-        if text_type == "其他":
-            return None
+            # print(alone_message)
+            text_type = (await self.request_fetch_primary(alone_message))
 
-        else:
-            return text_type
+            print("判断:",text_type)
+            if text_type in ["true", "false"]:
+                break
+            
+            if n >= 3:
+                return None
+            
+            n+=1
         
-    async def reply_group_chat(self)->str:
+        if text_type == "false":
+            return None
+        return text_type
+        
+    async def reply_group_chat(self,context:str)->str:
         """回复消息, 返回回复内容，如果不回返回nene"""
         
         role = [{
@@ -80,8 +90,12 @@ class initiative_chat():
 2.你的本名アトリ(ATRI),亚托莉,外号\"萝卜子\".提到自己或介绍自己时叫自己\"ATRI\""""
         }]
         
-        alone_message = role + list(self.messages) + [{"role": "system","content":"prompt:你所处的是一个群聊环境注意区分多个人，你负责在群里卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为肯定能解决得问题,不要在话中带上或问有什么需要帮忙.你在群里像真猫一样懒洋洋的就够了。最好在回复的句子中加入颜文字，以表达自己的情绪\"\"\"最重要\"\"\"如果你感觉上文他们的话只有一般或是什么不对，或是不在我要求的环境的就输出\"none\"."}]
+        grout_chat = [{
+            "role": "user", 
+            "content": f"{{{context},\"prompt\":你所处的是一个群聊环境注意区分多个人，你负责在群里卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为肯定能解决得问题,不要在话中带上或问有什么需要帮忙.你在群里像真猫一样懒洋洋的就够了。最好在回复的句子中加入颜文字，以表达自己的情绪\"\"\"最重要\"\"\"如果你感觉上文他们的话只有一半（没说完）或是什么不对，能不回复或不是我要求的情况就就直接输出\"none\"不然就正常输出回复，如果不知道可以大方说不知道，不要乱猜,你需要回复的是\"latest_news\"，而不是回复整个上下文的全部消息。\"}}"
+        }]
         
-        text_type = await self.request_fetch_primary(alone_message)
+        text_type = (await self.request_fetch_primary(role + grout_chat))
         
         return text_type
+    

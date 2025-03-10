@@ -1,4 +1,5 @@
 import websockets,asyncio,json,sys
+from concurrent.futures import ThreadPoolExecutor
 from asyncio import Queue
 
 class WebSocketClient:
@@ -17,7 +18,7 @@ class WebSocketClient:
         return cls._instance
 
     def __init__(self, uri = "127.0.0.1:8080",access_token = None, websocket=None):
-        if not hasattr(self, "_initialized"): # 检查是否已经初始化
+        if not hasattr(self, "_initialized"):
             access_token = access_token
             if access_token is None:
                 self.uri = f'ws://{uri}/'
@@ -27,8 +28,11 @@ class WebSocketClient:
             self._listeners = [
                 self.add_pending_request
             ]
-
-            self._initialized = True  # 标记为已初始化
+            
+            # self.executor = ThreadPoolExecutor(max_workers=4) # 以后可能会用到的线程池
+            # self.loop = asyncio.get_event_loop()
+            # self._lock = threading.Lock()
+            self._initialized = True
 
     async def connect(self):
         """连接到WebSocket服务器"""
@@ -69,6 +73,7 @@ class WebSocketClient:
                     try:
                         asyncio.create_task(callback(data))  # 异步回调
                         # callback(data)  # 同步回调
+                        # await self.loop.run_in_executor(self.executor, callback, data) # 多线程异步回调
                     except Exception as e:
                         print(f"回调错误: {e}")
             except Exception as e:
@@ -80,6 +85,7 @@ class WebSocketClient:
     
     async def add_pending_request(self, data):
         """添加待处理的回声"""
+        # with self._lock:
         if "echo" in data and data["echo"] != "":
             # print("添加回声:",data["echo"])
             self.pending_requests_echos[data["echo"]] = data

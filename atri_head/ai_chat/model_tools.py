@@ -3,7 +3,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "将文本内容转换为语音消息并进行发送，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。",
+            "description": "将文本内容转换为语音消息并进行发送(不会结束工具调用,发完后一般调用工具tool_calls_end)，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。",
             "parameters": {            
                 "type": "object",
                 "properties": {
@@ -20,7 +20,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_text_message",
-            "description": "用来发送文本消息,发送然后不会结束你的这次响应机会，适用于需要连续发多条消息的多步场景。",
+            "description": "用来发送文本消息(不会结束工具调用,发完后一般调用工具tool_calls_end)，适用于需要连续发多条消息的多步场景。",
             "parameters": {            
                 "type": "object",
                 "properties": {

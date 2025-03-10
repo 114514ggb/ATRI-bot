@@ -28,7 +28,7 @@ class bigModel_api:
     def append_playRole(self,content,messages:list):
         """添加扮演的角色，固定为列表的第一个元素"""
         if content != "":
-            messages.append({"role": "system","content": content})
+             messages.insert(0, {"role": "system","content": content})
         return messages
     
     def append_message_text(self,messages:list,role:str,content:str):

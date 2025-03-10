@@ -18,22 +18,22 @@ class AtriDB_Async:
     @classmethod
     async def create(cls, host, user, password, pool_minsize=2, pool_maxsize=8):
         """初始化连接池"""
-        with cls._thread_lock:
-            if cls._pool is None:
-                async with cls._lock:
-                    if cls._pool is None:
-                        print("初始化数据库连接池...")
-                        cls._pool = await aiomysql.create_pool(
-                            host=host,
-                            user=user,
-                            password=password,
-                            db='atri',
-                            autocommit=True,
-                            minsize=pool_minsize,
-                            maxsize=pool_maxsize,
-                            pool_recycle=300  # 重连
-                        )
-                        print(f"连接池已创建（大小：{pool_minsize}-{pool_maxsize}）")
+        # with cls._thread_lock:
+        if cls._pool is None:
+            async with cls._lock:
+                if cls._pool is None:
+                    print("初始化数据库连接池...")
+                    cls._pool = await aiomysql.create_pool(
+                        host=host,
+                        user=user,
+                        password=password,
+                        db='atri',
+                        autocommit=True,
+                        minsize=pool_minsize,
+                        maxsize=pool_maxsize,
+                        pool_recycle=300  # 重连
+                    )
+                    print(f"连接池已创建（大小：{pool_minsize}-{pool_maxsize}）")
         return cls()
     
     @classmethod
@@ -97,6 +97,8 @@ class AtriDB_Async:
 
     async def _auto_connect(self):
         """确保操作前有可用连接"""
+        if self.conn and self.conn.closed:  # 检查连接是否已关闭
+            await self.release_connection() 
         if not self.conn:
             self.conn = await self._pool.acquire()
         if not self.cursor:
@@ -218,7 +220,7 @@ if __name__ == "__main__":
     async def main():
         async with await AtriDB_Async.create('localhost', 'root', '180710') as db:
             # await db.add_user(123, 'test')
-            print(await db.get_user(123))
+            print(await db.get_user(2631018780))
     
     asyncio.run(main())
     

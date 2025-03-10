@@ -7,7 +7,7 @@ class itemAction():
         self.basics = Basics()
         self.listeners = [
             self.poke, #戳一戳
-            # self.initiative_chat, #自动回复
+            self.initiative_chat, #自动回复
         ]
         """监听器list"""
 
@@ -37,7 +37,7 @@ class itemAction():
                 data=data,
                 user_text = self.basics.Command.data_processing_text(data)
                 )
-            print("AI回复",ai_response)
+            # print("AI回复",ai_response)
             if ai_response:
                 await self.basics.QQ_send_message.send_group_message(qq_TestGroup,ai_response)
                 return True

@@ -10,6 +10,7 @@ class async_openAI:
         'max_tokens': 8192,#生成文本的最大长度
         'stop': None,#当模型生成的文本即将包含指定的字符串或token_id时，将自动停止生成。
     }
+    """模型参数"""
 
     tools = []
     '''工具列表，用于指定模型可以使用的工具'''
@@ -62,7 +63,7 @@ class async_openAI:
             messages = my_messages,
             frequency_penalty = self.model_parameters['frequency_penalty'],
             top_p = self.model_parameters['top_p'],
-            temperature = self.model_parameters['temperature'],
+            # temperature = self.model_parameters['temperature'],
             max_tokens = self.model_parameters['max_tokens'],
         )
 
@@ -74,8 +75,8 @@ class async_openAI:
             model = my_model, 
             messages = my_messages,
             frequency_penalty = self.model_parameters['frequency_penalty'],
-            # top_p = self.model_parameters['top_p'],
-            # temperature = self.model_parameters['temperature'],
+            top_p = self.model_parameters['top_p'],
+            temperature = self.model_parameters['temperature'],
             max_tokens = self.model_parameters['max_tokens'],
             response_format = response_format,
             tools = self.tools,
