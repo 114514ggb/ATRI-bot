@@ -126,9 +126,10 @@ class group_message_processing():
 
     async def exit_save(self):
         """退出时保存数据"""
-        db_quit= self.basics.async_database.close_pool
+        pass
+        # db_quit= self.basics.async_database.close_pool #清理数据库
         
-        self.basics.exiter_save.register_async(db_quit)
+        # self.basics.exiter_save.register_async(db_quit)
         
             
             

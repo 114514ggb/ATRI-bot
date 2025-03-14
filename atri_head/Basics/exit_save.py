@@ -2,7 +2,7 @@ import signal
 import asyncio
 import logging
 import sys
-from typing import Callable, Awaitable, Optional
+from typing import Callable, Awaitable
 
 class graceful_exiter:
     """退出保存类"""
@@ -30,31 +30,25 @@ class graceful_exiter:
                 except Exception as e:
                     logging.exception(f"同步清理失败: {e}")
             
-            
-            loop: Optional[asyncio.AbstractEventLoop] = None
-            
             if self.async_handlers:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                self._run_async_handlers(loop)
-                
+                try:
+                    asyncio.run(self._run_async_handlers())
+                except Exception as e:
+                    logging.exception(f"异步清理过程中发生错误: {e}")
+                    
         finally:
-            if loop and not loop.is_closed():
-                    loop.close()
+            print(f"清理完成, 退出程序 (退出码: {self.exit_code})")
             sys.exit(self.exit_code)
 
-    def _run_async_handlers(self, loop: asyncio.AbstractEventLoop) -> None:
+    async def _run_async_handlers(self) -> None:
         """执行异步处理器"""
-        async def _gather_tasks():
-            return await asyncio.gather(
-                *[handler() for handler in self.async_handlers],
-                return_exceptions=True
-            )
-
         try:
-            loop.run_until_complete(
-                asyncio.wait_for(_gather_tasks(), timeout=self.timeout)
-            )
+            await asyncio.wait_for(
+                asyncio.gather(
+                    *[handler() for handler in self.async_handlers],
+                    return_exceptions=True
+                )                               
+                , timeout=self.timeout)
         except asyncio.TimeoutError:
             logging.error(f"异步清理超时 (最长等待 {self.timeout}s)")
         

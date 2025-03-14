@@ -5,6 +5,7 @@ import asyncio
 from ..Basics.WebSocketClient import WebSocketClient
 
 class QQ_send_message():
+    """QQ消息发送器"""
     _instance = None
     File_root_directory = "E:/程序文件/python/ATRI/document/"
     
@@ -100,6 +101,48 @@ class QQ_send_message():
         await self.async_send(url,params)
         # self.send(url,params)
 
+    async def send_group_reply_msg(self,group_id:int, message:str, reply_message_id:int):
+        """发送群聊回复消息"""
+        params = [
+            {
+                "type": "reply",#这个必须第一个
+                "data": {
+                    "id": reply_message_id
+                }
+            },
+            {
+                "type": "text",
+                "data": {
+                    "text": message
+                }
+            }
+        ]
+        
+        await self.send_group_message(group_id, params)
+
+        
+    async def send_group_merge_forward(self,group_id, message):
+        """发送群合并转发消息"""
+        api_url = "send_group_forward_msg"
+        pass
+    
+    async def send_group_poke(self,group_id, user_id):
+        """发送群戳一戳"""
+        api_url = "group_poke"
+        
+        payload ={
+            "group_id": group_id,
+            "user_id": user_id
+        }
+        
+        await self.async_send(api_url,payload)
+
+    
+    async def send_group_json(self,group_id, message):
+        """发送群JSON"""
+        api_url = "send_group_msg"
+        pass
+
     async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True):
         """发送群图片,默认图片为img_ATRI.png还有可开启默认路径"""
         if default:
@@ -169,7 +212,6 @@ class QQ_send_message():
         return await self.requests_require_return(url=url ,payload=payload)
             
         
-
     async def group_message_request(self,group_id,type,file_url,Path_type = True):
         """发送单个,非文字群消息"""
 

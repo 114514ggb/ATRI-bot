@@ -1,8 +1,11 @@
 from ..Basics import Basics
+import asyncio
 import random
 
 class itemAction():
     """根据需要执行对应的操作"""
+    _lock_async = asyncio.Lock()
+    
     def __init__(self):
         self.basics = Basics()
         self.listeners = [
@@ -26,21 +29,22 @@ class itemAction():
             text = random.choice(reactivity_list)
 
             await self.basics.QQ_send_message.send_group_message(qq_TestGroup,text)
+            await self.basics.QQ_send_message.send_group_poke(qq_TestGroup,data['user_id'])
             return True
         
         return False
     
     async def initiative_chat(self,qq_TestGroup, data):
         """自动判断回复群消息"""
-        if qq_TestGroup == 984466158 and "message" in data:
-            ai_response = await self.basics.AI_interaction.auto_response.chat_main(
-                data=data,
-                user_text = self.basics.Command.data_processing_text(data)
-                )
-            # print("AI回复",ai_response)
-            if ai_response:
-                await self.basics.QQ_send_message.send_group_message(qq_TestGroup,ai_response)
-                return True
+        if qq_TestGroup == 1062704755 and "message" in data:
+            async with self._lock_async:
+                ai_response = await self.basics.AI_interaction.auto_response.chat_main(
+                    data=data,
+                    user_text = self.basics.Command.data_processing_text(data)
+                    )
+                if ai_response:
+                    await self.basics.QQ_send_message.send_group_message(qq_TestGroup,ai_response)
+                    return True
                 
         return False
 

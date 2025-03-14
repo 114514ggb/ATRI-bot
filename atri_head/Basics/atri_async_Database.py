@@ -1,5 +1,6 @@
 import aiomysql
 from aiomysql import IntegrityError, Pool
+from contextvars import ContextVar
 from threading import Lock
 import asyncio
 
@@ -10,10 +11,9 @@ class AtriDB_Async:
     _lock = asyncio.Lock()
     _thread_lock = Lock()
     _close_lock = asyncio.Lock()
-    
-    def __init__(self):
-        self.conn = None
-        self.cursor = None
+    _conn_var: ContextVar[aiomysql.Connection] = ContextVar("conn")
+    _cursor_var: ContextVar[aiomysql.Cursor] = ContextVar("cursor")
+
         
     @classmethod
     async def create(cls, host, user, password, pool_minsize=2, pool_maxsize=8):
@@ -55,10 +55,15 @@ class AtriDB_Async:
      
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """归还连接到池中"""
-        if self.cursor:
+        try:
             await self.cursor.close()
-        if self.conn:
-            self._pool.release(self.conn)
+        except LookupError:
+            pass #如果找不到则忽略
+        finally:
+            try:
+                self._pool.release(self.conn)
+            except LookupError:
+                pass 
         self.conn = None
         self.cursor = None
         
@@ -94,15 +99,29 @@ class AtriDB_Async:
                 maxsize=pool_maxsize
             )
 
+        
+    async def _get_current_conn(self) -> None:
+        """获取当前协程的数据库conn连接（自动重连）"""
+        try:
+            if self.conn.closed:
+                #刷新conn
+                self.conn.close()
+                self.conn = await self._pool.acquire()
 
+        except LookupError:
+            # 未通过上下文管理器时自动获取
+            self.conn = await self._pool.acquire()
+
+                
     async def _auto_connect(self):
         """确保操作前有可用连接"""
-        if self.conn and self.conn.closed:  # 检查连接是否已关闭
-            await self.release_connection() 
-        if not self.conn:
-            self.conn = await self._pool.acquire()
-        if not self.cursor:
+        try:
+            if self.cursor.closed:
+                self.cursor = await self.conn.cursor()
+        except LookupError:
+            await self._get_current_conn()
             self.cursor = await self.conn.cursor()
+
             
     async def add_user(self, user_id, nickname):
         """添加用户"""
@@ -215,6 +234,26 @@ class AtriDB_Async:
         await self.cursor.execute(sql, argument)
         
         return await self.cursor.fetchall()
+    
+    @property
+    def conn(self):
+        """获取数据库连接"""
+        return self._conn_var.get()
+    
+    @conn.setter
+    def conn(self, value):
+        """设置数据库连接"""
+        self._conn_var.set(value)
+        
+    @property
+    def cursor(self):
+        """获取数据库游标"""
+        return self._cursor_var.get()
+
+    @cursor.setter
+    def cursor(self, value):
+        """设置数据库游标"""
+        self._cursor_var.set(value)
     
 if __name__ == "__main__":
     async def main():

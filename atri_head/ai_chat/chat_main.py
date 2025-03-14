@@ -116,8 +116,8 @@ class Chat_processing():
         chat_text =  await self.chat(message, data, qq_TestGroup)
         if chat_text != None:
             for message in chat_text.split("\\"):
-                await asyncio.sleep(0.8)
-                await self.tool_calls.passing_message.send_group_message(qq_TestGroup,chat_text)
+                await asyncio.sleep(0.8) #模拟输入延迟
+                await self.tool_calls.passing_message.send_group_reply_msg(qq_TestGroup,chat_text,data["message_id"])
         # print(self.messages)
         
         await self.store_group_chat(group_id) #储存群聊消息
@@ -242,7 +242,7 @@ class Chat_processing():
                         
                 self.all_group_messages_list[group_id] +=  list_messages
 
-    def append_message_review(self,content:dict):
+    def append_message_review(self, content:dict):
         """添加带审查的消息,添加于临时消息列表"""
         if self.whether_use_system_review:
             self.model.append_message_text(self.temporary_messages,"user",str(content))
