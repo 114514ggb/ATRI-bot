@@ -4,7 +4,7 @@ from atri_head.Basics import Basics,Command_information
 basics = Basics()
 
 
-async def toggleModel(argument,qq_TestGroup,data):
+async def toggleModel(argument,group_ID,data):
     """切换模型人物"""
     playRole = argument[1][0]
     group_id = str(data["group_id"])
@@ -15,7 +15,7 @@ async def toggleModel(argument,qq_TestGroup,data):
     else:
         raise Exception("没有这个角色")
 
-    await basics.QQ_send_message.send_group_message(qq_TestGroup,f"已切换为人物:{playRole}")
+    await basics.QQ_send_message.send_group_message(group_ID,f"已切换为人物:{playRole}")
 
     return "ok"
 

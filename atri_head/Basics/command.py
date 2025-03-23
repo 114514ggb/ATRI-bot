@@ -28,7 +28,7 @@ class Command(Permissions_management):
         
     def processingParameter(self,command):
         """提取参数"""
-        pattern_command_argumrnts = r'-([^\s-]+)' #匹配参数'-'开头
+        pattern_command_argumrnts = r'(?<=\s)-([^\s-]+)' #匹配参数'-'开头
         pattern_command_other_argumrnts = r'(?<=\s)([^/\s-]\S*)' #匹配命令其他参数
 
         command_argumrnts = re.findall(pattern_command_argumrnts, command)

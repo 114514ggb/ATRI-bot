@@ -5,7 +5,7 @@ from datetime import datetime
 basics = Basics()
 group_print = basics.QQ_send_message.send_group_message
 
-async def query_mysql(argument,qq_TestGroup,data):
+async def query_mysql(argument,group_ID,data):
     
     minus_argument,other_argument = argument
 
@@ -62,12 +62,12 @@ WHERE user_id = %s
                 else:
                     time_diff = "".join(time_parts) + "前"
 
-            await group_print(qq_TestGroup,
+            await group_print(group_ID,
                 f"数据库中[{name}]最后发言是在：\n{time}\n上次发言:{time_diff}\n近1天消息:{number_days}条\n近7天消息:{week_daye}条"
                 )
             
         else:
-            await group_print(qq_TestGroup,f"数据库中未找到用户{other_argument[0]}")
+            await group_print(group_ID,f"数据库中未找到用户{other_argument[0]}")
         
     else:
         Exception("请输入正确的QQ号")

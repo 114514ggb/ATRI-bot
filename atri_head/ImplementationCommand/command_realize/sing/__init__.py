@@ -22,7 +22,7 @@ class sing():
         return files_dict
             
         
-    async def main(self,argument,qq_TestGroup,data):
+    async def main(self,argument,group_ID,data):
         """发送对应歌曲"""
         name = ' '.join(argument[1])
 
@@ -30,23 +30,23 @@ class sing():
             hyphen_argument = argument[0][0]
             if hyphen_argument == "d" and name in self.sing_list:
                 
-                await self.basics.QQ_send_message.send_group_file(qq_TestGroup,url_file = "E:/程序文件/python/ATRI/document/audio/sing/"+self.sing_list[name])
+                await self.basics.QQ_send_message.send_group_file(group_ID,url_file = "E:/程序文件/python/ATRI/document/audio/sing/"+self.sing_list[name])
                 return True
             
             elif argument[1] == []:
                 if hyphen_argument == "r":
                     
                     self.sing_list = self.load_song()
-                    await self.basics.QQ_send_message.send_group_message(qq_TestGroup,"已刷新歌单。")
+                    await self.basics.QQ_send_message.send_group_message(group_ID,"已刷新歌单。")
                     return True
                 elif hyphen_argument == "l":
-                    await self.basics.QQ_send_message.send_group_message(qq_TestGroup,"歌单：\n"+'\n'.join(self.sing_list.keys()))
+                    await self.basics.QQ_send_message.send_group_merge_forward(group_ID,"歌单：\n"+'\n'.join(self.sing_list.keys()))
                     return True
                 
             raise ValueError(f"未知/无效参数\"{hyphen_argument}\"")
             
         elif name in self.sing_list:
-            await self.basics.QQ_send_message.send_group_audio(qq_TestGroup,"sing/"+self.sing_list[name],default=True)
+            await self.basics.QQ_send_message.send_group_audio(group_ID,"sing/"+self.sing_list[name],default=True)
         else:
             raise Exception("没有这个歌曲")
         return "ok"

@@ -29,7 +29,7 @@ class manage_Permissions():
         "black": "黑名单"
     }
 
-    async def manage_Permissions(self, argument, qq_TestGroup, data):
+    async def manage_Permissions(self, argument, group_ID, data):
         
         minus_argument,other_argument = argument
         self.people = data["user_id"]
@@ -50,7 +50,7 @@ class manage_Permissions():
         # 执行操作
         text = self.handle_operation(action, role, Be_operated_qq)
 
-        await self.basics.QQ_send_message.send_group_message(qq_TestGroup, text)
+        await self.basics.QQ_send_message.send_group_message(group_ID, text)
         
         return "ok"
 

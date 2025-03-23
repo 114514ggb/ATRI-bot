@@ -18,7 +18,7 @@ class crawler_bili():
     """bilibili请求头"""
 
 
-    async def main(self, argument, qq_TestGroup, data):
+    async def main(self, argument, group_ID, data):
 
         url = argument[1][0]
 
@@ -38,8 +38,8 @@ class crawler_bili():
                     video_tag,video_introduce,video_cover = tree.xpath('//meta[@name="keywords" or @name="description" or @itemprop="thumbnailUrl"]/@content')
                     text = f"网站标题:{web_title}\n网站标签:\n{video_tag}\n网站介绍:\n{video_introduce}\n封面:{video_cover}"
 
-                    await self.basics.QQ_send_message.send_group_message(qq_TestGroup,text)
-                    await self.basics.QQ_send_message.send_group_pictures(qq_TestGroup,"https:"+video_cover,local_Path_type=False)
+                    await self.basics.QQ_send_message.send_group_message(group_ID,text)
+                    await self.basics.QQ_send_message.send_group_pictures(group_ID,"https:"+video_cover,local_Path_type=False)
 
                     return "ok"
 

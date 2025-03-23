@@ -15,14 +15,14 @@ class group_message_processing():
         self.basics = Basics(http_base_url, token, playRole, connection_type)
         self.command_processor = command_processor()
         self.textMonitoring = textMonitoring()
-        self.basics.Command.syncing_locally()#同步管理员名单数据库
+        self.basics.Command.syncing_locally()#同步管理员名单
 
     async def main(self,data:dict)-> bool:
         """主消息处理函数"""
         if 'group_id' in data and data['group_id'] in self.qq_white_list or ('user_id' in data and data['user_id'] == 2631018780): # 判断是否在白名单中
 
             print("Received event:", data)
-            qq_TestGroup = data['group_id']
+            group_ID = data['group_id']
             message = ""
 
             if 'message' in data:   # 提取消息内容并确保是字符串
@@ -33,23 +33,23 @@ class group_message_processing():
             # 检查是否是群消息事件并且是目标群消息而且是at机器人
                 
                 print(f"Processed message: {message}")
-                await self.receive_event_at(data,qq_TestGroup,message) #at@事件处理
+                await self.receive_event_at(data,group_ID,message) #at@事件处理
             
             elif self.basics.Command.blacklist_intercept(data["user_id"]): #黑名单检测
 
-                await self.receive_event(data,qq_TestGroup,message) #非at@事件处理
+                await self.receive_event(data,group_ID,message) #非at@事件处理
         
         return await self.data_store(data) #数据存储
             
 
-    async def receive_event_at(self,data:dict,qq_TestGroup:int,message:str)-> bool:
+    async def receive_event_at(self,data:dict,group_ID:int,message:str)-> bool:
         """at@事件处理"""  
 
         if message.startswith(("/", " /")):#命令处理
-            # await self.command_processor.main(message,qq_TestGroup,data)#测试，执行指令时创建一个新进程
+            # await self.command_processor.main(message,group_ID,data)#测试，执行指令时创建一个新进程
 
             # start_time = time.perf_counter()
-            await self.command_processor.main(message,qq_TestGroup,data)
+            await self.command_processor.main(message,group_ID,data)
             # end_time = time.perf_counter()
             # print("指令耗时：", end_time - start_time, "秒")
             return True
@@ -59,7 +59,7 @@ class group_message_processing():
 
                 if self.basics.Command.blacklist_intercept(data['user_id']):
                     
-                    await self.basics.AI_interaction.chat.main(qq_TestGroup, message, data) #聊天处理
+                    await self.basics.AI_interaction.chat.main(group_ID, message, data) #聊天处理
                     return True
                 
                 else:
@@ -67,17 +67,17 @@ class group_message_processing():
                     
 
             except Exception as e:
-                await self.basics.QQ_send_message.send_group_message(qq_TestGroup,"聊天出错了，请稍后再试!\nType Error:"+str(e))
+                await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e))
                 return False
 
         
 
-    async def receive_event(self, data:dict, qq_TestGroup:int, message:str):
+    async def receive_event(self, data:dict, group_ID:int, message:str):
         """非at@事件处理"""
 
         if  data['user_id'] != data['self_id']: #排除自己发送的消息
 
-            await self.textMonitoring.monitoring(message,qq_TestGroup,data)
+            await self.textMonitoring.monitoring(message,group_ID,data)
             
             return True
         

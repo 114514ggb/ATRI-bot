@@ -12,53 +12,57 @@ class textMonitoring():
     last_time = 0 #上次反应时间
     cooldown = 1 #反应间隔时间
     
-    async def monitoring(self, text, qq_TestGroup,data):
+    async def monitoring(self, text, group_ID,data):
         """监控并产生对应的反映"""
-        if await self.monitoringItem(qq_TestGroup,data): #监控指定的字段
+        if await self.monitoringItem(group_ID,data): #监控指定的字段
             return True
         # elif self.response_cooldown(): #反应间隔时间
-        elif await self.alikeRespond(text, qq_TestGroup): #精确匹配
+        elif await self.alikeRespond(text, group_ID): #精确匹配
             return True
-        elif await self.haveRespond(text, qq_TestGroup): #模糊匹配
+        elif await self.haveRespond(text, group_ID): #模糊匹配
             return True
         return False
 
-    async def alikeRespond(self, text, qq_TestGroup):
+    async def alikeRespond(self, text, group_ID):
         """精确匹配，匹配字段一样就反应"""
         if text in self.monitoring_alike_list.keys():
             
-            if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(30):#有在常用词列表里，并且随机到50%的概率不反应
+            if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(50): #随机反应
                 return True
             
-            await self.sendHandle(qq_TestGroup,self.monitoring_alike_list[text])
+            await self.sendHandle(group_ID,self.monitoring_alike_list[text])
             return True
         return False
 
-    async def haveRespond(self, text, qq_TestGroup):
+    async def haveRespond(self, text, group_ID):
         """模糊匹配,有匹配字段就反应"""
         for key in self.monitoring_have_list:
+            
+            # if self.basics.Chance.judgeChance(50):
+            #     return True
+            
             if key in text:
-                await self.sendHandle(qq_TestGroup,self.monitoring_have_list[key])
+                await self.sendHandle(group_ID,self.monitoring_have_list[key])
                 return True
             
         return False
     
-    async def monitoringItem(self, qq_TestGroup, data):
+    async def monitoringItem(self, group_ID, data):
         """监控指定的字段"""
-        return await self.itemAction.main(qq_TestGroup, data)
+        return await self.itemAction.main(group_ID, data)
 
         
-    async def sendHandle(self, qq_TestGroup, handle):
+    async def sendHandle(self, group_ID, handle):
         """发送文本的对应的反应"""
         type,document = random.choice(handle)
         document = random.choice(document)
 
         if type == "text":
-            await self.basics.QQ_send_message.send_group_message(qq_TestGroup, document)
+            await self.basics.QQ_send_message.send_group_message(group_ID, document)
         elif type == "img":
-            await self.basics.QQ_send_message.send_group_pictures(qq_TestGroup, document, True)
+            await self.basics.QQ_send_message.send_group_pictures(group_ID, document, True)
         elif type == "audio":
-            await self.basics.QQ_send_message.send_group_audio(qq_TestGroup, document, True)
+            await self.basics.QQ_send_message.send_group_audio(group_ID, document, True)
             
     def response_cooldown(self):
         """冷却时间"""
@@ -129,8 +133,9 @@ class textMonitoring():
         "叫哥哥": [["text",["欧尼～酱","欧尼酱","哥哥","哥哥～"]]],
         "唱歌": [["img",["ATRI_唱片.gif"]]],
         "6": [["text",["6"]]],
+        "唉": [["text",["为什么叹气呢？"]]],
         "害怕":[["text",["不怕，亚托莉会一直陪着你的!"]]],
-        "ok": [["text",["ok","好的"]]],
+        "ok": [["text",["ok","好的"]],["img",["ATRI_OK.gif"]]],
         "no": [["img",["ATRI_no.gif"]]],
         "NO": [["img",["ATRI_no.gif"]]],
         "不要": [["img",["ATRI_摆手.gif","ATRI_不要1.gif"]]],
@@ -138,6 +143,7 @@ class textMonitoring():
         "不行": [["img",["ATRI_垂头丧气.gif","ATRI_不要1.gif"]]],
         "。": [["img",["ATRI_句号.gif"]]],
         "可怕": [["img",["ATRI_惊讶.jpg"]]],
+        "催眠": [["img",["ATRI_催眠爱心.gif"]]],
         "我喜欢你": [["text",["当流星陨落爱情的唯美，生命就开始哭泣，受伤的人就喜欢躲在黑暗的角落，任其身体的荒凉，仿佛全世界的人都在讨论爱情，但喜欢的事物却在另一个世界，这一刻更喜欢孤寂。"]]],
     }
     '''精确匹配列表'''
@@ -163,11 +169,13 @@ class textMonitoring():
         "嘲讽": [["img",["ATRI_嘲笑.jpg","ATRI_下蹲.gif"]]],
         "哈基米": [["audio",["哈基米.wav"]],["text",["不要再哈基米了！喵！"]]],
         "吃饭": [["img",["ATRI_吃饭高兴.jpg","ATRI_吃饭第一名.jpg"]]],
-        "好吃": [["img",["ATRI_吃饭高兴.jpg"]]],
+        "好吃": [["img",["ATRI_好吃到流口水.jpg"]]],
         "学习": [["img",["ATRI_学习.jpg"]]],
+        "进攻": [["img",["ATRI_拿火箭筒.jpg"]]],
         "刷牙": [["img",["ATRI_提醒刷牙.jpg"]]],
         "哼哼": [["img",["ATRI_恶臭1145.jpg"]]],
         "粽子": [["img",["ATRI_粽子.gif"]]],
+        "异议": [["img",["ATRI_我有异议.jpg"]]],
         "qwq": [["img",["ATRI_qwq.jpg"]],["text",["QWQ"]]],
         "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
         # "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],

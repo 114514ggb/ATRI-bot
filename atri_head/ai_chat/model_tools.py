@@ -86,7 +86,7 @@ class tool_calls:
         #     tools=self.tools
         # )
 
-    async def calls(self, tool_name, arguments_str, qq_TestGroup):
+    async def calls(self, tool_name, arguments_str, group_ID):
         """调用工具"""
         if tool_name in self.tools_functions_dict|self.tools_functions_dict_qq:
             try:
@@ -94,7 +94,7 @@ class tool_calls:
                 if arguments_str == "{}":   
                     return await self.tools_functions_dict[tool_name]()
                 elif tool_name in self.tools_functions_dict_qq: 
-                    return await self.tools_functions_dict_qq[tool_name](**(json.loads(arguments_str)|{"qq_TestGroup":qq_TestGroup}))
+                    return await self.tools_functions_dict_qq[tool_name](**(json.loads(arguments_str)|{"group_ID":group_ID}))
                 else:
                     return await self.tools_functions_dict[tool_name](**json.loads(arguments_str))
                 
@@ -189,23 +189,23 @@ class tool_calls:
 
         return tool_json_integrity
      
-    async def send_text_message(self, message, qq_TestGroup):
+    async def send_text_message(self, message, group_ID):
         """发送文本消息"""
-        await self.passing_message.send_group_message(qq_TestGroup,message)
+        await self.passing_message.send_group_message(group_ID,message)
 
         return {"send_text_message": f"已发送:{message}"}
     
-    async def send_speech_message(self, message, qq_TestGroup):
+    async def send_speech_message(self, message, group_ID):
         """发送语音消息"""
         url = self.text_to_speech(message)
-        await self.passing_message.send_group_audio(qq_TestGroup, url)
+        await self.passing_message.send_group_audio(group_ID, url)
 
         return {"send_speech_message": f"已发送语音内容：{message}"}
     
-    async def send_image_message(self, prompt, qq_TestGroup):
+    async def send_image_message(self, prompt, group_ID):
         """生成发送图片消息"""
         url = self.model.generate_image(prompt)['data'][0]['url']
-        await self.passing_message.send_group_pictures(qq_TestGroup,url,local_Path_type=False)
+        await self.passing_message.send_group_pictures(group_ID,url,local_Path_type=False)
         print("图片发送成功")
         return {"send_image_message": "图片消息已发送"}
     

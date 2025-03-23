@@ -89,8 +89,11 @@ class QQ_send_message():
             return await self.websocketClient.gain_echo(request_id)
 
 
-    async def send_group_message(self,group_id, message):
-        """发送群聊文字消息"""
+    async def send_group_message(self,group_id: int, message):
+        """
+            发送群聊文字消息\n
+            message可以是str也可以是包含混合消息的list
+        """
         url = "send_group_msg"
         
         params = {
@@ -121,10 +124,45 @@ class QQ_send_message():
         await self.send_group_message(group_id, params)
 
         
-    async def send_group_merge_forward(self,group_id, message):
-        """发送群合并转发消息"""
+    async def send_group_merge_forward(self,group_id: int, message: str):
+        """
+            发送群合并转发消息\n
+            目前支持发一条文字消息\n
+            目的是用来防止过长的消息刷屏，合并转发比较优雅:)
+        """
         api_url = "send_group_forward_msg"
-        pass
+        
+        payload = {
+            "group_id": group_id,
+            "messages": [
+                {
+                    "type": "node",
+                    "data": {
+                        "user_id": "3889393615",
+                        "nickname": "ATRI-亚托莉",
+                        "content": [
+                        {
+                            "type": "text",
+                            "data": {
+                                "text": message
+                            }
+                        }
+                        ]
+                    }
+                }
+            ],
+            "news": [
+                {
+                    "text": "ATRI:晚上一个人偷偷看",
+                    "text": "ATRI:[图片]"
+                }
+            ],
+            "prompt": "男娘秘籍", #外显
+            "summary": "查看信息", #底下文本
+            "source": "聊天记录" #内容
+        }
+        
+        await self.async_send(api_url,payload)
     
     async def send_group_poke(self,group_id, user_id):
         """发送群戳一戳"""
@@ -138,10 +176,61 @@ class QQ_send_message():
         await self.async_send(api_url,payload)
 
     
-    async def send_group_json(self,group_id, message):
+    async def send_group_json(self,group_id: int, json: json):
         """发送群JSON"""
-        api_url = "send_group_msg"
-        pass
+        payload =[
+            {
+                "type": "json",
+                "data": {
+                    "data": json
+                }
+            }
+        ]
+        
+        await self.send_group_message(group_id, payload)
+    
+    
+    async def set_group_add_request(self,flag: str, approve: bool, reason: str = "不对!"):
+        """
+            处理加群请求\n
+            flag: 请求id\n
+            approve: 是否同意\n
+            reason: 拒绝理由(可选)
+        """
+        api_url = "set_group_add_request"
+
+        if approve:
+            payload = {
+                "flag": flag,
+                "approve": approve
+            }
+        else:
+            payload = {
+                "flag": flag,
+                "approve": approve,
+                "reason": reason
+            }
+
+        await self.async_send(api_url,payload)
+   
+   
+    async def set_group_ban(self,group_id, user_id, duration = 1800):
+        """
+            禁言群成员\n
+            group_id: 群号\n
+            user_id: 要禁言的成员QQ号\n
+            duration: 禁言时长(单位:秒)
+        """
+        api_url = "set_group_ban"
+
+        payload = {
+            "group_id": group_id,
+            "user_id": user_id,
+            "duration": duration
+        }
+
+        await self.async_send(api_url,payload)
+   
 
     async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True):
         """发送群图片,默认图片为img_ATRI.png还有可开启默认路径"""
@@ -150,21 +239,21 @@ class QQ_send_message():
 
         await self.group_message_request(group_id,"image",url_img,local_Path_type)
 
-    async def send_group_audio(self,qq_TestGroup,url_audio = "Atri my dear moments.mp3",default = False,local_Path_type = True):
+    async def send_group_audio(self,group_ID,url_audio = "Atri my dear moments.mp3",default = False,local_Path_type = True):
         """发送群语音"""
         if default: 
             url_audio = f"{self.File_root_directory}audio/{url_audio}"
     
-        await self.group_message_request(qq_TestGroup,"record",url_audio,Path_type=local_Path_type)
+        await self.group_message_request(group_ID,"record",url_audio,Path_type=local_Path_type)
     
-    async def send_group_video(self,qq_TestGroup,url_video = "ATRIの珍贵录像.mp4",default = False,local_Path_type = True):
+    async def send_group_video(self,group_ID,url_video = "ATRIの珍贵录像.mp4",default = False,local_Path_type = True):
         """发送群视频"""
         if default: 
             url_video = f"{self.File_root_directory}video/{url_video}"
 
-        await self.group_message_request(qq_TestGroup,"video",url_video,Path_type=local_Path_type)
+        await self.group_message_request(group_ID,"video",url_video,Path_type=local_Path_type)
 
-    async def send_group_file(self,qq_TestGroup,url_file = "ATRI的文件.txt",default = False,local_Path_type = True):
+    async def send_group_file(self,group_ID,url_file = "ATRI的文件.txt",default = False,local_Path_type = True):
         """发送群文件"""
         if default: 
             url_file = f"{self.File_root_directory}file/{url_file}"
@@ -177,7 +266,7 @@ class QQ_send_message():
 
         url = "send_group_msg"
         payload ={
-            "group_id": qq_TestGroup,
+            "group_id": group_ID,
             "message": [
                 {
                     "type": "file",

@@ -4,13 +4,13 @@ from atri_head.Basics import Basics,Command_information
 basics = Basics()
 
 
-async def voice(argument,qq_TestGroup,data):
+async def voice(argument,group_ID,data):
     """合成指定音频"""
     
     text = ' '.join(argument[1])
     url = basics.AI_interaction.speech_synthesis(text)
 
-    await basics.QQ_send_message.send_group_audio(qq_TestGroup,url_audio=url)
+    await basics.QQ_send_message.send_group_audio(group_ID,url_audio=url)
     return "ok"
 
 

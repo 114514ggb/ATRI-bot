@@ -126,7 +126,7 @@ warn :所有命令以开头要@bot再接一个"/"才能使用
             list_text = "当前可用的命令:\n"
             for command in self.command_list:
                 list_text += f"{command.name} : {command.description}\n\n"
-            await self.basics.QQ_send_message.send_group_message(qq_id,list_text)
+            await self.basics.QQ_send_message.send_group_merge_forward(qq_id,list_text)
             return True
             
         elif parameter == [[],["atri"]]:

@@ -42,7 +42,7 @@ class zhipu_video():
         raise ValueError("超过最大请求次数，仍未请求到视频!")
 
 
-    async def main(self,argument,qq_TestGroup,data):
+    async def main(self,argument,group_ID,data):
 
         prompt = " ".join(argument[1])
         id = None
@@ -61,13 +61,13 @@ class zhipu_video():
         if id == None:
             id = self.request_video(prompt)["id"]
 
-        await self.basics.QQ_send_message.send_group_message(qq_TestGroup,f"正在生成视频，请稍后...\n任务ID:{id}\n注意这个模型的效果不佳！不要预期太高！")
+        await self.basics.QQ_send_message.send_group_message(group_ID,f"正在生成视频，请稍后...\n任务ID:{id}\n注意这个模型的效果不佳！不要预期太高！")
 
         image_url,total_wait_time = await self.acquire_video(id)
 
-        await self.basics.QQ_send_message.send_group_message(qq_TestGroup,f"视频生成完成，耗时{total_wait_time}秒\nurl:{image_url}")
+        await self.basics.QQ_send_message.send_group_message(group_ID,f"视频生成完成，耗时{total_wait_time}秒\nurl:{image_url}")
 
-        await self.basics.QQ_send_message.send_group_video(qq_TestGroup, image_url,local_Path_type=False)
+        await self.basics.QQ_send_message.send_group_video(group_ID, image_url,local_Path_type=False)
         
         return True
     
