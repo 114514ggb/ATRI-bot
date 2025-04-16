@@ -54,14 +54,17 @@ tools = [
 
 from ..Basics.qq_send_message import QQ_send_message
 from gradio_client import Client
-from .bigModel_api import bigModel_api
-from .universal_async_ai_api import universal_ai_api
-from .async_open_ai_api import async_openAI
+from .model_api.bigModel_api import bigModel_api
+from .model_api.universal_async_ai_api import universal_ai_api
+from .model_api.async_open_ai_api import async_openAI
 import importlib.util
 import os
 import json
 
 class tool_calls:
+    """
+    工具调用类
+    """
     code_url = "document\code.py"
     """python代码运行路径"""
 
@@ -207,7 +210,7 @@ class tool_calls:
         url = self.model.generate_image(prompt)['data'][0]['url']
         await self.passing_message.send_group_pictures(group_ID,url,local_Path_type=False)
         print("图片发送成功")
-        return {"send_image_message": "图片消息已发送"}
+        return {"send_image_message": "图片已发送"}
     
     def text_to_speech(self, text):
         """文本转语音,返回语音路径"""

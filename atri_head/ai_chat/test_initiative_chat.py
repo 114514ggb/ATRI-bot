@@ -1,7 +1,9 @@
-from .async_open_ai_api import async_openAI
+from .model_api.async_open_ai_api import async_openAI
 from collections import deque
 from datetime import datetime
 import asyncio
+from .prepare_model_prompt import build_prompt
+
 
 
 class initiative_chat():
@@ -15,6 +17,17 @@ class initiative_chat():
     def __init__(self):
         self.chat_api = async_openAI(api_key = self.api_key,base_url = self.url)
         self.messages = deque(maxlen = self.max_length)
+        self.build_prompt = build_prompt(
+            "1.尽量说中文\n"
+            "2你的目标是回复有一些事你可以表示一些看法，或是赞同别人的话的内容，还有人在重复时\n"
+            "3.如果要回复的话,不要重复前文,只需要输出回复的文字或在不是完全理解别人在说什么输出\n"
+            "4..如果要回复的话,单次回复的长度不应过长，应该是较为简短的日常对话,回答应该尽量简短并富有感情\n"
+            "5..如果要回复的话,使用反斜线 (\) 分隔句子或短语"
+            "参考："
+            "【如果你觉得现在不适合发消息，请直接输出<NO_RESPONSE>】"
+            ,
+            "你在一个qq群聊中，聊天记录chat_history（所有消息均被格式化成文本，如图片被转换为[图片]，表情被转换为[动画表情]）:\n\n你输出的内容将作为群聊中的消息发送。你只应该发送文字消息，不要发送[图片]、[qq表情]、[@某人(id:xxx)]等你在聊天记录中看到的特殊内容。"
+            )
         """群聊聊天"""
         
     async def chat_main(self, data:dict, user_text:str)->str:
@@ -92,7 +105,6 @@ class initiative_chat():
 \"\"\"回复规则\"\"\"
 1.不要重复前文,只需要输出回复的文字或在不是完全理解别人在说什么输出就\"none\".单次回复的长度不应过长，应该是较为简短的日常对话,回答应该尽量简短并富有感情.
 2.你的本名亚托莉,外号\"萝卜子\".提到自己或介绍自己时叫自己\"ATRI\"
-3.使用反斜线 (\\) 分隔句子或短语参考：加油喵！\\你会有机会的喵！
 """
 
         }]
@@ -106,3 +118,7 @@ class initiative_chat():
         
         return text_type
     
+    def build_prompt(self, latest_news:str)->str:
+        """构建提示词"""
+        
+        return None

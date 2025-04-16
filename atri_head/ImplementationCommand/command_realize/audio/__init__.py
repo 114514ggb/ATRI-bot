@@ -19,5 +19,5 @@ command_main = Command_information(
     aliases=["说话", "voice"],
     handler=voice,
     description="合成指定文字的音频，支持中英日文.",
-    parameter=[[0, 0], [1, 1]]
+    parameter=[[0, 0], [1, 100]]
 )

@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 tool_json = {
     "name" : "http_request_tool",
-    "description": "向一个url发送http的get请求,并返回获取的html",
+    "description": "向一个url发送http的get请求,并返回获取已经清洗过的html",
     "properties": {
         "url": {
             "type": "string",
@@ -45,4 +45,4 @@ async def get(url):
 
 
 if __name__ == "__main__":
-    print(asyncio.run(main("https://github.com/DEC-Development/ThePoetryOfWinter")))
+    print(asyncio.run(main("https://r18.中国/")))

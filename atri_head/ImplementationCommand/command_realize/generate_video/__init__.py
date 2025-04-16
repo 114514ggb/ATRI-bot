@@ -1,5 +1,5 @@
 from atri_head.Basics import Basics,Command_information
-from atri_head.ai_chat import bigModel_api
+from atri_head.ai_chat.model_api import bigModel_api
 import asyncio
 import base64
 

@@ -26,7 +26,7 @@ class itemAction():
     async def poke(self,group_ID, data):
         """戳一戳的反馈"""
         if 'sub_type' in data and data['sub_type'] == "poke" and data['self_id'] == data['target_id']:
-            reactivity_list = ["你揉我干嘛？哎呦( •̀ ω •́ )","不要揉了啊,痛吖喵!","呜喵！","( •̀ ω •́ )喵~","喵~(〃ω〃)","喵！（炸毛）","我的天！你居然揉我！喵！","(〃ω〃)喵~","你揉我干嘛！,自己揉自己啊！喵！","揉脸打咩！(〃ω〃)喵~","喵~再揉脸要坏掉了","尾巴要秃了啦！快住手喵！(＞﹏＜)","别揉耳朵啦！会聋掉的喵！(｀Д´)","揉揉按摩禁止！会痒到炸毛的喵！(//∇//)","喵~请继续！(ฅ´ω`ฅ)"]
+            reactivity_list = ["你揉我干嘛？哎呦( •̀ ω •́ )","不要揉了啊,痛吖喵!","呜喵！","( •̀ ω •́ )喵~","喵~(〃ω〃)","喵！（炸毛）","我的天！你居然揉我！喵！","(〃ω〃)喵~","你揉我干嘛！,自己揉自己啊！喵！","揉脸打咩！(〃ω〃)喵~","喵~再揉脸要坏掉了","尾巴要秃了啦！快住手喵！(＞﹏＜)","别揉耳朵啦！会聋掉的喵！(｀Д´)","揉揉按摩禁止！会痒到炸毛的喵！(//∇//)","喵~请继续！(ฅ´ω`ฅ)","再揉收费了哦！一次50喵！这样就有钱吃小鱼干了"]
             text = random.choice(reactivity_list)
 
             await self.basics.QQ_send_message.send_group_message(group_ID,text)
@@ -67,7 +67,6 @@ class itemAction():
                 
                 if data['comment'] == white_list_gropup[group_ID]: 
                     await self.basics.QQ_send_message.set_group_add_request(data['flag'],True)
-                    await self.basics.QQ_send_message.send_group_message(group_ID,f"欢迎{user_id}加入群聊！")
                 else:
                     await self.basics.QQ_send_message.send_group_message(group_ID,f"有人申请加群了!\n{data['comment']}")
                     
