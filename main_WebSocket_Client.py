@@ -15,7 +15,11 @@ qq_white_list.append(235984211) #形形色色的群
 async def client():
 
     my_client = WebSocketClient(uri = ws_url, access_token = access_token)
-    ATRI = group_message_processing(playRole = playRole, connection_type = "WebSocket", qq_white_list = qq_white_list)
+    ATRI = group_message_processing(
+        playRole = playRole, 
+        connection_type = "WebSocket", 
+        qq_white_list = qq_white_list
+    )
 
     await my_client.connect()
 

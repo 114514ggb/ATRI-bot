@@ -1,8 +1,8 @@
+from ..Basics.WebSocketClient import WebSocketClient
 import json
 import httpx
 import uuid
-import asyncio
-from ..Basics.WebSocketClient import WebSocketClient
+# import asyncio
 
 class QQ_send_message():
     """QQ消息发送器"""
@@ -26,13 +26,14 @@ class QQ_send_message():
                 }
                 self.client = httpx.AsyncClient()
 
-            elif connection_type == "WebSocket":
+            elif connection_type in ["WebSocket","WebSocket_client","WebSocket_server"]:
                 self.websocketClient = WebSocketClient()
             else:
                 print("连接类型错误")
                 raise Exception("连接类型错误")
                 
             self.connection_type = connection_type # 连接类型
+            print("当前连接类型为"+connection_type+"\n")
             self._initialized = True
 
     # def send(self, url, payload):
@@ -67,7 +68,7 @@ class QQ_send_message():
                 "params": payload
             }
 
-            if echo != None:
+            if echo is not None:
                 message["echo"] = echo
 
             try:
@@ -153,8 +154,12 @@ class QQ_send_message():
             ],
             "news": [
                 {
-                    "text": "ATRI:晚上一个人偷偷看",
-                    "text": "ATRI:[图片]"
+                    'type': 'text',
+                    'data': {'text': 'ATRI:晚上一个人偷偷看'}
+                },
+                {
+                    'type': 'text',
+                    'data': {'text': 'ATRI:[图片]'}
                 }
             ],
             "prompt": "男娘秘籍", #外显

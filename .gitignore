@@ -2,4 +2,6 @@ assets/
 document/
 abandoned/
 .vscode/
+.venv/
+uv.lock
 __pycache__

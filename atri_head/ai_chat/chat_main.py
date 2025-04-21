@@ -1,5 +1,7 @@
 from .model_tools import tool_calls
-import base64,json,os
+import base64
+import json
+import os
 from collections import defaultdict
 from threading import Lock
 from typing import List, Dict
@@ -90,7 +92,7 @@ class Chat_processing():
             print(assistant_message)
 
 
-            if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] == None:
+            if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
                 self.model.append_message_text(self.messages,"user",user_original_data)
                 self.messages.append(assistant_message)
                 
@@ -114,7 +116,7 @@ class Chat_processing():
         await self.get_group_chat(group_id) #获取群聊消息
         
         chat_text =  await self.chat(message, data, group_ID)
-        if chat_text != None and chat_text != "":
+        if chat_text is not None and chat_text != "":
             if '$' in chat_text:
                 for message in chat_text.split("$"):
                     await self.tool_calls.passing_message.send_group_message(group_ID,message)
@@ -163,11 +165,11 @@ class Chat_processing():
         while True:
             
             print("在工具调用中")
-            if assistant_message['content'] != None and assistant_message['content'] != "\n":
+            if assistant_message['content'] is not None and assistant_message['content'] != "\n":
                 await self.tool_calls.passing_message.send_group_message(group_ID,assistant_message['content'])
                 
-            for tool_calls in assistant_message['tool_calls']:
-                function = tool_calls['function']
+            for tool_call in assistant_message['tool_calls']:
+                function = tool_call['function']
                 # print("工具",function)
                 tool_name,tool_input = function['name'], function['arguments']
                 tool_output = {}
@@ -185,7 +187,7 @@ class Chat_processing():
                 self.temporary_messages.append({
                     "role": "tool",
                     "content": f"{json.dumps(tool_output)}",
-                    "tool_call_id":tool_calls['id']
+                    "tool_call_id":tool_call['id']
                 })
 
                 if tool_output == {"tool_calls_end": "已经退出工具调用循环"}:
@@ -200,7 +202,7 @@ class Chat_processing():
             print(assistant_message)
             self.temporary_messages.append(assistant_message)
 
-            if 'tool_calls' not in assistant_message or assistant_message ['tool_calls'] == None:
+            if 'tool_calls' not in assistant_message or assistant_message ['tool_calls'] is None:
                 break
 
         return assistant_message['content']

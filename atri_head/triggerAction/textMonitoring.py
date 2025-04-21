@@ -1,5 +1,5 @@
-from .Basics import *
-from .itemAction.action_main import itemAction
+from ..Basics import Basics
+from .action_main import itemAction
 import random
 import time
 

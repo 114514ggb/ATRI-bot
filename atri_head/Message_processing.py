@@ -1,8 +1,6 @@
 from .ImplementationCommand.command_processor import command_processor
-from .textMonitoring import textMonitoring
+from .triggerAction.textMonitoring import textMonitoring
 from .Basics import Basics
-import asyncio
-import time
 
 
 class group_message_processing():
@@ -89,12 +87,13 @@ class group_message_processing():
     
     async def data_store(self, data:dict) -> bool:
         """数据存储"""
-        if self.first_connect_database == False:
+        if not self.first_connect_database:
             
             await self.basics.link_async_database("127.0.0.1","root","180710")
             await self.exit_save() #退出时处理
             
             self.first_connect_database = True
+            
             
         if "post_type" in data and data["post_type"] == "message":
             

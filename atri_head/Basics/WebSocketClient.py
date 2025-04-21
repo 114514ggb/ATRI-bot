@@ -1,6 +1,9 @@
-import websockets,asyncio,json,sys
-from concurrent.futures import ThreadPoolExecutor
+# from concurrent.futures import ThreadPoolExecutor
 from asyncio import Queue
+import websockets
+import asyncio
+import json
+import sys
 
 class WebSocketClient:
     """WebSocket客户端类"""
@@ -19,7 +22,6 @@ class WebSocketClient:
 
     def __init__(self, uri = "127.0.0.1:8080",access_token = None, websocket=None):
         if not hasattr(self, "_initialized"):
-            access_token = access_token
             if access_token is None:
                 self.uri = f'ws://{uri}/'
             else:
@@ -53,7 +55,14 @@ class WebSocketClient:
 
     async def start_while(self):
         """启动获取消息和处理消息的事件循环"""
-        await asyncio.gather(self.queue_put(), self.queue_get())
+        try:
+            await asyncio.gather(
+                self.queue_put(), 
+                self.queue_get(),
+                return_exceptions=True
+            )
+        except Exception as e:
+            print(f"事件循环意外终止: {e}")
 
     async def queue_put(self):
         while True:
@@ -61,8 +70,16 @@ class WebSocketClient:
 
                 await self.message_queue.put(json.loads(await self.websocket.recv()))
 
-            except websockets.ConnectionClosed:
-                print("连接断开，尝试重连...")
+            except json.JSONDecodeError as e:
+                print(f"JSON解析错误: {e}")
+            except websockets.exceptions.ConnectionClosed as e:
+                if e.code == 1005:
+                    print("WebSocket连接正常关闭")
+                else:
+                    print(f"WebSocket连接异常关闭: {e}")
+                    await self.connect()
+            except Exception as e:
+                print(f"未知错误: {e}")
                 await self.connect()
 
     async def queue_get(self):
@@ -78,6 +95,15 @@ class WebSocketClient:
                         print(f"回调错误: {e}")
             except Exception as e:
                 print(f"队列处理错误: {e}")
+                
+    async def close(self):
+        if self.websocket:
+            await self.websocket.close()
+        self._listeners.clear()
+        self.pending_requests_echos.clear()
+        # 清空消息队列
+        while not self.message_queue.empty():
+            await self.message_queue.get()
             
     def add_listener(self, callback):
         """添加消息监听器"""

@@ -1,4 +1,5 @@
-import re,sqlite3
+import sqlite3
+import re
 
 class Permissions_management():
     root = [2631018780] #超级管理员 3
@@ -116,8 +117,8 @@ class Permissions_management():
             conn.close()
         
             return "同步成功"
-        except:
-            Exception("同步到数据库失败")
+        except Exception as e:
+            Exception(f"同步到数据库失败:{e}")
     
     def syncing_locally(self):
         """把数据库同步到本地"""
@@ -138,6 +139,6 @@ class Permissions_management():
             conn.close()
 
             return "同步成功"
-        except:
-            Exception("数据库同步到本地失败")
+        except Exception as e:
+            Exception(f"数据库同步到本地失败:{e}")
     

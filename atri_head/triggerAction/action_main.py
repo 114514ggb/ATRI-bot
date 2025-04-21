@@ -18,8 +18,7 @@ class itemAction():
     async def main(self,group_ID, data):
         """反射主函数"""
         for item in self.listeners:
-            if await item(group_ID, data) == True:
-                return True
+            await item(group_ID, data)
             
         return False
         

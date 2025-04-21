@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 tool_json = {
     "name" : "http_request_tool",
-    "description": "向一个url发送http的get请求,并返回获取已经清洗过的html",
+    "description": "可以从给定的网址获取网页内容，并以纯文本格式返回。适合只需要抓取网页文本内容，不需要任何格式化的场景。",
     "properties": {
         "url": {
             "type": "string",

@@ -1,5 +1,7 @@
 from fastapi import FastAPI, WebSocket
-import uvicorn,asyncio,threading
+import uvicorn
+import asyncio
+import threading
 from atri_head.Message_processing import group_message_processing
 
 
@@ -19,7 +21,13 @@ qq_white_list.append(235984211) #形形色色的群
 # qq_white_list.append(936819059) #真爱协会
 
 
-ATRI = group_message_processing(http_base_url=http_base_url, token=token, playRole=playRole, connection_type="http", qq_white_list = qq_white_list)
+ATRI = group_message_processing(
+    http_base_url=http_base_url, 
+    token=token, 
+    playRole=playRole, 
+    connection_type="http", 
+    qq_white_list = qq_white_list
+)
 
 
 def run_atrib_main(data):

@@ -1,71 +1,18 @@
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "send_speech_message",
-            "description": "将文本内容转换为语音消息并进行发送(不会结束工具调用,发完后一般调用工具tool_calls_end)，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。",
-            "parameters": {            
-                "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "description": "需转换为语音的文本内容（支持中文/英文/日语）",
-                    }
-                }
-            },
-            "required": ["message"]
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "send_text_message",
-            "description": "用来发送文本消息(不会结束工具调用,发完后一般调用工具tool_calls_end)，适用于需要连续发多条消息的多步场景。",
-            "parameters": {            
-                "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "description": "需要直接呈现给用户的文本内容",
-                    }
-                }
-            },
-            "required": ["message"]
-        }
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "send_image_message",
-            "description": "这是你的画板,图像生成工具，能够根据文字描述自动生成对应的图片，并将生成的图片发送给用户。适用于需要将文本转化为视觉内容的场景。",
-            "parameters": {            
-                "type": "object",
-                "properties": {
-                    "prompt": {
-                        "type": "string",
-                        "description": "需要生成的图片内容",
-                    }
-                }
-            },
-            "required": ["prompt"]
-        }
-    },    
-]
-
 from ..Basics.qq_send_message import QQ_send_message
 from gradio_client import Client
 from .model_api.bigModel_api import bigModel_api
 from .model_api.universal_async_ai_api import universal_ai_api
-from .model_api.async_open_ai_api import async_openAI
+# from .model_api.async_open_ai_api import async_openAI
 import importlib.util
 import os
 import json
+
 
 class tool_calls:
     """
     工具调用类
     """
-    code_url = "document\code.py"
+    code_url = "document\\code.py"
     """python代码运行路径"""
 
     def __init__(self):
@@ -233,3 +180,59 @@ class tool_calls:
                         fn_index=3
         )
         return result
+
+
+
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "send_speech_message",
+            "description": "将文本内容转换为语音消息并进行发送(不会结束工具调用,发完后一般调用工具tool_calls_end)，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。",
+            "parameters": {            
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "需转换为语音的文本内容（支持中文/英文/日语）",
+                    }
+                }
+            },
+            "required": ["message"]
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_text_message",
+            "description": "用来发送文本消息(不会结束工具调用,发完后一般调用工具tool_calls_end)，适用于需要连续发多条消息的多步场景。",
+            "parameters": {            
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "description": "需要直接呈现给用户的文本内容",
+                    }
+                }
+            },
+            "required": ["message"]
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_image_message",
+            "description": "这是你的画板,图像生成工具，能够根据文字描述自动生成对应的图片，并将生成的图片发送给用户。适用于需要将文本转化为视觉内容的场景。",
+            "parameters": {            
+                "type": "object",
+                "properties": {
+                    "prompt": {
+                        "type": "string",
+                        "description": "需要生成的图片内容",
+                    }
+                }
+            },
+            "required": ["prompt"]
+        }
+    },    
+]

@@ -1,0 +1,14 @@
+[project]
+name = "atri"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "mcp>=1.6.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "abandoned/MCP_test/mcp-client",
+]
