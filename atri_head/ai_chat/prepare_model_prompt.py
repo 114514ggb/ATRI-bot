@@ -3,7 +3,7 @@ import time
 class build_prompt:
     """
         构造prompt的类\n
-        对model的环境和prompt进行封装
+        对model的上下文环境和prompt进行封装
     """
     prompt = ""
     """model输出要求"""
@@ -54,18 +54,50 @@ class build_prompt:
                 "qq_id":data['user_id'], #qq号
                 "group_name":data['group_name'],#群昵称
                 "nick_name":data['sender']['nickname'],#user昵称
+                "message":data['raw_message'] #消息内容
             }
         )
         
-    def build_user_Information(self, data:dict)-> str:
+    def build_user_Information(self, data:dict, message:str)-> str:
         """ 构造用户消息 """
         return str(
             {
                 "qq_id":data['user_id'], #qq号
                 "nick_name":data['sender']['nickname'],#user昵称
-                "message":data['raw_message'] #消息内容
+                "message":message #消息内容
             }
         )
     
+    def append_playRole(self,content,messages:list):
+        """添加扮演的角色，固定为列表的第一个元素"""
+        if content != "":
+             messages.insert(0, {"role": "system","content": content})
+        return messages
     
+    def append_message_text(self,messages:list,role:str,content:str):
+        """添加文本消息,role为角色,content为内容"""
+        messages.append({"role": role,"content": content})
+        return messages
+    
+    def append_message_image(self,messages:list,image_url, text="请详细描述这个图片，如果上面有文字也要详细说清楚", role = "user"):
+        """添加带图片消息,role为角色,image_url为图片链接,text为问题文字"""
+        messages.append({
+            "role": role,
+            "content": [
+                {"type": "image_url","image_url": {"url": image_url}},
+                {"type": "text","text": text}
+            ]  
+        })
+
+        return messages
+    
+    def append_message_tool(self,messages:list ,tool_content:str ,tool_call_id:str):
+        """ 添加工具消息 """
+        messages.append({
+            "role": "tool",
+            "content": tool_content,
+            "tool_call_id": tool_call_id,
+        })
+        
+        return messages
     

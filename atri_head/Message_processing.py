@@ -17,6 +17,9 @@ class group_message_processing():
 
     async def main(self,data:dict)-> bool:
         """主消息处理函数"""
+        
+        # print(data)
+        
         if 'group_id' in data and data['group_id'] in self.qq_white_list or ('user_id' in data and data['user_id'] == 2631018780): # 判断是否在白名单中
 
             print("Received event:", data)

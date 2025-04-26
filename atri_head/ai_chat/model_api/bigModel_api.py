@@ -24,29 +24,6 @@ class bigModel_api:
         """修改模型参数"""
         self.model_parameters[parameters] = value
         return self.model_parameters
-    
-    def append_playRole(self,content,messages:list):
-        """添加扮演的角色，固定为列表的第一个元素"""
-        if content != "":
-             messages.insert(0, {"role": "system","content": content})
-        return messages
-    
-    def append_message_text(self,messages:list,role:str,content:str):
-        """添加文本消息,role为角色,content为内容"""
-        messages.append({"role": role,"content": content})
-        return messages
-    
-    def append_message_image(self,messages:list,image_url, text="请详细描述这个图片，如果上面有文字也要详细说清楚", role = "user"):
-        """添加带图片消息,role为角色,image_url为图片链接,text为问题文字"""
-        messages.append({
-            "role": role,
-            "content": [
-                {"type": "image_url","image_url": {"url": image_url}},
-                {"type": "text","text": text}
-            ]  
-        })
-
-        return messages
 
     def generate_text(self, my_model, my_messages):
         """请求生成文本,全部默认。"""

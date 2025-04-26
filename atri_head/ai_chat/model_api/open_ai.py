@@ -54,14 +54,6 @@ class OpenAI_api:
 
         return completion.model_dump()
 
-    def generate_text(self, my_model, my_messages):
-        """请求生成文本,全部默认。"""
-        completion = self.client.chat.completions.create(
-            model = my_model, 
-            messages = my_messages,
-        )
-
-        return completion.model_dump()
 
     def generate_text_argument(self, my_model, my_messages):
         """请求生成文本，带自定义参数"""

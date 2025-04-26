@@ -16,7 +16,7 @@ async def voice(argument,group_ID,data):
 
 command_main = Command_information(
     name="voice",
-    aliases=["说话", "voice"],
+    aliases=["说话", "say"],
     handler=voice,
     description="合成指定文字的音频，支持中英日文.",
     parameter=[[0, 0], [1, 100]]

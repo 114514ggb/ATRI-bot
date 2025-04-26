@@ -154,17 +154,12 @@ class QQ_send_message():
             ],
             "news": [
                 {
-                    'type': 'text',
-                    'data': {'text': 'ATRI:晚上一个人偷偷看'}
-                },
-                {
-                    'type': 'text',
-                    'data': {'text': 'ATRI:[图片]'}
+                "text": "ATRI:晚上一个人偷偷看[图片]"
                 }
             ],
-            "prompt": "男娘秘籍", #外显
-            "summary": "查看信息", #底下文本
-            "source": "聊天记录" #内容
+            "prompt": "聊天记录", #外显
+            "summary": "点击即看", #底下文本
+            "source": "男娘秘籍" #内容
         }
         
         await self.async_send(api_url,payload)
