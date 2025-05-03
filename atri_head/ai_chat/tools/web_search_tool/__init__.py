@@ -10,7 +10,7 @@ headers = {
 
 tool_json = {
     "name": "web_search_tool",
-    "description": "网络信息检索工具,可以搜索到一些和关键词有关的信息,也可以用于获取一些新闻",
+    "description": "网络信息检索工具,可以搜索到一些和关键词有关的信息,也可以用于获取一些新闻,建议在别人问你一些有关你不确定或需要时效性的知识时使用",
     "properties": {
         "query": {
             "type": "string",
@@ -18,12 +18,12 @@ tool_json = {
         },
         "topic": {
             "type": "string",
-            "description": "搜索类别可以是general或news，如果不填则默认为basic，需要近三天的新闻就填news"
+            "description": "搜索类别可以是general或news，如果不填则默认为general，需要近三天的新闻就填news"
         }
 }
 }
 
-async def main(query, topic = "basic"):
+async def main(query, topic = "general"):
     return await web_search(query, topic)
 
 

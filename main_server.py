@@ -11,7 +11,7 @@ import asyncio
 http_base_url = "http://localhost:8088" 
 ws_url = "127.0.0.1:8080"      
 access_token = "ATRI114514"
-playRole = "ATRI"  # 默认聊天扮演角色 
+playRole = "猫娘"  # 默认聊天扮演角色 
 connection_type = "WebSocket_client"
 Server_port = 3000
 

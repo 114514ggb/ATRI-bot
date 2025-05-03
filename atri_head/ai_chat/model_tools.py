@@ -188,7 +188,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "将文本内容转换为语音消息并进行发送(不会结束工具调用,发完后一般调用工具tool_calls_end)，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。",
+            "description": "将文本内容转换为语音消息并进行发送(不会结束工具调用,发完后一般调用工具tool_calls_end)，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。建议在你需要或想发出声音说话时使用",
             "parameters": {            
                 "type": "object",
                 "properties": {

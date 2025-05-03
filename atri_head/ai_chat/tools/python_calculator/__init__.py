@@ -1,4 +1,3 @@
-import math
 
 tool_json = {
     "name": "python_calculator",

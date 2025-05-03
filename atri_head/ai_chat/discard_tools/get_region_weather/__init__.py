@@ -1,4 +1,4 @@
-import httpx,asyncio
+import httpx
 
 
 key = "S-6FTxYf0YMfqlS2d"

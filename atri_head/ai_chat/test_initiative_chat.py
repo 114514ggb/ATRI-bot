@@ -117,7 +117,3 @@ class initiative_chat():
         
         return text_type
     
-    def build_prompt(self, latest_news:str)->str:
-        """构建提示词"""
-        
-        return None

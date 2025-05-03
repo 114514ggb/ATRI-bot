@@ -73,7 +73,7 @@ class textMonitoring():
         return True
 
     monitoring_alike_list = {
-        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg"]],["text",["?"]]],
+        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg","ATRI_问号7.jpg"]],["text",["?"]]],
         "草": [["text",["草"]]],
         "艹": [["text",["艹"]]],
         "怪了": [["text",["怪了"]]],
@@ -110,6 +110,7 @@ class textMonitoring():
         "好看": [["text",["好看!"]]],
         "出拳": [["img",["ATRI_吃我一拳.gif"]]],
         "也是": [["text",["也是"]]],
+        "阿巴阿巴":[["img",["ATRI_阿巴阿巴.jpg"]]],
         "我的天": [["text",["我的天!"]]],
         "true": [["img",["ATRI_正确的.jpg"]]],
         "原神": [["text",["启动喵！","启动","玩原玩的？喵！"]]],
@@ -200,6 +201,7 @@ class textMonitoring():
         "好强":[["text",["好强"]]],
         "盯着你": [["img",["ATRI_盯着你.jpg","ATRI_眨眼.gif","ATRI_眨眼1.gif"]]],
         "厉害": [["img",["ATRI_厉害.jpg"]]],
+        "这么强": [["img",["ATRI_厉害.jpg"]]],
         "yes": [["img",["ATRI_yes.jpg","ATRI_YES1.jpg"]]],
         "YES": [["img",["ATRI_yes.jpg","ATRI_YES1.jpg"]]],
         "杂鱼": [["img",["ATRI_杂鱼.jpg"]]],

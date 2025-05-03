@@ -36,7 +36,7 @@ class Command(Permissions_management):
 
         return [command_argumrnts,command_other_argumrnts]
 
-    def data_processing_text(self,data:dict)->str:
+    def data_processing_text(self, data:dict)->str:
         """处理原data成纯text"""
         text = ""
         for message in data["message"]:
@@ -47,7 +47,9 @@ class Command(Permissions_management):
                 summary = message["data"]["summary"]
                 text += summary if summary != "" else "[image]"
             elif my_type == "at":
-                text = "[@"+message["data"]["qq"]+"]"
+                text += "[@"+message["data"]["qq"]+"]"
+            elif my_type == "file":
+                text += "[\"file\":"+message["data"]["file"]+"]"
             else:
                 text += "["+message["type"]+"]"
         return text

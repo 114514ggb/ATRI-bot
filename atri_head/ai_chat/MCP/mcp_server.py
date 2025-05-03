@@ -1,18 +1,18 @@
 from mcp.server.fastmcp import FastMCP
-import time
+from .MCP_tools.get_weather import weather_main
 
 
-mcp = FastMCP("WeatherServer")
+mcp = FastMCP("mcpServer")
 
 
 @mcp.tool()
-async def get_time() -> str:
+async def query_weather(city: str) -> str:
     """
-    获取当前时间\n
-    :param: 什么也不需要\n
-    :return: time
+    输入指定城市的英文名称，返回今日天气查询结果。
+    :param city: 城市名称（需使用英文）
+    :return: 格式化后的天气信息
     """
-    return time.strftime('%Y-%m-%d %H:%M:%S')
+    return await weather_main(city)
 
 
 
