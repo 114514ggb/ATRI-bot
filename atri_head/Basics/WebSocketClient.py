@@ -30,7 +30,7 @@ class WebSocketClient:
             self._listeners = [
                 self.add_pending_request
             ]
-            
+            self._running = False  # 控制循环的运行状态
             # self.executor = ThreadPoolExecutor(max_workers=4) # 以后可能会用到的线程池
             # self.loop = asyncio.get_event_loop()
             # self._lock = threading.Lock()
@@ -55,6 +55,7 @@ class WebSocketClient:
 
     async def start_while(self):
         """启动获取消息和处理消息的事件循环"""
+        self._running = True
         try:
             await asyncio.gather(
                 self.queue_put(), 
@@ -63,9 +64,11 @@ class WebSocketClient:
             )
         except Exception as e:
             print(f"事件循环意外终止: {e}")
+        finally:
+            self._running = False
 
     async def queue_put(self):
-        while True:
+        while self._running:
             try:
 
                 await self.message_queue.put(json.loads(await self.websocket.recv()))
@@ -83,7 +86,7 @@ class WebSocketClient:
                 await self.connect()
 
     async def queue_get(self):
-        while True:
+        while self._running:
             try:
                 data = await self.message_queue.get()
                 for callback in self._listeners:
@@ -97,10 +100,17 @@ class WebSocketClient:
                 print(f"队列处理错误: {e}")
                 
     async def close(self):
+        """优雅关闭连接"""
+        self._running = False  # 停止循环
+        
+        # 关闭WebSocket连接
         if self.websocket:
             await self.websocket.close()
+            
+        # 清空监听器和回声字典
         self._listeners.clear()
         self.pending_requests_echos.clear()
+        
         # 清空消息队列
         while not self.message_queue.empty():
             await self.message_queue.get()

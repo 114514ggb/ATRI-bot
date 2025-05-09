@@ -1,8 +1,10 @@
-from .model_tools import tool_calls
-from collections import defaultdict
-from threading import Lock
-from typing import List, Dict
 from .prepare_model_prompt import build_prompt
+from .model_tools import tool_calls
+from .emoji_system import emoji_core
+
+from collections import defaultdict
+from typing import List, Dict
+from threading import Lock
 import contextvars
 import threading
 import asyncio
@@ -55,11 +57,12 @@ class Chat_processing:
     
     def __init__(self,playRole="none"):
         if not hasattr(self, "_initialized"):
-            self.tool_calls = tool_calls()
-            self.model = self.tool_calls.model #免费打工的
+            self.tool_calls = tool_calls()#模型调用工具
+            self.model = self.tool_calls.model #免费打工的api
             self.deepseek = self.tool_calls.deepseek
             self.import_default_character_setting()
             self.Default_playRole = self.playRole_list[playRole]
+            self.emoji_system = emoji_core("document\\img\\emojis")#表情包管理
             self.build_prompt = build_prompt(
                 model_environment = 
                 "你在一个qq群聊中，你输出的内容将作为群聊中的消息发送。你只应该发送文字消息，不要发送[图片]、[qq表情]、[@某人(id:xxx)]等你在聊天记录中看到的特殊内容。"
@@ -75,12 +78,12 @@ class Chat_processing:
         
 
     async def chat(self, text: str, data: dict, group_ID: str)-> str:
-        """聊天"""
+        """回复主逻辑"""
         if text != "":
             self.restrictions_messages_length() #消息长度限制
             await self.image_processing(data) #图片处理
             
-            user_formatting_data = self.build_prompt.build_user_Information(data,text)
+            user_formatting_data = build_prompt.build_user_Information(data,text)
             
             # self.append_message_review(self.build_prompt.build_group_user_Information(data))
             self.append_message_review(user_formatting_data)
@@ -132,13 +135,8 @@ class Chat_processing:
         await self.get_group_chat(group_id) #获取群聊消息
         
         chat_text =  await self.chat(message, data, group_id)
-        if chat_text is not None and chat_text != "":
-            if '$' in chat_text:
-                for message in chat_text.split("$"): #消息专用分隔符$
-                    await self.tool_calls.passing_message.send_group_message(group_ID,message)
-                    await asyncio.sleep(0.8) #模拟输入延迟
-            else:
-                await self.tool_calls.passing_message.send_group_reply_msg(group_ID,chat_text,data["message_id"])
+
+        await self.bot_send_text(chat_text,group_ID,data)#发送消息
         
         # print(self.messages)
         # print(self.temporary_messages)
@@ -222,6 +220,37 @@ class Chat_processing:
 
         return assistant_message['content']
     
+    async def bot_send_text(self, chat_text:str, group_ID:int, data:dict):
+        """回复的群文本消息"""
+        MESSAGE_DELAY = 0.8 #多条消息间隔时间
+        MESSAGE_DELIMITER = "$" #分隔符
+        
+        if chat_text is not None and chat_text != "":
+            
+            (chat_text,tag_list) = emoji_core.process_text_and_emotion_tags(chat_text,self.emoji_system.emoji_file_dict)
+            #提取标签
+            
+            first_msg, *rest_msgs = chat_text.split(MESSAGE_DELIMITER) if MESSAGE_DELIMITER in chat_text else [chat_text]
+            
+            await self.tool_calls.passing_message.send_group_reply_msg(
+                group_ID,
+                first_msg,
+                data["message_id"]
+            )
+
+            for message in rest_msgs:
+                await self.tool_calls.passing_message.send_group_message(group_ID, message)
+                await asyncio.sleep(MESSAGE_DELAY)
+                
+            for tag in tag_list:
+                await asyncio.sleep(MESSAGE_DELAY)
+                await self.tool_calls.passing_message.send_group_pictures(
+                    group_ID,
+                    f"emojis/{tag}/{self.emoji_system.get_random_emoji_name(tag)}",
+                    default = True
+                )
+                
+                
     def reset_chat(self,group_id:str):
         """重置聊天记录"""
         self.all_group_messages_list[group_id] = build_prompt.append_playRole(self.Default_playRole,[])
@@ -266,6 +295,13 @@ class Chat_processing:
 
     def append_message_review(self, content:str):
         """添加带审查的消息,添加于临时消息列表"""
+        
+        emoji_prompt = build_prompt.append_tag_hint(
+            "",
+            "代表你所想表达的感情，你可以通过在对话中加入这些标签来实现发送应感情的表情包(user看不到这些标签,不过也不要发太多)",
+            list(self.emoji_system.emoji_file_dict.keys())
+        )
+        
         if self.whether_use_system_review:
             build_prompt.append_message_text(
                 self.temporary_messages,
@@ -273,13 +309,16 @@ class Chat_processing:
                 content
             )
             self.temporary_messages.append(
-                self.build_prompt.model_environment+self.build_prompt.prompt               
+                self.build_prompt.model_environment + \
+                self.build_prompt.prompt + \
+                emoji_prompt               
             )
         else:
             build_prompt.append_message_text(
                 self.temporary_messages,
                 "user",
-                self.build_prompt.build_prompt(context=content)
+                self.build_prompt.build_prompt(context=content) +\
+                emoji_prompt
             )
             
 

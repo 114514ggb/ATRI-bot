@@ -301,8 +301,16 @@ class QQ_send_message():
         return await self.requests_require_return(url=url ,payload=payload)
             
         
-    async def group_message_request(self,group_id,type,file_url,Path_type = True):
-        """发送单个,非文字群消息"""
+    async def group_message_request(self,group_id,type,file_url,Path_type = True)->None:
+        """
+        发送单个,非文字群消息
+        
+        Args:
+            group_id:群号
+            type:类型
+            file_url:文件目录/url
+            Path_type:是否是文件
+        """
 
         if Path_type:
             Path_type = "file://"

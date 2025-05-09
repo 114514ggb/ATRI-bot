@@ -32,7 +32,11 @@ class graceful_exiter:
             
             if self.async_handlers:
                 try:
-                    asyncio.run(self._run_async_handlers())
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        loop.create_task(self._run_async_handlers())
+                    else:
+                        asyncio.run(self._run_async_handlers())
                 except Exception as e:
                     logging.exception(f"异步清理过程中发生错误: {e}")
                     

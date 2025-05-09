@@ -6,7 +6,7 @@ from .Basics import Basics
 class group_message_processing():
     """群消息处理类"""
     qq_white_list = [] #qq白名单
-    first_connect_database = False #是否第一次连接数据库
+    single_use = False #一次性
 
     def __init__(self, playRole, http_base_url = None, token= None, connection_type = "http",qq_white_list = []):
         self.qq_white_list = qq_white_list
@@ -39,6 +39,15 @@ class group_message_processing():
             elif self.basics.Command.blacklist_intercept(data["user_id"]): #黑名单检测
 
                 await self.receive_event(data,group_ID,message) #非at@事件处理
+                
+                
+        if not self.single_use:
+            """一次性"""
+            
+            await self.basics.link_async_database("127.0.0.1","root","180710")
+            await self.exit_save() #退出时处理
+            
+            self.single_use = True
         
         return await self.data_store(data) #数据存储
             
@@ -90,13 +99,6 @@ class group_message_processing():
     
     async def data_store(self, data:dict) -> bool:
         """数据存储"""
-        if not self.first_connect_database:
-            
-            await self.basics.link_async_database("127.0.0.1","root","180710")
-            await self.exit_save() #退出时处理
-            
-            self.first_connect_database = True
-            
             
         if "post_type" in data and data["post_type"] == "message":
             
@@ -128,10 +130,11 @@ class group_message_processing():
 
     async def exit_save(self):
         """退出时保存数据"""
-        pass
-        # db_quit= self.basics.async_database.close_pool #清理数据库
+        db_quit = self.basics.async_database.close_pool #清理数据库
+        connect_close = self.basics.QQ_send_message.websocketClient.close
         
-        # self.basics.exiter_save.register_async(db_quit)
+        self.basics.exiter_save.register_async(db_quit)
+        self.basics.exiter_save.register_async(connect_close)
         
             
             

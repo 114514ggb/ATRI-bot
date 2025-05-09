@@ -100,4 +100,11 @@ class build_prompt:
         })
         
         return messages
-    
+
+    def append_tag_hint(text:str, tag_prompt:str, tag_list:list ,tag_symbol:str = "<内容>")->str:
+        """向原有提示词添加可输出标签提示"""
+        text += "\n\n可以在输出中加入带有如下内容的标签:" + str(tag_list) + \
+            "\n标签格式是:" + tag_symbol +\
+            "\n这是用来" + tag_prompt + "\n"
+        
+        return text
