@@ -1,5 +1,6 @@
 from .AI_interaction import AI_interaction
 # from .atri_Database import AtriDB #数据库
+from .message_buffer_memory import MessageCache
 from .atri_async_Database import AtriDB_Async
 from .chance import Chance
 from .qq_send_message import QQ_send_message
@@ -26,12 +27,20 @@ class Basics:
     def __init__(self, http_base_url  = "http://localhost:8088", token = "ATRI114514", playRole = "ATRI",connection_type = None):
 
         if not hasattr(self, "_initialized"):
-            self.QQ_send_message = QQ_send_message(token, http_base_url, connection_type) #QQ 发送消息等交互
-            self.AI_interaction = AI_interaction(playRole) #AI 交互
-            self.Command = Command() #命令还有权限管理
-            self.Chance = Chance() #随机事件
-            self.exiter_save = graceful_exiter() #退出保存
+            self.QQ_send_message = QQ_send_message(token, http_base_url, connection_type) 
+            """QQ 发送消息等交互"""
+            self.AI_interaction = AI_interaction(playRole) 
+            """AI 交互"""
+            self.Command = Command() 
+            """命令还有权限管理"""
+            self.Chance = Chance() 
+            """随机事件"""
+            self.exiter_save = graceful_exiter()
+            """退出保存"""
+            self.MessageCache = MessageCache()
+            """消息暂时缓存"""
             # self.database = AtriDB("localhost", "root", "180710") #数据库
+            
             self.async_database = None #异步数据库
             self._initialized = True  # 标记为已初始化 
 

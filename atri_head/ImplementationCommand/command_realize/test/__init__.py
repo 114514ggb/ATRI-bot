@@ -12,6 +12,7 @@ async def test(argument,group_ID,data):
     await basics.QQ_send_message.send_group_merge_forward(group_ID, "ATRI接收到的参数有:\n"+message)
     # await basics.QQ_send_message.send_group_message(group_ID,"ATRI接收到的参数有:\n"+message+"\n要exec语句为:"+argument_2[0])
 
+    await basics.QQ_send_message.send_group_merge_forward(group_ID,basics.MessageCache.get_group_messages(argument_2))
     # exec(argument_2[0])
 
     return "ok"

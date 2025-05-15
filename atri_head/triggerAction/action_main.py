@@ -71,15 +71,15 @@ class itemAction():
                     
             elif sub_type == "approve":
                 
-                await self.basics.QQ_send_message.send_group_message(group_ID,f"欢迎{user_id}加入群聊！")
+                await self.basics.QQ_send_message.send_group_message(group_ID,f"欢迎[CQ:at,qq={user_id}]加入群聊！")
 
             elif sub_type == 'kick':
                 
-               await self.basics.QQ_send_message.send_group_message(group_ID,f"{user_id}被{data['operator_id']}踢出群聊！")
+               await self.basics.QQ_send_message.send_group_message(group_ID,f"[CQ:at,qq={user_id}]被管理员{data['operator_id']}踢出群聊！")
                
             elif sub_type == 'leave':
                 
-                await self.basics.QQ_send_message.send_group_message(group_ID,f"{user_id}退出群聊！")
+                await self.basics.QQ_send_message.send_group_message(group_ID,f"[CQ:at,qq={user_id}]退出群聊！")
                 
         return False
 

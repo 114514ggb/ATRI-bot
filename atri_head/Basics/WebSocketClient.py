@@ -115,6 +115,8 @@ class WebSocketClient:
         while not self.message_queue.empty():
             await self.message_queue.get()
             
+        asyncio.Task.cancel()
+            
     def add_listener(self, callback):
         """添加消息监听器"""
         self._listeners.append(callback)

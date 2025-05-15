@@ -1,7 +1,10 @@
-import re
 from .permissions_management import Permissions_management
+from typing import Dict
+import re
+import json
 
 class Command(Permissions_management):
+    """有关指令的文本解析"""
     
     def verifyParameter(self, parameter_list, quantity_list):
         """
@@ -36,20 +39,43 @@ class Command(Permissions_management):
 
         return [command_argumrnts,command_other_argumrnts]
 
-    def data_processing_text(self, data:dict)->str:
-        """处理原data成纯text"""
-        text = ""
+    def data_processing_text(self, data:Dict[str, int|str|Dict])->str:
+        """处理原data里的message处理成纯text"""
+        text_parts = []
+        
         for message in data["message"]:
-            my_type = message["type"]
+            message:Dict[str,str|dict]
+            my_type:str = message.get("type")
+
             if my_type == "text":
-                text += message["data"]["text"]
+                text_data = message.get("data", {}).get("text", "")
+                text_parts.append(str(text_data))
+                
             elif my_type == "image":
-                summary = message["data"]["summary"]
-                text += summary if summary != "" else "[image]"
+                summary = message.get("data", {}).get("summary", "")
+                text_parts.append(summary if summary else "[image]")
+                
             elif my_type == "at":
-                text += "[@"+message["data"]["qq"]+"]"
+                qq = message.get("data", {}).get("qq", "")
+                text_parts.append(f"[@{qq}]")
+                
             elif my_type == "file":
-                text += "[\"file\":"+message["data"]["file"]+"]"
+                file = message.get("data", {}).get("file", "")
+                text_parts.append(f"[\"file\":{file}]")
+                
+            elif my_type == "face":
+                face_text = message.get("data", {}).get('raw', {}).get('faceText')
+                text_parts.append(face_text if face_text is not None else "[unknown_face]")
+                
+            elif my_type == "json":
+                try:
+                    json_data:dict = json.loads(message.get('data', {}).get("data", "{}"))
+                    prompt = json_data.get("prompt", "")
+                    text_parts.append(f"[json_prompt:{prompt}]")
+                except json.JSONDecodeError:
+                    text_parts.append("[json]")
+                    
             else:
-                text += "["+message["type"]+"]"
-        return text
+                text_parts.append(f"[{my_type}]")
+
+        return "".join(text_parts)

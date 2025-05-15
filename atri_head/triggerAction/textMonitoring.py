@@ -12,15 +12,16 @@ class textMonitoring():
     last_time = 0 #上次反应时间
     cooldown = 1 #反应间隔时间
     
-    async def monitoring(self, text, group_ID,data):
+    async def monitoring(self, text:str, group_ID,data:dict):
         """监控并产生对应的反映"""
         if await self.monitoringItem(group_ID,data): #监控指定的字段
             return True
         # elif self.response_cooldown(): #反应间隔时间
-        elif await self.alikeRespond(text, group_ID): #精确匹配
-            return True
-        elif await self.haveRespond(text, group_ID): #模糊匹配
-            return True
+        elif  data.get('message_type','') == 'group': #只要群
+            if await self.alikeRespond(text, group_ID): #精确匹配
+                return True
+            elif await self.haveRespond(text, group_ID): #模糊匹配
+                return True
         return False
 
     async def alikeRespond(self, text, group_ID):
@@ -87,6 +88,7 @@ class textMonitoring():
         "哎": [["text",["哎"]]],
         "乐": [["text",["乐","乐！"]]],
         "233": [["text",["233"]]],
+        "难受":[["img",["ATRI_难受.gif"]]],
         # "萝卜子": [["img",['ATRI_鸭子走.gif','ATRI_左右.gif',"ATRI_呆望.jpg","ATRI_不要1.gif"]]],
         "螃蟹": [["img",["ATRI_见到螃蟹.gif","ATRI_是螃蟹.jpg","ATRI_爱螃蟹.jpg"]],["text",["亚托莉最喜欢吃螃蟹了~"]]],
         "摸头": [["img",["ATRI_摸头.gif","ATRI_摸头1.gif","ATRI_摸头2.gif","ATRI_摸头.jpg","ATRI_摸头3.gif"]]],

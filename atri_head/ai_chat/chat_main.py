@@ -298,7 +298,7 @@ class Chat_processing:
         
         emoji_prompt = build_prompt.append_tag_hint(
             "",
-            "代表你所想表达的感情，你可以通过在对话中加入这些标签来实现发送应感情的表情包(user看不到这些标签,不过也不要发太多)",
+            "代表你所想表达的感情，你可以通过在对话中加入这些标签来实现发送应感情的表情包,user看不到这些标签,不要发太多标签",
             list(self.emoji_system.emoji_file_dict.keys())
         )
         
@@ -317,7 +317,10 @@ class Chat_processing:
             build_prompt.append_message_text(
                 self.temporary_messages,
                 "user",
-                self.build_prompt.build_prompt(context=content) +\
+                self.build_prompt.build_prompt(
+                    context=content,
+                    # chat_history=self.
+                ) +\
                 emoji_prompt
             )
             

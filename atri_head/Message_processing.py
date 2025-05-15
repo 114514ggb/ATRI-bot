@@ -5,7 +5,8 @@ from .Basics import Basics
 
 class group_message_processing():
     """群消息处理类"""
-    qq_white_list = [] #qq白名单
+    qq_white_list = []
+    """qq白名单"""
     single_use = False #一次性
 
     def __init__(self, playRole, http_base_url = None, token= None, connection_type = "http",qq_white_list = []):
@@ -20,8 +21,8 @@ class group_message_processing():
         
         # print(data)
         
-        if 'group_id' in data and data['group_id'] in self.qq_white_list or ('user_id' in data and data['user_id'] == 2631018780): # 判断是否在白名单中
-
+        if data.get("group_id",0) in self.qq_white_list or ('user_id' in data and data['user_id'] == 2631018780):
+            """过滤出群事件"""
             print("Received event:", data)
             group_ID = data['group_id']
             message = ""
@@ -30,10 +31,9 @@ class group_message_processing():
                 message_objects = data['message']
                 message = ''.join([m['data']['text'] for m in message_objects if m['type'] == 'text'])
 
-            if data['post_type'] == 'message' and data['message_type'] == 'group' and  {'type': 'at', 'data': {'qq': '168238719'}} in data['message']:                
-            # 检查是否是群消息事件并且是目标群消息而且是at机器人
-                
-                print(f"Processed message: {message}")
+            if  data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:                
+            
+                print(f"at message: {message}")
                 await self.receive_event_at(data,group_ID,message) #at@事件处理
             
             elif self.basics.Command.blacklist_intercept(data["user_id"]): #黑名单检测
@@ -48,8 +48,10 @@ class group_message_processing():
             await self.exit_save() #退出时处理
             
             self.single_use = True
+            
+        await self.data_store(data) #数据存储
         
-        return await self.data_store(data) #数据存储
+        return True
             
 
     async def receive_event_at(self,data:dict,group_ID:int,message:str)-> bool:
@@ -81,7 +83,6 @@ class group_message_processing():
                 return False
 
         
-
     async def receive_event(self, data:dict, group_ID:int, message:str):
         """非at@事件处理"""
 
@@ -99,16 +100,22 @@ class group_message_processing():
     
     async def data_store(self, data:dict) -> bool:
         """数据存储"""
+        
+        data_text = ""
+        if data.get('message',False):
+            data_text = self.basics.Command.data_processing_text(data)
+            #message字符串化
+        
+        await self.basics.MessageCache.cache_system(data=data,message_test=data_text)
+        #消息缓存
             
         if "post_type" in data and data["post_type"] == "message":
-            
-            text = self.basics.Command.data_processing_text(data=data)
             
             group_name = (await self.basics.QQ_send_message.get_group_info(data["group_id"]))["data"]["group_name"]
             
             try:
                 users = {"user_id":data["user_id"],"nickname":data['sender']['nickname']}
-                message ={"message_id":data["message_id"],"content":text,"timestamp":data["time"],"group_id":data["group_id"],"user_id":data["user_id"]}
+                message ={"message_id":data["message_id"],"content":data_text,"timestamp":data["time"],"group_id":data["group_id"],"user_id":data["user_id"]}
                 user_group = {"group_id":data["group_id"],"group_name":group_name}
             except Exception as e:
                 print("获取参数失败:",e)
