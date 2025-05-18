@@ -1,8 +1,8 @@
 from ..Basics.qq_send_message import QQ_send_message
-from gradio_client import Client
 from .model_api.bigModel_api import bigModel_api
 from .model_api.universal_async_ai_api import universal_ai_api
 # from .model_api.async_open_ai_api import async_openAI
+from ..Basics import Basics
 import importlib.util
 import os
 import json
@@ -17,6 +17,7 @@ class tool_calls:
 
     def __init__(self):
         self.passing_message = QQ_send_message()
+        self.basics = Basics()
         self.tools_functions_dict = {
         }
         self.tools_functions_dict_qq = {
@@ -147,7 +148,7 @@ class tool_calls:
     
     async def send_speech_message(self, message, group_ID):
         """发送语音消息"""
-        url = self.text_to_speech(message)
+        url = self.basics.AI_interaction.speech_synthesis(message)
         await self.passing_message.send_group_audio(group_ID, url)
 
         return {"send_speech_message": f"已发送语音内容：{message}"}
@@ -159,29 +160,6 @@ class tool_calls:
         print("图片发送成功")
         return {"send_image_message": "图片已发送"}
     
-    def text_to_speech(self, text):
-        """文本转语音,返回语音路径"""
-        client = Client("http://localhost:9872/")
-        result = client.predict(
-                        "E:\\ffmpeg\\.......我为了夏生先生行动需要理由吗.mp3",
-                        # "E:\\ffmpeg\\啊我真是太高性能了.mp3",	
-                        # str (filepath on your computer (or URL) of file) in '请上传3~10秒内参考音频，超过会报错！' Audio component
-                        "あ，私です夏生さんのために動く理由が必要なんですか",
-                        # "あ、なんて高性能なの、私は！",	
-                        # str in '参考音频的文本' Textbox component
-                        "日文",	# str (Option from: ['中文', '英文', '日文', '中英混合', '日英混合', '多语种混合']) in '参考音频的语种' Dropdown component
-                        text,	# str in '需要合成的文本' Textbox component
-                        "多语种混合",	# str (Option from: ['中文', '英文', '日文', '中英混合', '日英混合', '多语种混合']) in '需要合成的语种' Dropdown component
-                        "凑四句一切",	# str in '怎么切' Radio component
-                        30,	# float (numeric value between 1 and 100) in 'top_k' Slider component
-                        1,	# float (numeric value between 0 and 1) in 'top_p' Slider component
-                        1,	# float (numeric value between 0 and 1) in 'temperature' Slider component
-                        False,	# bool in '开启无参考文本模式。不填参考文本亦相当于开启。' Checkbox component
-                        fn_index=3
-        )
-        return result
-
-
 
 tools = [
     {

@@ -1,6 +1,7 @@
 from .ImplementationCommand.command_processor import command_processor
 from .triggerAction.textMonitoring import textMonitoring
 from .Basics import Basics
+from .ai_chat.chat_main import Chat_processing
 
 
 class group_message_processing():
@@ -11,9 +12,11 @@ class group_message_processing():
 
     def __init__(self, playRole, http_base_url = None, token= None, connection_type = "http",qq_white_list = []):
         self.qq_white_list = qq_white_list
-        self.basics = Basics(http_base_url, token, playRole, connection_type)
+        self.basics = Basics(http_base_url, token, playRole, connection_type)#这个一定要第一个
         self.command_processor = command_processor()
+        self.chat_ai = Chat_processing()
         self.textMonitoring = textMonitoring()
+        
         self.basics.Command.syncing_locally()#同步管理员名单
 
     async def main(self,data:dict)-> bool:
@@ -31,14 +34,16 @@ class group_message_processing():
                 message_objects = data['message']
                 message = ''.join([m['data']['text'] for m in message_objects if m['type'] == 'text'])
 
-            if  data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:                
-            
-                print(f"at message: {message}")
-                await self.receive_event_at(data,group_ID,message) #at@事件处理
-            
-            elif self.basics.Command.blacklist_intercept(data["user_id"]): #黑名单检测
-
-                await self.receive_event(data,group_ID,message) #非at@事件处理
+            if self.basics.Command.blacklist_intercept(data["user_id"]):#黑名单检测
+                
+                if  data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:                
+                
+                    print(f"at message: {message}")
+                    await self.receive_event_at(data,group_ID,message) #at@事件处理
+                    
+                else:
+                    
+                    await self.receive_event(data,group_ID,message) #非at@事件处理
                 
                 
         if not self.single_use:
@@ -68,15 +73,13 @@ class group_message_processing():
 
         else:
             try:
-
-                if self.basics.Command.blacklist_intercept(data['user_id']):
                     
-                    await self.basics.AI_interaction.chat.main(group_ID, message, data) #聊天处理
-                    return True
-                
-                else:
-                    raise Exception("检测到黑名单内人员")
-                    
+                await self.chat_ai.main(
+                    group_ID, 
+                    message, 
+                    data
+                ) 
+                return True
 
             except Exception as e:
                 await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e))

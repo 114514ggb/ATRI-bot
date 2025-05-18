@@ -32,11 +32,12 @@ class command_processor():
 
             except Exception as e:
                 await self.basics.QQ_send_message.send_group_message(qq_id,"指令执行异常，请稍后再试!😰\nType Error:"+str(e))
-                return False
+                
 
         except Exception as e:
             await self.basics.QQ_send_message.send_group_message(qq_id,"ATRI用手挠了挠脑袋,表示不理解这个指令😕\nType Error:"+str(e))
-            return False
+            
+        return False
 
     def verify_command(self, user_input: str, user_qq_id: int):
         """验证指令,用来判断命令是否存在，是否具有权限,参数数量是否正确,成功后返回命令主函数和提取的参数列表"""
@@ -151,7 +152,14 @@ class command_processor():
             
             for command in self.command_list:
                 if command.name == parameter[1][0]:
-                    command_text = f"指令名称: {command.name}\n调用名: {command.aliases}\n功能描述: {command.description}\n执行所需最低权限等级: {command.authority_level}级\n指令可接受参数数量范围: {command.parameter}"
+                    command_text = (
+                        f"✨<{command.name}>指令信息✨\n"
+                        f"├─ 📛 指令名称: {command.name}\n"
+                        f"├─ 🏷️ 调用名: {', '.join(command.aliases) if isinstance(command.aliases, (list, tuple)) else command.aliases}\n"
+                        f"├─ 📝 功能描述: {command.description}\n"
+                        f"├─ 🔐 执行权限: 最低 {command.authority_level} 级\n"
+                        f"└─ 🎯 参数要求: {command.parameter}\n"
+                    )                 
                     await self.basics.QQ_send_message.send_group_message(qq_id,command_text)
                     return True
             

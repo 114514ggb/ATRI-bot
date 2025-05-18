@@ -6,6 +6,7 @@ basics = Basics()
 group_print = basics.QQ_send_message.send_group_message
 
 async def query_mysql(argument, group_ID, data):
+    
     def format_timedelta(delta):
         """将时间差格式化为'X天Y小时Z分钟A秒'的字符串"""
         days = delta.days
@@ -28,7 +29,11 @@ async def query_mysql(argument, group_ID, data):
 
     minus_argument, other_argument = argument
 
-    if basics.Command.isQQ(other_argument[0]):
+
+    user_id = other_argument[0] if  other_argument != [] else  data['user_id']
+    #获取ID
+
+    if basics.Command.isQQ(user_id):
         sql_days = """
 SELECT
   SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 86400 THEN 1 ELSE 0 END) AS daily_count,
@@ -40,10 +45,10 @@ FROM message
 WHERE user_id = %s
 """
         async with basics.async_database as db:
-            my_tuple = await db.get_user(other_argument[0])
+            my_tuple = await db.get_user(user_id)
             daye = await db.execute_SQL(
                 sql=sql_days,
-                argument=(other_argument[0],)
+                argument=(user_id,)
             )
             
         number_days = str(daye[0][0])
@@ -75,7 +80,7 @@ WHERE user_id = %s
 
             await group_print(
                 group_ID,
-                f"✨【QQ用户活跃报告】✨\n"
+                f"✨ QQ用户活跃报告 ✨\n"
                 f"----------------------------------------\n"
                 f"👤 基础信息\n"
                 f"  名称: {name}\n"
@@ -100,7 +105,7 @@ WHERE user_id = %s
                 f"----------------------------------------"
             )
         else:
-            await group_print(group_ID, f"数据库中未找到用户{other_argument[0]}")
+            await group_print(group_ID, f"数据库中未找到用户{user_id}")
     else:
         Exception("请输入正确的QQ号")
         
@@ -179,7 +184,7 @@ command_main = Command_information(
     name="query_mysql",
     aliases=["query", "mysql", "查询"],
     handler=query_mysql,
-    description="查询数据库,返回用户信息.目前只支持查询信息用户一些信息",
+    description="查询数据库,返回用户信息.空参数返回发送者信息,目前只支持查询信息用户一些信息",
     authority_level=1, 
-    parameter=[[0, 0], [1, 1]]
+    parameter=[[0, 0], [0, 1]]
 )

@@ -3,7 +3,7 @@ import time
 class build_prompt:
     """
         构造prompt的类\n
-        对model的上下文环境和prompt进行封装
+        对model的上下文环境的prompt进行封装
     """
     prompt = ""
     """model输出要求"""
@@ -38,12 +38,12 @@ class build_prompt:
             prompt += f"对话环境:{self.model_environment}\n\n"
             
         if chat_history != "":
-            prompt += f"chat_history:{chat_history}\n\n"
+            prompt += f"QQ_chat_history:<BEGIN>{chat_history}<FINISH>\n\n"
         
         prompt += f"需要响应的内容:<BEGIN>{context}<FINISH>\n\n"
         
         if self.prompt != "":
-            prompt += f"system_prompt:{self.prompt}\n\n"
+            prompt += f"system_prompt:<BEGIN>{self.prompt}<FINISH>\n\n"
         
         return prompt
     
