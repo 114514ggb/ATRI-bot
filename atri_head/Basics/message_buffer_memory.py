@@ -45,7 +45,8 @@ class MessageCache:
         if message_type := data.get("message_type",False): 
             #是带消息的dict
             
-            if message_type == 'group':
+            if message_type == 'group' and data['self_id'] != data['user_id']:
+                
                 await self._set_group_messages(
                     data['group_id'],
                     message_test

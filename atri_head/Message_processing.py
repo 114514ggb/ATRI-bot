@@ -109,6 +109,7 @@ class group_message_processing():
             data_text = self.basics.Command.data_processing_text(data)
             #message字符串化
         
+
         await self.basics.MessageCache.cache_system(data=data,message_test=data_text)
         #消息缓存
             

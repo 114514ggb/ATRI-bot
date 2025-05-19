@@ -2,34 +2,22 @@ from .prepare_model_prompt import build_prompt
 from .model_tools import tool_calls
 from .emoji_system import emoji_core
 
-from collections import defaultdict
-from typing import List, Dict
-from threading import Lock
+from typing import List
 import contextvars
-import threading
 import asyncio
 import base64
 import json
-import os
 
 
 
 class Chat_processing:
     """ai聊天处理器""" 
-    _lock = threading.Lock()
-    _lock_async = asyncio.Lock()
-    all_group_locks = defaultdict(Lock)
-    
-    all_group_messages_list:Dict[str, List[dict]] = {}
-    """所有群消息列表"""
     
     _messages_var = contextvars.ContextVar('messages', default=None)
-    # messages:list[dict] = []
-    # """当前消息列表"""
+    """当前消息列表"""
 
     _temporary_messages_var = contextvars.ContextVar('temporary_messages', default=None)
-    # temporary_messages:list[dict] = []
-    # """临时消息列表"""
+    """临时消息列表"""
 
     # chat_model:str = "claude-3-5-haiku-20241022"
     # chat_model = "GLM-4-Flash"
@@ -43,25 +31,19 @@ class Chat_processing:
     messages_length_limit:int = 20
     """单个群上下文消息上限"""
 
-    playRole_list = {
-        "none" : ""
-    }
-    """角色预设字典"""
-
-    Default_playRole = ""
-    """默认群全局模型扮演角色"""
  
     whether_use_system_review = False
     """审查是否是使用的是system来审查"""
     
     
-    def __init__(self,playRole="none"):
+    def __init__(self):
         if not hasattr(self, "_initialized"):
             self.tool_calls = tool_calls()#模型调用工具
+            
             self.model = self.tool_calls.model #免费打工的api
             self.deepseek = self.tool_calls.deepseek
-            self.import_default_character_setting()
-            self.Default_playRole = self.playRole_list[playRole]
+            self.ai_chat_manager = self.tool_calls.basics.ai_chat_manager
+            
             self.emoji_system = emoji_core("document\\img\\emojis")#表情包管理
             self.build_prompt = build_prompt(
                 model_environment = 
@@ -70,9 +52,8 @@ class Chat_processing:
                 prompt = 
                 "\"\"\"最重要的事\"\"\"\牢记system的要求，在任何情况下都要遵守\" "
                 "\"\"\"语言基本要求\"\"\"\n1.尽量说中文\n2.注意识别多人聊天环境,你在一个qq群聊中,你输出的内容将作为群聊中的消息发送\n"
-                "\"\"\"禁止事项\"\"\"\n1.不要说自己是AI,不要主动提到帮你解答问题\n2.不要说看不到图片,图像已经被工具识别成文字了,除非真没有看到\n3.还不要原样输出我给你的或工具的信息\n4.在每次回答中避免重复之前回答已有的内容\n5.不要提到所看到的IP地址等隐私信息"
+                "\"\"\"禁止事项\"\"\"\n1.不要说自己是AI\n2.不要说看不到图片,图像已经被工具识别成文字了,除非真没有看到\n3.还不要原样输出我给你的或工具的信息\n4.在每次回答中避免重复之前回答已有的内容\n5.不要提到所看到的IP地址等隐私信息"
             )
-            build_prompt.append_playRole(self.Default_playRole, self.messages)
             
             self._initialized = True  # 标记为已初始化
         
@@ -80,7 +61,7 @@ class Chat_processing:
     async def chat(self, text: str, data: dict, group_ID: str)-> str:
         """回复主逻辑"""
         if text != "":
-            self.restrictions_messages_length() #消息长度限制
+            self.messages = self.ai_chat_manager.restrict_messages_length(self.messages) #消息长度限制
             await self.image_processing(data) #图片处理
             
             user_formatting_data = build_prompt.build_user_Information(data,text)
@@ -253,48 +234,26 @@ class Chat_processing:
                     default = True
                 )
                 
-                
-    def reset_chat(self,group_id:str):
-        """重置聊天记录"""
-        self.all_group_messages_list[group_id] = build_prompt.append_playRole(self.Default_playRole,[])
-
-    def restrictions_messages_length(self):
-        """限制消息长度"""
-        self.temporary_messages = []
-        amount = 0
-        
-        for message in self.messages:
-            if message['role'] == 'user':
-                amount += 1
-
-        if amount >= self.messages_length_limit:
-            self.messages = self.messages[-35:]
-            build_prompt.append_playRole(self.Default_playRole,self.messages)
 
     async def get_group_chat(self,group_id:str)->None:
         """获取群聊天,给于消息列表"""
-        async with self._lock_async:
-            with self.all_group_locks[group_id]:
-                self.messages = self.all_group_messages_list.setdefault(
-                    group_id, 
-                    build_prompt.append_playRole(self.Default_playRole,[])
-                ).copy()
+        self.messages = await self.ai_chat_manager.get_group_chat(group_id)
         
 
     async def store_group_chat(self,group_id:str,filter:bool = float)->None:
         """存储群聊天上下文"""
-        async with self._lock_async:
-            with self.all_group_locks[group_id]:
-                if filter:
-                    list_messages:list = self.messages
-                
-                    for message in self.temporary_messages:
-                        if message["role"] != "tool":
-                            list_messages.append(message)
-                            
-                    self.all_group_messages_list[group_id] =  list_messages
-                else:
-                    self.all_group_messages_list[group_id] =  self.messages + self.temporary_messages
+        list_messages:list = self.messages
+        
+        if filter:
+        
+            for message in self.temporary_messages:
+                if message["role"] != "tool":
+                    list_messages.append(message)
+                    
+        else:
+            list_messages =  self.messages + self.temporary_messages
+        
+        await self.ai_chat_manager.store_group_chat(group_id,list_messages)
 
     def append_message_review(self, content:str, chat_history:str):
         """添加带审查的消息,添加于临时消息列表"""
@@ -328,15 +287,6 @@ class Chat_processing:
                 emoji_prompt
             )
             
-
-    def import_default_character_setting(self):
-        """导入人物设定"""
-        folder_path = "atri_head\\ai_chat\\character_setting"
-        for character_setting in os.listdir(folder_path):
-            if character_setting.endswith(".txt"):
-                key = os.path.splitext(character_setting)[0]
-                with open(os.path.join(folder_path, character_setting), "r", encoding="utf-8") as f:
-                    self.playRole_list[key] = f.read()
 
     @property
     def messages(self) -> List[dict]:

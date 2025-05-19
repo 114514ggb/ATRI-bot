@@ -36,7 +36,7 @@ class ai_chat_manager:
         async with self._lock_async:
             with self.all_group_locks[group_id]:
                 if group_id not in self.all_group_messages:
-                    role = self.play_role_list(self.group_play_roles.get(group_id, self.default_play_role))
+                    role = self.play_role_list[self.group_play_roles.get(group_id, self.default_play_role)]
                     self.all_group_messages[group_id] = self._create_initial_messages(role)
                 return self.all_group_messages[group_id].copy()
     
@@ -50,7 +50,7 @@ class ai_chat_manager:
         """重置指定群的聊天记录"""
         async with self._lock_async:
             with self.all_group_locks[group_id]:
-                role = self.play_role_list(self.group_play_roles.get(group_id, self.default_play_role))
+                role = self.play_role_list[self.group_play_roles.get(group_id, self.default_play_role)]
                 self.all_group_messages[group_id] = self._create_initial_messages(role)
     
     async def set_group_role(self, group_id: str, role_key: str) -> bool:
@@ -58,7 +58,7 @@ class ai_chat_manager:
         async with self._lock_async:
             with self.all_group_locks[group_id]:
                 if role_key in self.play_role_list:
-                    self.group_play_roles[group_id] = self.play_role_list[role_key]
+                    self.group_play_roles[group_id] = role_key
                     return True
                 return False
     
@@ -112,3 +112,13 @@ class ai_chat_manager:
         self._default_play_role = value
         
         
+        
+if __name__ == "__main__":
+    async def my_main():
+        ACM = ai_chat_manager()
+        # print(ACM.play_role_list["ATRI"])
+        # await ACM.store_group_chat(123456,["aaaaaa","bbbbb"])
+        await ACM.set_group_role(123456,"ATRI")
+        print(await ACM.get_group_chat(123456))
+    
+    asyncio.run(my_main())
