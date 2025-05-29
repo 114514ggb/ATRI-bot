@@ -44,6 +44,7 @@ class Command(Permissions_management):
         text_parts = []
         
         for message in data["message"]:
+            
             message:Dict[str,str|dict]
             my_type:str = message.get("type")
 

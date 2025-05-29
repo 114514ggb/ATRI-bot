@@ -130,7 +130,7 @@ class WebSocketClient:
 
     async def gain_echo(self,echo):
         """获取对应echo返回值"""
-        for i in range(50):
+        for i in range(100):
             if echo in self.pending_requests_echos:
 
                 echo_data = self.pending_requests_echos[echo]

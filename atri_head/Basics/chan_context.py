@@ -44,7 +44,7 @@ class ai_chat_manager:
         """存储指定群的聊天记录"""
         async with self._lock_async:
             with self.all_group_locks[group_id]:
-                self.all_group_messages[group_id] = messages
+                self.all_group_messages[group_id] = messages.copy()
     
     async def reset_group_chat(self, group_id: str) -> None:
         """重置指定群的聊天记录"""
@@ -52,6 +52,7 @@ class ai_chat_manager:
             with self.all_group_locks[group_id]:
                 role = self.play_role_list[self.group_play_roles.get(group_id, self.default_play_role)]
                 self.all_group_messages[group_id] = self._create_initial_messages(role)
+    
     
     async def set_group_role(self, group_id: str, role_key: str) -> bool:
         """设置指定群的扮演角色"""
@@ -113,12 +114,16 @@ class ai_chat_manager:
         
         
         
-if __name__ == "__main__":
-    async def my_main():
-        ACM = ai_chat_manager()
-        # print(ACM.play_role_list["ATRI"])
-        # await ACM.store_group_chat(123456,["aaaaaa","bbbbb"])
-        await ACM.set_group_role(123456,"ATRI")
-        print(await ACM.get_group_chat(123456))
+# if __name__ == "__main__":
+#     async def my_main():
+#         ACM = ai_chat_manager("ATRI")
+#         print(ACM.play_role_list["ATRI"])
+#         await ACM.store_group_chat(123456,["aaaaaa","bbbbb"])
+#         print(await ACM.get_group_chat(123456))
+#         await ACM.store_group_chat(123456,[])
+#         print(await ACM.reset_group_chat(123456))
+#         await ACM.set_group_role(123456,"文言文版")
+#         await ACM.reset_group_chat(123456)
+#         print(await ACM.get_group_chat(123456))
     
-    asyncio.run(my_main())
+#     asyncio.run(my_main())

@@ -106,9 +106,11 @@ class group_message_processing():
         
         data_text = ""
         if data.get('message',False):
-            data_text = self.basics.Command.data_processing_text(data)
-            #message字符串化
-        
+            try:
+                data_text = self.basics.Command.data_processing_text(data)
+                #message字符串化
+            except Exception as e: 
+                print("\nmessage字符串化失败:",e,"\n原消息:",data)
 
         await self.basics.MessageCache.cache_system(data=data,message_test=data_text)
         #消息缓存

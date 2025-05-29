@@ -66,21 +66,16 @@ class Chat_processing:
             
             user_formatting_data = build_prompt.build_user_Information(data,text)
             
-            # self.append_message_review(self.build_prompt.build_group_user_Information(data))
             self.append_message_review(
                 user_formatting_data,
-                str(await self.tool_calls.basics.MessageCache.get_group_messages(group_ID)) #qq历史消息
+                str(await self.tool_calls.basics.MessageCache.get_group_messages(int(group_ID))) #qq历史消息
             )
             #审查,构造提示词
             
             # print(self.messages,"\n\n\n",self.temporary_messages)
-            try:
-                assistant_message = await self.deepseek.request_fetch_primary(my_model = self.chat_model,my_messages = self.messages + self.temporary_messages)
-            except Exception as e:
-                print("Errors:"+str(e))
-                assistant_message = self.model.generate_text_tools("GLM-4-Flash",my_messages = self.messages + self.temporary_messages)['choices'][0]['message']
+            assistant_message = await self.get_chat_json()
 
-            print(assistant_message)
+            # print(assistant_message)
 
 
             if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None: #工具调用
@@ -106,7 +101,8 @@ class Chat_processing:
                     user_formatting_data
                 )
                 
-                await self.store_group_chat(group_ID,True) #储存除了工具的消息
+                # await self.store_group_chat(group_ID,True)#不存储tool消息
+                await self.store_group_chat(group_ID)#存储tool消息
                 
                 return content
             
@@ -190,13 +186,10 @@ class Chat_processing:
                 if tool_output == {"tool_calls_end": "已经退出工具调用循环"}:
                     return None
                 
-            try:
-                assistant_message = await self.deepseek.request_fetch_primary(my_model = self.chat_model,my_messages = self.messages + self.temporary_messages)
-            except Exception as e:
-                print("Errors:"+str(e))
-                assistant_message = self.model.generate_text_tools("GLM-4-Flash",my_messages = self.messages + self.temporary_messages)['choices'][0]['message']
 
-            print(assistant_message)
+            assistant_message = await self.get_chat_json()
+
+            # print(assistant_message)
             self.temporary_messages.append(assistant_message)
 
             if 'tool_calls' not in assistant_message or assistant_message ['tool_calls'] is None:
@@ -238,20 +231,18 @@ class Chat_processing:
     async def get_group_chat(self,group_id:str)->None:
         """获取群聊天,给于消息列表"""
         self.messages = await self.ai_chat_manager.get_group_chat(group_id)
+        # print("聊天记录:\n",self.messages)
         
 
-    async def store_group_chat(self,group_id:str,filter:bool = float)->None:
+    async def store_group_chat(self,group_id:str,filter:bool = False)->None:
         """存储群聊天上下文"""
-        list_messages:list = self.messages
+        list_messages:list = list(self.messages)
         
         if filter:
         
             for message in self.temporary_messages:
-                if message["role"] != "tool":
+                if message["role"] == "assistant":
                     list_messages.append(message)
-                    
-        else:
-            list_messages =  self.messages + self.temporary_messages
         
         await self.ai_chat_manager.store_group_chat(group_id,list_messages)
 
@@ -260,7 +251,7 @@ class Chat_processing:
         
         emoji_prompt = build_prompt.append_tag_hint(
             "",
-            "代表你所想表达的感情，你可以通过在对话中加入这些标签来实现发送应感情的表情包,user看不到这些标签,不要发太多标签",
+            "代表你所想表达的感情，你可以通过在对话中加入这些标签来实现发送应感情的表情包,user看不到这些标签,一般就发一个就行了",
             list(self.emoji_system.emoji_file_dict.keys())
         )
         
@@ -287,6 +278,26 @@ class Chat_processing:
                 emoji_prompt
             )
             
+    async def get_chat_json(self)->str:
+        """获取api返回的响应json,如果出错了会使用备用api,都失败会抛出错误"""
+        try:
+            assistant_message = await self.deepseek.request_fetch_primary(
+                my_model = self.chat_model,
+                my_messages = self.messages + self.temporary_messages
+            )
+        except Exception as e:
+            print(f"主API调用失败，尝试备用方法。错误: {str(e)}")
+            try:
+                assistant_message = self.model.generate_text_tools(
+                    "GLM-4-Flash",
+                    my_messages = self.messages + self.temporary_messages
+                )['choices'][0]['message']
+            except Exception as fallback_e:
+                print(f"备用方法也失败: {str(fallback_e)}")
+                ValueError("主API调用失败,并且备用方法也失败,这一定是openAI干的!")
+                
+        return assistant_message
+
 
     @property
     def messages(self) -> List[dict]:

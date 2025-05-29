@@ -6,6 +6,7 @@ basics = Basics()
 
 async def kill(argument,group_ID,data):
     """清除记忆"""
+    group_ID = str(group_ID)
     await basics.ai_chat_manager.reset_group_chat(group_ID)
     await basics.QQ_send_message.send_group_message(group_ID,"ATRI的记忆已经被清除,重新开始对话吧!😊")
     return "ok"

@@ -7,6 +7,7 @@ basics = Basics()
 async def toggleModel(argument,group_ID,data):
     """切换模型人物"""
     
+    group_ID = str(group_ID)
     if argument[0] != []:
         dash_argument = argument[0][0]
         if dash_argument in ["l","all"] :
@@ -23,7 +24,7 @@ async def toggleModel(argument,group_ID,data):
     if argument[1] != []:
         playRole =  argument[1][0]
         if playRole in basics.ai_chat_manager.play_role_list:
-            await basics.ai_chat_manager.set_group_role(group_ID)
+            await basics.ai_chat_manager.set_group_role(group_ID,playRole)
             await basics.ai_chat_manager.reset_group_chat(group_ID)
         else:
             raise Exception("没有这个角色!")
