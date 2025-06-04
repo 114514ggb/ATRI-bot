@@ -22,6 +22,16 @@ class group_message_processing():
     async def main(self,data:dict)-> bool:
         """主消息处理函数"""
         
+        if not self.single_use:
+            """一次性处理"""
+            
+            await self.basics.link_async_database("127.0.0.1","root","180710")#数据库
+            await self.exit_save() #退出时处理
+        
+            self.chat_ai.chat_request.tools = self.chat_ai.tool_calls.tools#添加工具
+            
+            self.single_use = True
+        
         # print(data)
         
         if data.get("group_id",0) in self.qq_white_list or ('user_id' in data and data['user_id'] == 2631018780):
@@ -35,7 +45,7 @@ class group_message_processing():
                 message = ''.join([m['data']['text'] for m in message_objects if m['type'] == 'text'])
 
             if self.basics.Command.blacklist_intercept(data["user_id"]):#黑名单检测
-                
+
                 if  data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:                
                 
                     print(f"at message: {message}")
@@ -44,15 +54,6 @@ class group_message_processing():
                 else:
                     
                     await self.receive_event(data,group_ID,message) #非at@事件处理
-                
-                
-        if not self.single_use:
-            """一次性"""
-            
-            await self.basics.link_async_database("127.0.0.1","root","180710")
-            await self.exit_save() #退出时处理
-            
-            self.single_use = True
             
         await self.data_store(data) #数据存储
         

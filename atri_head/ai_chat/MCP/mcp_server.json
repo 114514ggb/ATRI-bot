@@ -1,0 +1,18 @@
+{
+    "mcpServers": {
+      "fetch": {
+        "command": "uvx",
+        "args": ["mcp-server-fetch"]
+      },
+      "tavily-mcp": {
+        "command": "npx",
+        "args": ["-y", "tavily-mcp@0.1.4"],
+        "env": {
+          "TAVILY_API_KEY": "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"
+        },
+        "disabled": false,
+        "autoApprove": [],
+        "active": true
+      }
+    }
+  }

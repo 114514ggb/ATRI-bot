@@ -1,68 +1,78 @@
 from ..Basics.qq_send_message import QQ_send_message
 from .model_api.bigModel_api import bigModel_api
-from .model_api.universal_async_ai_api import universal_ai_api
+
 # from .model_api.async_open_ai_api import async_openAI
 from ..Basics import Basics
+from .model_api.universal_async_ai_api import universal_ai_api
+from .mcp_tool_manager import FuncCall
+import asyncio
 import importlib.util
 import os
 import json
-
+# from pprint import pp
 
 class tool_calls:
     """
     工具调用类
     """
-    code_url = "document\\code.py"
-    """python代码运行路径"""
 
     def __init__(self):
         self.passing_message = QQ_send_message()
         self.basics = Basics()
+        self.mcp_tool = FuncCall("atri_head\\ai_chat\\MCP\\")
+        """掌管MCP的""" 
         self.tools_functions_dict = {
         }
         self.tools_functions_dict_qq = {
             'send_speech_message': self.send_speech_message,
             'send_image_message': self.send_image_message,
-            'send_text_message': self.send_text_message,
+            # 'send_text_message': self.send_text_message,
         }
         self.tools = tools
-        self.load_additional_tools() # 加载额外工具
-        self.model = bigModel_api(tools=self.tools)
-        
-        self.deepseek = universal_ai_api(tools=self.tools)
-        
-        # self.deepseek = async_openAI(
+        self.mcp_service_queue = asyncio.Queue()
+        self.mcp_service_task = asyncio.create_task(self.mcp_tool.mcp_service_selector())
+        self.load_additional_tools()
+        self.model = bigModel_api()
+        self.chat_request = universal_ai_api()
+    
+        # self.chat_request = async_openAI(
         #     api_key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4",
         #     base_url = "https://aihubmix.com/v1",
-        #     tools=self.tools
         # )
+        
+
 
     async def calls(self, tool_name, arguments_str, group_ID):
         """调用工具"""
-        if tool_name in self.tools_functions_dict|self.tools_functions_dict_qq:
+        if tool_name in self.tools_functions_dict_qq:
             try:
                 
                 if arguments_str == "{}":   
-                    return await self.tools_functions_dict[tool_name]()
-                elif tool_name in self.tools_functions_dict_qq: 
+                    return await self.tools_functions_dict_qq[tool_name]({"group_ID":group_ID})
+                else: 
                     return await self.tools_functions_dict_qq[tool_name](**(json.loads(arguments_str)|{"group_ID":group_ID}))
-                else:
-                    return await self.tools_functions_dict[tool_name](**json.loads(arguments_str))
                 
             except TypeError as e:
                 print(f"函数调用参数错误: {e}")
             except KeyError as e:
                 print(f"工具函数未实现: {e}")
+        elif func_tool := self.mcp_tool.get_func(tool_name):
+            #MCP工具的调用
+            return await func_tool.execute(**json.loads(arguments_str))
         else:
-            Exception("Unknown tool")
+            raise Exception(f"Request function {tool_name} not found.")
 
-    def load_additional_tools(self):
+
+    def load_additional_tools(self)->list:
         """加载额外工具"""
         print("加载模型tools...")
-        tools_functions_dict, tools_json = self.get_files_in_folder()
-        self.tools_functions_dict.update(tools_functions_dict)
-        self.tools = tools_json + self.tools
+        self.mcp_tool.mcp_service_queue.put_nowait({"type": "init"})
+        
+        self.get_files_in_folder()
+
+        self.tools = self.tools + self.mcp_tool.get_func_desc_openai_style()
         print("加载模型tools完成!\n")
+        return self.tools
 
 
     def get_files_in_folder(self):
@@ -70,8 +80,6 @@ class tool_calls:
 
         folder_path = "atri_head\\ai_chat\\tools\\"
         default_module_name = "main"
-        tools_functions_dict = {}
-        tools_json = []
 
         for name in os.listdir(folder_path):
             dir_path = os.path.join(folder_path, name)
@@ -112,15 +120,24 @@ class tool_calls:
                     print(f"获取模块{file_path}中的函数tool_json 失败！")
                     continue
                 
-                tools_json.append(self.generate_integrity_tools_json(tool_json))
+                self.mcp_tool.add_func(
+                    name = tool_json["name"],
+                    func_args = {} if tool_json["properties"] is None else tool_json["properties"],
+                    desc = tool_json["description"],
+                    handler = tool_json
+                )
 
-                tools_functions_dict[name] = func
+    def get_all_tools_json(self)->list:
+        """获取默认的全部工具json"""
+        return tools + self.mcp_tool.get_func_desc_openai_style()
 
-        return tools_functions_dict,tools_json
 
-    def generate_integrity_tools_json(self,tool_json):
-        """生成工具完整json"""
-
+    def generate_integrity_tools_json(self, tool_json:dict):
+        """生成一个工具的完整json"""
+        
+        properties:dict = tool_json.get("properties") or {}
+        #允许properties没有，或值为None
+        
         tool_json_integrity = {
             "type": "function",
             "function": {
@@ -128,23 +145,21 @@ class tool_calls:
                 "description": tool_json["description"],
                 "parameters": {
                     "type": "object",
-                    "properties": tool_json["properties"],
+                    "properties": properties,
                 }
             }
         }
-
-        if tool_json["properties"] is None:
-            tool_json_integrity["function"]["parameters"]  = {"type": "object", "properties": {}}
-        else:
-            tool_json_integrity["function"]["required"] = list(tool_json["properties"].keys())
-
+        
+        if properties:
+            tool_json_integrity["function"]["required"] = list(properties.keys())
+        
         return tool_json_integrity
      
-    async def send_text_message(self, message, group_ID):
-        """发送文本消息"""
-        await self.passing_message.send_group_message(group_ID,message)
+    # async def send_text_message(self, message, group_ID):
+    #     """发送文本消息"""
+    #     await self.passing_message.send_group_message(group_ID,message)
 
-        return {"send_text_message": f"已发送:{message}"}
+    #     return {"send_text_message": f"已发送:{message}"}
     
     async def send_speech_message(self, message, group_ID):
         """发送语音消息"""
@@ -179,23 +194,23 @@ tools = [
             "required": ["message"]
         }
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "send_text_message",
-            "description": "用来发送文本消息(不会结束工具调用,发完后一般调用工具tool_calls_end)，适用于需要连续发多条消息的多步场景。",
-            "parameters": {            
-                "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "description": "需要直接呈现给用户的文本内容",
-                    }
-                }
-            },
-            "required": ["message"]
-        }
-    },
+    # {
+    #     "type": "function",
+    #     "function": {
+    #         "name": "send_text_message",
+    #         "description": "用来发送文本消息(不会结束工具调用,发完后一般调用工具tool_calls_end)，适用于需要连续发多条消息的多步场景。",
+    #         "parameters": {            
+    #             "type": "object",
+    #             "properties": {
+    #                 "message": {
+    #                     "type": "string",
+    #                     "description": "需要直接呈现给用户的文本内容",
+    #                 }
+    #             }
+    #         },
+    #         "required": ["message"]
+    #     }
+    # },
     {
         "type": "function",
         "function": {

@@ -2,11 +2,11 @@ from .prepare_model_prompt import build_prompt
 from .model_tools import tool_calls
 from .emoji_system import emoji_core
 
+
 from typing import List
 import contextvars
 import asyncio
 import base64
-import json
 
 
 
@@ -41,7 +41,7 @@ class Chat_processing:
             self.tool_calls = tool_calls()#模型调用工具
             
             self.model = self.tool_calls.model #免费打工的api
-            self.deepseek = self.tool_calls.deepseek
+            self.chat_request = self.tool_calls.chat_request
             self.ai_chat_manager = self.tool_calls.basics.ai_chat_manager
             
             self.emoji_system = emoji_core("document\\img\\emojis")#表情包管理
@@ -60,54 +60,50 @@ class Chat_processing:
 
     async def chat(self, text: str, data: dict, group_ID: str)-> str:
         """回复主逻辑"""
-        if text != "":
-            self.messages = self.ai_chat_manager.restrict_messages_length(self.messages) #消息长度限制
-            await self.image_processing(data) #图片处理
-            
-            user_formatting_data = build_prompt.build_user_Information(data,text)
-            
-            self.append_message_review(
-                user_formatting_data,
-                str(await self.tool_calls.basics.MessageCache.get_group_messages(int(group_ID))) #qq历史消息
+        self.messages = self.ai_chat_manager.restrict_messages_length(self.messages) #消息长度限制
+        await self.image_processing(data) #图片处理
+        
+        user_formatting_data = build_prompt.build_user_Information(data,text)
+        
+        self.append_message_review(
+            user_formatting_data,
+            str(await self.tool_calls.basics.MessageCache.get_group_messages(int(group_ID))) #qq历史消息
+        )
+        #审查,构造提示词
+        
+        # print(self.messages,"\n\n\n",self.temporary_messages)
+        assistant_message = await self.get_chat_json()
+
+        # print(assistant_message)
+
+
+        if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None: #工具调用
+            build_prompt.append_message_text(
+                self.messages,
+                "user",
+                user_formatting_data
             )
-            #审查,构造提示词
+            self.messages.append(assistant_message)
             
-            # print(self.messages,"\n\n\n",self.temporary_messages)
-            assistant_message = await self.get_chat_json()
-
-            # print(assistant_message)
-
-
-            if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None: #工具调用
-                build_prompt.append_message_text(
-                    self.messages,
-                    "user",
-                    user_formatting_data
-                )
-                self.messages.append(assistant_message)
-                
-                await self.store_group_chat(group_ID) #储存的消息
-                
-                return assistant_message['content']
+            await self.store_group_chat(group_ID) #储存的消息
             
-            else:
-                self.temporary_messages.append(assistant_message)
-                
-                content = await self.tool_calls_while(assistant_message,group_ID)
-                
-                build_prompt.append_message_text(
-                    self.messages,
-                    "user",
-                    user_formatting_data
-                )
-                
-                # await self.store_group_chat(group_ID,True)#不存储tool消息
-                await self.store_group_chat(group_ID)#存储tool消息
-                
-                return content
-            
+            return assistant_message['content']
+        
         else:
-            return "我在哦！叫我有什么事吗？"
+            self.temporary_messages.append(assistant_message)
+            
+            content = await self.tool_calls_while(assistant_message,group_ID,data["message_id"])
+            
+            build_prompt.append_message_text(
+                self.messages,
+                "user",
+                user_formatting_data
+            )
+            
+            # await self.store_group_chat(group_ID,True)#不存储tool消息
+            await self.store_group_chat(group_ID)#存储tool消息
+            
+            return content
 
     async def main(self,group_ID,message,data):
         """主函数"""
@@ -116,7 +112,7 @@ class Chat_processing:
         
         chat_text =  await self.chat(message, data, group_id)
 
-        await self.bot_send_text(chat_text,group_ID,data)#发送消息
+        await self.bot_send_text(chat_text,group_ID,data["message_id"])#发送消息
         
         # print(self.messages)
         # print(self.temporary_messages)
@@ -153,13 +149,17 @@ class Chat_processing:
 
                     build_prompt.append_message_text(self.messages,"tool",text)
 
-    async def tool_calls_while(self, assistant_message, group_ID):
+    async def tool_calls_while(self, assistant_message, group_ID, message_id:int):
         """工具调用"""
         while True:
             
             print("在工具调用中")
             if assistant_message['content'] is not None and assistant_message['content'] != "\n":
-                await self.tool_calls.passing_message.send_group_message(group_ID,assistant_message['content'])
+                await self.bot_send_text(
+                    assistant_message['content'],
+                    group_ID,
+                    message_id
+                )
                 
             for tool_call in assistant_message['tool_calls']:
                 function = tool_call['function']
@@ -179,7 +179,7 @@ class Chat_processing:
                 print("工具输出：",tool_output)
                 build_prompt.append_message_tool(
                     self.temporary_messages,
-                    f"{json.dumps(tool_output)}",
+                    str(tool_output),
                     tool_call['id']
                 )
 
@@ -197,9 +197,9 @@ class Chat_processing:
 
         return assistant_message['content']
     
-    async def bot_send_text(self, chat_text:str, group_ID:int, data:dict):
+    async def bot_send_text(self, chat_text:str, group_ID:int, message_id:int):
         """回复的群文本消息"""
-        MESSAGE_DELAY = 0.8 #多条消息间隔时间
+        MESSAGE_DELAY = 1 #多条消息间隔时间
         MESSAGE_DELIMITER = "$" #分隔符
         
         if chat_text is not None and chat_text != "":
@@ -212,12 +212,12 @@ class Chat_processing:
             await self.tool_calls.passing_message.send_group_reply_msg(
                 group_ID,
                 first_msg,
-                data["message_id"]
+                message_id
             )
 
             for message in rest_msgs:
-                await self.tool_calls.passing_message.send_group_message(group_ID, message)
                 await asyncio.sleep(MESSAGE_DELAY)
+                await self.tool_calls.passing_message.send_group_message(group_ID, message)
                 
             for tag in tag_list:
                 await asyncio.sleep(MESSAGE_DELAY)
@@ -280,8 +280,12 @@ class Chat_processing:
             
     async def get_chat_json(self)->str:
         """获取api返回的响应json,如果出错了会使用备用api,都失败会抛出错误"""
+        
+        self.chat_request.tools = self.tool_calls.get_all_tools_json()
+        #获取工具
+        
         try:
-            assistant_message = await self.deepseek.request_fetch_primary(
+            assistant_message = await self.chat_request.request_fetch_primary(
                 my_model = self.chat_model,
                 my_messages = self.messages + self.temporary_messages
             )
@@ -294,7 +298,7 @@ class Chat_processing:
                 )['choices'][0]['message']
             except Exception as fallback_e:
                 print(f"备用方法也失败: {str(fallback_e)}")
-                ValueError("主API调用失败,并且备用方法也失败,这一定是openAI干的!")
+                raise ValueError("主API调用失败,并且备用方法也失败,这一定是openAI干的!")
                 
         return assistant_message
 
