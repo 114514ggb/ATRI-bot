@@ -40,13 +40,14 @@ class build_prompt:
         if chat_history != "":
             prompt += f"QQ_chat_history:<BEGIN>{chat_history}<FINISH>\n\n"
         
-        prompt += f"需要响应的内容:<BEGIN>{context}<FINISH>\n\n"
-        
         if self.prompt != "":
             prompt += f"system_prompt:<BEGIN>{self.prompt}<FINISH>\n\n"
+            
+        prompt += f"需要回复的内容:<BEGIN>{context}<FINISH>\n\n"
         
         return prompt
     
+    @staticmethod
     def build_group_user_Information(self, data:dict)-> str:
         """ 构造群用户信息 """
         return str(
@@ -57,7 +58,8 @@ class build_prompt:
                 "message":data['raw_message'] #消息内容
             }
         )
-        
+    
+    @staticmethod    
     def build_user_Information(data:dict, message:str)-> str:
         """ 构造用户消息 """
         return str(
@@ -68,17 +70,20 @@ class build_prompt:
             }
         )
     
+    @staticmethod
     def append_playRole(content,messages:list):
         """添加扮演的角色，固定为列表的第一个元素"""
         if content != "":
              messages.insert(0, {"role": "system","content": content})
         return messages
     
+    @staticmethod
     def append_message_text(messages:list,role:str,content:str):
         """添加文本消息,role为角色,content为内容"""
         messages.append({"role": role,"content": content})
         return messages
     
+    @staticmethod
     def append_message_image(messages:list,image_url, text="请详细描述这个图片，如果上面有文字也要详细说清楚", role = "user"):
         """添加带图片消息,role为角色,image_url为图片链接,text为问题文字"""
         messages.append({
@@ -91,6 +96,7 @@ class build_prompt:
 
         return messages
     
+    @staticmethod
     def append_message_tool(messages:list ,tool_content:str ,tool_call_id:str):
         """ 添加工具消息 """
         messages.append({
@@ -101,6 +107,7 @@ class build_prompt:
         
         return messages
 
+    @staticmethod
     def append_tag_hint(text:str, tag_prompt:str, tag_list:list ,tag_symbol:str = "[内容]")->str:
         """向原有提示词添加可输出标签提示"""
         text += "\n\n可以在输出中加入带有如下内容的标签:" + str(tag_list) + \

@@ -100,8 +100,8 @@ class Chat_processing:
                 user_formatting_data
             )
             
-            # await self.store_group_chat(group_ID,True)#不存储tool消息
-            await self.store_group_chat(group_ID)#存储tool消息
+            await self.store_group_chat(group_ID,True)#不存储tool消息
+            # await self.store_group_chat(group_ID)#存储tool消息
             
             return content
 
@@ -172,7 +172,7 @@ class Chat_processing:
                     tool_output = await self.tool_calls.calls(tool_name,tool_input,group_ID)
 
                 except Exception as e:
-                    text = "\n调用工具发生错误，请检查参数是否正确。\nErrors:"+str(e)
+                    text = "\n调用工具发生错误。\nErrors:"+str(e)
                     print(text)
                     tool_output = text
 
@@ -226,6 +226,7 @@ class Chat_processing:
                     f"emojis/{tag}/{self.emoji_system.get_random_emoji_name(tag)}",
                     default = True
                 )
+            #抛弃循环了只返回一个表情
                 
 
     async def get_group_chat(self,group_id:str)->None:
@@ -239,9 +240,9 @@ class Chat_processing:
         list_messages:list = list(self.messages)
         
         if filter:
-        
             for message in self.temporary_messages:
-                if message["role"] == "assistant":
+                # if message["role"] == "assistant":
+                if message["role"] != "user":
                     list_messages.append(message)
         
         await self.ai_chat_manager.store_group_chat(group_id,list_messages)

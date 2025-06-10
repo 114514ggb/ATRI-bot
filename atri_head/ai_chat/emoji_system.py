@@ -1,4 +1,5 @@
 from typing import Match
+# from ..Basics.chance import Chance
 import random
 import os
 import re
@@ -9,6 +10,8 @@ class emoji_core:
     def __init__(self,folder_path:str = ""):
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
+        
+        # self.Chance = Chance()
         if folder_path != "":
             self.init_emoji_catalogue(folder_path)
         
@@ -61,7 +64,9 @@ class emoji_core:
 
     def get_random_emoji_name(self, tag:str)->str:
         """根据所属标签随机返回一个文件名"""
+        # return self.Chance.random_choice(self.emoji_file_dict[tag]) if tag in self.emoji_file_dict else None
         return random.choice(self.emoji_file_dict[tag]) if tag in self.emoji_file_dict else None
+    
     
     
     def process_text_and_emotion_tags(text: str, emoji_dict: dict) -> tuple[str, list[str]]:
@@ -140,6 +145,8 @@ if __name__ == "__main__":
     pass
     # ec = emoji_core()
     # ec.init_emoji_catalogue("E:/程序文件/python/ATRI/document/img/emojis")
+    # print(emoji_core.process_text_and_emotion_tags("[happy]qweqweqewqe",ec.emoji_file_dict))
     # print(ec.emoji_file_dict)
-    # print(ec.get_random_emoji_name("happy"))
+    # for _ in range(1,10):
+    #     print(ec.get_random_emoji_name("happy"))
     # print(ec._levenshtein_distance("检查目录是否为空","啊啊啊")) 

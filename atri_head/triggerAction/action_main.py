@@ -1,6 +1,8 @@
 from ..Basics import Basics
 import asyncio
 import random
+import httpx
+import re
 
 class itemAction():
     """根据需要执行对应的操作"""
@@ -11,6 +13,7 @@ class itemAction():
         self.listeners = [
             self.poke,
             self.manage_add_group,
+            self.listen_music
             # self.initiative_chat,
         ]
         """监听器list"""
@@ -82,6 +85,49 @@ class itemAction():
                 await self.basics.QQ_send_message.send_group_message(group_ID,f"[CQ:at,qq={user_id}]退出群聊！")
                 
         return False
+    
+    async def listen_music(self,group_ID, data:dict):
+        """掌管群听歌的"""
+        
+        async def search_music(keywords, limit=5)->list[dict]:
+            """
+            网易云音乐搜索接口，返回歌曲信息列表
+            
+            Args:
+                :keywords 搜索关键词
+                :limit 返回数量
+                
+            Returns:
+                歌曲名和id
+                [{'name': '冬の花', 'id': 1345485069},...]
+            """
+            url = 'https://music.163.com/api/cloudsearch/pc'
+            data = {'s': keywords, 'type': 1, 'limit': limit}
+            headers = {
+                'User-Agent': 'Mozilla/5.0',
+                'Referer': 'https://music.163.com/'
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, data=data, headers=headers)
+            data = response.json()
+            print(data)
+            return [{"name":v["name"],"id":v["id"]}  for v in data['result'].get('songs',[])]
+        
+        pattern = r"^来首(.{1,25})$"
+        
+        if match := re.match(pattern,data.get("raw_message","")):
+            if music_lsit := await search_music(match.group(1)):
+                await self.basics.QQ_send_message.send_group_music(
+                    group_ID,
+                    "163",
+                    str(music_lsit[0]["id"])
+                )
+        
+        return False
+        
+        
+
 
 
     def add_listener(self, callback):

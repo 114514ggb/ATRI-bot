@@ -181,21 +181,66 @@ class QQ_send_message():
         payload =[
             {
                 "type": "json",
-                "data": {
-                    "data": json
-                }
+                "data": json
             }
         ]
         
         await self.send_group_message(group_id, payload)
+        
+    async def send_group_music(
+            self,
+            group_id:str|int,
+            type: str, 
+            id: str = None, 
+            url: str = None, 
+            image: str = None,
+            singer: str = None,
+            title: str = None,
+            content: str = None
+        ):
+        """
+        用于分享音乐
+        Args:
+            type: 音乐平台(qq、163、kugou、kuwo、migu、custom)
+            id: 音乐ID(平台非custom时必填)
+            url: 音乐链接(custom时必填)
+            image: 封面图片(custom时必填)
+            singer: 歌手(可选)
+            title: 标题(可选)
+            content: 内容描述(可选)
+        """
+        
+        if type != "custom" and not id:
+                    raise ValueError("当 type 不是 'custom' 时，id 必须提供")
+        if type == "custom" and (not url or not image):
+            raise ValueError("当 type 是 'custom' 时，url 和 image 必须提供")
+        
+        data = {
+            "type": type,
+            "id": id,
+            "url": url,
+            "image": image,
+            "singer": singer,
+            "title": title,
+            "content": content
+        }       
+        
+        message = [{
+                "type": "music",
+                "data": {k:v for k,v in data.items() if v is not None}
+            }
+        ]
+        
+        await self.send_group_message(group_id,message)
+        
     
-    
-    async def set_group_add_request(self,flag: str, approve: bool, reason: str = "不对!"):
+    async def set_group_add_request(self,flag: str, approve: bool, reason: str = "不行哦!"):
         """
             处理加群请求\n
-            flag: 请求id\n
-            approve: 是否同意\n
-            reason: 拒绝理由(可选)
+            Args:
+                flag: 请求id\n
+                approve: 是否同意\n
+                reason: 拒绝理由(可选)
         """
         api_url = "set_group_add_request"
 
@@ -217,9 +262,10 @@ class QQ_send_message():
     async def set_group_ban(self,group_id, user_id, duration = 1800):
         """
             禁言群成员\n
-            group_id: 群号\n
-            user_id: 要禁言的成员QQ号\n
-            duration: 禁言时长(单位:秒)
+            Args:
+                group_id: 群号\n
+                user_id: 要禁言的成员QQ号\n
+                duration: 禁言时长(单位:秒)
         """
         api_url = "set_group_ban"
 
