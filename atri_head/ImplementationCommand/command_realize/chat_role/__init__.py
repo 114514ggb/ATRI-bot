@@ -39,6 +39,6 @@ command_main = Command_information(
     aliases=["角色", "role"],
     handler=toggleModel,
     description="切换模型人物,切换会清除上下文,none无人物,-l或-all参数查看可扮演list",
-    authority_level=3, 
+    authority_level=2, 
     parameter=[[0, 1], [0, 1]]
 )

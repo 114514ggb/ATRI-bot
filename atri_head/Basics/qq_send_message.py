@@ -7,7 +7,8 @@ import uuid
 class QQ_send_message():
     """QQ消息发送器"""
     _instance = None
-    File_root_directory = "E:/程序文件/python/ATRI/document/"
+    # File_root_directory = "E:/程序文件/python/ATRI/document/"
+    File_root_directory = "/mnt/e/程序文件/python/ATRI/document/"
     
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:

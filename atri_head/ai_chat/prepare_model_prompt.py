@@ -35,15 +35,15 @@ class build_prompt:
         prompt = f"现在的时间是:{time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         
         if self.model_environment != "":
-            prompt += f"对话环境:{self.model_environment}\n\n"
+            prompt += f"<对话环境>{self.model_environment}</对话环境>\n\n"
             
         if chat_history != "":
-            prompt += f"QQ_chat_history:<BEGIN>{chat_history}<FINISH>\n\n"
+            prompt += f"<QQ_chat_history>{chat_history}</QQ_chat_history>\n\n"
         
         if self.prompt != "":
-            prompt += f"system_prompt:<BEGIN>{self.prompt}<FINISH>\n\n"
+            prompt += f"<prompt>{self.prompt}</prompt>\n\n"
             
-        prompt += f"需要回复的内容:<BEGIN>{context}<FINISH>\n\n"
+        prompt += f"需要回答的:<user_input>{context}</user_input>\n\n"
         
         return prompt
     

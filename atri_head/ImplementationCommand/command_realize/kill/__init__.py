@@ -17,4 +17,5 @@ command_main = Command_information(
     aliases=["失忆", "kill"],
     handler=kill,
     description="清除记忆",
+    authority_level=2
 )

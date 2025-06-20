@@ -8,7 +8,7 @@ import sys
 class WebSocketClient:
     """WebSocket客户端类"""
     _instance = None
-    maximum_retry = 10
+    maximum_retry = 1000
     """最大重连次数"""
     message_queue = Queue(10)
     """消息队列"""
@@ -47,8 +47,8 @@ class WebSocketClient:
             except Exception as e:
                 if self.maximum_retry > 0:
                     self.maximum_retry -= 1
-                    print(f"连接失败: {e}, 10秒后重试...")
-                    await asyncio.sleep(10)
+                    print(f"连接失败: {e}, 0.1秒后重试...")
+                    await asyncio.sleep(0.1)
                 else:
                     print(f"连接失败: {e}, 已达到最大重连次数")
                     sys.exit(1)

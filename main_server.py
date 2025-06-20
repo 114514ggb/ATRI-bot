@@ -9,7 +9,7 @@ import asyncio
 
 
 http_base_url = "http://localhost:8088" 
-ws_url = "127.0.0.1:8080"      
+ws_url = "127.0.0.1:8080"         
 access_token = "ATRI114514"
 playRole = "猫娘"  # 默认聊天扮演角色 
 connection_type = "WebSocket_client"
@@ -17,8 +17,8 @@ Server_port = 3000
 
 qq_white_list: List[int] = [1062704755, 984466158, 1038698883]  # qq群白名单
 qq_white_list.append(235984211)  # 形形色色的群
-# qq_white_list.append(946533123) #狗熊岭
 # qq_white_list.append(936819059) #真爱协会
+# qq_white_list.append(946533123) #狗熊岭
 
 
 # @cache

@@ -14,7 +14,7 @@ class AI_interaction():
     def speech_synthesis(self, text):
         """语音合成,返回音频文件路径"""
         client = Client("http://localhost:9872/")
-        result = client.predict(
+        result:str = client.predict(
                         "E:\\ffmpeg\\.......我为了夏生先生行动需要理由吗.mp3",
                         # "E:\\ffmpeg\\啊我真是太高性能了.mp3",	
                         # str (filepath on your computer (or URL) of file) in '请上传3~10秒内参考音频，超过会报错！' Audio component
@@ -31,7 +31,9 @@ class AI_interaction():
                         False,	# bool in '开启无参考文本模式。不填参考文本亦相当于开启。' Checkbox component
                         fn_index=3
         )
-        return result
+        # C:/Users/Administrator/AppData/Local/Temp/gradio/5f162adfba8e02d5aece25be4ac80d91925eba90/audio.wav
+        #/mnt/e/Users/Administrator/AppData/Local/Temp/gradio/5f162adfba8e02d5aece25be4ac80d91925eba90/audio.wav
+        return "/mnt/c" + result[2:].replace("\\", "/")
         
     def image_recognition(self,url)->str:
         """图像描述成文字(未完成)"""

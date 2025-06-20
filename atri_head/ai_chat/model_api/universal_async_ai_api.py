@@ -76,6 +76,7 @@ class universal_ai_api:
             headers=self.headers,
             data=payload,
         )
+        
         print(response.text)
         return response.json()
 

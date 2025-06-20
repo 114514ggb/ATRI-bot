@@ -58,7 +58,7 @@ class zhipu_video():
 
                     id = self.request_video(prompt,img_base)["id"]
 
-        if id == None:
+        if id is None:
             id = self.request_video(prompt)["id"]
 
         await self.basics.QQ_send_message.send_group_message(group_ID,f"正在生成视频，请稍后...\n任务ID:{id}\n注意这个模型的效果不佳！不要预期太高！")
@@ -79,7 +79,7 @@ command_main = Command_information(
     aliases=["视频","video"],
     handler=video.main,
     description="生成视频,支持文生和图片生成视频\n语法: /视频 [prompt] [picture]\n",
-    authority_level=1,
+    authority_level=2,
     parameter=[[0,0],[1, 10]]
 )
 

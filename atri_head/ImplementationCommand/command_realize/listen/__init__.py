@@ -7,7 +7,7 @@ import os
 
 class want_to_listen:
     
-    folder_path = "document\\audio\\ATRI_游戏原音"
+    folder_path = "document/audio/ATRI_游戏原音"
     """音频文件夹路径"""
     
     def __init__(self):
@@ -37,7 +37,7 @@ class want_to_listen:
         
         await self.basics.QQ_send_message.send_group_audio(
             group_ID,
-            url_audio="ATRI_游戏原音\\" + name,
+            url_audio="ATRI_游戏原音/" + name,
             default=True
         )
         return "ok"

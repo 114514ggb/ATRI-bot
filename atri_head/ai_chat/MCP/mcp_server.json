@@ -2,7 +2,20 @@
   "mcpServers": {
     "fetch": {
       "command": "uvx",
-      "args": ["mcp-server-fetch"]
+      "args": ["mcp-server-fetch"],
+      "active": false
+    },
+    "魔塔-fetch": {
+      "type": "sse",
+      "url": "https://mcp.api-inference.modelscope.net/fe8ec4fddb9847/sse",
+      "active": false
+    },
+    "mcp-server-firecrawl": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "fc-e1084899b29d4528ae047d0a7df91318"
+      }
     },
     "网络搜索-mcp": {
       "command": "npx",

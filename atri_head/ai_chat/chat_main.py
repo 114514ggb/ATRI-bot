@@ -61,7 +61,8 @@ class Chat_processing:
     async def chat(self, text: str, data: dict, group_ID: str)-> str:
         """回复主逻辑"""
         self.messages = self.ai_chat_manager.restrict_messages_length(self.messages) #消息长度限制
-        await self.image_processing(data) #图片处理
+        # await self.image_processing(data) 
+        #图片处理在linux好像路径有问题
         
         user_formatting_data = build_prompt.build_user_Information(data,text)
         
@@ -272,12 +273,13 @@ class Chat_processing:
             build_prompt.append_message_text(
                 self.temporary_messages,
                 "user",
+                emoji_prompt +\
                 self.build_prompt.build_prompt(
                     context=content,
                     chat_history= chat_history
-                ) +\
-                emoji_prompt
+                )
             )
+            #建议一些东西都放在前面
             
     async def get_chat_json(self)->str:
         """获取api返回的响应json,如果出错了会使用备用api,都失败会抛出错误"""

@@ -114,7 +114,7 @@ class itemAction():
             print(data)
             return [{"name":v["name"],"id":v["id"]}  for v in data['result'].get('songs',[])]
         
-        pattern = r"^来首(.{1,25})$"
+        pattern = r"^来首(.{1,50})$"
         
         if match := re.match(pattern,data.get("raw_message","")):
             if music_lsit := await search_music(match.group(1)):
