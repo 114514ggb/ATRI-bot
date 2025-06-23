@@ -8,6 +8,7 @@ from .command import Command #还有一个Permissions_management继承在里面
 from .chan_context import ai_chat_manager
 from .Command_information import Command as Command_information
 from .exit_save import graceful_exiter
+from .mcp_tool_manager import FuncCall
 from threading import Lock
 import asyncio
 
@@ -42,6 +43,8 @@ class Basics:
             """消息暂时缓存"""
             self.ai_chat_manager = ai_chat_manager(playRole)
             """ai上下文管理"""
+            self.mcp_tool = FuncCall("atri_head\\ai_chat\\MCP\\")
+            """MCP工具类"""
             # self.database = AtriDB("localhost", "root", "180710") #数据库            
             
             self.async_database = None #异步数据库

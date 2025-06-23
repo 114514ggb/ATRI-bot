@@ -126,11 +126,22 @@ class QQ_send_message():
         await self.send_group_message(group_id, params)
 
         
-    async def send_group_merge_forward(self,group_id: int, message: str):
+    async def send_group_merge_forward(
+        self,
+        group_id: int, 
+        message: str,
+        source: str = "男娘秘籍",
+        preview: str = "ATRI:晚上一个人偷偷看[图片]"
+    ):
         """
             发送群合并转发消息\n
             目前支持发一条文字消息\n
             目的是用来防止过长的消息刷屏，合并转发比较优雅:)
+            Args:
+                group_id:群号 
+                message:消息内容
+                source:标题
+                preview:预览
         """
         api_url = "send_group_forward_msg"
         
@@ -155,12 +166,12 @@ class QQ_send_message():
             ],
             "news": [
                 {
-                "text": "ATRI:晚上一个人偷偷看[图片]"
+                "text": preview
                 }
             ],
             "prompt": "聊天记录", #外显
             "summary": "点击即看", #底下文本
-            "source": "男娘秘籍" #内容
+            "source": source #内容
         }
         
         await self.async_send(api_url,payload)

@@ -27,6 +27,7 @@ class bigModel_api:
 
     def generate_text(self, my_model, my_messages):
         """请求生成文本,全部默认。"""
+        self.client.web_search
         completion = self.client.chat.completions.create(
             model = my_model, 
             messages = my_messages,

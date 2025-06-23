@@ -118,6 +118,7 @@ class command_processor():
             "/test -[at_will] [at_will] -测试用命令\n"
             "/role [role_name] -切换聊天角色\n"
             "/permissions -查看自己当前权限"
+            "/ls [list_name] -查看系统列表"
         )
         if parameter == [[],[]]:
             await self.basics.QQ_send_message.send_group_message(qq_id,help_text)
@@ -126,13 +127,17 @@ class command_processor():
             list_text = "当前可用的命令:\n"
             for command in self.command_list:
                 list_text += f"{command.name} : {command.description}\n\n"
-            await self.basics.QQ_send_message.send_group_merge_forward(qq_id,list_text)
+            await self.basics.QQ_send_message.send_group_merge_forward(
+                qq_id,
+                list_text,
+                source="指令列表"
+            )
             return True
             
         elif parameter == [[],["atri"]]:
             
             introduce = (
-                "ATRI 是一个 高性能的 面对无界数据流处理的 执行系统，\n"
+                "ATRI 是一个 高性能的 信息处理系统，\n"
                 "主要是面对无界的格式化数据流进行处理。\n"
                 "简单来说是用于处理对你们在qq发送消息的一个机器人.\n"
                 "基本功能:\n"

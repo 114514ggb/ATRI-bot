@@ -135,7 +135,7 @@ class Chat_processing:
                         "role": "user",
                         "content": [
                             {"type": "image_url","image_url": {"url": img_base}},
-                            {"type": "text","text": "请详细描述你看到的东西,上面是什么有什么，如果上面有文字也要详细说清楚,如果上面是什么你认识的人或游戏或建筑也可以介绍一下"}
+                            {"type": "text","text": "请详细描述你看到的东西,上面是什么有什么在什么地方，如果上面有文字也要详细说清楚,如果上面是什么你认识的可以介绍一下"}
                         ] 
                     }]
                     
@@ -296,7 +296,7 @@ class Chat_processing:
             print(f"主API调用失败，尝试备用方法。错误: {str(e)}")
             try:
                 assistant_message = self.model.generate_text_tools(
-                    "GLM-4-Flash",
+                    "GLM-4-Flash-250414",
                     my_messages = self.messages + self.temporary_messages
                 )['choices'][0]['message']
             except Exception as fallback_e:

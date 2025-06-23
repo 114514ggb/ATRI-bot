@@ -16,7 +16,11 @@ async def toggleModel(argument,group_ID,data):
             for key in basics.ai_chat_manager.play_role_list.keys():
                 name_list += key + "\n"
             
-            await basics.QQ_send_message.send_group_merge_forward(group_ID, name_list)
+            await basics.QQ_send_message.send_group_merge_forward(
+                group_ID, 
+                name_list,
+                source = "可用人设"
+            )
             
         else:
             raise ValueError(f"无效dash参数\"{dash_argument}\"!")

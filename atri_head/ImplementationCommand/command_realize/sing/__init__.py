@@ -40,7 +40,11 @@ class sing():
                     await self.basics.QQ_send_message.send_group_message(group_ID,"已刷新歌单。")
                     return True
                 elif hyphen_argument == "l":
-                    await self.basics.QQ_send_message.send_group_merge_forward(group_ID,"歌单：\n"+'\n'.join(self.sing_list.keys()))
+                    await self.basics.QQ_send_message.send_group_merge_forward(
+                        group_ID,
+                        "歌单：\n"+'\n'.join(self.sing_list.keys()),
+                        source = "目前可用歌曲"
+                    )
                     return True
                 
             raise ValueError(f"未知/无效参数\"{hyphen_argument}\"")

@@ -130,12 +130,45 @@ def get_system_info():
     
     return "\n".join(output)
 
+def get_mcp_info():
+    """查看系统MCP工具信息，返回格式化的字符串"""
+    tools_info = []
+    
+    for func in basics.mcp_tool.func_list:
+        status = "✅" if func.active else "❌"
+        
+        origin_info = f"来源: {func.origin}"
+        if func.origin == "mcp" and func.mcp_server_name:
+            origin_info += f" (服务: {func.mcp_server_name})"
+        
+        params_info = []
+        for param,detail in func.parameters["properties"].items():
+            param_type = detail.get("type", "unknown")
+            param_desc = detail.get("description", "无描述")
+            params_info.append(f"    ▪ {param}: {param_type} - {param_desc}")
+
+        
+        parameters = "参数:\n" + "\n".join(params_info) if params_info else "参数: 无"
+        
+        tool_info = f"""
+🔧 工具名称: {func.name} {status}
+{origin_info}
+📝 描述: {func.description}
+{parameters}
+        """.strip()
+        
+        tools_info.append(tool_info)
+    
+    separator = "\n" + "━" * 20 + "\n"
+    header = "📡 系统MCP工具列表 (共{}个)\n".format(len(tools_info)) + "="*20
+    return header + "\n" + separator.join(tools_info) + "\n" + "="*20
+
 
 async def view_lsit(argument,group_ID,data):
     """查看指定东西的list信息"""
     argument = argument[1][0]
     time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    output = [f"🔍 系统监控报告 (请求: {argument})"]
+    output = [f"🔍 查看系统list (请求: {argument})"]
     output.append(f"生成时间: {time_str}\n")
     
 
@@ -152,12 +185,15 @@ async def view_lsit(argument,group_ID,data):
         output.append(get_disk_info())
     elif argument == "sys":
         output.append(get_system_info())
+    elif argument == "mcp":
+        output.append(get_mcp_info())
     else:
-        raise ValueError(f"无效参数: {argument}\n可用参数: all, cpu, mem, disk, sys")
+        raise ValueError(f"无效参数: {argument}\n可用参数: all, cpu, mem, disk, sys, mcp")
     
     await basics.QQ_send_message.send_group_merge_forward(
         group_id=group_ID,
-        message = "\n".join(output)
+        message = "\n".join(output),
+        source = "查看列表返回值"
     )
 
 
@@ -168,7 +204,7 @@ command_main = Command_information(
     name="ls",
     aliases=["lsit", "ls"],
     handler=view_lsit,
-    description="查看指定list",
+    description="查看指定list,可用参数: all, cpu, mem, disk, sys, mcp",
     parameter=[[0, 0], [1, 1]],
     authority_level=2
 )

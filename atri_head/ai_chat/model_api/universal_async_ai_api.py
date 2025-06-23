@@ -57,7 +57,7 @@ class universal_ai_api:
         """模型可能会调用的 tool 的列表。最多支持 128 个 function。"""
         self.client = httpx.AsyncClient(timeout=httpx.Timeout(120.0))
 
-    def alter_parameters(self, parameters:str, value):
+    def alter_parameters(self, parameters:str, value:float|bool|dict):
         """修改模型参数"""
         self.model_parameters[parameters] = value
 

@@ -1,10 +1,8 @@
 from ..Basics.qq_send_message import QQ_send_message
 from .model_api.bigModel_api import bigModel_api
-
 # from .model_api.async_open_ai_api import async_openAI
 from ..Basics import Basics
 from .model_api.universal_async_ai_api import universal_ai_api
-from .mcp_tool_manager import FuncCall
 import asyncio
 import importlib.util
 import os
@@ -19,7 +17,7 @@ class tool_calls:
     def __init__(self):
         self.passing_message = QQ_send_message()
         self.basics = Basics()
-        self.mcp_tool = FuncCall("atri_head\\ai_chat\\MCP\\")
+        self.mcp_tool = self.basics.mcp_tool
         """掌管MCP的""" 
         self.tools_functions_dict = {
         }
@@ -34,6 +32,7 @@ class tool_calls:
         self.load_additional_tools()
         self.model = bigModel_api()
         self.chat_request = universal_ai_api()
+        self.chat_request.alter_parameters('temperature',0.5)# 设置温度
     
         # self.chat_request = async_openAI(
         #     api_key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4",
@@ -76,7 +75,7 @@ class tool_calls:
 
 
     def get_files_in_folder(self):
-        """获取返回文件夹中的所有工具函数和工具json"""
+        """获添加文件夹中的所有工具函数和工具json"""
 
         folder_path = "atri_head\\ai_chat\\tools\\"
         default_module_name = "main"
@@ -124,7 +123,7 @@ class tool_calls:
                     name = tool_json["name"],
                     func_args = {} if tool_json["properties"] is None else tool_json["properties"],
                     desc = tool_json["description"],
-                    handler = tool_json
+                    handler = func
                 )
 
     def get_all_tools_json(self)->list:

@@ -146,8 +146,8 @@ class group_message_processing():
         """退出时保存数据"""
         register_async_all = []
         register_async_all.append(self.basics.async_database.close_pool) #清理数据库
-        register_async_all.append(self.chat_ai.tool_calls.mcp_tool.terminate) #清理MCP客户端
         register_async_all.append(self.basics.QQ_send_message.websocketClient.close) #关闭主连接
+        register_async_all.append(self.chat_ai.tool_calls.mcp_tool.terminate) #清理MCP客户端
         
         for async_all in register_async_all:
             self.basics.exiter_save.register_async(async_all)

@@ -42,7 +42,7 @@ class FuncTool:
 
     name: str
     """名称"""
-    parameters: Dict
+    parameters: Dict[str,dict[str,dict]]
     """参数类型字典"""
     description: str
     """工具作用"""

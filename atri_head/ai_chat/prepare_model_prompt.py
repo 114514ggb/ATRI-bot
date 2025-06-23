@@ -48,7 +48,7 @@ class build_prompt:
         return prompt
     
     @staticmethod
-    def build_group_user_Information(self, data:dict)-> str:
+    def build_group_user_Information(data:dict)-> str:
         """ 构造群用户信息 """
         return str(
             {

@@ -43,7 +43,7 @@
       "env": {
         "AMAP_MAPS_API_KEY": "33a63b198b158f9ddf2a8bb5c514130c"
       },
-      "active":true
+      "active": false
     },
     "思维工具-thinking": {
       "command": "npx",
