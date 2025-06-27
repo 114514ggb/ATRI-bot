@@ -1,5 +1,5 @@
 from ..Basics.qq_send_message import QQ_send_message
-from .model_api.bigModel_api import bigModel_api
+from .model_api.bigModel_api import async_bigModel_api
 # from .model_api.async_open_ai_api import async_openAI
 from ..Basics import Basics
 from .model_api.universal_async_ai_api import universal_ai_api
@@ -27,10 +27,13 @@ class tool_calls:
             # 'send_text_message': self.send_text_message,
         }
         self.tools = tools
+        
         self.mcp_service_queue = asyncio.Queue()
-        self.mcp_service_task = asyncio.create_task(self.mcp_tool.mcp_service_selector())
+        self.mcp_service_task = asyncio.create_task(self.mcp_tool.mcp_service_selector())#mcp控制方法
+        self.mcp_tool.mcp_service_queue.put_nowait({"type": "init"})#初始化所有MCP客户端
+        
         self.load_additional_tools()
-        self.model = bigModel_api()
+        self.model = async_bigModel_api()
         self.chat_request = universal_ai_api()
         self.chat_request.alter_parameters('temperature',0.5)# 设置温度
     
@@ -65,7 +68,6 @@ class tool_calls:
     def load_additional_tools(self)->list:
         """加载额外工具"""
         print("加载模型tools...")
-        self.mcp_tool.mcp_service_queue.put_nowait({"type": "init"})
         
         self.get_files_in_folder()
 
@@ -162,17 +164,17 @@ class tool_calls:
     
     async def send_speech_message(self, message, group_ID):
         """发送语音消息"""
-        url = self.basics.AI_interaction.speech_synthesis(message)
+        url = await self.basics.AI_interaction.speech_synthesis(message)
         await self.passing_message.send_group_audio(group_ID, url)
 
         return {"send_speech_message": f"已发送语音内容：{message}"}
     
     async def send_image_message(self, prompt, group_ID):
         """生成发送图片消息"""
-        url = self.model.generate_image(prompt)['data'][0]['url']
+        url = await self.model.generate_image(prompt)
         await self.passing_message.send_group_pictures(group_ID,url,local_Path_type=False)
-        print("图片发送成功")
-        return {"send_image_message": "图片已发送"}
+        # print("图片发送成功")
+        return {"send_image_message": "图片成功发送"}
     
 
 tools = [
@@ -180,7 +182,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "将文本内容转换为语音消息并进行发送(不会结束工具调用,发完后一般调用工具tool_calls_end)，支持发送中文、英文、日语。适用于需要你说话的场景，建议使用口语化表达并避免代码等特殊符号。建议在你需要或想发出声音说话时使用",
+            "description": "在需要你发语音或是让你说话的时候使用,将文本内容转换为语音消息并进行发送(使用后不会结束工具调用)，支持发送中文、英文、日语，建议使用口语化表达并避免代码等特殊符号",
             "parameters": {            
                 "type": "object",
                 "properties": {

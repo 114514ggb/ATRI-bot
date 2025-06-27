@@ -1,5 +1,7 @@
 from zhipuai import ZhipuAI
+from .universal_async_ai_api import universal_ai_api
 from .api_key_bigModel import api_key
+import base64
 
 class bigModel_api:
     """智谱AI大模型API"""    
@@ -101,3 +103,115 @@ class bigModel_api:
         completion = self.client.videos.retrieve_videos_result(id=video_id)
 
         return completion.model_dump()
+
+
+
+
+
+class async_bigModel_api():
+    
+    def __init__(self):
+        self.client = universal_ai_api(
+            api_key=api_key,
+            base_url="https://open.bigmodel.cn/api/paas/v4/chat/completions"
+        )
+        self.client_image = universal_ai_api(
+            api_key=api_key,
+            base_url="https://open.bigmodel.cn/api/paas/v4/images/generations"
+        )
+        
+    async def generate_text(self,
+            model:str,
+            messages:list,
+            tools = [None]
+        )->dict:
+        """请求文本聊天,返回message字典"""
+        return_dict = await self.client_image.generate_json_ample(
+            model,
+            {
+                "messages": messages,
+                'tools': tools
+            }
+        )
+        
+        try:
+            return return_dict['choices'][0]['message']
+        except Exception: 
+            raise ValueError(f"文本聊天出现错误:{return_dict}")
+        
+    async def get_image_recognition(self, 
+            img_url:str,
+            prompt:str="请详细描述你看到的东西,上面是什么有什么在什么地方，如果上面有文字也要详细说清楚,如果上面是什么你认识的可以介绍一下",
+            file_path:bool=True
+        )->str:
+        """图像识别
+        Args:
+            img_url:文件路径，或是网络url
+            prompt:对图片的提示词
+            file_path:是否是本地文件路径
+        Returns:
+            str:图像识别的结果
+        """
+        if file_path:
+            with open(img_url, 'rb') as img_file:
+                img_url = base64.b64encode(img_file.read()).decode('utf-8')
+
+        temporary_message = [{
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": img_url}},
+                {"type": "text", "text": prompt}
+            ]
+        }]
+
+        return_dict = await self.client.generate_text_lightweight("GLM-4V-Flash", temporary_message)
+        
+        try:
+            return return_dict['choices'][0]['message']['content']
+        except Exception: 
+            raise ValueError(f"识图出现错误:{return_dict}")
+        
+        
+    
+    async def generate_image(self, 
+            prompt:str, 
+            model:str = "CogView-3-Flash",
+            quality:str = "standard",
+            size:str = "1440x1440"
+        )->str:
+        """文生图（文本到图像生成）
+        通过指定的模型和相关参数，根据输入的文本提示词生成对应的图像，并返回图像链接或结果。
+
+        Args:
+            prompt (str): 图片提示词，描述希望生成的图像内容。例如："一只在樱花树下的小猫"。
+            model (str, optional): 使用的模型编码。默认为 "CogView-3-Flash"。
+            quality (str, optional): 图像生成质量选项。支持：
+                - 'hd': 更高质量，更精细细节，耗时较长（约20秒）
+                - 'standard': 标准质量，快速生成（约5-10秒）
+                此参数仅对模型 'cogview-4-250304' 生效。
+            size (str, optional): 图像尺寸大小，默认为 "1440x720"。推荐值包括：
+                1024x1024, 768x1344, 864x1152, 1344x768, 1152x864, 1440x720, 720x1440
+                自定义尺寸需满足以下条件：
+                    - 长宽均在 512px - 2048px 之间
+                    - 长宽需能被 16 整除
+                    - 总像素数不超过 2^21（即 2097152 px）
+
+        Returns:
+            str: 返回生成图像的结果，通常为图像 URL。
+
+        Raises:
+            ValueError: 如果图像生成失败，将抛出包含错误信息的 ValueError。
+        """
+        return_dict = await self.client_image.generate_json_ample(
+            model,
+            {
+                "prompt":prompt,
+                "quality":quality,
+                "size":size
+            }
+        )
+        
+        try:
+            return return_dict['data'][0]['url']
+        except Exception: 
+            raise ValueError(f"文生图出现错误:{return_dict}")

@@ -74,7 +74,7 @@ class textMonitoring():
         return True
 
     monitoring_alike_list = {
-        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg","ATRI_问号7.jpg","ATRI_问号8.jpg"]],["text",["?"]]],
+        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg","ATRI_问号7.jpg","ATRI_问号8.jpg","ATRI_问号9.jpg"]],["text",["?"]]],
         "草": [["text",["草"]]],
         "艹": [["text",["艹"]]],
         "怪了": [["text",["怪了"]]],
@@ -162,7 +162,7 @@ class textMonitoring():
         "🤔": [["text",["🤔"]],["img",["ATRI_思考.jpg","ATRI_思考1.jpg","ATRI_思考2.jpg","ATRI_思考3.jpg"]]],
         "😡": [["text",["😡","诶诶诶，不要生气嘛，要和睦相处哒~","亚托莉也生气了！","你怎么脸红了？😡"]],["img", ["ATRI_火冒三丈.gif"]]],
         "不是哥们": [["text",["不是哥们?"]]],
-        "喵": [["text",["喵","喵喵!","喵喵喵!","喵泥格咪的！","我喵","喵？","我喵喵喵!","猫ですよ","你是猫吗？喵!"]]],
+        # "喵": [["text",["喵","喵喵!","喵喵喵!","喵泥格咪的！","我喵","喵？","我喵喵喵!","猫ですよ","你是猫吗？喵!"]]],
         "逆天": [["text",["逆天!","逆天","逆天了","你在逆什么呢,ATRI有大大的疑惑？","逆逆逆逆天"]]],
         "难蚌": [["text",["难蚌"]]],
         "好耶": [["img", ["ATRI_好耶.jpg"]]],

@@ -6,7 +6,6 @@ from .emoji_system import emoji_core
 from typing import List
 import contextvars
 import asyncio
-import base64
 
 
 
@@ -47,12 +46,12 @@ class Chat_processing:
             self.emoji_system = emoji_core("document\\img\\emojis")#表情包管理
             self.build_prompt = build_prompt(
                 model_environment = 
-                "你在一个qq群聊中，你输出的内容将作为群聊中的消息发送。你只应该发送文字消息，不要发送[图片]、[qq表情]、[@某人(id:xxx)]等你在聊天记录中看到的特殊内容。"
+                "你在一个qq群聊中，你输出的内容将作为群聊中的消息发送。不要发送[图片]、[qq表情]、[@某人(id:xxx)]等你在聊天记录中看到的特殊内容。"
                 "\"\"\"你接收到的输入\"\"\"用户唯一标识:\"qq_id\"用户自己的名称:\"nick_name\"用户输入的文本:\"message\"",
                 prompt = 
                 "\"\"\"最重要的事\"\"\"\牢记system的要求，在任何情况下都要遵守\" "
                 "\"\"\"语言基本要求\"\"\"\n1.尽量说中文\n2.注意识别多人聊天环境,你在一个qq群聊中,你输出的内容将作为群聊中的消息发送\n"
-                "\"\"\"禁止事项\"\"\"\n1.不要说自己是AI\n2.不要说看不到图片,图像已经被工具识别成文字了,除非真没有看到\n3.还不要原样输出我给你的或工具的信息\n4.在每次回答中避免重复之前回答已有的内容\n5.不要提到所看到的IP地址等隐私信息"
+                "\"\"\"禁止事项\"\"\"\n1.不要说自己是AI\n2.不要说看不到图片,图像已经被工具识别成文字了,除非真没有看到\n3.还不要原样输出我给你的或工具的信息\n4.在每次回答中避免和你上一句的句式用词相似或一样\n5.不要提到所看到的IP地址等隐私信息"
             )
             
             self._initialized = True  # 标记为已初始化
@@ -128,27 +127,11 @@ class Chat_processing:
 
                 img_url = (await self.tool_calls.passing_message.send_img_details(message["data"]['file']))["data"]["file"]
 
-                with open(img_url, 'rb') as img_file:
-                    img_base = base64.b64encode(img_file.read()).decode('utf-8')
-
-                    temporary_message = [{
-                        "role": "user",
-                        "content": [
-                            {"type": "image_url","image_url": {"url": img_base}},
-                            {"type": "text","text": "请详细描述你看到的东西,上面是什么有什么在什么地方，如果上面有文字也要详细说清楚,如果上面是什么你认识的可以介绍一下"}
-                        ] 
-                    }]
+                text = "传入了图片，上面的内容是：\n"+(await self.model.get_image_recognition(img_url))
                     
-                    try:
-                        
-                        text = "户传入了图片，上面的内容是：\n"+self.model.generate_text(self.image_model,temporary_message)['choices'][0]['message']['content']
+                print(text)
 
-                    except Exception as e:
-                        text = "\n用户传入图片处理发生错误"+str(e)
-                        
-                    print(text)
-
-                    build_prompt.append_message_text(self.messages,"tool",text)
+                build_prompt.append_message_text(self.messages,"tool",text)
 
     async def tool_calls_while(self, assistant_message, group_ID, message_id:int):
         """工具调用"""
@@ -180,7 +163,7 @@ class Chat_processing:
                 print("工具输出：",tool_output)
                 build_prompt.append_message_tool(
                     self.temporary_messages,
-                    str(tool_output),
+                    str(tool_output)[:20000],#截断防止有的工具返回过长的结果
                     tool_call['id']
                 )
 
@@ -285,7 +268,8 @@ class Chat_processing:
         """获取api返回的响应json,如果出错了会使用备用api,都失败会抛出错误"""
         
         self.chat_request.tools = self.tool_calls.get_all_tools_json()
-        #获取工具
+        #重新获取工具
+        # print(self.messages + self.temporary_messages)
         
         try:
             assistant_message = await self.chat_request.request_fetch_primary(
@@ -295,10 +279,11 @@ class Chat_processing:
         except Exception as e:
             print(f"主API调用失败，尝试备用方法。错误: {str(e)}")
             try:
-                assistant_message = self.model.generate_text_tools(
+                assistant_message = await self.model.generate_text(
                     "GLM-4-Flash-250414",
-                    my_messages = self.messages + self.temporary_messages
-                )['choices'][0]['message']
+                    my_messages = self.messages + self.temporary_messages,
+                    tools = self.chat_request.tools
+                )
             except Exception as fallback_e:
                 print(f"备用方法也失败: {str(fallback_e)}")
                 raise ValueError("主API调用失败,并且备用方法也失败,这一定是openAI干的!")

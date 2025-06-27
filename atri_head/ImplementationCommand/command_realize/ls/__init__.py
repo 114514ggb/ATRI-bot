@@ -76,9 +76,7 @@ def get_memory_info():
 
 def get_disk_info():
     """获取磁盘信息并返回字符串"""
-    output = ["=" * 10]
-    output.append("💿 磁盘信息")
-    output.append("=" * 10)
+    output = []
     
     partitions = psutil.disk_partitions()
     total_size = 0

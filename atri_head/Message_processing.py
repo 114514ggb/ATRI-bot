@@ -27,8 +27,6 @@ class group_message_processing():
             
             await self.basics.link_async_database("127.0.0.1","root","180710")#数据库
             await self.exit_save() #退出时处理
-        
-            self.chat_ai.chat_request.tools = self.chat_ai.tool_calls.tools#添加工具
             
             self.single_use = True
         

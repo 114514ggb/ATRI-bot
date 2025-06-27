@@ -117,7 +117,7 @@ class command_processor():
             "/kill -清除记忆\n"
             "/test -[at_will] [at_will] -测试用命令\n"
             "/role [role_name] -切换聊天角色\n"
-            "/permissions -查看自己当前权限"
+            "/permissions -查看自己当前权限\n"
             "/ls [list_name] -查看系统列表"
         )
         if parameter == [[],[]]:
