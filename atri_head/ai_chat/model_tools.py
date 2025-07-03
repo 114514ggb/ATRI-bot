@@ -28,14 +28,20 @@ class tool_calls:
         }
         self.tools = tools
         
+        #tool
         self.mcp_service_queue = asyncio.Queue()
         self.mcp_service_task = asyncio.create_task(self.mcp_tool.mcp_service_selector())#mcp控制方法
         self.mcp_tool.mcp_service_queue.put_nowait({"type": "init"})#初始化所有MCP客户端
-        
         self.load_additional_tools()
+        
+        #ai_api
         self.model = async_bigModel_api()
-        self.chat_request = universal_ai_api()
-        self.chat_request.alter_parameters('temperature',0.5)# 设置温度
+        self.chat_request = universal_ai_api(
+            self.basics.config.model.connect.api_key,
+            self.basics.config.model.connect.base_url
+        )
+        self.chat_request.model_parameters |= dict(self.basics.config.model.chat_parameter)
+        
     
         # self.chat_request = async_openAI(
         #     api_key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4",
@@ -79,7 +85,7 @@ class tool_calls:
     def get_files_in_folder(self):
         """获添加文件夹中的所有工具函数和工具json"""
 
-        folder_path = "atri_head\\ai_chat\\tools\\"
+        folder_path = "atri_head/ai_chat/tools/"
         default_module_name = "main"
 
         for name in os.listdir(folder_path):

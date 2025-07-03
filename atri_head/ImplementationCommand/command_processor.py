@@ -1,4 +1,4 @@
-from ..Basics import Basics,Command_information
+from ..Basics import Basics,Command_information,Command
 import importlib.util
 import os
 import re
@@ -7,6 +7,7 @@ class command_processor():
     """指令处理器"""
     def __init__(self):
         self.basics = Basics()
+        self.Command = Command()
         self.command_list:list[Command_information] = [
             Command_information(
                 name="help",
@@ -50,10 +51,10 @@ class command_processor():
 
             for command in self.command_list:
                 if my_command in command.aliases:
-                    if self.basics.Command.permissions(user_qq_id, command.authority_level):
+                    if self.Command.permissions(user_qq_id, command.authority_level):
                         
-                        parameter = self.basics.Command.processingParameter(user_input)
-                        self.basics.Command.verifyParameter(parameter,command.parameter)
+                        parameter = self.Command.processingParameter(user_input)
+                        self.Command.verifyParameter(parameter,command.parameter)
                         
                         return command.handler,parameter
                     

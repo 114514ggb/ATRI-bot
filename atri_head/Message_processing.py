@@ -1,23 +1,23 @@
 from .ImplementationCommand.command_processor import command_processor
 from .triggerAction.textMonitoring import textMonitoring
-from .Basics import Basics
+from .Basics import Basics,Command
 from .ai_chat.chat_main import Chat_processing
 
 
 class group_message_processing():
     """群消息处理类"""
-    qq_white_list = []
-    """qq白名单"""
     single_use = False #一次性
 
-    def __init__(self, playRole, http_base_url = None, token= None, connection_type = "http",qq_white_list = []):
+    def __init__(self,qq_white_list = []):
         self.qq_white_list = qq_white_list
-        self.basics = Basics(http_base_url, token, playRole, connection_type)#这个一定要第一个
+        """qq白名单"""
+        self.basics = Basics()#这个一定要第一个
         self.command_processor = command_processor()
         self.chat_ai = Chat_processing()
         self.textMonitoring = textMonitoring()
+        self.Command = Command()
         
-        self.basics.Command.syncing_locally()#同步管理员名单
+        self.Command.syncing_locally()#同步管理员名单
 
     async def main(self,data:dict)-> bool:
         """主消息处理函数"""
@@ -25,7 +25,7 @@ class group_message_processing():
         if not self.single_use:
             """一次性处理"""
             
-            await self.basics.link_async_database("127.0.0.1","root","180710")#数据库
+            await self.basics.link_async_database()#连接数据库
             await self.exit_save() #退出时处理
             
             self.single_use = True
@@ -42,7 +42,7 @@ class group_message_processing():
                 message_objects = data['message']
                 message = ''.join([m['data']['text'] for m in message_objects if m['type'] == 'text'])
 
-            if self.basics.Command.blacklist_intercept(data["user_id"]):#黑名单检测
+            if self.Command.blacklist_intercept(data["user_id"]):#黑名单检测
 
                 if  data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:                
                 
@@ -106,7 +106,7 @@ class group_message_processing():
         data_text = ""
         if data.get('message',False):
             try:
-                data_text = self.basics.Command.data_processing_text(data)
+                data_text = self.Command.data_processing_text(data)
                 #message字符串化
             except Exception as e: 
                 print("\nmessage字符串化失败:",e,"\n原消息:",data)

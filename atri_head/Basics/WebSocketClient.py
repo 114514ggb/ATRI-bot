@@ -20,12 +20,12 @@ class WebSocketClient:
             cls._instance = super(WebSocketClient, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, uri = "127.0.0.1:8080",access_token = None, websocket=None):
+    def __init__(self, url = "127.0.0.1:8080",access_token = None, websocket=None):
         if not hasattr(self, "_initialized"):
             if access_token is None:
-                self.uri = f'ws://{uri}/'
+                self.uri = f'ws://{url}/'
             else:
-                self.uri = f'ws://{uri}/websocket?access_token={access_token}'
+                self.uri = f'ws://{url}/websocket?access_token={access_token}'
             self.websocket = websocket
             self._listeners = [
                 self.add_pending_request

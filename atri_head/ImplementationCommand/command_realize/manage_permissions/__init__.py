@@ -1,4 +1,4 @@
-from atri_head.Basics import Basics,Command_information
+from atri_head.Basics import Basics,Command_information,Command
 
 
 class manage_Permissions():
@@ -6,6 +6,7 @@ class manage_Permissions():
     
     def __init__(self):
         self.basics = Basics()
+        self.Command = Command()
 
     action_map = {
         "添加": "添加",
@@ -55,22 +56,22 @@ class manage_Permissions():
         return "ok"
 
     def query_admin(self):
-        return f"管理员列表:\n{self.basics.Command.administrator}"
+        return f"管理员列表:\n{self.Command.administrator}"
 
     def query_blacklist(self):
-        return f"黑名单列表:\n{self.basics.Command.blacklist}"
+        return f"黑名单列表:\n{self.Command.blacklist}"
 
     
     def handle_operation(self,action, role, qq_id):
         """执行权限操作"""
         operations = {
             "添加": {
-                "管理员": self.basics.Command.administrator_add,
-                "黑名单": self.basics.Command.blacklist_add,
+                "管理员": self.Command.administrator_add,
+                "黑名单": self.Command.blacklist_add,
             },
             "删除": {
-                "管理员": self.basics.Command.administrator_delete,
-                "黑名单": self.basics.Command.blacklist_delete,
+                "管理员": self.Command.administrator_delete,
+                "黑名单": self.Command.blacklist_delete,
             },
             "查询": {
                 "管理员": self.query_admin,
@@ -85,7 +86,7 @@ class manage_Permissions():
 
         if action in ["添加", "删除"]:
             operations[action][role](qq_id, self.people)
-            self.basics.Command.synchronous_database(qq_id, role, add=(action == "添加"))#同步数据库
+            self.Command.synchronous_database(qq_id, role, add=(action == "添加"))#同步数据库
             return f"已将QQ:{qq_id}\n{action}{role}"
 
         elif action == "查询":

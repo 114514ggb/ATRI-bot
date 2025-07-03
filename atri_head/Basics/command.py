@@ -6,7 +6,8 @@ import json
 class Command(Permissions_management):
     """有关指令的文本解析"""
     
-    def verifyParameter(self, parameter_list, quantity_list):
+    @staticmethod
+    def verifyParameter(parameter_list, quantity_list):
         """
         验证参数长度。
 
@@ -28,8 +29,9 @@ class Command(Permissions_management):
         
         # 如果所有参数都符合要求，则返回参数及其长度
         return [appointed_params, appointed_length], [other_params, other_length]
-        
-    def processingParameter(self,command):
+    
+    @staticmethod
+    def processingParameter(command):
         """提取参数"""
         pattern_command_argumrnts = r'(?<=\s)-([^\s-]+)' #匹配参数'-'开头
         pattern_command_other_argumrnts = r'(?<=\s)([^/\s-]\S*)' #匹配命令其他参数
@@ -39,7 +41,8 @@ class Command(Permissions_management):
 
         return [command_argumrnts,command_other_argumrnts]
 
-    def data_processing_text(self, data:Dict[str, int|str|Dict])->str:
+    @staticmethod
+    def data_processing_text(data:Dict[str, int|str|Dict])->str:
         """处理原data里的message处理成纯text"""
         text_parts = []
         

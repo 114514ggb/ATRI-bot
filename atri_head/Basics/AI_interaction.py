@@ -46,7 +46,3 @@ class AI_interaction():
             await asyncio.sleep(0.5)
             
         raise RuntimeError("tts合成错误,可能是服务端超时，或内容太长,或输入不支持的语言.")
-        
-    def image_recognition(self,url)->str:
-        """图像描述成文字(未完成)"""
-        pass

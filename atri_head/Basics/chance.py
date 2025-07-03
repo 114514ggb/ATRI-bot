@@ -1,7 +1,7 @@
 import time
 
 class Chance():
-    """提供随机"""
+    """提供随机有关的方法类"""
     def __init__(self):
         self.m = 2**32
         self.a = 1664525

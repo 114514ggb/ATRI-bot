@@ -1,8 +1,9 @@
-from atri_head.Basics import Basics,Command_information
+from atri_head.Basics import Basics,Command_information,Command
 from datetime import datetime
 
 
 basics = Basics()
+Command_ = Command()
 group_print = basics.QQ_send_message.send_group_message
 
 async def query_mysql(argument, group_ID, data):
@@ -33,7 +34,7 @@ async def query_mysql(argument, group_ID, data):
     user_id = other_argument[0] if  other_argument != [] else  data['user_id']
     #获取ID
 
-    if basics.Command.isQQ(user_id):
+    if Command_.isQQ(user_id):
         sql_days = """
 SELECT
   SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 86400 THEN 1 ELSE 0 END) AS daily_count,

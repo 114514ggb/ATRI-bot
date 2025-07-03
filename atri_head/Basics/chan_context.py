@@ -10,10 +10,10 @@ class ai_chat_manager:
     _lock = threading.Lock()
     _lock_async = asyncio.Lock()
     all_group_locks = defaultdict(Lock)
-    folder_path = "atri_head\\ai_chat\\character_setting"
+    folder_path = "atri_head/ai_chat/character_setting"
     """默认角色路径"""
     
-    def __init__(self,default_play_role:str = "none"):
+    def __init__(self,default_play_role:str = "none",messages_length_limit:int=20):
         self.all_group_messages: Dict[str, List[dict]] = {}
         """所有群消息列表"""
         
@@ -26,7 +26,7 @@ class ai_chat_manager:
         self.play_role_list: Dict[str, str] = {"none": ""}
         """角色预设字典"""
         
-        self.messages_length_limit: int = 20
+        self.messages_length_limit: int = messages_length_limit
         """单个群上下文消息上限"""
         
         self._load_character_settings()
@@ -71,7 +71,7 @@ class ai_chat_manager:
                     del self.group_play_roles[group_id]
     
     def restrict_messages_length(self, messages: List[dict]) -> List[dict]:
-        """限制消息长度"""
+        """消息长度检查"""
         user_message_count = sum(1 for msg in messages if msg['role'] == 'user')
         
         if user_message_count >= self.messages_length_limit:

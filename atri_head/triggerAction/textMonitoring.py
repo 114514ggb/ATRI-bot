@@ -1,4 +1,4 @@
-from ..Basics import Basics
+from ..Basics import Basics,Chance
 from .action_main import itemAction
 import random
 import time
@@ -8,6 +8,7 @@ class textMonitoring():
     def __init__(self):
         self.itemAction = itemAction()
         self.basics = Basics()
+        self.Chance = Chance()
 
     last_time = 0 #上次反应时间
     cooldown = 1 #反应间隔时间
@@ -28,7 +29,7 @@ class textMonitoring():
         """精确匹配，匹配字段一样就反应"""
         if text in self.monitoring_alike_list.keys():
             
-            if text in self.Frequently_used_words_list and self.basics.Chance.judgeChance(50): #随机反应
+            if text in self.Frequently_used_words_list and self.Chance.judgeChance(50): #随机反应
                 return True
             
             await self.sendHandle(group_ID,self.monitoring_alike_list[text])

@@ -1,4 +1,4 @@
-from ..Basics import Basics
+from ..Basics import Basics,Command
 import asyncio
 import random
 import httpx
@@ -63,7 +63,7 @@ class itemAction():
             async with self._lock_async:
                 ai_response = await self.basics.AI_interaction.auto_response.chat_main(
                     data=data,
-                    user_text = self.basics.Command.data_processing_text(data)
+                    user_text = Command.data_processing_text(data)
                     )
                 if ai_response:
                     for message in ai_response.split("\\"):
