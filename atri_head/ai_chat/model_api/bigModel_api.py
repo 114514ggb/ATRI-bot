@@ -141,7 +141,7 @@ class async_bigModel_api():
         
     async def get_image_recognition(self, 
             img_url:str,
-            prompt:str="请详细描述你看到的东西,上面是什么有什么在什么地方，如果上面有文字也要详细说清楚,如果上面是什么你认识的可以介绍一下",
+            prompt:str="请详细描述你看到的东西,上面是什么有什么在什么地方，如果上面有文字也要详细说清楚,如果有什么自己的理解可以说出来，如果上面是什么你认识的可以介绍一下",
             file_path:bool=True
         )->str:
         """图像识别

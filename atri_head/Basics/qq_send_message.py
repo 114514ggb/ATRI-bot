@@ -169,7 +169,7 @@ class QQ_send_message():
                 "text": preview
                 }
             ],
-            "prompt": "聊天记录", #外显
+            "prompt": "果然是群聊天记录", #外显
             "summary": "点击即看", #底下文本
             "source": source #内容
         }
@@ -338,12 +338,47 @@ class QQ_send_message():
         await self.async_send(url=url,payload=payload)
         # self.send(url,payload)
 
-    async def send_img_details(self,file_id):
+    async def get_img_details(self,file_id):
         """获取图片消息详情"""
         url = "get_image"
 
         payload = {
             "file_id": file_id,
+        }
+
+        return await self.requests_require_return(url=url,payload=payload)
+
+    async def get_recordg_details(self,
+            file:str,
+            file_id:str,
+            out_format:str = "mp3"
+        ):
+        """获取语音消息详情。
+
+        该异步方法用于获取语音文件的相关信息，包括但不限于格式转换后的输出。
+
+        Args:
+            file (str): 文件路径。
+            file_id (str): 文件ID，用于标识不同的语音记录。
+            out_format (str, optional): 输出格式。支持的枚举值有'mp3', 'amr', 'wma',
+                'm4a', 'spx', 'ogg', 'wav', 'flac'。默认值为'mp3'。
+        """
+        url = "get_recordg"
+
+        payload = {
+            "file": file,
+            "file_id": file_id,
+            "out_format": out_format
+        }
+        
+        return await self.requests_require_return(url=url,payload=payload)
+    
+    async def get_msg_details(self,message_id:str):
+        """获取消息详情"""
+        url = "get_msg"
+
+        payload = {
+            "message_id": message_id,
         }
 
         return await self.requests_require_return(url=url,payload=payload)

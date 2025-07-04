@@ -28,7 +28,7 @@ class build_prompt:
     def set_model_name(self, model_environment):
         self.model_environment = model_environment
 
-    def build_prompt(self, context:str, chat_history:str = "")-> str:
+    def build_prompt(self, context:str = "", chat_history:str = "")-> str:
         """
         构造用来回复的嵌入式prompt
         """
@@ -42,8 +42,9 @@ class build_prompt:
         
         if self.prompt != "":
             prompt += f"<prompt>{self.prompt}</prompt>\n\n"
-            
-        prompt += f"需要回答的:<user_input>{context}</user_input>\n\n"
+        
+        if context != "":   
+            prompt += f"需要回答的:<user_input>{context}</user_input>\n\n"
         
         return prompt
     
