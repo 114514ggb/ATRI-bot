@@ -75,7 +75,6 @@ class group_message_processing():
                     
                 await self.chat_ai.main(
                     group_ID, 
-                    message, 
                     data
                 ) 
                 return True

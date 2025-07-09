@@ -4,7 +4,7 @@ import re
 import json
 
 class Command(Permissions_management):
-    """有关指令的文本解析"""
+    """有关指令和文本解析类"""
     
     @staticmethod
     def verifyParameter(parameter_list, quantity_list):
@@ -57,29 +57,60 @@ class Command(Permissions_management):
                 
             elif my_type == "image":
                 summary = message.get("data", {}).get("summary", "")
-                text_parts.append(summary if summary else "[image]")
+                text_parts.append(f"[CQ:image,summary:{summary}" if summary else "[CQ:image]")
                 
             elif my_type == "at":
                 qq = message.get("data", {}).get("qq", "")
-                text_parts.append(f"[@{qq}]")
+                text_parts.append(f"[CQ:at,qq={qq}]")
                 
             elif my_type == "file":
                 file = message.get("data", {}).get("file", "")
-                text_parts.append(f"[\"file\":{file}]")
+                text_parts.append(f"[CQ:file,name:{file}]")
                 
             elif my_type == "face":
-                face_text = message.get("data", {}).get('raw', {}).get('faceText')
-                text_parts.append(face_text if face_text is not None else "[unknown_face]")
+                face_text = message["data"]["raw"]["faceText"]
+                text_parts.append(f"[CQ:face,prompt:{face_text}]" if face_text else "[CQ:face]")
                 
             elif my_type == "json":
                 try:
                     json_data:dict = json.loads(message.get('data', {}).get("data", "{}"))
                     prompt = json_data.get("prompt", "")
-                    text_parts.append(f"[json_prompt:{prompt}]")
+                    text_parts.append(f"[CQ:json,prompt:{prompt}]")
                 except json.JSONDecodeError:
-                    text_parts.append("[json]")
+                    text_parts.append("[CQ:json]")
                     
             else:
-                text_parts.append(f"[{my_type}]")
+                text_parts.append(f"[CQ:{my_type}]")
 
+        return "".join(text_parts)
+    
+    @staticmethod
+    def data_processing_ai_chat_text(data:Dict[str, int|str|Dict])->str:
+        """用来解析成ai读的文本"""
+        text_parts = []
+        img_count = 1
+        
+        for message in data["message"]:
+            message:Dict[str,str|dict]
+            my_type:str = message.get("type")
+            
+            if my_type == "text":
+                text_data = message.get("data", {}).get("text", "")
+                text_parts.append(str(text_data))
+            
+            elif my_type == "at":
+                qq = message.get("data", {}).get("qq", "")
+                text_parts.append(f"[CQ:at,qq={qq}]")
+                
+            elif my_type == "face":
+                face_text = message["data"]["raw"]["faceText"]
+                text_parts.append(f"[CQ:face,prompt:{face_text}]" if face_text else "[CQ:face]")
+                
+            elif my_type == "image":
+                text_parts.append(f"[CQ:图片{img_count}]")
+                img_count += 1
+                
+            else:
+                text_parts.append(f"[CQ:{my_type}]")
+        
         return "".join(text_parts)

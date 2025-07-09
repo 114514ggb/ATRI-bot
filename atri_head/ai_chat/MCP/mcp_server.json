@@ -8,7 +8,7 @@
     "魔塔-fetch": {
       "type": "sse",
       "url": "https://mcp.api-inference.modelscope.net/fe8ec4fddb9847/sse",
-      "active": true
+      "active": false
     },
     "mcp-server-firecrawl": {
       "command": "npx",

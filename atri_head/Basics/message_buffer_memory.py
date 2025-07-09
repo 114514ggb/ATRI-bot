@@ -49,7 +49,7 @@ class MessageCache:
                 
                 await self._set_group_messages(
                     data['group_id'],
-                    f"{data['user_id']}说:{message_test}"
+                    {data['user_id']:message_test}
                 )
                 return None
             

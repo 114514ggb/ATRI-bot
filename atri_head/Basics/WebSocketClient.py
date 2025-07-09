@@ -47,7 +47,7 @@ class WebSocketClient:
             except Exception as e:
                 if self.maximum_retry > 0:
                     self.maximum_retry -= 1
-                    print(f"连接失败: {e}, 0.1秒后重试...")
+                    print(f"连接失败: {e}\n0.1秒后重试...")
                     await asyncio.sleep(0.1)
                 else:
                     print(f"连接失败: {e}, 已达到最大重连次数")
