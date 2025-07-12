@@ -170,7 +170,7 @@ class textMonitoring():
         "难蚌": [["text",["难蚌"]]],
         "好耶": [["img", ["ATRI_好耶.jpg"]]],
         "高性能": [["img",["ATRI_高性能.png","ATRI_得意.gif","ATRI_自我陶醉.gif","ATRI_机智如我.jpg","ATRI_我是高性能.jpg","ATRI_我可是高性能的.jpg","ATRI_高性能1.jpg","ATRI_高性能2.jpg","ATRI_得意.jpg","ATRI_高性能3.jpg"]]],
-        "Ciallo": [["img",["ATRI_Ciallo.jpg","ATRI_Ciallo1.gif"]]],
+        "Ciallo": [["img",["ATRI_Ciallo.jpg","ATRI_Ciallo1.gif"]],["text",["Ciallo~"]]],
         "废物":[["img",["ATRI_欺负我你能得到什么.jpg","ATRI_ 气鼓鼓.gif","ATRI_生气到爆.gif","ATRI_怎么你了.jpg","ATRI_违反机器人保护法.jpg","ATRI_别骂了.jpg"]]],
         "晚安":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚上好，晚安！我也要睡觉啦~"]]],
         # "早安": [["text",["早上好！","早上好呀！","早上好，今天也要元气满满哦！"]]],

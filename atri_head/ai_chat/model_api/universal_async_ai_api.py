@@ -3,7 +3,6 @@ import httpx
 
 class universal_ai_api:
     """通用异步AI API"""
-
     
     model_parameters = {
         'stream': False,#是否流式输出如果设置为 True，将会以 SSE（server-sent events）的形式以流式发送消息增量。消息流以 data: [DONE] 结尾。
@@ -78,7 +77,7 @@ class universal_ai_api:
             data=payload,
         )
         
-        print(response.text)
+        # print(response.text)
         return response.json()
 
     async def generate_text_lightweight(self, my_model:str, my_messages:list):

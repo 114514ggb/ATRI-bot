@@ -10,10 +10,13 @@ class ai_chat_manager:
     _lock = threading.Lock()
     _lock_async = asyncio.Lock()
     all_group_locks = defaultdict(Lock)
-    folder_path = "atri_head/ai_chat/character_setting"
-    """默认角色路径"""
     
-    def __init__(self,default_play_role:str = "none",messages_length_limit:int=20):
+    def __init__(
+        self,
+        default_play_role:str = "none",
+        messages_length_limit:int=20,
+        folder_path:str = "atri_head/ai_chat/character_setting"
+    ):
         self.all_group_messages: Dict[str, List[dict]] = {}
         """所有群消息列表"""
         
@@ -28,6 +31,9 @@ class ai_chat_manager:
         
         self.messages_length_limit: int = messages_length_limit
         """单个群上下文消息上限"""
+        
+        self.folder_path:str = folder_path
+        """扮演角色文件路径"""
         
         self._load_character_settings()
     

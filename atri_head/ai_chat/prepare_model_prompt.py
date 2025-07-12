@@ -80,19 +80,38 @@ class build_prompt:
     
     @staticmethod
     def append_message_text(messages:list,role:str,content:str):
-        """添加文本消息,role为角色,content为内容"""
+        """
+        添加文本消息.
+        
+        Args:
+            messages (list):消息list 
+            role (str): 消息角色。
+            content (str):content为内容
+        """
         messages.append({"role": role,"content": content})
         return messages
     
     @staticmethod
-    def append_message_image(messages:list,image_url, text="请详细描述这个图片，如果上面有文字也要详细说清楚", role = "user"):
-        """添加带图片消息,role为角色,image_url为图片链接,text为问题文字"""
+    def append_message_image(messages: list, image_urls: list, text="请详细描述这个图片，如果上面有文字也要详细说清楚", role: str = "user"):
+        """
+        添加带图片的消息到 messages 列表中。
+        
+        Args:
+            messages (list): 当前的消息列表，每个元素是一个字典，表示一条消息。
+            image_urls (list): 图片的 URL 列表，每个 URL 都会被作为独立的图片项添加到 content 中。
+            text (str): 对图片的描述或提问内容，默认为“请详细描述这个图片，如果上面有文字也要详细说清楚”。
+            role (str): 消息角色，通常是 'user' 或 'assistant'，默认为 'user'。
+            
+        Returns:
+            list: 更新后的 messages 列表，包含新增的消息内容。
+        """
+        print({
+            "role": role,
+            "content": [{"type": "image_url", "image_url": {"url": url}} for url in image_urls] + [{"type": "text", "text": text}]
+        })
         messages.append({
             "role": role,
-            "content": [
-                {"type": "image_url","image_url": {"url": image_url}},
-                {"type": "text","text": text}
-            ]  
+            "content": [{"type": "image_url", "image_url": {"url": url}} for url in image_urls] + [{"type": "text", "text": text}]
         })
 
         return messages

@@ -49,7 +49,8 @@ class Basics:
             """消息暂时缓存"""
             self.ai_chat_manager = ai_chat_manager(
                 self.config.ai_chat.playRole,
-                self.config.ai_chat.ai_max_record
+                self.config.ai_chat.ai_max_record,
+                self.config.file_path.chat_manager
             )
             """ai上下文管理"""
             self.mcp_tool = FuncCall("atri_head/ai_chat/MCP/")

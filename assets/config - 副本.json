@@ -18,6 +18,13 @@
     "model":{
         "connect":
         {
+            "base_url":"https://api.deepseek.com/chat/completions",
+            "api_key":"sk-8403066c2841461491dd0b642a6c44af",
+            "model_name":"deepseek-chat",
+            "visual_sense":false
+        },
+        "connect1":
+        {
             "base_url":"https://api.kourichat.com/v1/chat/completions",
             "api_key":"sk-gTimJsqOxEZZI1b8o9YqMI9Pr3URiEN4Icj1Q2Ph895TXME1",
             "model_name":"gemini-2.5-flash-05-20",

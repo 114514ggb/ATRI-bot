@@ -70,7 +70,7 @@ class async_openAI:
             messages = my_messages,
             frequency_penalty = self.model_parameters['frequency_penalty'],
             top_p = self.model_parameters['top_p'],
-            temperature = self.model_parameters['temperature'],
+            # temperature = self.model_parameters['temperature'],
             max_tokens = self.model_parameters['max_tokens'],
             response_format = response_format,
             tools = self.tools,
