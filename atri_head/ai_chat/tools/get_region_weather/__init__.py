@@ -1,5 +1,4 @@
 import aiohttp
-import asyncio
 
 tool_json = {
     "name": "get_region_weather",

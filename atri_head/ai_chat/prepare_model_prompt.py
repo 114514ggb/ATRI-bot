@@ -105,10 +105,10 @@ class build_prompt:
         Returns:
             list: 更新后的 messages 列表，包含新增的消息内容。
         """
-        print({
-            "role": role,
-            "content": [{"type": "image_url", "image_url": {"url": url}} for url in image_urls] + [{"type": "text", "text": text}]
-        })
+        # print({
+        #     "role": role,
+        #     "content": [{"type": "image_url", "image_url": {"url": url}} for url in image_urls] + [{"type": "text", "text": text}]
+        # })
         messages.append({
             "role": role,
             "content": [{"type": "image_url", "image_url": {"url": url}} for url in image_urls] + [{"type": "text", "text": text}]

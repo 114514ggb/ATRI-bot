@@ -330,13 +330,14 @@ class Chat_processing:
         self.chat_request.tools = self.tool_calls.get_all_tools_json()
         #重新获取工具
         # print(self.messages + self.temporary_messages)
+        # print(self.chat_model)
         
         try:
             assistant_message = await self.chat_request.request_fetch_primary(
-                my_model = self.chat_model,
-                my_messages = self.messages + self.temporary_messages
+                my_messages = self.messages + self.temporary_messages,
+                my_model = self.chat_model
             )
-            print(assistant_message)
+            # print(assistant_message)
         except Exception as e:
             print(f"主API调用失败，尝试备用方法。错误: {str(e)}")
             try:

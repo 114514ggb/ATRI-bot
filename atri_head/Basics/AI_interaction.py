@@ -2,7 +2,9 @@
 # from ..ai_chat.chat_main import Chat_processing
 from ..ai_chat.test_initiative_chat import initiative_chat
 from gradio_client import Client
+import aiohttp
 import asyncio
+
 
 
 class AI_interaction():
@@ -11,13 +13,24 @@ class AI_interaction():
     def __init__(self):
         # self.chat = Chat_processing(playRole)
         self.auto_response = initiative_chat()
+        self.audio_count:int = 1
     
 
-    async def speech_synthesis(self, text):
-        """语音合成,返回音频文件路径,长度不会超过500"""
+    async def speech_synthesis(self, text:str):
+        """语音合成,返回音频文件路径,长度不会超过500(已废弃)
+        
+        Args:
+            text (str): 需要合成的文本
+
+        Raises:
+            RuntimeError: 超时错误
+
+        Returns:
+            str: 文件的在文件系统的路径
+        """
         client = Client("http://localhost:9872/")
         job = client.submit(
-                        "E:\\ffmpeg\\.......我为了夏生先生行动需要理由吗.mp3",
+                        "E:/ffmpeg/.......我为了夏生先生行动需要理由吗.mp3",
                         # "E:\\ffmpeg\\啊我真是太高性能了.mp3",	
                         # str (filepath on your computer (or URL) of file) in '请上传3~10秒内参考音频，超过会报错！' Audio component
                         "あ，私です夏生さんのために動く理由が必要なんですか",
@@ -46,3 +59,73 @@ class AI_interaction():
             await asyncio.sleep(0.5)
             
         raise RuntimeError("tts合成错误,可能是服务端超时，或内容太长,或输入不支持的语言.")
+
+    async def get_tts_path(self,test:str,emotion:str="高兴",speed:float=1)->str:
+        """tts文本合成语音
+        
+        Args:
+            text (str): 需要合成的文本
+            emotion (str): 音频的情感,枚举值：高兴,机械,平静
+            speed (float): 语速，取值范围0.6~1.65,默认1
+            
+        Raises:
+            ValueError: 抛出包含错误信息的json
+
+        Returns:
+            str: 返回wav文件的相对路径
+        """
+        api_url = "http://127.0.0.1:9880"
+        
+        emotion_list = {
+            "高兴":{
+                "refer_wav_path": "E:/ffmpeg/ああ、なんて高性能なんでしょ、私は.mp3",
+                "prompt_text": "ああ、なんて高性能なんでしょ、私は",
+                "prompt_language": "ja"
+            },
+            "机械":{
+                "refer_wav_path": "E:/ffmpeg/あ，私です夏生さんのために動く理由が必要なんですか.mp3",
+                "prompt_text": "あ，私です夏生さんのために動く理由が必要なんですか",
+                "prompt_language": "ja"
+            },            
+            "平静":{
+                "refer_wav_path": "E:/ffmpeg/夏生さんが望むのでしたら.mp3",
+                "prompt_text": "夏生さんが望むのでしたら",
+                "prompt_language": "ja"
+            }
+        }
+        
+        if emotion not in emotion_list:
+            raise ValueError(f"不支持的情感:{emotion}")
+        
+        payload = {
+            "text": test,
+            "text_language": "auto",
+            "top_k": 20,
+            "top_p": 0.6,
+            "temperature": 0.6,
+            "speed": speed,
+            "inp_refs": ["E:/ffmpeg/ああ、なんて高性能なんでしょ、私は.mp3","E:/ffmpeg/あ，私です夏生さんのために動く理由が必要なんですか.mp3",]#辅助音频
+        } | emotion_list[emotion]
+        
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.post(api_url, json=payload) as response:
+                if response.status == 200:
+                    # print("成功获取音频数据")
+                    audio_bytes = await response.read()
+                    audio_relatively = f"TTS_output/output{self.audio_count}.wav"
+                    
+                    if self.audio_count != 10:
+                        self.audio_count += 1
+                    else:
+                        self.audio_count = 1
+                    
+                    with open(f"E:/程序文件/python/ATRI/document/audio/{audio_relatively}", "wb") as f:
+                        f.write(audio_bytes)
+                        
+                    return audio_relatively
+                else:
+                    error_data = await response.json()
+                    # print("TTS请求失败:", error_data)
+                    raise ValueError(f"TTS请求失败{error_data}")
+                    

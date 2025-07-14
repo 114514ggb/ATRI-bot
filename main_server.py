@@ -62,7 +62,7 @@ async def run_websocket_server():
         url=config.network.url, 
         access_token=config.network.access_token
     )
-    
+
     bot = get_bot()#单例问题必须要在WebSocketClient后实例化
      
     await my_client.connect()

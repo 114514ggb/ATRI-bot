@@ -39,7 +39,7 @@ class Basics:
             ) 
             """QQ 发送消息等交互"""
             self.AI_interaction = AI_interaction() 
-            """AI 交互"""
+            """AI功能类"""
             self.exiter_save = graceful_exiter()
             """退出保存"""
             self.MessageCache = MessageCache(

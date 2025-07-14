@@ -61,13 +61,13 @@ class universal_ai_api:
         """修改模型参数"""
         self.model_parameters[parameters] = value
 
-    async def generate_text_tools(self, my_model:str, my_messages:list,response_format= {"type": "text"}):
+    async def generate_text_tools(self, my_model:str, my_messages:list):
         """请求生成文本，全量参数,返回全部内容"""
         payload = json.dumps({
             "model": my_model,
             "messages": my_messages,
             'tools':self.tools,
-            'response_format':response_format,
+            # 'response_format':response_format,
         } | self.model_parameters
         )
 
@@ -107,9 +107,9 @@ class universal_ai_api:
         )
         return response.json()
         
-    async def request_fetch_primary(self, my_messages:list ,my_model = "deepseek-chat",response_format= {"type": "text"}):
+    async def request_fetch_primary(self, my_messages:list ,my_model = "deepseek-chat"):
         """请求生成文本，返回主要内容"""
-        data = await self.generate_text_tools(my_model, my_messages,response_format)
+        data = await self.generate_text_tools(my_model, my_messages)
         # print(data)
         return data['choices'][0]['message']
 

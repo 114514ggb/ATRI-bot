@@ -201,7 +201,7 @@ class textMonitoring():
         "无敌了":[["text",["无敌了!","无敌了"]]],
         "让世界感受痛苦":[["img",["ATRI_地爆天星.jpg"]]],
         "啊这":[["img",["ATRI_没办法给你解释.jpg","ATRI_惊讶.gif","ATRI_眨眼1.gif"]],["text",["啊这?"]]],
-        "我来":[["img",["ATRI_交给我把.gif","ATRI_敬礼.gif"]]],
+        "我来":[["img",["ATRI_交给我把.gif","ATRI_敬礼.gif","ATRI_敬礼2.gif"]]],
         "正确": [["img",["ATRI_正确的.jpg"]]],
         "笑死我了":[["text",["笑死你了？","笑死我了!","我也笑死了"]]],
         # "二次元":[["img",["ATRI_和我一起去二次元.jpg"]]],

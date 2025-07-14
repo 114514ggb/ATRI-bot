@@ -168,12 +168,16 @@ class tool_calls:
 
     #     return {"send_text_message": f"已发送:{message}"}
     
-    async def send_speech_message(self, message, group_ID):
+    async def send_speech_message(self, text,group_ID, emotion="高兴", speed=1):
         """发送语音消息"""
-        url = await self.basics.AI_interaction.speech_synthesis(message)
-        await self.passing_message.send_group_audio(group_ID, url)
+        url = await self.basics.AI_interaction.get_tts_path(
+            text,
+            emotion,
+            speed
+        )
+        await self.passing_message.send_group_audio(group_ID, url,default=True)
 
-        return {"send_speech_message": f"已发送语音内容：{message}"}
+        return {"send_speech_message": f"已发送语音内容：{text}"}
     
     async def send_image_message(self, prompt, group_ID):
         """生成发送图片消息"""
@@ -188,17 +192,25 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "在需要你发语音或是让你说话的时候使用,将文本内容转换为语音消息并进行发送(使用后不会结束工具调用)，支持发送中文、英文、日语，建议使用口语化表达并避免代码等特殊符号",
+            "description": "在需要你发语音或是让你说话的时候使用,将文本内容转换为语音消息并进行发送(使用后不会结束工具调用)，建议使用口语化表达并避免代码等特殊符号",
             "parameters": {            
                 "type": "object",
                 "properties": {
-                    "message": {
+                    "text": {
                         "type": "string",
-                        "description": "需转换为语音的文本内容（支持中文/英文/日语）",
+                        "description": "需转换为语音的文本内容（支持中文/英文/日语/韩文）可以混合语言",
+                    },
+                    "emotion": {
+                        "type": "string",
+                        "description": "音频的情感,默认为高兴,枚举值：高兴,机械,平静",
+                    },
+                    "speed": {
+                        "type": "string",
+                        "description": "语速，取值范围0.6~1.65,默认1",
                     }
                 }
             },
-            "required": ["message"]
+            "required": ["text"]
         }
     },
     # {
@@ -222,13 +234,13 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_image_message",
-            "description": "这是你的画板,图像生成工具，能够根据文字描述自动生成对应的图片，并将生成的图片发送给用户。适用于需要将文本转化为视觉内容的场景。",
+            "description": "这是你的画板,图像生成工具，能够根据文字描述自动生成对应的图片，并将生成的图片发送给用户。适用于需要你绘画的场景。",
             "parameters": {            
                 "type": "object",
                 "properties": {
                     "prompt": {
                         "type": "string",
-                        "description": "需要生成的图片内容",
+                        "description": "需要生成图片的提示词"
                     }
                 }
             },
