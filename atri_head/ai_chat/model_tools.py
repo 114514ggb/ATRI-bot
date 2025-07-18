@@ -192,13 +192,13 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "在需要你发语音或是让你说话的时候使用,将文本内容转换为语音消息并进行发送(使用后不会结束工具调用)，建议使用口语化表达并避免代码等特殊符号",
+            "description": "在需要你发语音或是让你说话的时候使用,将文本内容转换为语音消息并进行发送(使用后不会结束工具调用,建议手动调用tool_calls_end结束)，建议使用口语化表达并避免代码等特殊符号",
             "parameters": {            
                 "type": "object",
                 "properties": {
                     "text": {
                         "type": "string",
-                        "description": "需转换为语音的文本内容（支持中文/英文/日语/韩文）可以混合语言",
+                        "description": "需转换为语音的文本内容（支持中文/英文/日语）可以混合语言",
                     },
                     "emotion": {
                         "type": "string",

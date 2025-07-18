@@ -39,10 +39,10 @@ class emoji_core:
         tags = []
         start = 0
         while True:
-            start = text.find('[', start)
+            start = text.find('<', start)
             if start == -1:
                 break
-            end = text.find(']', start)
+            end = text.find('>', start)
             if end == -1:
                 break
             tag = text[start+1:end].lower()
@@ -87,11 +87,11 @@ class emoji_core:
         
         while i < number:
             char = text[i]
-            if char == '[':
+            if char == '<':
                 start = i + 1  # 记录标签开始位置
                 i += 1
 
-                while i < number and text[i] != ']':
+                while i < number and text[i] != '>':
                     i += 1
                 if i < number:
                     tag_content = text[start:i]

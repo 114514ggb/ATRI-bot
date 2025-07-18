@@ -64,7 +64,7 @@ class AI_interaction():
         """tts文本合成语音
         
         Args:
-            text (str): 需要合成的文本
+            text (str): 需要合成的文本,支持中日英韩，但是目前不要输入韩文
             emotion (str): 音频的情感,枚举值：高兴,机械,平静
             speed (float): 语速，取值范围0.6~1.65,默认1
             
@@ -96,6 +96,9 @@ class AI_interaction():
         
         if emotion not in emotion_list:
             raise ValueError(f"不支持的情感:{emotion}")
+        
+        if len(test) > 100:
+            raise ValueError(f"输入不能超过100个字符,当前有{len(test)}个")
         
         payload = {
             "text": test,

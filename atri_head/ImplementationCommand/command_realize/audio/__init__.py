@@ -31,6 +31,6 @@ command_main = Command_information(
     name="voice",
     aliases=["说话", "say"],
     handler=voice,
-    description="合成指定文字的音频，支持中文,英文,日语,韩文.\n传入-e参数可以指定感情支持高兴,机械,平静,默认高兴",
+    description="合成指定文字的音频，支持中文,英文,日语,韩文.\n传入-e参数可以指定感情,支持高兴,机械,平静\n默认高兴",
     parameter=[[0, 1], [1, 100]]
 )

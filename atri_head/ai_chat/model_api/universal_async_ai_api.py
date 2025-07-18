@@ -77,7 +77,7 @@ class universal_ai_api:
             data=payload,
         )
         
-        # print(response.text)
+        print(response.text)
         return response.json()
 
     async def generate_text_lightweight(self, my_model:str, my_messages:list):

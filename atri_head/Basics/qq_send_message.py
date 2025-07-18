@@ -347,6 +347,23 @@ class QQ_send_message():
         }
 
         return await self.requests_require_return(url=url,payload=payload)
+    
+    async def get_stranger_info(self,qq_id:str)->dict:
+        """获取账号信息
+
+        Args:
+            qq_id (str): qq号
+
+        Returns:
+            dict: 返回账号信息
+        """
+        url = "get_stranger_info"
+
+        payload = {
+            "user_id": qq_id,
+        }
+
+        return await self.requests_require_return(url=url,payload=payload)
 
     async def get_recordg_details(self,
             file:str,
