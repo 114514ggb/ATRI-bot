@@ -128,7 +128,7 @@ class build_prompt:
         return messages
 
     @staticmethod
-    def append_tag_hint(text:str, tag_prompt:str, tag_list:list ,tag_symbol:str = "<值>")->str:
+    def append_tag_hint(text:str, tag_prompt:str, tag_list:list ,tag_symbol:str = "[值]")->str:
         """向原有提示词添加可输出标签提示"""
         text += "<emoji_img>标签枚举值:" + str(tag_list) + \
                 "\n标签作用:" + tag_prompt +\

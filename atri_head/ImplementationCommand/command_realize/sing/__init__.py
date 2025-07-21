@@ -30,7 +30,7 @@ class sing():
             hyphen_argument = argument[0][0]
             if hyphen_argument == "d" and name in self.sing_list:
                 
-                await self.basics.QQ_send_message.send_group_file(group_ID,url_file = "E:/程序文件/python/ATRI/document/audio/sing/"+self.sing_list[name])
+                await self.basics.QQ_send_message.send_group_file(group_ID,url_file = "/mnt/e/程序文件/python/ATRI/document/audio/sing/"+self.sing_list[name])
                 return True
             
             elif argument[1] == []:

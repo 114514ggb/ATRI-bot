@@ -86,10 +86,26 @@ class group_message_processing():
         
     async def receive_event(self, data:dict, group_ID:int, message:str):
         """非at@事件处理"""
+        rouse_word = ["ATRI","atri"]
 
         if  data['user_id'] != data['self_id']: #排除自己发送的消息
 
+            if any(word in message for word in rouse_word):
+                try:
+                    print(f"尝试回复:{message}")
+                    
+                    await self.chat_ai.main(
+                        group_ID, 
+                        data
+                    ) 
+                    return True
+
+                except Exception as e:
+                    await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e))
+                    return False
+                
             await self.textMonitoring.monitoring(message,group_ID,data)
+            #监控
             
             return True
         

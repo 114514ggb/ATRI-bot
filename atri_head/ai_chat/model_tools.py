@@ -5,6 +5,8 @@ from ..Basics import Basics
 from .model_api.universal_async_ai_api import universal_ai_api
 import asyncio
 import importlib.util
+import httpx
+import random
 import os
 import json
 # from pprint import pp
@@ -24,6 +26,7 @@ class tool_calls:
         self.tools_functions_dict_qq = {
             'send_speech_message': self.send_speech_message,
             'send_image_message': self.send_image_message,
+            'send_cloud_music': self.send_cloud_music,
             # 'send_text_message': self.send_text_message,
         }
         self.tools = tools
@@ -177,14 +180,63 @@ class tool_calls:
         )
         await self.passing_message.send_group_audio(group_ID, url,default=True)
 
-        return {"send_speech_message": f"已发送语音内容：{text}"}
+        return {"send_speech_message": f"已发送：{text}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
     
-    async def send_image_message(self, prompt, group_ID):
+    async def send_image_message(self, prompt, group_ID, width="1024", height="1024"):
         """生成发送图片消息"""
-        url = await self.model.generate_image(prompt)
-        await self.passing_message.send_group_pictures(group_ID,url,local_Path_type=False)
+        model = "flux" #flux,kontext,turbo,gptimage
+        Token = "56zs_9uGTfe19hUH"
+        Seed = random.randint(1, 2_147_483_647)
+        
+        # url = await self.model.generate_image(prompt)
+        url = f"https://image.pollinations.ai/prompt/{prompt}?width={width}&height={height}&enhance=true&private=true&Seed={Seed}&Enhance=true&Model={model}&Token={Token}"
+    
+        data = await self.passing_message.send_group_pictures(group_ID,url,local_Path_type=False,get_return=True)
         # print("图片发送成功")
-        return {"send_image_message": "图片成功发送"}
+        return {"send_image_message": {"status":data["status"]}}
+    
+    async def send_cloud_music(self, name:str,group_ID:int|str):
+        """分享网易云歌曲
+
+        Args:
+            name (str): 歌曲名称
+            group_ID (int | str): 群号一般自动传入
+        """
+        async def search_music(keywords, limit=5)->list[dict]:
+            """
+            网易云音乐搜索接口，返回歌曲信息列表
+            
+            Args:
+                :keywords 搜索关键词
+                :limit 返回数量
+                
+            Returns:
+                歌曲名和id
+                [{'name': '冬の花', 'id': 1345485069},...]
+            """
+            url = 'https://music.163.com/api/cloudsearch/pc'
+            data = {'s': keywords, 'type': 1, 'limit': limit}
+            headers = {
+                'User-Agent': 'Mozilla/5.0',
+                'Referer': 'https://music.163.com/'
+            }
+            
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, data=data, headers=headers)
+            data = response.json()
+            # print(data)
+            return [{"name":v["name"],"id":v["id"]}  for v in data['result'].get('songs',[])]
+        
+        if music_lsit := await search_music(name):
+            await self.basics.QQ_send_message.send_group_music(
+                group_ID,
+                "163",
+                str(music_lsit[0]["id"])
+            )
+            
+            return {"send_cloud_music":f"发送歌曲:{music_lsit[0]["name"]},<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
+        else:
+            return {"send_cloud_music":"没有这首歌"}
     
 
 tools = [
@@ -192,7 +244,7 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_speech_message",
-            "description": "在需要你发语音或是让你说话的时候使用,将文本内容转换为语音消息并进行发送(使用后不会结束工具调用,建议手动调用tool_calls_end结束)，建议使用口语化表达并避免代码等特殊符号",
+            "description": "在需要你发语音或是让你说话的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
             "parameters": {            
                 "type": "object",
                 "properties": {
@@ -202,7 +254,7 @@ tools = [
                     },
                     "emotion": {
                         "type": "string",
-                        "description": "音频的情感,默认为高兴,枚举值：高兴,机械,平静",
+                        "description": "音频的情感,默认为高兴,支持的枚举值：高兴,机械,平静",
                     },
                     "speed": {
                         "type": "string",
@@ -234,17 +286,42 @@ tools = [
         "type": "function",
         "function": {
             "name": "send_image_message",
-            "description": "这是你的画板,图像生成工具，能够根据文字描述自动生成对应的图片，并将生成的图片发送给用户。适用于需要你绘画的场景。",
+            "description": "这是你的画板,图像生成工具，能够根据提示词自动生成对应的图片，并将生成的图片发送给用户。适用于需要你绘画的场景。",
             "parameters": {            
                 "type": "object",
                 "properties": {
                     "prompt": {
                         "type": "string",
-                        "description": "需要生成图片的提示词"
-                    }
+                        "description": "需要生成图片的prompt,最好英文"
+                    },
+                    "width": {
+                        "type": "string",
+                        "description": "图像宽度，单位像素,默认1024"
+                    },
+                    "height": {
+                        "type": "string",
+                        "description": "图像高度，单位像素,默认1024"
+                    },
                 }
             },
             "required": ["prompt"]
         }
     },    
+    {
+        "type": "function",
+        "function": {
+            "name": "send_cloud_music",
+            "description": "分享来源网易云的歌曲,有人让你唱歌可以调用这个工具",
+            "parameters": {            
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "歌曲名称",
+                    }
+                }
+            },
+            "required": ["name"]
+        }
+    },
 ]

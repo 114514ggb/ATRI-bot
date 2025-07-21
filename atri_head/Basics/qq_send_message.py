@@ -290,12 +290,13 @@ class QQ_send_message():
         await self.async_send(api_url,payload)
    
 
-    async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True):
+    async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True, get_return = False)->dict|None:
         """发送群图片,默认图片为img_ATRI.png还有可开启默认路径"""
         if default:
             url_img = f"{self.File_root_directory}img/{url_img}"
 
-        await self.group_message_request(group_id,"image",url_img,local_Path_type)
+        return await self.group_message_request(group_id,"image",url_img,local_Path_type,get_return = get_return)
+
 
     async def send_group_audio(self,group_ID,url_audio = "Atri my dear moments.mp3",default = False,local_Path_type = True):
         """发送群语音"""
@@ -411,15 +412,16 @@ class QQ_send_message():
         return await self.requests_require_return(url=url ,payload=payload)
             
         
-    async def group_message_request(self,group_id,type,file_url,Path_type = True)->None:
+    async def group_message_request(self,group_id,type,file_url,Path_type = True, get_return:bool = False)->None:
         """
         发送单个,非文字群消息
-        
+                
         Args:
             group_id:群号
             type:类型
             file_url:文件目录/url
             Path_type:是否是文件
+            get_return:是否返回发送状态
         """
 
         if Path_type:
@@ -439,9 +441,12 @@ class QQ_send_message():
                 }
             ],
         }
+        if get_return:
+            return await self.requests_require_return(url=url,payload = payload)
+        else:
+            await self.async_send(url=url,payload = payload)
+            # self.send(url,payload)
 
-        await self.async_send(url=url,payload = payload)
-        # self.send(url,payload)
 
     async def Send_personal_message(self,qq_id, data,type):
         """发送私聊消息"""

@@ -13,7 +13,7 @@ class itemAction():
         self.listeners = [
             self.poke,
             self.manage_add_group,
-            self.listen_music
+            # self.listen_music
             # self.initiative_chat,
         ]
         """监听器list"""

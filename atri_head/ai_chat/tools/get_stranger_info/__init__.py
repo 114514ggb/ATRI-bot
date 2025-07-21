@@ -30,7 +30,7 @@ def parse_qq_profile(json_data:dict)->dict:
     Returns:
         str: 字典形式的人类可读用户资料      
     """
-    data = json_data.get('data', {})
+    data:dict = json_data.get('data', {})
     
     def format_timestamp(timestamp):
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(timestamp))

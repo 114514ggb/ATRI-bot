@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 
 tool_json = {
     "name" : "http_request_tool",
-    "description": "网页内容提取工具，可以从指定的URL中获取html中的有意义的文本或json内容",
+    "description": "网页内容提取工具，取并返回干净的纯文本内容，移除HTML标签和脚本",
     "properties": {
         "url": {
             "type": "string",
