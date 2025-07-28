@@ -13,7 +13,7 @@ class itemAction():
         self.listeners = [
             self.poke,
             self.manage_add_group,
-            # self.listen_music
+            self.listen_music
             # self.initiative_chat,
         ]
         """监听器list"""
@@ -36,7 +36,7 @@ class itemAction():
                 "揉揉按摩禁止！会痒到炸毛的喵！(//∇//)","喵~请继续！(ฅ´ω`ฅ)","再揉收费了哦！一次50喵！这样就有钱吃小鱼干了",
                 "咕噜咕噜~算你手法合格喵~(=｀ω´=)","肚子不能碰！会踢到你的喵！(╬ Ò﹏Ó)","爪垫是禁区！再摸咬你哦！(｀ε´#)",
                 "喵嗷！再揉就收双倍小鱼干！(￣^￣)ゞ","轻点呀笨蛋！毛要打结啦喵！(>_<)","呼噜...勉强允许揉三分钟喵(´-ω-`)",
-                "喵！偷袭肚子太过分了！(⁄ ⁄•⁄ω⁄•⁄ ⁄)","耳朵敏感啦！停下喵！(,,#ﾟДﾟ)","尾巴毛要掉光啦！赔我罐头喵！(;´༎ຶД༎ຶ`)",
+                "喵！偷袭肚子太过分了！(⁄ ⁄•⁄ω⁄•⁄ ⁄)","耳朵敏感啦！停下喵！(,,#ﾟДﾟ)","尾巴毛要掉光啦！赔我罐头喵！ᯠ  _   ̫  _ ̥ ᯄ ੭",
                 "咕噜...下巴这里...可以多揉揉喵(ฅ>ω<*ฅ)","喵？！谁准你揉头顶王冠的！(╯‵□′)╯︵┻━┻","揉背可以...但别停喵~（眯眼瘫倒）",
                 "爪爪不能捏！要留指甲抓沙发的喵！(๑•̀ㅂ•́)و✧","呜...脖子痒到笑出猪叫喵！(≧∇≦)ﾉ",
                 "再揉就启动喵喵拳了哦！(ง •_•)ง","小鱼干+罐罐=允许揉十分钟喵(♡˙︶˙♡)","喵！肚皮是陷阱！快缩手！(ﾟДﾟ≡ﾟДﾟ)",
@@ -98,11 +98,11 @@ class itemAction():
 
             elif sub_type == 'kick':
                 
-               await self.basics.QQ_send_message.send_group_message(group_ID,f"[CQ:at,qq={user_id}]被管理员{data['operator_id']}踢出群聊！")
+               await self.basics.QQ_send_message.send_group_message(group_ID,f"qq:{user_id}被管理员{data['operator_id']}踢出群聊！")
                
             elif sub_type == 'leave':
                 
-                await self.basics.QQ_send_message.send_group_message(group_ID,f"[CQ:at,qq={user_id}]退出群聊！")
+                await self.basics.QQ_send_message.send_group_message(group_ID,f"qq:{user_id}已离开！")
                 
         return False
     

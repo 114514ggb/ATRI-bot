@@ -271,7 +271,7 @@ class QQ_send_message():
         await self.async_send(api_url,payload)
    
    
-    async def set_group_ban(self,group_id, user_id, duration = 1800):
+    async def set_group_ban(self,group_id:str|int, user_id:str|int, duration:int = 1800):
         """
             禁言群成员\n
             Args:

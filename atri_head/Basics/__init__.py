@@ -10,6 +10,7 @@ from .Command_information import Command as Command_information
 from .exit_save import graceful_exiter
 from .mcp_tool_manager import FuncCall
 from .atri_config import atri_config
+from .AI_connection_manager import AI_connection_manager
 from threading import Lock
 import asyncio
 
@@ -42,6 +43,10 @@ class Basics:
             """AI功能类"""
             self.exiter_save = graceful_exiter()
             """退出保存"""
+            self.AI_supplier_manager = AI_connection_manager(
+                self.config.file_path.supplier_config_path
+            )
+            """ai的api供应商管理"""
             self.MessageCache = MessageCache(
                 self.config.ai_chat.group_max_record,
                 self.config.ai_chat.private_max_record

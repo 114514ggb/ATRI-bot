@@ -13,7 +13,8 @@
     "file_path":{
         "document":"/mnt/e/程序文件/python/ATRI/document/",
         "emoji":"document/img/emojis",
-        "chat_manager":"atri_head/ai_chat/character_setting"
+        "chat_manager":"atri_head/ai_chat/character_setting",
+        "supplier_config_path":"assets/supplier_config.json"
     },
     "model":{
         "connect":
@@ -24,7 +25,7 @@
             "visual_sense":true
         },
         "chat_parameter":{
-            "temperature":0.6,
+            "temperature":0.2,
             "frequency_penalty":2.0,
             "presence_penalty":2.0
         }

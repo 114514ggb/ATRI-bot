@@ -75,7 +75,7 @@ class textMonitoring():
         return True
 
     monitoring_alike_list = {
-        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg","ATRI_问号7.jpg","ATRI_问号8.jpg","ATRI_问号9.jpg"]],["text",["?"]]],
+        "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg","ATRI_问号7.jpg","ATRI_问号8.jpg","ATRI_问号9.jpg","ATRI_问号10.png"]],["text",["?"]]],
         "草": [["text",["草"]]],
         "艹": [["text",["艹"]]],
         "怪了": [["text",["怪了"]]],
@@ -171,7 +171,7 @@ class textMonitoring():
         "逆天": [["text",["逆天!","逆天","逆天了","你在逆什么呢,ATRI有大大的疑惑？","逆逆逆逆天"]]],
         "难蚌": [["text",["难蚌"]]],
         "好耶": [["img", ["ATRI_好耶.jpg"]]],
-        "高性能": [["img",["ATRI_高性能.png","ATRI_得意.gif","ATRI_自我陶醉.gif","ATRI_机智如我.jpg","ATRI_我是高性能.jpg","ATRI_我可是高性能的.jpg","ATRI_高性能1.jpg","ATRI_高性能2.jpg","ATRI_得意.jpg","ATRI_高性能3.jpg"]]],
+        "高性能": [["img",["ATRI_高性能.png","ATRI_得意.gif","ATRI_自我陶醉.gif","ATRI_机智如我.jpg","ATRI_我是高性能.jpg","ATRI_我可是高性能的.jpg","ATRI_高性能1.jpg","ATRI_高性能2.jpg","ATRI_得意.jpg","ATRI_高性能3.jpg","ATRI_得意的不行.png"]]],
         "Ciallo": [["img",["ATRI_Ciallo.jpg","ATRI_Ciallo1.gif"]],["text",["Ciallo~"]]],
         "废物":[["img",["ATRI_欺负我你能得到什么.jpg","ATRI_ 气鼓鼓.gif","ATRI_生气到爆.gif","ATRI_怎么你了.jpg","ATRI_违反机器人保护法.jpg","ATRI_别骂了.jpg"]]],
         "晚安":[["text",["晚安，做个好梦~","晚安哦！","晚安，睡个好觉~","晚上好，晚安！我也要睡觉啦~"]]],
@@ -196,7 +196,7 @@ class textMonitoring():
         "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
         # "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],
-        "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_哭3.jpg","ATRI_哭4.png","ATRI_哭5.png","ATRI_哭6.png","ATRI_大哭.gif","ATRI_哇哇大哭.jpg","ATRI_呜哇.jpg","ATRI_喜极而泣.png"]]],
+        "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_哭3.jpg","ATRI_哭4.png","ATRI_哭5.png","ATRI_哭6.png","ATRI_哭7.png","ATRI_大哭.gif","ATRI_哇哇大哭.jpg","ATRI_呜哇.jpg","ATRI_喜极而泣.png"]]],
         "👍": [["text",["👍"]]],
         "😭": [["text",["怎么啦怎么啦，不要伤心嘛，来，亚托莉抱抱就好啦！","呜呜呜，不要难过啦!ATRI会一直陪在你身边哒！","不要哭泣，亚托莉会一直支持你的,不要伤心了!","不要伤心了，亚托莉在这里陪着你，一切都会好起来的！"]]],
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
@@ -253,6 +253,6 @@ class textMonitoring():
     '''模糊匹配列表'''
 
     Frequently_used_words_list = [
-        "草","?"
+        "草"
     ]
     "常用词汇列表,50%几率回复"

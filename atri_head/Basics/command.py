@@ -107,7 +107,7 @@ class Command(Permissions_management):
             
             elif my_type == "reply":#引用消息
                 reply_data = (await self.send_message.get_msg_details(message["data"]["id"]))["data"]
-                reply_text_parts = ["<quote_message>"]
+                reply_text_parts = ["<reply_message>"]
                 for reply_message in reply_data["message"]:
                     reply_message:Dict[str,str|dict]
                     reply_type:str = reply_message.get("type")
@@ -144,7 +144,7 @@ class Command(Permissions_management):
                     else:
                         reply_text_parts.append(f"[CQ:{reply_type}]")
                         
-                text_parts.append("".join(reply_text_parts)+"</quote_message>")
+                text_parts.append("".join(reply_text_parts)+"</reply_message>")
                     
             
             elif my_type == "at":

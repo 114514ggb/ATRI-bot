@@ -171,7 +171,7 @@ class tool_calls:
 
     #     return {"send_text_message": f"已发送:{message}"}
     
-    async def send_speech_message(self, text,group_ID, emotion="高兴", speed=1):
+    async def send_speech_message(self, text,group_ID, emotion="高兴", speed=0.9):
         """发送语音消息"""
         url = await self.basics.AI_interaction.get_tts_path(
             text,
@@ -234,7 +234,7 @@ class tool_calls:
                 str(music_lsit[0]["id"])
             )
             
-            return {"send_cloud_music":f"发送歌曲:{music_lsit[0]["name"]},<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
+            return {"send_cloud_music":f"已发送:{music_lsit[0]["name"]}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
         else:
             return {"send_cloud_music":"没有这首歌"}
     
