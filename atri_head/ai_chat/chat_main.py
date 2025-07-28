@@ -2,6 +2,8 @@ from .prepare_model_prompt import build_prompt
 from .model_tools import tool_calls
 from .emoji_system import emoji_core
 from atri_head.Basics import Command
+from .model_api.universal_async_ai_api import universal_ai_api
+from .model_api.bigModel_api import async_bigModel_api
 
 from typing import List
 import contextvars
@@ -26,8 +28,10 @@ class Chat_processing:
         if not hasattr(self, "_initialized"):
             self.tool_calls = tool_calls()#模型调用工具
             
-            self.model = self.tool_calls.model #免费打工的api
-            self.chat_request = self.tool_calls.chat_request
+            self.supplier_manager = self.tool_calls.basics.AI_supplier_manager
+            """模型供应商"""
+            self.big_model:async_bigModel_api = self.supplier_manager.get_filtration_connection(supplier_name="bigModel")[0] #备用的api
+            self.chat_request:universal_ai_api = self.supplier_manager.get_filtration_connection(supplier_name=self.tool_calls.basics.config.model.connect.supplier)[0]
             self.ai_chat_manager = self.tool_calls.basics.ai_chat_manager
             self.chat_model = self.tool_calls.basics.config.model.connect.model_name
             """聊天模型name"""
@@ -132,7 +136,7 @@ class Chat_processing:
                     
                     # print("工具",function)
 
-                    tool_output = await self.tool_calls.calls(tool_name,tool_input,group_ID)
+                    tool_output = (await self.tool_calls.calls(tool_name,tool_input,group_ID)).content
 
                 except Exception as e:
                     text = "\n调用工具发生错误。\nErrors:"+str(e)
@@ -176,7 +180,7 @@ class Chat_processing:
         try:
 
             descriptions = await asyncio.gather(*[
-                self.model.get_image_recognition(url, file_path=False)
+                self.big_model.get_image_recognition(url, file_path=False)
                 for url in image_urls[:5]
             ])
             
@@ -224,7 +228,7 @@ class Chat_processing:
                 await asyncio.sleep(MESSAGE_DELAY)
                 await self.tool_calls.passing_message.send_group_message(group_ID, message)
             
-        for tag in emoji_tags[:1]:
+        for tag in emoji_tags:
             #发送表情,防止过多只支持一个
             await asyncio.sleep(MESSAGE_DELAY)
             await self.tool_calls.passing_message.send_group_pictures(
@@ -267,7 +271,7 @@ class Chat_processing:
         
         emoji_prompt = build_prompt.append_tag_hint(
             "",
-            "(可选)在输出中加入一个带有枚举值之一标签，标签会解析成对应分类的表情包，一次回复标签最好不超过一个,user看不到这些标签",
+            "在输出中加入一个带有枚举值之一标签(可自由选择是否加入)，标签会解析成对应分类的表情包，一次回复标签不能超过一个,标签解析后消失user看不到",
             list(self.emoji_system.emoji_file_dict.keys())
         )
         #发表情提示词
@@ -327,16 +331,16 @@ class Chat_processing:
     async def get_chat_json(self)->str:
         """获取api返回的响应json,如果出错了会使用备用api,都失败会抛出错误"""
         
-        self.chat_request.tools = self.tool_calls.get_all_tools_json()
+        tools = self.tool_calls.get_all_tools_json()
         #重新获取工具
         # print(self.messages + self.temporary_messages)
         # print(self.chat_request.tools)
         # print(self.chat_model)
         
-        
         try:
             assistant_message = await self.chat_request.request_fetch_primary(
                 my_messages = self.messages + self.temporary_messages,
+                tools = tools,
                 my_model = self.chat_model
             )
             # print(assistant_message)
@@ -345,17 +349,16 @@ class Chat_processing:
             print(f"上下文历史：{self.messages + self.temporary_messages}")
             print(f"工具历史:{self.chat_request.tools}")
             try:
-                assistant_message = await self.model.generate_text(
+                assistant_message = await self.big_model.generate_text(
                     "GLM-4-Flash-250414",
                     messages = self.messages + self.temporary_messages,
-                    tools = self.chat_request.tools
+                    tools = tools
                 )
             except Exception as fallback_e:
                 print(f"备用方法也失败: {str(fallback_e)}")
                 raise ValueError("主API调用失败,并且备用方法也失败,这一定是openAI干的!")
                 
         return assistant_message
-
 
     @property
     def messages(self) -> List[dict]:

@@ -6,7 +6,7 @@ tool_json = {
     "properties": {
         "location": {
             "type": "string",
-            "description": "地名（如北京,武汉）,支持中英等多国语言地名,如果为空就是本机ip所在的地址",
+            "description": "地名（如北京,武汉）,支持中英等多国语言地名,如果为空就是本地地址的天气",
         }
     }
 }

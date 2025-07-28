@@ -2,7 +2,6 @@ from ..Basics.qq_send_message import QQ_send_message
 from .model_api.bigModel_api import async_bigModel_api
 # from .model_api.async_open_ai_api import async_openAI
 from ..Basics import Basics
-from .model_api.universal_async_ai_api import universal_ai_api
 import asyncio
 import importlib.util
 import httpx
@@ -37,20 +36,10 @@ class tool_calls:
         self.mcp_tool.mcp_service_queue.put_nowait({"type": "init"})#初始化所有MCP客户端
         self.load_additional_tools()
         
-        #ai_api
-        self.model = async_bigModel_api()
-        self.chat_request = universal_ai_api(
-            self.basics.config.model.connect.api_key,
-            self.basics.config.model.connect.base_url
+        self.basics.AI_supplier_manager.add_connection(
+            name = "bigModel",
+            connection_object = async_bigModel_api()
         )
-        self.chat_request.model_parameters |= dict(self.basics.config.model.chat_parameter)
-        
-    
-        # self.chat_request = async_openAI(
-        #     api_key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4",
-        #     base_url = "https://aihubmix.com/v1",
-        # )
-        
 
 
     async def calls(self, tool_name, arguments_str, group_ID):

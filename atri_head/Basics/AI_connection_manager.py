@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Union
+from typing import Dict
 from atri_head.ai_chat.model_api.universal_async_ai_api import universal_ai_api
 import json
 
@@ -68,7 +68,7 @@ class AI_connection_manager:
                 except (ValueError, TypeError) as e:
                     print(f"初始化 {api_config.get('name', '未知API')} 连接失败: {e}")
                     
-            print("供应商连接已完成！")
+            print("供应商连接已完成！\n")
                 
         except (FileNotFoundError, json.JSONDecodeError, KeyError) as e:
             print(f"初始化连接失败: {e}")
@@ -120,7 +120,7 @@ class AI_connection_manager:
         self,
         supplier_name: str = "",
         model_name: str = ""
-    ) -> List[Union[universal_ai_api, None]]:
+    ) -> list[universal_ai_api]:
         """返回筛选的供应商,可根据model_name或supplier_name来筛选
 
         Args:

@@ -16,11 +16,10 @@
         "chat_manager":"atri_head/ai_chat/character_setting",
         "supplier_config_path":"assets/supplier_config.json"
     },
-    "model":{
+    "model":{ 
         "connect":
         {
-            "base_url":"https://api.kourichat.com/v1/chat/completions",
-            "api_key":"sk-gTimJsqOxEZZI1b8o9YqMI9Pr3URiEN4Icj1Q2Ph895TXME1",
+            "supplier":"kourichat",
             "model_name":"gemini-2.5-flash-05-20",
             "visual_sense":true
         },

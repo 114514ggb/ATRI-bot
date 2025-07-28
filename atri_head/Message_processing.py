@@ -80,7 +80,7 @@ class group_message_processing():
                 return True
 
             except Exception as e:
-                await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"建议联系管理员:2631018780")
+                await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"\n请务必联系管理员:2631018780,fuck什么玄学bug还没好！")
                 return False
 
         
@@ -101,7 +101,7 @@ class group_message_processing():
                     return True
 
                 except Exception as e:
-                    await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"建议联系管理员:2631018780")
+                    await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"\n请务必联系管理员:2631018780,fuck什么玄学bug还没好！")
                     return False
                 
             await self.textMonitoring.monitoring(message,group_ID,data)

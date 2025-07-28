@@ -90,12 +90,12 @@ class universal_ai_api:
                     raise  e
                 await asyncio.sleep(retry_delay)
     
-    async def generate_text_tools(self, my_model:str, my_messages:list):
+    async def generate_text_tools(self, my_model:str, my_messages:list,tools:list):
         """请求生成文本，全量默认参数,返回全部内容"""
         payload = json.dumps({
             "model": my_model,
             "messages": my_messages,
-            'tools':self.tools,
+            'tools':tools,
             # 'response_format':response_format,
         } | self.model_parameters
         )
@@ -121,9 +121,9 @@ class universal_ai_api:
     
 
         
-    async def request_fetch_primary(self, my_messages:list ,my_model = "deepseek-chat"):
+    async def request_fetch_primary(self, my_messages:list ,tools:list, my_model:str):
         """请求生成文本，返回主要内容"""
-        data = await self.generate_text_tools(my_model, my_messages)
+        data = await self.generate_text_tools(my_model, my_messages, tools)
         # print(data)
         return data['choices'][0]['message']
 
