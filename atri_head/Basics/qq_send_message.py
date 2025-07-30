@@ -314,28 +314,20 @@ class QQ_send_message():
 
     async def send_group_file(self,group_ID,url_file = "ATRI的文件.txt",default = False,local_Path_type = True):
         """发送群文件"""
-        if default: 
-            url_file = f"{self.File_root_directory}file/{url_file}"
-            
-        Path_type = ""
-
-        if local_Path_type:
-            Path_type = "file://"
-            
-
         url = "send_group_msg"
-        payload ={
+        
+        payload = {
             "group_id": group_ID,
             "message": [
                 {
                     "type": "file",
                     "data": {
-                    "file": Path_type+url_file
+                        "file": f"{'file://' if local_Path_type else ''}{f"{self.File_root_directory}file/{url_file}" if default else url_file}"
                     }
                 }
             ],
         }
-        
+                
         await self.async_send(url=url,payload=payload)
         # self.send(url,payload)
 
@@ -377,7 +369,7 @@ class QQ_send_message():
 
         Args:
             file (str): 文件路径。
-            file_id (str): 文件ID，用于标识不同的语音记录。
+            file_id (str): 文件ID,用于标识不同的语音记录。
             out_format (str, optional): 输出格式。支持的枚举值有'mp3', 'amr', 'wma',
                 'm4a', 'spx', 'ogg', 'wav', 'flac'。默认值为'mp3'。
         """
@@ -424,11 +416,6 @@ class QQ_send_message():
             get_return:是否返回发送状态
         """
 
-        if Path_type:
-            Path_type = "file://"
-        else:
-            Path_type = ""
-
         url = "send_group_msg"
         payload ={
             "group_id": group_id,
@@ -436,7 +423,7 @@ class QQ_send_message():
                 {
                     "type": type,
                     "data": {
-                    "file": Path_type+file_url
+                    "file": "file://"+file_url if Path_type else file_url
                     }
                 }
             ],
@@ -471,18 +458,14 @@ class QQ_send_message():
 
     async def send_personal_pictures(self,qq_id,url_img = "img_ATRI.png",default = False):
         """发送私聊图片,默认图片为img_ATRI.png还有可开启默认路径"""
-        if default:
-            url_img = f"{self.File_root_directory}img/{url_img}"
 
-        data = {"file": "file://"+url_img}
+        data = {"file": "file://"+f"{self.File_root_directory}img/{url_img}" if default else url_img}
 
         await self.Send_personal_message(qq_id,data,"image")
 
     async def send_personal_audio(self,qq_id,url_audio = "Atri my dear moments.mp3",default = False):
         """发送私聊语音"""
-        if default: 
-            url_audio = f"{self.File_root_directory}audio/{url_audio}"
 
-        data = {"file": "file://"+url_audio}
+        data = {"file": "file://"+ f"{self.File_root_directory}audio/{url_audio}" if default else url_audio}
 
         await self.Send_personal_message(qq_id,data,"record")

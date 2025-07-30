@@ -58,7 +58,7 @@ class tool_calls:
                 print(f"工具函数未实现: {e}")
         elif func_tool := self.mcp_tool.get_func(tool_name):
             #MCP工具的调用
-            return await func_tool.execute(**json.loads(arguments_str))
+            return (await func_tool.execute(**json.loads(arguments_str))).content
         else:
             raise Exception(f"Request function {tool_name} not found.")
 

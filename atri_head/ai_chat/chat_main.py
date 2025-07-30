@@ -136,7 +136,7 @@ class Chat_processing:
                     
                     # print("工具",function)
 
-                    tool_output = (await self.tool_calls.calls(tool_name,tool_input,group_ID)).content
+                    tool_output = await self.tool_calls.calls(tool_name,tool_input,group_ID)
 
                 except Exception as e:
                     text = "\n调用工具发生错误。\nErrors:"+str(e)
@@ -207,7 +207,7 @@ class Chat_processing:
         MESSAGE_DELIMITER = "$" #分隔符
 
         if not (chat_text := chat_text.strip()):
-            return
+            return 
             
         (processed_text, emoji_tags) = emoji_core.process_text_and_emotion_tags(
             chat_text, self.emoji_system.emoji_file_dict
@@ -228,7 +228,7 @@ class Chat_processing:
                 await asyncio.sleep(MESSAGE_DELAY)
                 await self.tool_calls.passing_message.send_group_message(group_ID, message)
             
-        for tag in emoji_tags:
+        for tag in emoji_tags[:1]:
             #发送表情,防止过多只支持一个
             await asyncio.sleep(MESSAGE_DELAY)
             await self.tool_calls.passing_message.send_group_pictures(
