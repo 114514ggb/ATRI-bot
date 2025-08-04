@@ -74,6 +74,8 @@ class AI_interaction():
         Returns:
             str: 返回wav文件的相对路径
         """
+        # raise ValueError("语音因为资源分配问题暂时被关了,不要再尝试使用")
+        
         api_url = "http://127.0.0.1:9880"
         
         emotion_list = {

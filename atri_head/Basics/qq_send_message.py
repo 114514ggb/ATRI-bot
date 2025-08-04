@@ -91,7 +91,7 @@ class QQ_send_message():
             return await self.websocketClient.gain_echo(request_id)
 
 
-    async def send_group_message(self,group_id: int, message):
+    async def send_group_message(self,group_id: int, message:str|list):
         """
             发送群聊文字消息\n
             message可以是str也可以是包含混合消息的list,str会解析CQ码

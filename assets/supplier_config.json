@@ -44,6 +44,25 @@
                     "visual_sense":true
                 }
             ]
+        },
+        {
+            "name":"ollama",
+            "base_url":"http://localhost:11434/v1/",
+            "api_key":"sk-114514",
+            "models":[
+                {
+                    "name":"dengcao/Qwen3-Embedding-0.6B:F16",
+                    "visual_sense":false
+                },
+                {
+                    "name":"dengcao/Qwen3-Reranker-8B:Q4_K_M",
+                    "visual_sense":false
+                },
+                {
+                    "name":"gemma3:27b",
+                    "visual_sense":true
+                }
+            ]
         }
     ]
 }

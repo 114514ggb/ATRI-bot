@@ -109,6 +109,9 @@ class bigModel_api:
 
 
 class async_bigModel_api():
+    chat_model = "GLM-4.5-Flash"
+    chat_model = "GLM-4.1V-Thinking-Flash"
+    
     
     def __init__(self):
         self.client = universal_ai_api(
@@ -164,7 +167,7 @@ class async_bigModel_api():
             ]
         }]
 
-        return_dict = await self.client.generate_text_lightweight("GLM-4V-Flash", temporary_message)
+        return_dict = await self.client.generate_text_lightweight("GLM-4.1V-Thinking-Flash", temporary_message)
         
         try:
             return return_dict['choices'][0]['message']['content']
@@ -175,7 +178,7 @@ class async_bigModel_api():
     
     async def generate_image(self, 
             prompt:str, 
-            model:str = "CogView-3-Flash",
+            model:str = "Cogview-3-Flash",
             quality:str = "standard",
             size:str = "1440x1440"
         )->str:

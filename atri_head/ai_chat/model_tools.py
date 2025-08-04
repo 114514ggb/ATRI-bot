@@ -28,7 +28,7 @@ class tool_calls:
             'send_cloud_music': self.send_cloud_music,
             # 'send_text_message': self.send_text_message,
         }
-        self.tools = tools
+        self.tools = TOOLS
         
         #tool
         self.mcp_service_queue = asyncio.Queue()
@@ -58,7 +58,7 @@ class tool_calls:
                 print(f"工具函数未实现: {e}")
         elif func_tool := self.mcp_tool.get_func(tool_name):
             #MCP工具的调用
-            return (await func_tool.execute(**json.loads(arguments_str))).content
+            return await func_tool.execute(**json.loads(arguments_str))
         else:
             raise Exception(f"Request function {tool_name} not found.")
 
@@ -128,7 +128,7 @@ class tool_calls:
 
     def get_all_tools_json(self)->list:
         """获取默认的全部工具json"""
-        return tools + self.mcp_tool.get_func_desc_openai_style()
+        return TOOLS + self.mcp_tool.get_func_desc_openai_style()
 
 
     def generate_integrity_tools_json(self, tool_json:dict):
@@ -182,7 +182,7 @@ class tool_calls:
     
         data = await self.passing_message.send_group_pictures(group_ID,url,local_Path_type=False,get_return=True)
         # print("图片发送成功")
-        return {"send_image_message": {"status":data["status"]}}
+        return {"send_image_message": {"status":"生成图片成功<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}}
     
     async def send_cloud_music(self, name:str,group_ID:int|str):
         """分享网易云歌曲
@@ -228,7 +228,7 @@ class tool_calls:
             return {"send_cloud_music":"没有这首歌"}
     
 
-tools = [
+TOOLS = [
     {
         "type": "function",
         "function": {

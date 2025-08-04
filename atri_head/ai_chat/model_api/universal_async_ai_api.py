@@ -118,12 +118,19 @@ class universal_ai_api:
         }|remainder)
         
         return await self._client_post(payload)
-    
-
         
     async def request_fetch_primary(self, my_messages:list ,tools:list, my_model:str):
         """请求生成文本，返回主要内容"""
-        data = await self.generate_text_tools(my_model, my_messages, tools)
-        # print(data)
-        return data['choices'][0]['message']
+        max_retries = 3
+        retry_delay = 0.5
+        for attempt in range(max_retries):
+            try:
+                data = await self.generate_text_tools(my_model, my_messages, tools)
+                # print(data)
+                return data['choices'][0]['message']
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise  e
+                await asyncio.sleep(retry_delay)
+        
 

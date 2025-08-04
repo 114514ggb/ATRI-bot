@@ -138,7 +138,7 @@ class emoji_core:
                 if remaining_text := text[add_start:]:
                     segments.append({
                         'type': 'text',
-                        'data': {'text': remaining_text}
+                        'data': {'text': remaining_text.strip()}
                     })
                 break
             
@@ -150,7 +150,7 @@ class emoji_core:
                 if remaining_text := text[add_start:]:
                     segments.append({
                         'type': 'text',
-                        'data': {'text': remaining_text}
+                        'data': {'text': remaining_text.strip()}
                     })
                 break
             
@@ -163,13 +163,13 @@ class emoji_core:
                 if before_text := text[add_start:bracket_start]:
                     segments.append({
                         'type': 'text',
-                        'data': {'text': before_text}
+                        'data': {'text': before_text.strip()}
                     })
                 
                 # 添加表情图片
                 segments.append({
                     "type": "image",
-                    "data": {"file": f"file:///mnt/e/程序文件/python/ATRI/document/img/emojis/{tag_content}/{tag_content}"}
+                    "data": {"file": f"file:///mnt/e/程序文件/python/ATRI/document/img/emojis/{tag_content}/{self.get_random_emoji_name(tag_content)}"}
                 })
                 
                 # 更新位置
@@ -179,7 +179,83 @@ class emoji_core:
                 start_pos = bracket_start + 1
         
         return segments
-        
+
+    def parse_text_with_emotion_tags_separator(self, text: str, emoji_dict: dict, separator:str) -> list:
+            """
+            解析文本并提取表情标签，保留原始位置信息，直接生成结构化输出
+            
+            Args:
+                text: 要处理的字符串
+                emoji_dict: 表情标签字典
+
+            Returns:
+                list: 结构化数据列表，包含文本和图片元素
+            """
+            if not text:
+                    return []
+            
+            if '[' not in text:
+                return [{'type': 'text', 'data': {'text': text}}]
+            
+            emoji_set = set(emoji_dict)
+            segments = []
+            start_pos = 0
+            add_start = 0
+            text_len = len(text)
+            
+            def append_separator_text(separator_text:str):
+                if separator in separator_text:
+                    for text_ in separator_text.split(separator):
+                        segments.append({
+                            'type': 'text',
+                            'data': {'text': text_.strip()}
+                        })
+                else:
+                    segments.append({
+                        'type': 'text',
+                        'data': {'text': separator_text.strip()}
+                    })
+            
+            while start_pos < text_len:
+                bracket_start = text.find('[', start_pos)
+                
+                if bracket_start == -1:
+                    # 添加剩余文本
+                    if remaining_text := text[add_start:]:
+                        append_separator_text(remaining_text)
+                    break
+                
+                # 查找对应的 ']'
+                bracket_end = text.find(']', bracket_start + 1)
+                
+                if bracket_end == -1:
+                    # 没有 ']'，剩余部分作为文本
+                    if remaining_text := text[add_start:]:
+                        append_separator_text(remaining_text)
+                    break
+                
+                # 提取标签内容
+                tag_content = text[bracket_start + 1:bracket_end]
+                
+                # 检查标签是否有效（非空且在字典中）
+                if tag_content and tag_content in emoji_set:
+                    # 添加标签前的文本
+                    if before_text := text[add_start:bracket_start]:
+                        append_separator_text(before_text)
+                    # 添加表情图片
+                    segments.append({
+                        "type": "image",
+                        "data": {"file": f"file:///mnt/e/程序文件/python/ATRI/document/img/emojis/{tag_content}/{self.get_random_emoji_name(tag_content)}"}
+                    })
+                    
+                    # 更新位置
+                    add_start = start_pos = bracket_end + 1
+                else:
+                    # 无效标签，从下一个字符继续查找
+                    start_pos = bracket_start + 1
+            
+            return segments
+    
     def _levenshtein_distance(self, s1: str, s2: str) -> int:
         """计算两个字符串的编辑距离
 
@@ -213,8 +289,7 @@ class emoji_record:
     """表情数据容器"""
     pass
     
-if __name__ == "__main__":
-    pass
+# if __name__ == "__main__":
     # ec = emoji_core()
     # ec.init_emoji_catalogue("E:/程序文件/python/ATRI/document/img/emojis")
     # print(emoji_core.process_text_and_emotion_tags("[happy]qweqweqewqe",ec.emoji_file_dict))

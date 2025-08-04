@@ -32,6 +32,8 @@ class Chat_processing:
             """模型供应商"""
             self.big_model:async_bigModel_api = self.supplier_manager.get_filtration_connection(supplier_name="bigModel")[0] #备用的api
             self.chat_request:universal_ai_api = self.supplier_manager.get_filtration_connection(supplier_name=self.tool_calls.basics.config.model.connect.supplier)[0]
+            self.chat_request.model_parameters |= self.tool_calls.basics.config.model.chat_parameter #更新参数
+            
             self.ai_chat_manager = self.tool_calls.basics.ai_chat_manager
             self.chat_model = self.tool_calls.basics.config.model.connect.model_name
             """聊天模型name"""
@@ -203,39 +205,45 @@ class Chat_processing:
         message_id: int,
     ) -> None:
         """发送群文本消息，支持多段分割和表情标签。"""
-        MESSAGE_DELAY = 1 #多条消息间隔时间
+        MESSAGE_DELAY = 0.8 #多条消息间隔时间
         MESSAGE_DELIMITER = "$" #分隔符
 
         if not (chat_text := chat_text.strip()):
             return 
-            
-        (processed_text, emoji_tags) = emoji_core.process_text_and_emotion_tags(
-            chat_text, self.emoji_system.emoji_file_dict
-        )#提取标签
         
-        if processed_text:
-            #发送文本
-            processed_text:str
-            messages = [
-                message 
-                for msg in processed_text.split(MESSAGE_DELIMITER) 
-                if (message:= msg.strip())
-            ]
-            
-            await self.tool_calls.passing_message.send_group_message(group_ID, f"[CQ:reply,id={message_id}]{messages[0]}")
-            
-            for message in messages[1:]:
-                await asyncio.sleep(MESSAGE_DELAY)
-                await self.tool_calls.passing_message.send_group_message(group_ID, message)
-            
-        for tag in emoji_tags[:1]:
-            #发送表情,防止过多只支持一个
-            await asyncio.sleep(MESSAGE_DELAY)
-            await self.tool_calls.passing_message.send_group_pictures(
-                group_ID,
-                f"emojis/{tag}/{self.emoji_system.get_random_emoji_name(tag)}",
-                default = True
+        if len(chat_text) <= 125 or MESSAGE_DELIMITER in chat_text:
+            #分条发送
+            messages_list = self.emoji_system.parse_text_with_emotion_tags_separator(
+                text = chat_text, 
+                emoji_dict = self.emoji_system.emoji_file_dict, 
+                separator = MESSAGE_DELIMITER
             )
+            # [CQ:reply,id={message_id}]
+            for message in messages_list:
+                await self.tool_calls.passing_message.send_group_message(
+                    group_ID,
+                    [message]
+                )
+                await asyncio.sleep(MESSAGE_DELAY)
+        else:
+            #合并发送完
+            messages_list = self.emoji_system.parse_text_with_emotion_tags(
+                chat_text, 
+                self.emoji_system.emoji_file_dict
+            )
+            await self.tool_calls.passing_message.send_group_message(
+                group_ID,
+                [
+                    {
+                    "type": "reply",
+                    "data": {
+                        "id": message_id
+                        }
+                    },
+                    *messages_list
+                ]
+            )
+
                 
 
     async def get_group_chat(self,group_id:str)->None:
@@ -271,7 +279,7 @@ class Chat_processing:
         
         emoji_prompt = build_prompt.append_tag_hint(
             "",
-            "在输出中加入一个带有枚举值之一标签(可自由选择是否加入)，标签会解析成对应分类的表情包，一次回复标签不能超过一个,标签解析后消失user看不到",
+            "在输出中加入带有枚举值之一标签(可自由选择是否加入)，标签会解析成对应分类的表情包，标签不要超过1个,标签解析后消失user看不到",
             list(self.emoji_system.emoji_file_dict.keys())
         )
         #发表情提示词
@@ -336,22 +344,22 @@ class Chat_processing:
         # print(self.messages + self.temporary_messages)
         # print(self.chat_request.tools)
         # print(self.chat_model)
-        
+        my_messages = list(self.messages + self.temporary_messages)
         try:
             assistant_message = await self.chat_request.request_fetch_primary(
-                my_messages = self.messages + self.temporary_messages,
+                my_messages = my_messages,
                 tools = tools,
                 my_model = self.chat_model
             )
             # print(assistant_message)
         except Exception as e:
             print(f"主API调用失败，尝试备用方法。错误: {str(e)}")
-            print(f"上下文历史：{self.messages + self.temporary_messages}")
-            print(f"工具历史:{self.chat_request.tools}")
+            print(f"上下文历史：{self.messages + self.temporary_messages}\n\n")
+            print(f"工具历史:{tools}\n\n")
             try:
                 assistant_message = await self.big_model.generate_text(
-                    "GLM-4-Flash-250414",
-                    messages = self.messages + self.temporary_messages,
+                    "GLM-4.5-Flash",
+                    messages = my_messages,
                     tools = tools
                 )
             except Exception as fallback_e:
