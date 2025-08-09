@@ -82,6 +82,7 @@ class emoji_core:
         """
         tags_list = []
         result_chars = []
+        emoji_set = set(emoji_dict)
         i = 0
         number = len(text)
         
@@ -95,7 +96,7 @@ class emoji_core:
                     i += 1
                 if i < number:
                     tag_content = text[start:i]
-                    if tag_content in emoji_dict:
+                    if tag_content in emoji_set:
                         tags_list.append(tag_content)
                         i += 1
                         continue  # 跳过添加标签内容到结果
@@ -187,15 +188,13 @@ class emoji_core:
             Args:
                 text: 要处理的字符串
                 emoji_dict: 表情标签字典
+                separator: 分隔符
 
             Returns:
                 list: 结构化数据列表，包含文本和图片元素
             """
             if not text:
                     return []
-            
-            if '[' not in text:
-                return [{'type': 'text', 'data': {'text': text}}]
             
             emoji_set = set(emoji_dict)
             segments = []

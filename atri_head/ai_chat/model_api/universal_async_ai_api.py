@@ -56,7 +56,7 @@ class universal_ai_api:
         self.tools = tools
         """模型可能会调用的 tool 的列表。最多支持 128 个 function。"""
         self.client = httpx.AsyncClient(
-            timeout=httpx.Timeout(1800.0),
+            timeout=httpx.Timeout(120.0),
             limits=httpx.Limits(
                 max_connections=100,
                 max_keepalive_connections=5, 
@@ -118,19 +118,33 @@ class universal_ai_api:
         }|remainder)
         
         return await self._client_post(payload)
+    
+    async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024)->dict:
+        """异步调用指定的嵌入模型，将输入的文本转换为向量表示。
+
+        Args:
+            model (str): 要使用的嵌入模型的编码
+            input (Union[str, List[str]]): 需要进行向量化的文本内容。可以是单个字符串，或一个字符串列表。
+            dimensions (int): 输出向量的维度。默认为 1024
+
+        Returns:
+            dict: _description_
+        """
+        payload = json.dumps({
+            "model": model,
+            "input":input,
+            "dimensions":dimensions
+        })
+        
+        return await self._client_post(payload)
         
     async def request_fetch_primary(self, my_messages:list ,tools:list, my_model:str):
         """请求生成文本，返回主要内容"""
-        max_retries = 3
-        retry_delay = 0.5
-        for attempt in range(max_retries):
-            try:
-                data = await self.generate_text_tools(my_model, my_messages, tools)
-                # print(data)
-                return data['choices'][0]['message']
-            except Exception as e:
-                if attempt == max_retries - 1:
-                    raise  e
-                await asyncio.sleep(retry_delay)
-        
+        data = await self.generate_text_tools(my_model, my_messages, tools)
+        # print(data)
+        try:
+            return data['choices'][0]['message']
+        except EOFError:
+            raise ValueError(data)
+
 

@@ -9,7 +9,8 @@ dependencies = [
     "jieba>=0.42.1",
     "mcp>=1.12.2",
     "openai>=1.82.0",
-    "pymilvus>=2.5.14",
+    "pymilvus==2.6.0",
+    "fastapi>=0.115.12",
 ]
 
 [tool.uv.workspace]
@@ -18,5 +19,5 @@ members = [
 ]
 
 [[tool.uv.index]]
-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+url = "https://mirrors.aliyun.com/pypi/simple/"
 default = true

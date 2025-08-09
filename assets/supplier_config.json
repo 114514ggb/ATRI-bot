@@ -21,7 +21,11 @@
             "api_key":"sk-gTimJsqOxEZZI1b8o9YqMI9Pr3URiEN4Icj1Q2Ph895TXME1",
             "models":[
                 {
-                    "name":"gemini-2.5-flash-05-20",
+                    "name":"gemini-2.5-flash",
+                    "visual_sense":true
+                },
+                {
+                    "name":"gemini-2.5-flash-lite",
                     "visual_sense":true
                 },
                 {

@@ -20,7 +20,7 @@
         "connect":
         {
             "supplier":"kourichat",
-            "model_name":"gemini-2.5-flash-05-20",
+            "model_name":"gemini-2.5-flash",
             "visual_sense":true
         },
         "chat_parameter":{

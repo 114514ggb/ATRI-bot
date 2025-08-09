@@ -173,16 +173,17 @@ class tool_calls:
     
     async def send_image_message(self, prompt, group_ID, width="1024", height="1024"):
         """生成发送图片消息"""
-        model = "flux" #flux,kontext,turbo,gptimage
+        model = "gptimage" #flux,kontext,turbo,gptimage
         Token = "56zs_9uGTfe19hUH"
         Seed = random.randint(1, 2_147_483_647)
         
         # url = await self.model.generate_image(prompt)
-        url = f"https://image.pollinations.ai/prompt/{prompt}?width={width}&height={height}&enhance=true&private=true&Seed={Seed}&Enhance=true&Model={model}&Token={Token}"
+        #&enhance=true
+        url = f"https://image.pollinations.ai/prompt/{prompt}?width={width}&height={height}&private=true&Seed={Seed}&Model={model}&Token={Token}"
     
         data = await self.passing_message.send_group_pictures(group_ID,url,local_Path_type=False,get_return=True)
         # print("图片发送成功")
-        return {"send_image_message": {"status":"生成图片成功<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}}
+        return {"send_image_message": {"status":f"{data}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}}
     
     async def send_cloud_music(self, name:str,group_ID:int|str):
         """分享网易云歌曲
@@ -281,7 +282,7 @@ TOOLS = [
                 "properties": {
                     "prompt": {
                         "type": "string",
-                        "description": "需要生成图片的prompt,最好英文"
+                        "description": "需要生成图片的prompt,只能是英文"
                     },
                     "width": {
                         "type": "string",

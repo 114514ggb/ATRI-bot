@@ -109,8 +109,8 @@ class bigModel_api:
 
 
 class async_bigModel_api():
-    chat_model = "GLM-4.5-Flash"
-    chat_model = "GLM-4.1V-Thinking-Flash"
+    # chat_model = "GLM-4.5-Flash"
+    # chat_model = "GLM-4.1V-Thinking-Flash"
     
     
     def __init__(self):
@@ -129,7 +129,7 @@ class async_bigModel_api():
             tools = [None]
         )->dict:
         """请求文本聊天,返回message字典"""
-        return_dict = await self.client_image.generate_json_ample(
+        return_dict = await self.client.generate_json_ample(
             model,
             {
                 "messages": messages,

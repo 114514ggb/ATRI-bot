@@ -211,7 +211,7 @@ class Chat_processing:
         if not (chat_text := chat_text.strip()):
             return 
         
-        if len(chat_text) <= 125 or MESSAGE_DELIMITER in chat_text:
+        if len(chat_text) <= 150 or MESSAGE_DELIMITER in chat_text:
             #分条发送
             messages_list = self.emoji_system.parse_text_with_emotion_tags_separator(
                 text = chat_text, 
@@ -222,7 +222,7 @@ class Chat_processing:
             for message in messages_list:
                 await self.tool_calls.passing_message.send_group_message(
                     group_ID,
-                    [message]
+                    message["data"]["text"] if message["type"] == "text" else [message]
                 )
                 await asyncio.sleep(MESSAGE_DELAY)
         else:
@@ -344,7 +344,7 @@ class Chat_processing:
         # print(self.messages + self.temporary_messages)
         # print(self.chat_request.tools)
         # print(self.chat_model)
-        my_messages = list(self.messages + self.temporary_messages)
+        my_messages = list(self.messages) + list(self.temporary_messages)
         try:
             assistant_message = await self.chat_request.request_fetch_primary(
                 my_messages = my_messages,
@@ -364,7 +364,7 @@ class Chat_processing:
                 )
             except Exception as fallback_e:
                 print(f"备用方法也失败: {str(fallback_e)}")
-                raise ValueError("主API调用失败,并且备用方法也失败,这一定是openAI干的!")
+                raise ValueError("主API调用失败,并且备用方法也失败,这一定是openAI干的喵!")
                 
         return assistant_message
 

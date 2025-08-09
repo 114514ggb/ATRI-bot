@@ -13,6 +13,7 @@ config = atri_config()
 qq_white_list: List[int] = [1062704755, 984466158, 1038698883]  # qq群白名单
 qq_white_list.append(235984211)  # 形形色色的群
 qq_white_list.append(936819059) #真爱协会
+qq_white_list.append(779096917) #洛天依
 # qq_white_list.append(1031640399) #KouriChat
 # qq_white_list.append(946533123) #狗熊岭
 
