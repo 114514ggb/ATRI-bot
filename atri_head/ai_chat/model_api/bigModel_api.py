@@ -1,7 +1,11 @@
-from zhipuai import ZhipuAI
 from .universal_async_ai_api import universal_ai_api
 from .api_key_bigModel import api_key
 import base64
+try:
+    from zhipuai import ZhipuAI
+except NameError:
+    print("没有zhipuai，部分功能不可用！")
+
 
 class bigModel_api:
     """智谱AI大模型API"""    

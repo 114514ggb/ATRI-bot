@@ -28,6 +28,7 @@ class AtriDB_Async:
                         user=user,
                         password=password,
                         db='atri',
+                        charset='utf8mb4',
                         autocommit=True,
                         minsize=pool_minsize,
                         maxsize=pool_maxsize,

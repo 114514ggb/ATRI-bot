@@ -84,7 +84,8 @@ class itemAction():
     async def manage_add_group(self,group_ID, data):
         """管理群事件"""
         white_list_gropup:dict = {
-            1038698883 : "问题：亚托莉机器人的英文名\n答案：ATRI"
+            1038698883 : "问题：亚托莉机器人的英文名\n答案：ATRI",
+            2169027872 : "",
         }
         """白名单群key:群号 value:请求加群的验证信息"""
 

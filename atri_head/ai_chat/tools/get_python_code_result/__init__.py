@@ -13,7 +13,7 @@ tool_json = {
     }
 }
 
-code_url = "document\\code.py"
+code_url = "document/code.py"
 async def get_python_code_result(code):
     """获取python代码运行结果"""
     with open(code_url, "w", encoding='utf-8') as f:

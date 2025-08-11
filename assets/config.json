@@ -11,6 +11,7 @@
         "name":"ATRI-bot"
     },
     "file_path":{
+        "item_path":"/mnt/e/程序文件/python/ATRI/",
         "document":"/mnt/e/程序文件/python/ATRI/document/",
         "emoji":"document/img/emojis",
         "chat_manager":"atri_head/ai_chat/character_setting",

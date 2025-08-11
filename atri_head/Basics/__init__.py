@@ -36,7 +36,8 @@ class Basics:
             self.QQ_send_message = QQ_send_message(
                 self.config.network.access_token, 
                 self.config.network.url, 
-                self.config.network.connection_type
+                self.config.network.connection_type,
+                self.config.file_path.document
             ) 
             """QQ 发送消息等交互"""
             self.AI_interaction = AI_interaction() 

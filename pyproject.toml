@@ -1,16 +1,16 @@
 [project]
 name = "atri"
-version = "0.1.0"
-description = "Add your description here"
+version = "1.1.4"
+description = "一个qq机器人"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "httpx[http2]>=0.28.1",
-    "jieba>=0.42.1",
     "mcp>=1.12.2",
     "openai>=1.82.0",
-    "pymilvus==2.6.0",
-    "fastapi>=0.115.12",
+    "pymilvus>=2.6.0",
+    "fastapi>=0.115",
+    "aiomysql>=0.2.0",
 ]
 
 [tool.uv.workspace]
@@ -19,5 +19,5 @@ members = [
 ]
 
 [[tool.uv.index]]
-url = "https://mirrors.aliyun.com/pypi/simple/"
+url = "https://mirrors.aliyun.com/pypi/simple"
 default = true

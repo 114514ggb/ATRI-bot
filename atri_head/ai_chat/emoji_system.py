@@ -7,13 +7,12 @@ import re
 class emoji_core:
     """管理表情包"""
     
-    def __init__(self,folder_path:str = ""):
+    def __init__(self,item_path:str ,folder_path:str = ""):
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
-        
         # self.Chance = Chance()
-        if folder_path != "":
-            self.init_emoji_catalogue(folder_path)
+        self.file = f"file://{item_path}{folder_path}"
+        self.init_emoji_catalogue(folder_path)
         
         
     def init_emoji_catalogue(self,folder_path:str)->None:
@@ -67,7 +66,16 @@ class emoji_core:
         # return self.Chance.random_choice(self.emoji_file_dict[tag]) if tag in self.emoji_file_dict else None
         return random.choice(self.emoji_file_dict[tag]) if tag in self.emoji_file_dict else None
     
-    
+    def get_complete_file_path(self, tag_content:str)->str:
+        """返回一个标签的完整路径
+
+        Args:
+            tag_content (str): 标签
+
+        Returns:
+            str: 完整路径
+        """
+        return f"{self.file}/{tag_content}/{self.get_random_emoji_name(tag_content)}"
     
     def process_text_and_emotion_tags(text: str, emoji_dict: dict) -> tuple[str, list[str]]:
         """
@@ -170,7 +178,7 @@ class emoji_core:
                 # 添加表情图片
                 segments.append({
                     "type": "image",
-                    "data": {"file": f"file:///mnt/e/程序文件/python/ATRI/document/img/emojis/{tag_content}/{self.get_random_emoji_name(tag_content)}"}
+                    "data": {"file": self.get_complete_file_path(tag_content)}
                 })
                 
                 # 更新位置
@@ -201,6 +209,7 @@ class emoji_core:
             start_pos = 0
             add_start = 0
             text_len = len(text)
+            text = text.strip(separator)
             
             def append_separator_text(separator_text:str):
                 if separator in separator_text:
@@ -244,7 +253,7 @@ class emoji_core:
                     # 添加表情图片
                     segments.append({
                         "type": "image",
-                        "data": {"file": f"file:///mnt/e/程序文件/python/ATRI/document/img/emojis/{tag_content}/{self.get_random_emoji_name(tag_content)}"}
+                        "data": {"file": self.get_complete_file_path(tag_content)}
                     })
                     
                     # 更新位置

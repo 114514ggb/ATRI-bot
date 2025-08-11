@@ -1,6 +1,8 @@
-import aiohttp
+import httpx
+from httpx import Response
 import asyncio
 from bs4 import BeautifulSoup
+
 
 tool_json = {
     "name" : "http_request_tool",
@@ -32,18 +34,19 @@ async def main(url: str):
 
 async def get(url):
     """发送GET请求并返回HTML"""
-    async with aiohttp.ClientSession(headers=headers) as session:
-        async with session.get(
-            url = url,
-        ) as response:
-            if response.ok:
-                html = await response.text()
-                soup = BeautifulSoup(html, 'html.parser')
-                return soup.get_text(separator=' ', strip=True)
-            else:
-                return "请求到非200状态码"
+    async with httpx.AsyncClient(headers=headers) as session:
+        try:
+            response = await session.get(url = url)
+            response.raise_for_status()
+            html = response.text
+            soup = BeautifulSoup(html, 'html.parser')
+            return soup.get_text(separator=' ', strip=True)
+        except httpx.HTTPStatusError as e:
+            return f"请求到非200状态码: {e.response.status_code}"
+        except httpx.RequestError as e:
+            return f"请求出错: {e}"
 
 
 if __name__ == "__main__":
-    # print(asyncio.run(main("https://r18.中国/")))
-    print(asyncio.run(main("https://github.com/bytedance/trae-agent")))
+    print(asyncio.run(main("https://r18.中国/")))
+    # print(asyncio.run(main("https://github.com/bytedance/trae-agent")))

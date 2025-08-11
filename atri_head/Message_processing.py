@@ -80,29 +80,29 @@ class group_message_processing():
                 return True
 
             except Exception as e:
-                await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"\n请务必联系管理员:2631018780,fuck什么玄学bug还没好！")
+                await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"\n请务必联系管理员:2631018780！")
                 return False
 
         
     async def receive_event(self, data:dict, group_ID:int, message:str):
         """非at@事件处理"""
-        rouse_word = ["ATRI","atri"]
+        # rouse_word = ["ATRI","atri"]
 
         if  data['user_id'] != data['self_id']: #排除自己发送的消息
 
-            if any(word in message for word in rouse_word):
-                try:
-                    print(f"尝试回复:{message}")
+            # if any(word in message for word in rouse_word):
+            #     try:
+            #         print(f"尝试回复:{message}")
                     
-                    await self.chat_ai.main(
-                        group_ID, 
-                        data
-                    ) 
-                    return True
+            #         await self.chat_ai.main(
+            #             group_ID, 
+            #             data
+            #         ) 
+            #         return True
 
-                except Exception as e:
-                    await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"\n请务必联系管理员:2631018780,fuck什么玄学bug还没好！")
-                    return False
+            #     except Exception as e:
+            #         await self.basics.QQ_send_message.send_group_message(group_ID,"聊天出错了，请稍后再试!\nType Error:"+str(e)+"\n请务必联系管理员:2631018780！")
+            #         return False
                 
             await self.textMonitoring.monitoring(message,group_ID,data)
             #监控

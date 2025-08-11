@@ -8,15 +8,17 @@ class QQ_send_message():
     """QQ消息发送器"""
     _instance = None
     # File_root_directory = "E:/程序文件/python/ATRI/document/"
-    File_root_directory = "/mnt/e/程序文件/python/ATRI/document/"
+    # File_root_directory = "/mnt/e/程序文件/python/ATRI/document/"
     
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
             cls._instance = super(QQ_send_message, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self,token = "ATRI114514",http_base_url = "http://localhost:8080",connection_type = "http"):
+    def __init__(self,token = "ATRI114514",http_base_url = "http://localhost:8080",connection_type = "http",File_root_directory:str = ""):
         if not hasattr(self, "_initialized"):
+            self.File_root_directory = File_root_directory
+            
             if connection_type == "http":
 
                 self.access_token = token
