@@ -1,0 +1,28 @@
+[project]
+name = "atri"
+version = "1.2.4"
+description = "一个叫ATRI的qq机器人"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "aiohttp>=0.28.1",
+    "mcp>=1.12.2",
+    "openai>=1.82.0",
+    "pymilvus>=2.6.0",
+    "fastapi>=0.115",
+    "aiomysql>=0.2.0",
+    "websockets>=15.0.1",
+    "zhipuai>=2.1.5.20250801",
+    "bs4>=0.0.2",
+    "psutil>=7.0.0",
+    "pyahocorasick>=2.2.0",
+]
+
+[tool.uv.workspace]
+members = [
+    "abandoned/MCP_test/mcp-client",
+]
+
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+default = true

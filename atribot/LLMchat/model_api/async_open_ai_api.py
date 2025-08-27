@@ -1,0 +1,85 @@
+from openai import AsyncOpenAI
+
+class async_openAI:
+    """async OpenAI API"""
+    model_parameters = {
+        'stream': False,#是否流式输出
+        'frequency_penalty': 1.5,#一个介于-2.0和2.0之间的数字。正值会根据文本中至今出现的频率对新令牌进行惩罚，降低模型重复同一行文字的可能性。
+        'top_p':0.8,#核采样的概率阈值，用于控制模型生成文本的多样性。top_p越高，生成的文本更多样。反之，生成的文本更确定。取值范围：（0,1.0]
+        # 'temperature': 1.0,#控制生成文本的随机性。生成的文本更多样，反之，生成的文本更确定。 取值范围： [0, 2) temperature和top_p一般只设置一个
+        'max_tokens': 8192,#生成文本的最大长度
+        'stop': None,#当模型生成的文本即将包含指定的字符串或token_id时，将自动停止生成。
+    }
+    """模型参数"""
+
+    tools = []
+    '''默认工具列表，用于指定模型可以使用的工具'''
+
+    def __init__(self, api_key, base_url, tools = [None]):
+        self.client = AsyncOpenAI(
+            api_key=api_key, 
+            base_url=base_url,
+        )
+        self.tools = tools
+
+    def alter_parameters(self, parameters, value):
+        """修改参数"""
+        self.model_parameters[parameters] = value
+        return self.model_parameters
+    
+
+    async def generate_text(self, my_model:str, my_messages:list)->dict:
+        """请求生成文本,全部默认"""
+        completion = await self.client.chat.completions.create(
+            model = my_model, 
+            messages = my_messages,
+        )
+
+        return completion.model_dump()
+
+
+    async def generate_text_argument(self, my_model, my_messages, **kwargs):
+        """
+        请求生成文本，支持任意可选参数
+        
+        Args:
+            my_model: 模型名称或对象
+            my_messages: 消息列表
+            **kwargs: 任意其他模型参数
+        """
+        completion = await self.client.chat.completions.create(
+            model=my_model,
+            messages=my_messages,
+            **kwargs
+        )
+
+        return completion.model_dump()
+    
+    async def generate_image(self, prompt, my_model = "Cogview-3-Flash"):
+        """文生图"""
+        response = await self.client.chat.completions.create(
+            model = my_model, 
+            messages = prompt
+        )
+        return response.model_dump()
+    
+    async def generate_text_tools(self, my_model, my_messages, response_format= {"type": "text"}):
+        """请求生成文本,带工具,可带格式，带自定义参数"""
+        completion = await self.client.chat.completions.create(
+            model = my_model, 
+            messages = my_messages,
+            frequency_penalty = self.model_parameters['frequency_penalty'],
+            top_p = self.model_parameters['top_p'],
+            # temperature = self.model_parameters['temperature'],
+            max_tokens = self.model_parameters['max_tokens'],
+            response_format = response_format,
+            tools = self.tools,
+        )
+
+        return completion.model_dump()
+    
+    async def request_fetch_primary(self, my_messages:list ,my_model = "gemini-2.0-flash-exp-search",response_format= {"type": "text"}):
+        """请求生成文本，返回主要内容"""
+        data = await self.generate_text_tools(my_model, my_messages,response_format)
+        # print(data)
+        return data['choices'][0]['message']

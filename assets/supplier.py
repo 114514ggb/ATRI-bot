@@ -1,0 +1,68 @@
+{
+    "name":"deepseek",
+    "base_url":"https://api.deepseek.com/chat/completions",
+    "api_key":"sk-8403066c2841461491dd0b642a6c44af",
+    "models":[
+        {
+            "name":"deepseek-chat",
+            "visual_sense":False
+        },
+        {
+            "name":"deepseek-reasoner",
+            "visual_sense":False
+        }
+    ]
+},
+{
+    "name":"kourichat",
+    "base_url":"https://api.kourichat.com/v1/chat/completions",
+    "api_key":"sk-gTimJsqOxEZZI1b8o9YqMI9Pr3URiEN4Icj1Q2Ph895TXME1",
+    "models":[
+        {
+            "name":"gemini-2.5-flash",
+            "visual_sense":True
+        },
+        {
+            "name":"gemini-2.5-flash-lite",
+            "visual_sense":True
+        },
+        {
+            "name":"gemini-2.5-pro-06-05",
+            "visual_sense":True
+        }
+    ]
+},
+{
+    "name":"zetatechs",
+    "base_url":"https://api.zetatechs.com/v1/chat/completions",
+    "api_key":"sk-1tgN5EnR9QPqHPuh08CfO5R2oWx25Z1UtJJ94FMzUkMlLGJL",
+    "models":[
+        {
+            "name":"gemini-2.5-pro-free",
+            "visual_sense":True
+        },
+        {
+            "name":"gemini-2.5-flash-free",
+            "visual_sense":True
+        }
+    ]
+},
+{
+    "name":"ollama",
+    "base_url":"http://localhost:11434/v1/",
+    "api_key":"sk-114514",
+    "models":[
+        {
+            "name":"dengcao/Qwen3-Embedding-0.6B:F16",
+            "visual_sense":False
+        },
+        {
+            "name":"dengcao/Qwen3-Reranker-8B:Q4_K_M",
+            "visual_sense":False
+        },
+        {
+            "name":"gemma3:27b",
+            "visual_sense":True
+        }
+    ]
+}

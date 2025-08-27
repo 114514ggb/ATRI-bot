@@ -1,0 +1,63 @@
+{
+  "mcpServers": {
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "active": false
+    },
+    "魔塔-fetch": {
+      "type": "sse",
+      "url": "https://mcp.api-inference.modelscope.net/fe8ec4fddb9847/sse",
+      "active": false
+    },
+    "mcp-server-firecrawl": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "fc-e1084899b29d4528ae047d0a7df91318"
+      },
+      "active": false
+    },
+    "网络搜索-mcp": {
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@0.1.4"],
+      "env": {
+        "TAVILY_API_KEY": "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"
+      },
+      "disabled": false,
+      "autoApprove": [],
+      "active": true
+    },
+    "bingcn": {
+      "command": "npx",
+      "args": [
+        "bing-cn-mcp"
+      ],
+      "active": false
+    },
+    "高德地图-maps": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@amap/amap-maps-mcp-server"
+      ],
+      "env": {
+        "AMAP_MAPS_API_KEY": "33a63b198b158f9ddf2a8bb5c514130c"
+      },
+      "active": true
+    },
+    "思维工具-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ],
+      "active": false
+    },
+    "推荐食谱-mcp": {
+      "command": "npx",
+      "args": ["-y", "howtocook-mcp"],
+      "active": false
+    }
+  }
+}
