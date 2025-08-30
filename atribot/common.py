@@ -42,12 +42,14 @@ class common():
         data = {'s': keywords, 'type': 1, 'limit': limit}
         headers = {
             'User-Agent': 'Mozilla/5.0',
-            'Referer': 'https://music.163.com/'
+            'Referer': 'https://music.163.com/',
+            'Accept': 'application/json, text/plain, */*'
         }
         
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=data, headers=headers) as response:
                 data = await response.json()
+                # data = await response.text()
         # print(data)
         return [{"name":v["name"],"id":v["id"]}  for v in data['result'].get('songs',[])]
     

@@ -125,6 +125,11 @@ class context_management:
                         self.all_group_messages[group_id].clear()
                         
     
+    def anew_character_settings(self)->None:
+        """重新加载人设"""
+        self.play_role_list = {"none": ""}
+        self._load_character_settings()
+    
     def _load_character_settings(self) -> None:
         """加载角色设定文件"""
         for character_setting in os.listdir(self.folder_path):

@@ -33,7 +33,7 @@ class TTSService:
                     "prompt_language": "ja"
                 }
             }
-            self.base_output_path = container.get("config").file_path.item_path+"document/audio/"
+            self.base_output_path = container.get("config").file_path.procedure_root+"document/audio/"
             self.relative_output_prefix = "TTS_output/output"
             self._initialized = True
 

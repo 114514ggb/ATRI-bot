@@ -80,6 +80,7 @@ async def help_command(message_data: dict, list: bool = False):
             "所有命令以开头要@bot再以\"/\"开头才能使用\n"
             "输入 /help --list 查看完整命令列表\n"
             "输入 /help <命令名> 查看特定命令帮助\n\n"
+            "任意命令加入 --help 参数可以查看该命令的帮助信息"
             "基本功能:\n"
             "1.@bot后接文字就可以聊天\n"
             "2.@bot后以/开头接[命令]即可触发命令.\n"

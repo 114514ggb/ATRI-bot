@@ -88,7 +88,7 @@ class AIContextCommands:
             )
             return
         
-        await self.permissions_management.has_permission(user_id, 2)
+        self.permissions_management.has_permission(user_id, 2)
         
         # 检查角色是否存在
         if role_name not in self.context_management.play_role_list:
@@ -172,13 +172,13 @@ class AIContextCommands:
     
     async def _handle_reload_roles(self, group_id: str, user_id:int):
         """处理重载角色配置"""
-        await self.permissions_management.has_permission(user_id, 3)
+        self.permissions_management.has_permission(user_id, 3)
         
         try:
             old_count = len(self.context_management.play_role_list)
             old_roles = set(self.context_management.play_role_list.keys())
             
-            self.context_management._load_character_settings()
+            self.context_management.anew_character_settings()
             
             new_count = len(self.context_management.play_role_list)
             new_roles = set(self.context_management.play_role_list.keys())
@@ -208,7 +208,7 @@ class AIContextCommands:
     async def _handle_reset_context(self, group_id: str, user_id:int):
         """处理重置上下文"""
         
-        await self.permissions_management.has_permission(user_id, 2)
+        self.permissions_management.has_permission(user_id, 2)
         
         await self.context_management.reset_group_chat(group_id)
         
@@ -227,20 +227,19 @@ class AIContextCommands:
             self.context_management.default_play_role
         )
         
-        role_display = current_role
         message_count = len(context.messages)
         max_messages = self.context_management.messages_length_limit
         
         usage_percentage = (message_count / max_messages * 100) if max_messages > 0 else 0
         
         message = "📊 当前群上下文状态：\n"
-        message += f"当前角色：{role_display}\n"
+        message += f"当前角色：{current_role}\n"
         message += f"消息数量：{message_count}/{max_messages} ({usage_percentage:.1f}%)\n"
         
-        if usage_percentage < 70:
+        if usage_percentage < 150:
             status_icon = "🟢"
             status_text = "正常"
-        elif usage_percentage < 90:
+        elif usage_percentage < 200:
             status_icon = "🟡" 
             status_text = "接近上限"
         else:

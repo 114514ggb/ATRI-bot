@@ -11,8 +11,9 @@
         "name":"ATRI-bot"
     },
     "file_path":{
-        "item_path":"/mnt/e/程序文件/python/ATRI/",
-        "document":"/mnt/e/程序文件/python/ATRI/document/",
+        "item_path":"/mnt/e/程序文件/python/ATRI-main/",
+        "document":"/mnt/e/程序文件/python/ATRI-main/document/",
+        "procedure_root":"E:/程序文件/python/ATRI-main/",
         "emoji":"document/img/emojis",
         "commands":"atribot/commands",
         "chat_manager":"atribot/LLMchat/character_setting",
@@ -21,10 +22,10 @@
     "model":{ 
         "connect":
         {
-            "supplier":"deepseek",
-            "model_name":"deepseek-chat",
+            "supplier":"kourichat",
+            "model_name":"claude-sonnet-4-20250514",
             "visual_sense":false,
-            "system_review":true
+            "system_review":false
         },
         "chat_parameter":{
             "temperature":0.2,

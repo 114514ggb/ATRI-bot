@@ -142,7 +142,7 @@ class SystemMonitor:
                 param_desc = detail.get("description", "无描述")
                 params_info.append(f"    ▪ {param}: {param_type} - {param_desc}")
 
-            parameters = "参数:\n" + "\n".join(params_info) if params_info else "参数: 无"
+            parameters = "\n参数:\n" + "\n".join(params_info) if params_info else "\n参数: 无"
             
             tool_info = f"""🔧 工具名称: {func.name} {status}{origin_info}📝 描述: {func.description}{parameters}""".strip()
             

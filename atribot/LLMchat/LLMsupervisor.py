@@ -90,20 +90,20 @@ class large_language_model_supervisor():
 
         assistant_message:Dict = (await self.get_chat_json(
             request = request,
-            messages = request.messages + increase_context.get_messages(),
+            messages = request.messages + increase_context.messages,
             model_api = model_api
         ))['choices'][0]['message']
+        
+        increase_context.append(assistant_message)
         
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
             return GenerationResponse(
-                messages = increase_context,
+                messages = increase_context.messages,
                 reply_text = assistant_message['content'],
                 reasoning_content = assistant_message.get("reasoning_content","")
             )
             
-        
-        increase_context.append(assistant_message)
         return await self.tool_calls_while(
             request = request,
             assistant_message = assistant_message,
@@ -153,7 +153,9 @@ class large_language_model_supervisor():
                     text = f"调用工具发生错误。\nErrors:{e}"
                     self.logger.error(text)
                     tool_output = text
-                    
+
+            self.logger.debug(f"工具调用输出:{tool_output}")
+            
             increase_context.add_tool_message(
                 tool_output[:20000],#截断防止有的工具返回过长的结果
                 tool_call['id']
@@ -176,7 +178,7 @@ class large_language_model_supervisor():
             
             if 'tool_calls' not in assistant_message or assistant_message ['tool_calls'] is None:
                 return GenerationResponse(
-                    messages = increase_context,
+                    messages = increase_context.messages,
                     reply_text = reply + assistant_message.get('content', ''),
                     reasoning_content = reasoning_content
                 )

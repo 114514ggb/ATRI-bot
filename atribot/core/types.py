@@ -116,7 +116,7 @@ class Context():
         
     def record_validity_check(self)->None:
         """针对消息条数的验证,需要显示调用"""
-        if sum(1 for msg in self.messages if msg["role"] == "user") >= self.user_max_record:
+        if sum(1 for msg in self.messages if msg["role"] == "user") > self.user_max_record:
             self.messages = self.messages[-self.user_max_record:]
         
     def clear(self)->None:

@@ -16,12 +16,14 @@ tool_json = {
             "description": "需要生成图片的prompt,只能是英文"
         },
         "width": {
-            "type": "string",
-            "description": "图像宽度，单位像素,默认1024"
+            "type": "integer",
+            "description": "图像宽度，单位像素",
+            "default": 1024
         },
         "height": {
-            "type": "string",
-            "description": "图像高度，单位像素,默认1024"
+            "type": "integer",
+            "description": "图像高度，单位像素",
+            "default": 1024
         },
     }
 }

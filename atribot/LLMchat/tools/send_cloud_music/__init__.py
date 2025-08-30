@@ -27,7 +27,7 @@ async def main(group_id:int|str, name:str,):
 
     Args:
         name (str): 歌曲名称
-        group_id (int | str): 群号一般自动传入
+        group_id (int | str): 群号
     """
     
     if music_lsit := await common.search_music(name):

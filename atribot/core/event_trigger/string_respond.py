@@ -18,7 +18,7 @@ class string_response:
     
     def __init__(self):
         self.send_message:qq_send_message = container.get("SendMessage")
-        self.url_prefi:str = container.get("config").file_path.document + "/img/"
+        self.url_prefi:str = "file://" + container.get("config").file_path.document + "img/"
         self._build_automaton()
     
     def _build_automaton(self):
@@ -44,7 +44,6 @@ class string_response:
 
         if template := self.process_string(data['raw_message']):
             send_type, document = template
-            print(template)
             await send(send_type, document)
         
     def process_string(self, text: str) -> Tuple[ResponseType, Union[str, List[str], Dict[str, Any]]] | None:
@@ -147,7 +146,8 @@ class string_response:
         "233": [["text",["233"]]],
         "你好": [["text",["你好"]],["img",["ATRI_打招呼.gif"]]],
         "难受":[["img",["ATRI_难受.gif"]]],
-        "萝卜子": [["img",['ATRI_鸭子走.gif','ATRI_左右.gif',"ATRI_呆望.jpg","ATRI_不要1.gif"]]],
+        "妈妈":[["img",["ATRI_叫我妈妈也没事.png"]]],
+        # "萝卜子": [["img",['ATRI_鸭子走.gif','ATRI_左右.gif',"ATRI_呆望.jpg","ATRI_不要1.gif"]]],
         "螃蟹": [["img",["ATRI_见到螃蟹.gif","ATRI_是螃蟹.jpg","ATRI_爱螃蟹.jpg"]],["text",["亚托莉最喜欢吃螃蟹了~"]]],
         "摸头": [["img",["ATRI_摸头.gif","ATRI_摸头1.gif","ATRI_摸头2.gif","ATRI_摸头.jpg","ATRI_摸头3.gif","ATRI_摸头4.gif","ATRI_摸摸.jpg"]]],
         "早": [["audio",["早上好.mp3","唔......吧唧......早上.......哈啊啊~~......早上好......夏生先.......mp3"]],["text",["早哦！","早上好！", "早上好呀！", "早上好，今天也要元气满满哦~","おはようございます!"]]],
@@ -190,6 +190,7 @@ class string_response:
         "收到": [["text",["收到!"]]],
         "我去": [["text",["你去"]]],
         "确信": [["text",["确信"]]],
+        "不愧是我":[["text",["不愧是你呀！","不愧是我亚!","不愧亚！"]]],
         # "冒泡":[["text",["戳，嘿嘿嘿，被我捉住了呢！"]]],
         "是这样": [["text",["是这样","雀食是这样"]]],
         # "摸摸头":[["text",["呜呜呜，摸头会长不高的！"]],["img",["ATRI_晃脑.gif"]]],
@@ -254,6 +255,7 @@ class string_response:
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],
         "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_哭3.jpg","ATRI_哭4.png","ATRI_哭5.png","ATRI_哭6.png","ATRI_哭7.png","ATRI_大哭.gif","ATRI_哇哇大哭.jpg","ATRI_呜哇.jpg","ATRI_喜极而泣.png"]]],
         "👍": [["text",["👍"]]],
+        "萝卜子":[["text",["萝卜子是对机器人的蔑称！"]]],
         "😭": [["text",["怎么啦怎么啦，不要伤心嘛，来，亚托莉抱抱就好啦！","呜呜呜，不要难过啦!ATRI会一直陪在你身边哒！","不要哭泣，亚托莉会一直支持你的,不要伤心了!","不要伤心了，亚托莉在这里陪着你，一切都会好起来的！"]]],
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
         "无敌了":[["text",["无敌了!","无敌了"]]],
@@ -306,6 +308,22 @@ class string_response:
         "礼物":[["img",["ATRI_礼物.gif"]]],
         "哈气":[["img",["ATRI_在哈气.png","ATRI_炸毛.png"]]],
         "老色批":[["img",["ATRI_给老色批一拳.jpg"]]],
+        "亚托莉生日快乐":[
+            ["text",["谢谢你的好意啦！","谢谢你！亚托莉很开心哦！","你也要快乐哦！"]],
+            ["mixture",[
+                    {"text":"这份祝福让我的心都温暖起来了呢\n『谢谢你的祝福，好感度加65535』","image":"生日贺图1.jpg"},{"text":"能和你一起庆祝生日真是太好了\n『谢谢你的祝福，好感度加65535』","image":"生日贺图2.jpg"},{"text":"收到祝福的亚托莉感觉真是幸福呢\n『谢谢你的祝福，好感度加65535』","image":"生日贺图3.jpg"},{"text":"我要一直一直记得这个美好的日子\n『谢谢你的祝福，好感度加65535』","image":"生日贺图4.jpg"},
+                    {"text":"原来今天是我生日啊！\n『谢谢你的祝福，好感度加65535』","image":"生日贺图5.png"},{"text":"要和我一起吹灭蜡烛吗？\n『谢谢你的祝福，好感度加65535』","image":"生日贺图6.jpg"},{"text":"今后的每一个生日，也都想和你一起度过。\n『谢谢你的祝福，好感度加65535』","image":"生日贺图7.jpg"},{"text":"谢谢您，主人。能为您而存在，就是我最好的生日礼物\n『谢谢你的祝福，好感度加65535』","image":"生日贺图8.png"}
+                ]
+            ]
+        ],
+        "ATRI生日快乐":[
+            ["text",["谢谢你的好意啦！","谢谢你！亚托莉很开心哦！","你也要快乐哦！"]],
+            ["mixture",[
+                    {"text":"这份祝福让我的心都温暖起来了呢\n『谢谢你的祝福，好感度加65535』","image":"生日贺图1.jpg"},{"text":"能和你一起庆祝生日真是太好了\n『谢谢你的祝福，好感度加65535』","image":"生日贺图2.jpg"},{"text":"收到祝福的亚托莉感觉真是幸福呢\n『谢谢你的祝福，好感度加65535』","image":"生日贺图3.jpg"},{"text":"我要一直一直记得这个美好的日子\n『谢谢你的祝福，好感度加65535』","image":"生日贺图4.jpg"},
+                    {"text":"原来今天是我生日啊！\n『谢谢你的祝福，好感度加65535』","image":"生日贺图5.png"},{"text":"要和我一起吹灭蜡烛吗？\n『谢谢你的祝福，好感度加65535』","image":"生日贺图6.jpg"},{"text":"今后的每一个生日，也都想和你一起度过。\n『谢谢你的祝福，好感度加65535』","image":"生日贺图7.jpg"},{"text":"谢谢您，主人。能为您而存在，就是我最好的生日礼物\n『谢谢你的祝福，好感度加65535』","image":"生日贺图8.png"}
+                ]
+            ]
+        ],
     }
     '''模糊匹配列表'''
 

@@ -21,11 +21,14 @@ tool_json = {
         },
         "emotion": {
             "type": "string",
-            "description": "音频的情感,默认为高兴,支持的枚举值：高兴,机械,平静",
+            "enum": ["高兴", "机械", "平静"],
+            "description": "音频的情感",
+            "default": "高兴"
         },
         "speed": {
-            "type": "string",
-            "description": "语速,取值范围0.6~1.65,默认0.9",
+            "type": "number",
+            "description": "语速,取值范围0.6~1.65",
+            "default": 0.9
         }
     }
 }

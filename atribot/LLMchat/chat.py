@@ -138,7 +138,7 @@ class group_chat(chat_baseics):
             user_import, 
             img_list, 
             group_id,
-            img_prompt
+            prompt
         )
 
         #发送
@@ -148,11 +148,16 @@ class group_chat(chat_baseics):
             message_id = data["message_id"]
         )
         
-        #过滤扩展
+        #过滤扩展list
         increase_context.extend([msg for msg in response.messages if msg["role"] in ["assistant", "tool"]])
         
+        # print(response.messages)
+        
         #更新存储上下文
-        original_context.extend(increase_context.get_messages())
+        original_context.extend(increase_context.messages)
+        
+        # print(original_context)
+        
         await self.context.store_group_chat(
             group_id = group_id,
             context = original_context
@@ -168,7 +173,7 @@ class group_chat(chat_baseics):
         user_import: str, 
         img_list: list[str], 
         group_id: int, 
-        img_prompt: str,
+        prompt: str,
     )->GenerationResponse:
         """尝试模型请求，失败时自动降级到备用API
 
@@ -178,14 +183,14 @@ class group_chat(chat_baseics):
             user_import (str): 提示
             img_list (list[str]): 图像url list
             group_id (int): 群号
-            img_prompt (str): 图像提示
+            prompt (str): 提示
 
         Returns:
             GenerationResponse: 回复
         """
         try:
-            response = await self.model_api_supervisor.step(request)
-            return response
+
+            return await self.model_api_supervisor.step(request)
             
         except Exception as e:
             self.log.error(
@@ -193,7 +198,7 @@ class group_chat(chat_baseics):
                 f"群聊天出现了错误:{e}\n尝试备用api!"
             )
             
-            fallback_prompt = await self.prompt_structure(group_id, await self.image_processing(img_list)) if (img_list and self.visual_sense) else img_prompt
+            fallback_prompt = await self.prompt_structure(group_id, await self.image_processing(img_list)) if (img_list and self.visual_sense) else prompt
             
             fallback_request = replace(
                 request,
@@ -203,8 +208,7 @@ class group_chat(chat_baseics):
                 image_url_list=None
             )
             
-            response = await self.model_api_supervisor.step(fallback_request)
-            return response
+            return  await self.model_api_supervisor.step(fallback_request)
         
     async def prompt_structure(self, group_id:int, img_prompt:str)->str:
         """提示词构造方法
@@ -249,7 +253,7 @@ class group_chat(chat_baseics):
         if not (chat_text := chat_text.strip()):
             return 
         
-        if len(chat_text) <= 150 or MESSAGE_DELIMITER in chat_text:
+        if len(chat_text) <= 150 or MESSAGE_DELIMITER in chat_text or "[CQ:at,qq=" in chat_text:
             #分条发送
             messages_list = self.emoji_core.parse_text_with_emotion_tags_separator(
                 text = chat_text, 
