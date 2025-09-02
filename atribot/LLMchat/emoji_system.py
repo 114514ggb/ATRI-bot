@@ -208,50 +208,52 @@ class emoji_core:
             
             emoji_set = set(emoji_dict)
             segments = []
-            start_pos = 0
-            add_start = 0
-            text_len = len(text)
             text = text.strip(separator)
-            
-            def append_separator_text(separator_text:str):
-                if separator in separator_text:
-                    for text_ in separator_text.split(separator):
+            text_len = len(text)
+            current_pos = 0
+                    
+            def add_text_segment(text_content:str):
+                if not text_content:
+                    return
+                    
+                if separator in text_content:
+                    parts = text_content.split(separator)
+                    for part in parts:
+                        part = part.strip()
+                        if part: 
+                            segments.append({
+                                'type': 'text',
+                                'data': {'text': part}
+                            })
+                else:
+                    text_content = text_content.strip()
+                    if text_content:
                         segments.append({
                             'type': 'text',
-                            'data': {'text': text_.strip()}
+                            'data': {'text': text_content}
                         })
-                else:
-                    segments.append({
-                        'type': 'text',
-                        'data': {'text': separator_text.strip()}
-                    })
             
-            while start_pos < text_len:
-                bracket_start = text.find('[', start_pos)
+            while current_pos < text_len:
+                bracket_start = text.find('[', current_pos)
                 
                 if bracket_start == -1:
-                    # 添加剩余文本
-                    if remaining_text := text[add_start:]:
-                        append_separator_text(remaining_text)
+                    # 没有更多标签，添加剩余文本
+                    add_text_segment(text[current_pos:])
                     break
                 
                 # 查找对应的 ']'
                 bracket_end = text.find(']', bracket_start + 1)
                 
                 if bracket_end == -1:
-                    # 没有 ']'，剩余部分作为文本
-                    if remaining_text := text[add_start:]:
-                        append_separator_text(remaining_text)
+                    # 没有配对的 ']'，将剩余部分作为文本处理
+                    add_text_segment(text[bracket_start:])
                     break
                 
                 # 提取标签内容
                 tag_content = text[bracket_start + 1:bracket_end]
                 
-                # 检查标签是否有效（非空且在字典中）
-                if tag_content and tag_content in emoji_set:
-                    # 添加标签前的文本
-                    if before_text := text[add_start:bracket_start]:
-                        append_separator_text(before_text)
+                if tag_content in emoji_set:
+                    
                     # 添加表情图片
                     segments.append({
                         "type": "image",
@@ -259,10 +261,10 @@ class emoji_core:
                     })
                     
                     # 更新位置
-                    add_start = start_pos = bracket_end + 1
+                    current_pos = bracket_end + 1
                 else:
                     # 无效标签，从下一个字符继续查找
-                    start_pos = bracket_start + 1
+                    current_pos = bracket_start + 1
             
             return segments
     

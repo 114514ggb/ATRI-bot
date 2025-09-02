@@ -23,7 +23,7 @@
         "connect":
         {
             "supplier":"kourichat",
-            "model_name":"claude-sonnet-4-20250514",
+            "model_name":"gpt-5-chat-latest",
             "visual_sense":false,
             "system_review":false
         },
