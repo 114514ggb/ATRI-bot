@@ -217,17 +217,14 @@ class emoji_core:
                     return
                     
                 if separator in text_content:
-                    parts = text_content.split(separator)
-                    for part in parts:
-                        part = part.strip()
-                        if part: 
+                    for part in text_content.split(separator):
+                        if part:= part.strip():
                             segments.append({
                                 'type': 'text',
                                 'data': {'text': part}
                             })
                 else:
-                    text_content = text_content.strip()
-                    if text_content:
+                    if text_content := text_content.strip():
                         segments.append({
                             'type': 'text',
                             'data': {'text': text_content}
@@ -240,6 +237,10 @@ class emoji_core:
                     # 没有更多标签，添加剩余文本
                     add_text_segment(text[current_pos:])
                     break
+                
+                # 添加标签前的文本
+                if bracket_start > current_pos:
+                    add_text_segment(text[current_pos:bracket_start])
                 
                 # 查找对应的 ']'
                 bracket_end = text.find(']', bracket_start + 1)

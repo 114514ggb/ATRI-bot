@@ -4,43 +4,36 @@
             "name":"deepseek",
             "base_url":"https://api.deepseek.com/chat/completions",
             "api_key":"sk-8403066c2841461491dd0b642a6c44af",
-            "models":[
-                {
-                    "name":"deepseek-chat",
-                    "visual_sense":false
+            "models":{
+                "deepseek-chat": {
+                    "visual_sense": false
                 },
-                {
-                    "name":"deepseek-reasoner",
-                    "visual_sense":false
+                "deepseek-reasoner": {
+                    "visual_sense": false
                 }
-            ]
+            }
         },
         {
             "name":"kourichat",
             "base_url":"https://api.kourichat.com/v1/chat/completions",
             "api_key":"sk-gTimJsqOxEZZI1b8o9YqMI9Pr3URiEN4Icj1Q2Ph895TXME1",
-            "models":[
-                {
-                    "name":"gemini-2.5-auto",
-                    "visual_sense":true
+            "models":{
+                "gemini-2.5-auto": {
+                "visual_sense": true
                 },
-                {
-                    "name":"gemini-2.5-flash",
-                    "visual_sense":true
+                "gemini-2.5-flash": {
+                "visual_sense": true
                 },
-                {
-                    "name":"gemini-2.5-pro-old",
-                    "visual_sense":true
+                "gemini-2.5-pro-old": {
+                "visual_sense": true
                 },
-                {
-                    "name":"claude-sonnet-4-20250514",
-                    "visual_sense":false
+                "claude-sonnet-4-20250514": {
+                "visual_sense": false
                 },
-                {
-                    "name":"gpt-5-chat-latest",
-                    "visual_sense":false
+                "gpt-5-chat-latest": {
+                "visual_sense": false
                 }
-            ]
+            }
         }
     ]
 }

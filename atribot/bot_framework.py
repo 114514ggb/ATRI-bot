@@ -76,13 +76,20 @@ class BotFramework:
         LLMSupplier.add_connection(
             name = "bigModel",
             connection_object = bigModel,
-            model_list = [
-                {"name":"GLM-4.5-Flash","visual_sense":False},
-                {"name":"GLM-4V-Flash","visual_sense":True},
-                {"name":"GLM-4.1V-Thinking-Flash","visual_sense":True},
-                {"name":"GLM-4V-Flash","visual_sense":True},
-                {"name":"GLM-Z1-Flash","visual_sense":False},
-            ]
+            model_list = {
+                "GLM-4.5-Flash": {
+                "visual_sense": False
+                },
+                "GLM-4V-Flash": {
+                "visual_sense": True
+                },
+                "GLM-4.1V-Thinking-Flash": {
+                "visual_sense": True
+                },
+                "GLM-Z1-Flash": {
+                "visual_sense": False
+                }
+            }
         )
         
         #常用

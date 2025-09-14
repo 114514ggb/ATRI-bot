@@ -31,7 +31,25 @@
             "temperature":0.2,
             "frequency_penalty":2.0,
             "presence_penalty":2.0
-        }
+        },
+        "standby_model":[
+            {
+                "supplier":"kourichat",
+                "model_name":"gemini-2.5-pro-old"
+            },
+            {
+                "supplier":"kourichat",
+                "model_name":"claude-sonnet-4-20250514"
+            },
+            {
+                "supplier":"deepseek",
+                "model_name":"deepseek-chat"
+            },
+            {
+                "supplier":"bigModel",
+                "model_name":"GLM-4.5-Flash"
+            }
+        ]
     },
     "ai_chat":{
         "playRole":"猫娘",

@@ -1,4 +1,8 @@
-from atribot.LLMchat.LLMsupervisor import large_language_model_supervisor, GenerationRequest, GenerationResponse
+from atribot.LLMchat.LLMsupervisor import (
+    large_language_model_supervisor,
+    GenerationRequest,
+    GenerationResponse,
+)
 from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
@@ -19,198 +23,236 @@ import asyncio
 
 class chat_baseics(ABC):
     """聊天基类"""
+
     def __init__(self):
-        self.model_api_supervisor:large_language_model_supervisor = container.get("LLMsupervisor")
-        self.supplier:ai_connection_manager = container.get("LLMSupplier")
-        self.messages_cache:message_cache = container.get("MessageCache")
-        self.send_message:qq_send_message = container.get("SendMessage")
-        self.context:context_management = container.get("ChatContext") 
-        self.emoji_core:emoji_core = container.get("EmojiCore")
-        self.mcp_tool:FuncCall = container.get("MCP")
-        self.log:Logger = container.get("log")
+        self.model_api_supervisor: large_language_model_supervisor = container.get("LLMsupervisor")
+        self.supplier: ai_connection_manager = container.get("LLMSupplier")
+        self.messages_cache: message_cache = container.get("MessageCache")
+        self.send_message: qq_send_message = container.get("SendMessage")
+        self.context: context_management = container.get("ChatContext")
+        self.emoji_core: emoji_core = container.get("EmojiCore")
+        self.mcp_tool: FuncCall = container.get("MCP")
+        self.log: Logger = container.get("log")
         self.config = container.get("config")
         self.build_prompt = build_prompt()
-        self.bigModel:async_bigModel_api = self.supplier.connections["bigModel"].connection_object
+        self.bigModel: async_bigModel_api = self.supplier.connections[
+            "bigModel"
+        ].connection_object
 
-    
     @abstractmethod
-    async def step(self, data:Dict)->None:
+    async def step(self, data: Dict) -> None:
         """主的聊天逻辑处理
 
         Args:
             data (Dict): 原始消息
         """
-        
+
     @abstractmethod
-    def prompt_structure(self)->str:
+    def prompt_structure(self) -> str:
         """构建模型提示词"""
-    
+
     @abstractmethod
-    async def send_reply_message(self)->None:
+    async def send_reply_message(self) -> None:
         """模型响应结束最终回复部分"""
-        
-    async def image_processing(self,image_urls:list)->str:
+
+    async def image_processing(self, image_urls: list) -> str:
         """为不支持图片的model提供图片解析服务，支持多图片最大解析数量为5,
-    
-            Args:
-                image_urls:包含链接的图像
-                
-            Returns:
-                图片描述文本，如果没有图片则没有返回
-                
-            Raises:
-                可能抛出网络请求或图片处理相关的异常
+
+        Args:
+            image_urls:包含链接的图像
+
+        Returns:
+            图片描述文本，如果没有图片则没有返回
+
+        Raises:
+            可能抛出网络请求或图片处理相关的异常
         """
         try:
+            descriptions = await asyncio.gather(
+                *[
+                    self.bigModel.get_image_recognition(url, file_path=False)
+                    for url in image_urls[:5]
+                ]
+            )
 
-            descriptions = await asyncio.gather(*[
-                self.bigModel.get_image_recognition(url, file_path=False)
-                for url in image_urls[:5]
-            ])
-            
         except Exception as e:
             return f"user传入图片处理过程中发生错误: {str(e)}"
-        
+
         self.log.info(descriptions)
-        
+
         return "\n".join(
-            f"<image index={idx+1}>\n{desc}</image>"
+            f"<image index={idx + 1}>\n{desc}</image>"
             for idx, desc in enumerate(descriptions)
         )
-        
+
+
 class group_chat(chat_baseics):
     """处理群聊天"""
-    
+
     def __init__(self):
         super().__init__()
         self.data_manage = data_manage()
-        self.model_api = self.supplier.connections[self.config.model.connect.supplier].connection_object
+        self.model_api = self.supplier.connections[
+            self.config.model.connect.supplier
+        ].connection_object
         self.visual_sense = self.config.model.connect.visual_sense
+        self.api_order: list[dict[str, str]] = self.config.model.standby_model
+        """备用api调用list"""
 
         self.template_request = GenerationRequest(
-            model_api = self.model_api,
-            new_message = "",
-            messages = [],
-            model = self.config.model.connect.model_name,
-            system_review = self.config.model.connect.system_review,
-            parameter = self.config.model.chat_parameter
+            model_api=self.model_api,
+            new_message="",
+            messages=[],
+            model=self.config.model.connect.model_name,
+            system_review=self.config.model.connect.system_review,
+            parameter=self.config.model.chat_parameter,
         )
-        
-    async def step(self, data:Dict)->None:
-        
-        
-        group_id = data['group_id']
+
+    async def step(self, data: Dict) -> None:
+        """群聊主处理函数"""
+
+        group_id = data["group_id"]
         increase_context = Context()
-        readable_text,img_list = await self.data_manage.data_processing_ai_chat_text(data)
-        
+        readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
+            data
+        )
+
         self.log.debug(f"群聊天处理:{readable_text}")
-        
+
         original_context = await self.context.get_group_chat(group_id)
         original_context.record_validity_check()
         group_context = original_context.get_messages()
-        
+
         user_import = self.build_prompt.build_user_Information(
-            data = data,
-            message = readable_text
-        ) 
-        
+            data=data, message=readable_text
+        )
+
         increase_context.add_user_message(user_import)
-        
+
         img_prompt = None
         if img_list and not self.visual_sense:
             img_prompt = await self.image_processing(img_list)
-        
+
         prompt = await self.prompt_structure(group_id, img_prompt)
-        
+
         request = replace(
             self.template_request,
             messages=group_context,
             prompt=prompt,
             new_message=user_import,
             tool_json=self.mcp_tool.get_func_desc_openai_style(),
-            image_url_list=img_list if (img_list and self.visual_sense) else None
-        )
-        
-        #获取响应
-        response = await self._try_model_request(
-            request, 
-            group_context, 
-            user_import, 
-            img_list, 
-            group_id,
-            prompt
+            image_url_list=img_list if (img_list and self.visual_sense) else None,
         )
 
-        #发送
+        # 获取响应
+        response = await self._try_model_request(request, img_list, group_id)
+
+        # 发送基础信息
         await self.send_reply_message(
-            response.reply_text,
-            group_id = group_id,
-            message_id = data["message_id"]
+            response.reply_text, group_id=group_id, message_id=data["message_id"]
         )
-        
-        #过滤扩展list
-        increase_context.extend([msg for msg in response.messages if msg["role"] in ["assistant", "tool"]])
-        
+
+        # 思考的信息
+        if response.reasoning_content:
+            await self.send_message.send_group_merge_forward(
+                group_id=group_id,
+                message=response.reasoning_content,
+                sourceb="推理内容",
+            )
+
+        # 过滤扩展list
+        increase_context.extend(
+            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+        )
+
         # print(response.messages)
-        
-        #更新存储上下文
+
+        # 更新存储上下文
         original_context.extend(increase_context.messages)
-        
+
         # print(original_context)
-        
-        await self.context.store_group_chat(
-            group_id = group_id,
-            context = original_context
-        )
-        
+
+        await self.context.store_group_chat(group_id=group_id, context=original_context)
+
         self.log.debug("模型结束响应!")
-        
-            
+
     async def _try_model_request(
-        self, 
-        request: GenerationRequest, 
-        group_context: list, 
-        user_import: str, 
-        img_list: list[str], 
-        group_id: int, 
-        prompt: str,
-    )->GenerationResponse:
-        """尝试模型请求，失败时自动降级到备用API
+        self,
+        request: GenerationRequest,
+        img_list: list[str],
+        group_id: int,
+    ) -> GenerationResponse:
+        """尝试模型请求，失败时自动降级到配置的备用API
 
         Args:
             request (GenerationRequest): 请求体
-            group_context (list): ai的上下文
-            user_import (str): 提示
             img_list (list[str]): 图像url list
             group_id (int): 群号
-            prompt (str): 提示
 
         Returns:
             GenerationResponse: 回复
         """
         try:
-
             return await self.model_api_supervisor.step(request)
-            
+
         except Exception as e:
             self.log.error(
-                f"错误上下文:{group_context}\nuser输入:{user_import}\n"
+                f"错误上下文:{request.messages}\nuser输入:{request.new_message}\n"
                 f"群聊天出现了错误:{e}\n尝试备用api!"
             )
-            
-            fallback_prompt = await self.prompt_structure(group_id, await self.image_processing(img_list)) if (img_list and self.visual_sense) else prompt
-            
-            fallback_request = replace(
-                request,
-                model="GLM-4.5-Flash",
-                prompt=fallback_prompt,
-                model_api=self.bigModel,
-                image_url_list=None
-            )
-            
-            return  await self.model_api_supervisor.step(fallback_request)
-        
-    async def prompt_structure(self, group_id:int, img_prompt:str)->str:
+
+            cached_image_prompt = None
+
+            for parameter in self.api_order:
+                if img_list:
+                    supplier = parameter["supplier"]
+                    model_name = parameter["model_name"]
+                    visual_sense = self.supplier.get_model_information(
+                        supplier, model_name
+                    )["visual_sense"]
+
+                    if visual_sense == self.visual_sense:
+                        new_request = replace(
+                            request,
+                            model_api=None,
+                            model=model_name,
+                            supplier_name=supplier,
+                        )
+                    elif visual_sense:
+                        new_request = replace(
+                            request,
+                            model_api=None,
+                            model=model_name,
+                            supplier_name=supplier,
+                            image_url_list=img_list,
+                            prompt=await self.prompt_structure(group_id),
+                        )
+                    else:
+                        if not cached_image_prompt:
+                            cached_image_prompt = await self.prompt_structure(
+                                group_id, await self.image_processing(img_list)
+                            )
+
+                        new_request = replace(
+                            request,
+                            model_api=None,
+                            model=model_name,
+                            supplier_name=supplier,
+                            image_url_list=[],
+                            prompt=cached_image_prompt,
+                        )
+                else:
+                    new_request = request
+
+                try:
+                    return await self.model_api_supervisor.step(new_request)
+                except Exception as e:
+                    self.log.error(f"备用api{parameter}出现了错误!:{e}")
+
+            self.log.error("所有备用api出现错误!")
+            return GenerationResponse(messages=[])
+
+    async def prompt_structure(self, group_id: int, img_prompt: str) -> str:
         """提示词构造方法
 
         Args:
@@ -220,20 +262,19 @@ class group_chat(chat_baseics):
         Returns:
             str: 完整提示词
         """
-        
+
         prompt = self.build_prompt.group_chant_template(
             group_id,
-            chat_history = await self.messages_cache.get_group_messages(group_id)
+            chat_history=await self.messages_cache.get_group_messages(group_id),
         )
-        
+
         if img_prompt:
             prompt += f"<image_descriptions>{img_prompt}</image_descriptions>"
-            
+
         prompt += self.emoji_core.emoji_prompt
-        
+
         return prompt + "Please do not repeat the above information"
-    
-    
+
     async def send_reply_message(
         self,
         chat_text: str,
@@ -247,41 +288,48 @@ class group_chat(chat_baseics):
             group_id (int): 群号
             message_id (int): 输入消息的id
         """
-        MESSAGE_DELAY = 0.8 #多条消息间隔时间
-        MESSAGE_DELIMITER = "$" #分隔符
+        MESSAGE_DELAY = 0.8  # 多条消息间隔时间
+        MESSAGE_DELIMITER = "$"  # 分隔符
+        MAX_SINGLE_MESSAGE_LENGTH = 150  # 单条消息最大长度
 
         if not (chat_text := chat_text.strip()):
-            return 
-        
-        if len(chat_text) <= 150 or MESSAGE_DELIMITER in chat_text or "[CQ:at,qq=" in chat_text:
-            #分条发送
+            return
+
+        if (
+            len(chat_text) <= MAX_SINGLE_MESSAGE_LENGTH
+            or MESSAGE_DELIMITER in chat_text
+            or "[CQ:at,qq=" in chat_text
+        ):
+            # 分条发送
             messages_list = self.emoji_core.parse_text_with_emotion_tags_separator(
-                text = chat_text, 
-                emoji_dict = self.emoji_core.emoji_file_dict, 
-                separator = MESSAGE_DELIMITER
+                text=chat_text,
+                emoji_dict=self.emoji_core.emoji_file_dict,
+                separator=MESSAGE_DELIMITER,
             )
             # [CQ:reply,id={message_id}]
-            for message in messages_list:
+
+            message = messages_list[0]
+            await self.send_message.send_group_message(
+                group_id, [{"type": "reply", "data": {"id": message_id}}, message]
+            )
+
+            if len(messages_list) == 1:
+                return
+
+            await asyncio.sleep(MESSAGE_DELAY)
+
+            for message in messages_list[1:]:
                 await self.send_message.send_group_message(
                     group_id,
-                    message["data"]["text"] if message["type"] == "text" else [message]
+                    message["data"]["text"] if message["type"] == "text" else [message],
                 )
                 await asyncio.sleep(MESSAGE_DELAY)
         else:
-            #合并发送完
+            # 合并发送完
             messages_list = self.emoji_core.parse_text_with_emotion_tags(
-                chat_text, 
-                self.emoji_core.emoji_file_dict
+                chat_text, self.emoji_core.emoji_file_dict
             )
             await self.send_message.send_group_message(
                 group_id,
-                [
-                    {
-                    "type": "reply",
-                    "data": {
-                        "id": message_id
-                        }
-                    },
-                    *messages_list
-                ]
+                [{"type": "reply", "data": {"id": message_id}}, *messages_list],
             )

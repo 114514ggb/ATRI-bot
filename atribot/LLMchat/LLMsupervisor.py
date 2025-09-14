@@ -2,7 +2,7 @@ from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manage
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.core.service_container import container
 from atribot.LLMchat.model_tools import tool_calls
-from atribot.core.types import Context
+from atribot.core.types import Context,ToolCallsStopIteration
 from typing import Dict, List, Any
 from dataclasses import dataclass
 from logging import Logger
@@ -41,12 +41,12 @@ class GenerationRequest():
 class GenerationResponse():
     """响应后再更新状态"""
     
-    messages: List[Dict[str, Any]]
+    messages: List[Dict[str, Any]] = None
     """新增上下文"""
-    reply_text: str
+    reply_text: str = ""
     """合并后的模型回复的文本"""
     reasoning_content: str = ""
-    """推理模型的思考过程"""
+    """合并后的推理模型的思考过程"""
     metadata: Dict[str, Any] = None
     """基本信息"""
 
@@ -85,25 +85,28 @@ class large_language_model_supervisor():
         
         model_api = request.model_api or (self.supplier.get_filtration_connection(
             supplier_name=request.supplier_name,
-            model_name=request.model
+            model_name=request.model,
         )[0]).connection_object
 
-        assistant_message:Dict = (await self.get_chat_json(
+        api_reply:Dict = await self.get_chat_json(
             request = request,
-            messages = request.messages + increase_context.messages,
+            messages = request.messages + increase_context.get_messages(),
             model_api = model_api
-        ))['choices'][0]['message']
+        )
+        
+        self.logger.debug(f"模型返回:{api_reply}")
+        
+        assistant_message:Dict = api_reply['choices'][0]['message']
         
         increase_context.append(assistant_message)
         
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
-            return GenerationResponse(
-                messages = increase_context.messages,
-                reply_text = assistant_message['content'],
-                reasoning_content = assistant_message.get("reasoning_content","")
+            return  self._update_response(
+                GenerationResponse(messages = increase_context.messages), 
+                assistant_message
             )
-            
+             
         return await self.tool_calls_while(
             request = request,
             assistant_message = assistant_message,
@@ -126,19 +129,12 @@ class large_language_model_supervisor():
         """
         self.logger.debug("模型进入工具调用!")
         
-        reasoning_content = ""
-        """推理模型的思考"""
-        reply = ""
-        """回复的文本部分"""
+        response = GenerationResponse()
         
-        for _ in range(5):#防止无限循环调用
+        for _ in range(8):#防止无限循环调用
             
-            if content := assistant_message.get('content', ''):
-                reply += content
-                
-            if content := assistant_message.get("reasoning_content",""):
-                reasoning_content += content
-                
+            response = self._update_response(response, assistant_message)
+
             for tool_call in assistant_message['tool_calls']:#可能一次里面调用多少工具
                 
                 try:
@@ -148,41 +144,64 @@ class large_language_model_supervisor():
                     tool_output = ""
 
                     tool_output = str(await self.tool_management.calls(tool_name,tool_input))
-
+                    
+                except ToolCallsStopIteration:
+                    increase_context.add_tool_message(tool_output,tool_call['id'])
+                    self.logger.info("模型主动结束工具调用!")
+                    response.messages = increase_context.messages
+                    return response
+                    
                 except Exception as e:
                     text = f"调用工具发生错误。\nErrors:{e}"
                     self.logger.error(text)
                     tool_output = text
 
-            self.logger.debug(f"工具调用输出:{tool_output}")
-            
-            increase_context.add_tool_message(
-                tool_output[:20000],#截断防止有的工具返回过长的结果
-                tool_call['id']
-            )
-            
-            if tool_output == "{'tool_calls_end': '已退出循环'}":
-                return GenerationResponse(
-                    messages = increase_context,
-                    reply_text = reply,
-                    reasoning_content = reasoning_content
+                self.logger.debug(f"工具调用输出:{tool_output}")
+                
+                increase_context.add_tool_message(
+                    tool_output[:20000],#截断防止有的工具返回过长的结果
+                    tool_call['id']
                 )
             
-            assistant_message = (await self.get_chat_json(
+            api_reply = await self.get_chat_json(
                 request = request,
                 messages = request.messages + increase_context.get_messages(),
                 model_api = model_api
-            ))['choices'][0]['message']
+            )
+            
+            self.logger.debug(f"工具调用后模型返回:{api_reply}")
+            
+            assistant_message:Dict = api_reply['choices'][0]['message']
             
             increase_context.append(assistant_message)
             
-            if 'tool_calls' not in assistant_message or assistant_message ['tool_calls'] is None:
-                return GenerationResponse(
-                    messages = increase_context.messages,
-                    reply_text = reply + assistant_message.get('content', ''),
-                    reasoning_content = reasoning_content
-                )
+            if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
+                break
+        
+        response.messages = increase_context.messages
+        
+        return self._update_response(response, assistant_message)
     
+    @staticmethod
+    def _update_response(response:GenerationResponse ,assistant_message:Dict)->GenerationResponse:
+        """更新response
+
+        Args:
+            response (GenerationResponse): 原response
+            assistant_message (Dict): api返回消息
+
+        Returns:
+            GenerationResponse: 更新后的response
+        """
+        reply_text = assistant_message.get("content")
+        if isinstance(reply_text, str):
+            response.reply_text += reply_text
+        
+        reasoning_content = assistant_message.get("reasoningcontent")
+        if isinstance(reasoning_content, str):
+            response.reasoning_content += reasoning_content
+        
+        return response
     
     @staticmethod
     async def get_chat_json(request:GenerationRequest, messages:List[Dict[str, Any]], model_api:model_api_basics)->Dict:

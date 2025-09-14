@@ -12,8 +12,8 @@ class ai_api_connection:
     """
     name:str
     """连接供应商的名称"""
-    model_list:list[Dict[str,str|bool]] = None
-    """支持的模型信息list,里面的格式应该是{"name":"","visual_sense":False}"""
+    model_dict:Dict[str,Dict[str,str|bool]] = None
+    """支持的模型信息list,里面的格式应该是{models_name:{parameter}}"""
     base_url:str = ""
     """供应商api地址"""
     api_key:str = ""
@@ -24,8 +24,8 @@ class ai_api_connection:
     """模型设置默认的参数"""
 
     def __post_init__(self):
-        if self.model_list is None:
-            self.model_list = []
+        if self.model_dict is None:
+            self.model_dict = []
         if self.connection_object is None:
             if self.base_url and self.api_key:
                 self.connection_object = universal_ai_api(
@@ -65,7 +65,7 @@ class ai_connection_manager:
                     
                     connection = ai_api_connection(
                         name=api_config["name"],
-                        model_list=api_config.get("models", []),
+                        model_dict=api_config.get("models", {}),
                         model_parameter=api_config.get("model_parameter", {}),
                         connection_object = connection_object
                     )
@@ -92,7 +92,7 @@ class ai_connection_manager:
                 name=config["name"],
                 base_url=config.get("base_url", ""),
                 api_key=config.get("api_key", ""),
-                model_list=config.get("model_list", []),
+                model_dict=config.get("model_dict", {}),
                 connection_object=config["connection_object"],
                 model_parameter=config.get("model_parameter", None)
             )
@@ -102,6 +102,18 @@ class ai_connection_manager:
         except KeyError as e:
             print(f"添加供应商失败: 缺少必要参数 {e}")
 
+    def get_model_information(self, manager_name:str, model_name:str)->dict:
+        """返回对应模型的信息
+
+        Args:
+            manager_name (str): api供应商名称
+            model_name (str): 模型名称
+
+        Returns:
+            dict: 参数字典
+        """
+        return self.connections[manager_name].model_dict[model_name]
+    
     async def del_connection(self, name: str) -> bool:
         """删除一个供应商连接
 

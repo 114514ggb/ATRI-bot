@@ -2,6 +2,14 @@ from dataclasses import dataclass
 from typing import Dict,List,Any
 
 
+class ToolCallsStopIteration(Exception):
+    """结束工具调用异常"""
+    def __init__(self, message:str = ""):
+        if message:
+            super().__init__(f"'tool_calls_end': {message}")
+        else:
+            super().__init__("end tool call")
+        
 
 @dataclass
 class rich_data():

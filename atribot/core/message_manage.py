@@ -94,7 +94,7 @@ class group_manage(message_manage):
     async def handle_message(self, message: rich_data, group_id:int) -> None:
         data = message.primeval
         
-        if group_id in self.group_white_list or ('user_id' in data and data['user_id'] == 2631018780):
+        if group_id in self.group_white_list or data.get('user_id') == 2631018780:
             
             pure_text = message.pure_text
             self.logger.debug(f"Received group message:{data}")
@@ -120,9 +120,9 @@ class group_manage(message_manage):
                         self.logger.error(f"聊天出现了错误:{e}")
                         await self.send_message.send_group_message(group_id,f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}")
                         
-            elif data['user_id'] != data['self_id']:
+            elif data['user_id'] != data['self_id'] and self.permissions_management.check_access(data["user_id"]):
                 try:
-                    
+
                     await self.event_trigger.dispatch(data,group_id)
                     
                 except Exception as e:

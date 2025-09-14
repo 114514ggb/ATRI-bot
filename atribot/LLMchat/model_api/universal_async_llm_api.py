@@ -67,8 +67,14 @@ class universal_ai_api(model_api_basics):
                     headers=self.headers,
                     data=data,
                 )
-                print(await response.text())
-                return await response.json()
+                response_text = await response.text()
+                print(response_text)
+    
+                try:
+                    return await response.json()
+                except aiohttp.ContentTypeError:
+                    return json.loads(response_text)
+                
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise  e
