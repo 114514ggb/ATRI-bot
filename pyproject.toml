@@ -12,10 +12,10 @@ dependencies = [
     "fastapi>=0.115",
     "aiomysql>=0.2.0",
     "websockets>=15.0.1",
-    "zhipuai>=2.1.5.20250801",
     "bs4>=0.0.2",
     "psutil>=7.0.0",
     "pyahocorasick>=2.2.0",
+    "bilibili-api-python>=17.3.0"
 ]
 
 [tool.uv.workspace]

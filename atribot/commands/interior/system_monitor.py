@@ -4,6 +4,7 @@ from datetime import datetime
 import psutil
 
 mcp:FuncCall = container.get("MCP")
+config = container.get("config")
 
 class SystemMonitor:
     """系统监控类，用于获取和展示系统信息"""
@@ -152,6 +153,30 @@ class SystemMonitor:
         header = "📡 系统MCP工具列表 (共{}个)\n".format(len(tools_info)) + "="*20
         return header + "\n" + separator.join(tools_info) + "\n" + "="*20
 
+    def get_model_info(self)->str:
+        """返回模型信息"""
+        chief_model= config.model.connect.model_name
+        spare_model_list = config.model.standby_model
+        model_parameter =  config.model.chat_parameter
+        
+        spare_emoji = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"]
+        spare_text = "\n".join([
+            f"   {spare_emoji[i] if i < len(spare_emoji) else i+1} {model['model_name']}\n"
+            for i, model in enumerate(spare_model_list)
+        ])
+        
+        return (
+            f"✨ 模型配置信息 ✨\n\n"
+            f"🎯 主模型: 🚀 {chief_model}\n\n"
+            f"🔄 备用模型:\n"
+            f"{spare_text}\n"
+            f"⚙️  参数设置:\n"
+            f"   🌡️  温度: {model_parameter['temperature']:.1f}\n"
+            f"   📉  频率惩罚: {model_parameter['frequency_penalty']:.1f}\n"
+            f"   📈  存在惩罚: {model_parameter['presence_penalty']:.1f}\n\n"
+        )
+        
+    
     async def view_list(self, arguments: list[str]) -> str:
         """查看指定东西的list信息，根据参数列表返回组合的系统信息"""
         time_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -203,6 +228,10 @@ class SystemMonitor:
             elif arg == "mcp":
                 output.append(self.get_mcp_info())
                 sections_added.add("mcp")
+            
+            elif arg == "model":
+                output.append(self.get_model_info())
+                sections_added.add("model")
                 
             else:
                 # 忽略无效参数或者已经处理过的参数

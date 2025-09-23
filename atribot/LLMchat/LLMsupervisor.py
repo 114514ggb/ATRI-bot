@@ -22,7 +22,7 @@ class GenerationRequest():
     """聊天历史"""
     supplier_name:str = ""
     """供应商"""
-    model_api:model_api_basics = None
+    model_api:model_api_basics|None = None
     """模型的api实例"""
     prompt: str = ""
     """嵌入上下文的模型输出内容提示"""
@@ -98,15 +98,20 @@ class large_language_model_supervisor():
         
         assistant_message:Dict = api_reply['choices'][0]['message']
         
-        increase_context.append(assistant_message)
-        
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
+            
+            increase_context.add_assistant_message(assistant_message['content'])
             return  self._update_response(
                 GenerationResponse(messages = increase_context.messages), 
                 assistant_message
             )
-             
+            
+        increase_context.add_assistant_tool_message(
+            assistant_message['content'],
+            assistant_message['tool_calls']
+        )
+        
         return await self.tool_calls_while(
             request = request,
             assistant_message = assistant_message,
@@ -172,15 +177,21 @@ class large_language_model_supervisor():
             self.logger.debug(f"工具调用后模型返回:{api_reply}")
             
             assistant_message:Dict = api_reply['choices'][0]['message']
-            
-            increase_context.append(assistant_message)
-            
+        
             if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
+                increase_context.add_assistant_tool_message(assistant_message['content'])
                 break
+            
+            increase_context.add_assistant_tool_message(
+                assistant_message['content'],
+                assistant_message['tool_calls']
+            )
         
         response.messages = increase_context.messages
         
         return self._update_response(response, assistant_message)
+    
+    
     
     @staticmethod
     def _update_response(response:GenerationResponse ,assistant_message:Dict)->GenerationResponse:
@@ -193,18 +204,14 @@ class large_language_model_supervisor():
         Returns:
             GenerationResponse: 更新后的response
         """
-        reply_text = assistant_message.get("content")
-        if isinstance(reply_text, str):
-            response.reply_text += reply_text
-        
-        reasoning_content = assistant_message.get("reasoningcontent")
-        if isinstance(reasoning_content, str):
-            response.reasoning_content += reasoning_content
+        response.reply_text += assistant_message.get("content")
+        response.reasoning_content += assistant_message.get("reasoningcontent","")
         
         return response
     
     @staticmethod
     async def get_chat_json(request:GenerationRequest, messages:List[Dict[str, Any]], model_api:model_api_basics)->Dict:
+        """发起向api的请求"""
         if request.parameter:
             parameter = {
                 "messages": messages,

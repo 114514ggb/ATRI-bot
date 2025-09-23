@@ -69,7 +69,7 @@ async def help_command(message_data: dict, list: bool = False):
     group_id = message_data["group_id"]
     if list:
         help_text = cmd_system.get_help_text()
-        await send_message.send_group_merge_forward(
+        await send_message.send_group_merge_text(
             group_id = group_id,
             message = help_text,
             source = "命令list"
@@ -195,7 +195,7 @@ async def permission_command_handler(
     description='要查看的系统组件',
     required=True,
     multiple=True,
-    choices=['all', 'sys', 'cpu', 'mem', 'disk', 'mcp']
+    choices=['all', 'sys', 'cpu', 'mem', 'disk', 'mcp', 'model']
 )
 async def handle_status_command(message_data: dict, components: list):
     """
@@ -209,7 +209,7 @@ async def handle_status_command(message_data: dict, components: list):
         await send_message.send_group_message(group_id, "ℹ️ 未生成任何信息，请检查您的输入参数。")
         return
 
-    await send_message.send_group_merge_forward(
+    await send_message.send_group_merge_text(
         group_id, 
         info_str,
         source = "查看信息"

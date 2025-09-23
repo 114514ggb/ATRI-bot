@@ -110,9 +110,13 @@ class Context():
         """添加用户消息"""
         self.messages.append({"role": "user", "content": content})
         
-    def add_assistant_message(self, content: str) -> None:
+    def add_assistant_message(self, content: str|None) -> None:
         """添加助手消息"""
-        self.messages.append({"role": "assistant", "content": content})
+        self.messages.append({"role": "assistant", "content": content if content else ""})
+        
+    def add_assistant_tool_message(self, content: str|None,tool_calls:List[Dict] = None) -> None:
+        """添加助手调用工具消息"""
+        self.messages.append({"role": "assistant", "content": content if content else "", "tool_calls": tool_calls})
         
     def add_system_message(self, content: str) -> None:
         """添加系统消息"""

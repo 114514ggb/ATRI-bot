@@ -3,7 +3,6 @@ from atribot.core.service_container import container
 from logging import Logger
 import json
 import aiohttp
-import uuid
 # import asyncio
 
 class qq_send_message():
@@ -44,7 +43,7 @@ class qq_send_message():
             self.logger.info("当前连接类型为"+connection_type+"\n")
             self._initialized = True
         
-    async def async_send(self, url, payload, echo = None):
+    async def async_send(self, url, payload, echo = False)->dict|None:
         """发送异步请求,返回json"""
         if self.connection_type == "http":
             url = f"{self.http_base_url}/{url}"
@@ -67,26 +66,15 @@ class qq_send_message():
                 "params": payload
             }
 
-            if echo is not None:
-                message["echo"] = echo
-
             try:
 
-                await self.websocketClient.websocket.send(json.dumps(message))
-                self.logger.info("WC请求发送成功")
+                if reply := await self.websocketClient.send(message,echo):
+                    return reply
+                # self.logger.info("WC请求发送成功")
+                return None
                 
             except Exception as e:
                 self.logger.error("WC发送请求失败:", e)
-                
-    async def requests_require_return(self, url: str, payload: dict) -> dict:
-        """请求而且需要返回值"""
-        if self.connection_type == "http":
-            return await self.async_send(url=url,payload=payload)
-        else:
-            request_id = str(uuid.uuid4())
-            await self.async_send(url=url,payload=payload,echo = request_id)
-
-            return await self.websocketClient.gain_echo(request_id)
 
     async def send_group_message(self,group_id: int, message:str|list):
         """
@@ -123,7 +111,7 @@ class qq_send_message():
         await self.send_group_message(group_id, params)
 
         
-    async def send_group_merge_forward(
+    async def send_group_merge_text(
         self,
         group_id: int, 
         message: str,
@@ -161,6 +149,52 @@ class qq_send_message():
                     }
                 }
             ],
+            "news": [
+                {
+                "text": preview
+                }
+            ],
+            "prompt": "果然是群聊天记录", #外显
+            "summary": "点击即看", #底下文本
+            "source": source #内容
+        }
+        
+        await self.async_send(api_url,payload)
+        
+    async def send_group_merge_forward(
+        self,
+        group_id: int, 
+        input_messages: list[list[dict]],
+        source: str = "男娘秘籍",
+        preview: str = "ATRI:晚上一个人偷偷看[图片]"
+    ):
+        """
+            发送群合并转发消息
+            Args:
+                group_id:群号 
+                input_messages:多条消息内容
+                source:标题
+                preview:预览
+        """
+        api_url = "send_group_forward_msg"
+        
+        messages = []
+        
+        for message in input_messages:
+            messages.append(
+                {
+                    "type": "node",
+                    "data": {
+                        "user_id": "3889393615",
+                        "nickname": "ATRI-亚托莉",
+                        "content": message
+                    }
+                }
+            )
+        
+        payload = {
+            "group_id": group_id,
+            "messages": messages,
             "news": [
                 {
                 "text": preview
@@ -335,7 +369,7 @@ class qq_send_message():
             "file_id": file_id,
         }
 
-        return await self.requests_require_return(url=url,payload=payload)
+        return await self.async_send(url=url,payload=payload,echo= True)
     
     async def get_stranger_info(self,qq_id:str)->dict:
         """获取账号信息
@@ -352,7 +386,7 @@ class qq_send_message():
             "user_id": qq_id,
         }
 
-        return await self.requests_require_return(url=url,payload=payload)
+        return await self.async_send(url=url,payload=payload,echo= True)
 
     async def get_recordg_details(self,
             file:str,
@@ -377,7 +411,7 @@ class qq_send_message():
             "out_format": out_format
         }
         
-        return await self.requests_require_return(url=url,payload=payload)
+        return await self.async_send(url=url,payload=payload,echo= True)
     
     async def get_msg_details(self,message_id:str):
         """获取消息详情"""
@@ -387,7 +421,7 @@ class qq_send_message():
             "message_id": message_id,
         }
 
-        return await self.requests_require_return(url=url,payload=payload)
+        return await self.async_send(url=url,payload=payload,echo= True)
     
     async def get_group_info(self,group_id:int)->dict:
         """获取群信息"""
@@ -397,7 +431,7 @@ class qq_send_message():
             "group_id": group_id,
         }
         
-        return await self.requests_require_return(url=url ,payload=payload)
+        return await self.async_send(url=url,payload=payload,echo= True)
             
         
     async def group_message_request(self,group_id,type,file_url,Path_type = True, get_return:bool = False)->None:
@@ -424,11 +458,9 @@ class qq_send_message():
                 }
             ],
         }
-        if get_return:
-            return await self.requests_require_return(url=url,payload = payload)
-        else:
-            await self.async_send(url=url,payload = payload)
-            # self.send(url,payload)
+
+        return await self.async_send(url=url,payload=payload,echo=get_return)
+
 
 
     async def Send_personal_message(self,qq_id, data,type):

@@ -182,19 +182,22 @@ class common():
 
 
     @staticmethod
-    def construction_message_dict(template: dict, url_prefix: str = "") -> list[dict]:
+    def construction_message_dict(template: list[dict], url_prefix: str = "") -> list[dict]:
         """
         将包含image和text的字典转换为指定格式的消息列表（按原始键顺序）
         
         Args:
             template (dict): 包含"image"和/或"text"键的字典
-            url_prefix (str): 图片文件路径的前缀
-        
+            url_prefix (str): 图片文件路径的前缀,会统一加在所有前面\n
+                本地路径:"file://D:/a.jpg"\n
+                网络路径:"http://123456.com/a.jpg"\n
+                base64编码:"base64://xxx"
+                
         Returns:
             list[dict]: 转换后的消息字典列表
         
         Example:
-            input: {"image":"ATRI_思考.jpg","text":"是思考啊"}
+            input: [{"image":"ATRI_思考.jpg"},{"text":"是思考啊"}]
             output: [
                 {"type": "image", "data": {"file": "path/ATRI_思考.jpg"}},
                 {"type": "text", "data": {"text": "是思考啊"}}
@@ -202,24 +205,25 @@ class common():
         """
         result = []
         
-        for key, value in template.items():
-            if not value:
-                continue
+        for item in template:
+            for key, value in item.items():
+                if not value:
+                    continue
                 
-            if key == "image":
-                image_path = url_prefix + value if url_prefix else value
-                result.append({
-                    "type": "image",
-                    "data": {
-                        "file": image_path
-                    }
-                })
-            elif key == "text":
-                result.append({
-                    "type": "text",
-                    "data": {
-                        "text": value
-                    }
-                })
+                if key == "image":
+                    image_path = url_prefix + value if url_prefix else value
+                    result.append({
+                        "type": "image",
+                        "data": {
+                            "file": image_path
+                        }
+                    })
+                elif key == "text":
+                    result.append({
+                        "type": "text",
+                        "data": {
+                            "text": value
+                        }
+                    })
         
         return result

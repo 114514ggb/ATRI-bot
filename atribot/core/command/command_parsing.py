@@ -547,7 +547,7 @@ class command_system:
         command = self.command_registry[command_name]
         
         if parsed.get("_help"):
-            await self.send_message.send_group_merge_forward(
+            await self.send_message.send_group_merge_text(
                 group_id = data["group_id"],
                 message = self._get_command_help(command),
                 source = "命令的帮助信息"

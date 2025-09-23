@@ -62,7 +62,7 @@ class ai_connection_manager:
                         base_url=api_config["base_url"],
                         api_key=api_config["api_key"]
                     )
-                    
+
                     connection = ai_api_connection(
                         name=api_config["name"],
                         model_dict=api_config.get("models", {}),

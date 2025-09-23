@@ -15,12 +15,10 @@ from atribot.core.service_container import container
 from atribot.LLMchat.emoji_system import emoji_core
 from atribot.core.atri_config import atri_config
 from atribot.LLMchat.chat import group_chat
-# from atribot.common import common
-from logging import Logger
-
-
 from fastapi import FastAPI, WebSocket
+# from atribot.common import common
 from typing import Dict, Any
+from logging import Logger
 import uvicorn
 import asyncio
 
@@ -28,6 +26,7 @@ import asyncio
 
 
 class BotFramework:
+    """主初始化类"""
     
     def __init__(self):
         self.logger:Logger = container.get("log")
@@ -146,6 +145,7 @@ class BotFramework:
         """
         
         self.logger.critical("bot作为服务端的连接模块写完后没有测试过最好使用bot_client!")
+        raise ValueError("配置错误")
         
         _message_router = message_router()
         app = FastAPI()
@@ -206,11 +206,10 @@ class BotFramework:
         self.creation_send_message()
         _message_router = message_router()
         
-        await WSClient.connect()
 
         WSClient.add_listener(_message_router.main)
         
-        await WSClient.start_while()
+        await WSClient.start()
     
     def creation_send_message(self)->None:
         """初始化发送消息class,还有环节最后的加载"""

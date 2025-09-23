@@ -38,6 +38,14 @@ class model_api_basics(ABC):
     }
     """模型参数"""
     
+    def __init__(self, 
+            api_key = "", 
+            base_url = ""
+        ):
+        self.base_url = base_url
+        self.api_key = api_key
+        
+        
     @abstractmethod
     async def generate_text_tools(self, model:str, messages:list, tools:list)->dict:
         """请求生成文本，全量默认参数
@@ -96,3 +104,6 @@ class model_api_basics(ABC):
             return data['choices'][0]['message']
         except EOFError:
             raise ValueError(data)
+        
+    def __str__(self):
+        return f"url:{self.base_url},api_key:{self.base_url}"

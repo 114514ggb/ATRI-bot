@@ -71,7 +71,6 @@
             "visual_sense":False
         }
     }
-    
 },
 {
     "name":"小憨憨",
@@ -103,5 +102,24 @@
         "openai/gpt-5-chat": {
             "visual_sense": False
         }
+    }
+},
+{
+    "name":"rinkoai",
+    "base_url":"https://rinkoai.com/v1/chat/completions",
+    "api_key":"sk-QtbNCpq9giS6s6a5Jncob7YTvS93Ikn5j30BkAivfBtDfzvz",
+    "models":{
+        "deepseek-ai/DeepSeek-R1":{
+            "visual_sense":False
+        },
+        "gpt-oss-120b":{
+            "visual_sense":False
+        },
+        "xai/grok-4-fast-non-reasoning":{
+            "visual_sense":False
+        },
+        "xai/grok-4-fast-reasoning":{
+            "visual_sense":False
+        },
     }
 },

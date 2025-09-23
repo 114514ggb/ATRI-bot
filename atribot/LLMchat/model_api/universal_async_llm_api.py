@@ -12,14 +12,15 @@ class universal_ai_api(model_api_basics):
             base_url = "https://api.deepseek.com/chat/completions", 
             tools = None
         ):
-
+        super().__init__(api_key=api_key,base_url=base_url)
+        
         self.headers = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
         """请求头"""
-
+        
         self.base_url = base_url
         if tools:
             self.tools = tools
@@ -67,13 +68,12 @@ class universal_ai_api(model_api_basics):
                     headers=self.headers,
                     data=data,
                 )
-                response_text = await response.text()
-                print(response_text)
-    
                 try:
-                    return await response.json()
+                    response_json = await response.json()
+                    print(response_json)
+                    return response_json
                 except aiohttp.ContentTypeError:
-                    return json.loads(response_text)
+                    return json.loads(await response.text())
                 
             except Exception as e:
                 if attempt == max_retries - 1:

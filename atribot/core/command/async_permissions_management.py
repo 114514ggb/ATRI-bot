@@ -100,9 +100,9 @@ class permissions_management:
             if target_user_id in target_list:
                 raise ValueError(f"无法添加：用户 {target_user_id} 已在该列表中。")
             
-            target_list.add(target_user_id)
-            
             await self._sync_to_db(target_user_id, permission_role, operator_id, 'add')
+            
+            target_list.add(target_user_id)
             
             self.logging.info(f"操作成功：用户 {target_user_id} 已被 {operator_id} 添加到 {permission_role} 列表。")
 
@@ -110,10 +110,10 @@ class permissions_management:
             if target_user_id not in target_list:
                 raise ValueError(f"无法删除：用户 {target_user_id} 不在该列表中。")
 
-            target_list.remove(target_user_id)
-
             await self._sync_to_db(target_user_id, permission_role, operator_id, 'remove')
-
+            
+            target_list.remove(target_user_id)
+            
             self.logging.info(f"操作成功：用户 {target_user_id} 已被 {operator_id} 从 {permission_role} 列表移除。")
         else:
             raise ValueError("无效的操作类型。")

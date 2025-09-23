@@ -2,17 +2,17 @@
     "network":
     {
         "connection_type":"WebSocket_client",
-        "url":"127.0.0.1:8080",
+        "url":"127.0.0.1:8888",
         "access_token":"ATRI114514",
         "server_port":3000
     },
     "account":{
-        "id":168238719,
+        "id":3930909243,
         "name":"ATRI-bot"
     },
     "file_path":{
-        "item_path":"/mnt/e/程序文件/python/ATRI-main/",
-        "document":"/mnt/e/程序文件/python/ATRI-main/document/",
+        "item_path":"E:/程序文件/python/ATRI-main/",
+        "document":"E:/程序文件/python/ATRI-main/document/",
         "procedure_root":"E:/程序文件/python/ATRI-main/",
         "emoji":"document/img/emojis",
         "commands":"atribot/commands",
@@ -22,8 +22,8 @@
     "model":{ 
         "connect":
         {
-            "supplier":"kourichat",
-            "model_name":"gpt-5-chat-latest",
+            "supplier":"rinkoai",
+            "model_name":"xai/grok-4-fast-reasoning",
             "visual_sense":false,
             "system_review":false
         },
@@ -33,14 +33,6 @@
             "presence_penalty":2.0
         },
         "standby_model":[
-            {
-                "supplier":"kourichat",
-                "model_name":"gemini-2.5-pro-old"
-            },
-            {
-                "supplier":"kourichat",
-                "model_name":"claude-sonnet-4-20250514"
-            },
             {
                 "supplier":"deepseek",
                 "model_name":"deepseek-chat"

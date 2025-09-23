@@ -164,7 +164,7 @@ class AIContextCommands:
             
             message += "💡 使用 /chat role <角色名> 切换角色"
         
-        await self.send_message.send_group_merge_forward(
+        await self.send_message.send_group_merge_text(
             group_id, 
             message,
             source = "查看角色列表"

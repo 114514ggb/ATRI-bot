@@ -1,5 +1,4 @@
 from logging.handlers import TimedRotatingFileHandler
-from datetime import datetime
 import logging
 import sys
 import os
@@ -46,10 +45,10 @@ class Logger:
                 os.makedirs(log_dir)
             
             file_handler = TimedRotatingFileHandler(
-                filename=f"{log_dir}/{datetime.now().strftime("%Y-%m-%d")}.log",
+                filename=f"{log_dir}/atri_log_",
                 when="midnight", 
                 interval=1,
-                backupCount=7,  
+                backupCount=14, 
                 encoding='utf-8'
             )
             file_handler.suffix = "%Y-%m-%d.log"
@@ -71,3 +70,4 @@ if __name__ == "__main__":
     logger.warning("这是一条warning信息")
     logger.error("这是一条error信息")
     logger.critical("这是一条critical信息")
+    

@@ -17,7 +17,7 @@ from atribot.core.types import Context
 from abc import ABC, abstractmethod
 from dataclasses import replace
 from logging import Logger
-from typing import Dict
+from typing import Dict, List
 import asyncio
 
 
@@ -154,7 +154,7 @@ class group_chat(chat_baseics):
 
         # 思考的信息
         if response.reasoning_content:
-            await self.send_message.send_group_merge_forward(
+            await self.send_message.send_group_merge_text(
                 group_id=group_id,
                 message=response.reasoning_content,
                 sourceb="推理内容",
@@ -179,7 +179,7 @@ class group_chat(chat_baseics):
     async def _try_model_request(
         self,
         request: GenerationRequest,
-        img_list: list[str],
+        img_list: List[str],
         group_id: int,
     ) -> GenerationResponse:
         """尝试模型请求，失败时自动降级到配置的备用API
@@ -193,6 +193,7 @@ class group_chat(chat_baseics):
             GenerationResponse: 回复
         """
         try:
+            # raise ValueError("测试用错误!")
             return await self.model_api_supervisor.step(request)
 
         except Exception as e:
@@ -200,13 +201,14 @@ class group_chat(chat_baseics):
                 f"错误上下文:{request.messages}\nuser输入:{request.new_message}\n"
                 f"群聊天出现了错误:{e}\n尝试备用api!"
             )
-
+            request.model_api = None
             cached_image_prompt = None
 
             for parameter in self.api_order:
+                
+                supplier = parameter["supplier"]
+                model_name = parameter["model_name"]
                 if img_list:
-                    supplier = parameter["supplier"]
-                    model_name = parameter["model_name"]
                     visual_sense = self.supplier.get_model_information(
                         supplier, model_name
                     )["visual_sense"]
@@ -214,14 +216,12 @@ class group_chat(chat_baseics):
                     if visual_sense == self.visual_sense:
                         new_request = replace(
                             request,
-                            model_api=None,
                             model=model_name,
                             supplier_name=supplier,
                         )
                     elif visual_sense:
                         new_request = replace(
                             request,
-                            model_api=None,
                             model=model_name,
                             supplier_name=supplier,
                             image_url_list=img_list,
@@ -235,14 +235,17 @@ class group_chat(chat_baseics):
 
                         new_request = replace(
                             request,
-                            model_api=None,
                             model=model_name,
                             supplier_name=supplier,
                             image_url_list=[],
                             prompt=cached_image_prompt,
                         )
                 else:
-                    new_request = request
+                    new_request = replace(
+                        request,
+                        model=model_name,
+                        supplier_name=supplier,
+                    )
 
                 try:
                     return await self.model_api_supervisor.step(new_request)

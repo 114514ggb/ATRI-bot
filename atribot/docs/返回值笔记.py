@@ -1240,7 +1240,26 @@ data_music = {'self_id': 168238719,
            'prompt_tokens_details': {'cached_tokens': 43},
            'total_tokens': 5547}}
 
-
+{'id': 'chatcmpl-CFglK8cufxIO7bVpJ23pHQClCx3oj',
+ 'model': 'gpt-5-chat-latest',
+ 'object': 'chat.completion',
+ 'created': 1757855334,
+ 'choices': [{'index': 0,
+              'message': {'role': 'assistant', 'content': None},
+              'finish_reason': 'content_filter'}],
+ 'usage': {'prompt_tokens': 6472,
+           'completion_tokens': 41,
+           'total_tokens': 6513,
+           'prompt_tokens_details': {'cached_tokens': 5248,
+                                     'text_tokens': 0,
+                                     'audio_tokens': 0,
+                                     'image_tokens': 0},
+           'completion_tokens_details': {'text_tokens': 0,
+                                         'audio_tokens': 0,
+                                         'reasoning_tokens': 0},
+           'input_tokens': 0,
+           'output_tokens': 0,
+           'input_tokens_details': None}}
 
 {'role': 'assistant',
  'content': '你好呀！我是 **DeepSeek-V3**，由 **深度求索（DeepSeek）** 开发的智能 AI 助手。🤖✨\n'

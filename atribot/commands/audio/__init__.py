@@ -114,7 +114,7 @@ async def handle_song_command(
 
     if list:
         playlist_str = song_manager.get_full_playlist()
-        await send_message.send_group_merge_forward(
+        await send_message.send_group_merge_text(
             group_id, 
             playlist_str,
             source = "查看歌单"
