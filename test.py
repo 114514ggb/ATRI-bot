@@ -1,4 +1,5 @@
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
+from atribot.LLMchat.RAG.rag import RAG_Manager
 import asyncio
 from pprint import pp
 
@@ -15,37 +16,55 @@ from pprint import pp
 # key = "sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI"
 # http = "https://k2sonnet.epiphanymind.com/api/openai/chat/completions"
 # key = "sk-543f17bfa2839c1e2f111ed18d65c0c0506be6899db86e2b"
-http = "https://rinkoai.com/v1/chat/completions"
-key = "sk-QtbNCpq9giS6s6a5Jncob7YTvS93Ikn5j30BkAivfBtDfzvz"
+# http = "https://rinkoai.com/v1/chat/completions"
+# key = "sk-QtbNCpq9giS6s6a5Jncob7YTvS93Ikn5j30BkAivfBtDfzvz"
+# http = "https://openrouter.ai/api/v1/chat/completions"
+# key = "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"
+http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
+# http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
+# key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
+# key = "AIzaSyDskabP58oDUOfyZPRHopIztPXh2HIt8uI"
+key = "AIzaSyC2vB_wCuRCxngUcb9C63ihNG2jMjKRRvI"
 
 
 tools = [
     {
-        "type": "function",
-        "function": {
-            "name": "send_speech_message",
-            "description": "可以将文本内容转换为语音并发送出去，让你可以发出声音。只支持中文和英文日语。最好不要包含代码什么的",
-            "parameters": {            
-                "type": "object",
-                "properties": {
-                    "message": {
-                        "type": "string",
-                        "description": "需要发送消息的文本内容，只支持中文和英文日语",
-                    }
-                }
+      "type": "function",
+      "function": {
+        "name": "get_weather",
+        "description": "Get the current weather in a given location",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "location": {
+              "type": "string",
+              "description": "The city and state, e.g. Chicago, IL"
             },
-            "required": ["message"]
+            "unit": {
+              "type": "string",
+              "enum": ["celsius", "fahrenheit"]
+            }
+          },
+          "required": ["location"]
         }
-    },
+      }
+    }
 ]
 
 # model = "deepseek-ai/DeepSeek-V3"
-model = "xai/grok-4-fast-reasoning"
+# model = "deepseek-ai/DeepSeek-R1"
 # model = "claude-3-5-haiku-20241022"
 # model = "gemini-2.5-flash-05-20"
 # model = "gemini-2.5-pro-free"
 # model = "deepseek-reasoner"
 # model = "k2sonnet-chat"
+# model = "gpt-oss-120b"
+# model = "xai/grok-4-fast-non-reasoning"
+# model = "xai/grok-4-fast-reasoning"
+model = "google-ai-studio/gemini-2.5-flash"
+# model = "google-ai-studio/gemini-2.5-pro"
+
+
 
 # chat = async_openAI(base_url = http, api_key = key , tools = tools)
 
@@ -56,7 +75,7 @@ model = "xai/grok-4-fast-reasoning"
 messages = [
     {"role": "user", "content": "还有你看的到你能用的工具吗？你支持函数调用吗？如果支持的话说说有什么工具？没有的话也没关系，这是一条测试消息"}
     # {"role": "user", "content": "9.11和9.8相比哪个数大?"}
-    # {"role": "user", "content": "你好！你是？你都会些什么呢？能干什么？"}
+    # {"role": "user", "content": "你好,你是？你能干什么？"}
     # {
     #     "role": "user",
     #     "content": [
@@ -70,12 +89,28 @@ messages = [
 # text = asyncio.run(chat.request_fetch_primary(my_messages = messages, my_model = model))
 # text =  asyncio.run(chat.generate_text(model, messages))['choices'][0]['message']
 
-# async def main():
-#     chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key , tools = tools)
-#     text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
-#     await chat.aclose()
-#     pp(text)
+async def main():
+    chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key , tools = tools)
+    text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
+    await chat.aclose()
+    pp(text)
 
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
+
+
+
+# async def main():
+#     ai_api = await universal_ai_api.create(
+#         base_url="https://rinkoai.com/v1/chat/completions",
+#         api_key="sk-W9KbPxcgvMvLAzOgHDy0d8dJmPMhOw0TKBVDiglUA2g2F4jU",
+#     )
+#     rag = RAG_Manager(ai_api)
+#     embedding = await rag.calculate_embedding("今天天气不行")
+#     print(embedding)
 
 # if __name__ == "__main__":
 #     asyncio.run(main())
+    

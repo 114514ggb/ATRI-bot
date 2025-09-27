@@ -65,8 +65,9 @@ class universal_ai_api(model_api_basics):
             try:
                 response = await self.client.post(
                     self.base_url,
-                    headers=self.headers,
+                    # headers=self.headers,
                     data=data,
+                    # proxy='http://127.0.0.1:7890' # 代理
                 )
                 try:
                     response_json = await response.json()
@@ -97,32 +98,31 @@ class universal_ai_api(model_api_basics):
             "model": model,
             "messages": messages,
         })
-        
         return await self._client_post(payload)
     
     async def generate_json_ample(self, model,remainder)->dict:
-        
         payload = json.dumps({
             "model": model,
         }|remainder)
-        
         return await self._client_post(payload)
     
-    async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024)->dict:
+    async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024, encoding:str = "float")->dict:
         """异步调用指定的嵌入模型，将输入的文本转换为向量表示。
 
         Args:
             model (str): 要使用的嵌入模型的编码
             input (Union[str, List[str]]): 需要进行向量化的文本内容。可以是单个字符串，或一个字符串列表。
             dimensions (int): 输出向量的维度。默认为 1024
+            encoding (str): 向量的编码格式。默认为 "float"。
 
         Returns:
             dict: _description_
         """
         payload = json.dumps({
-            "model": model,
-            "input":input,
-            "dimensions":dimensions
+            "model" : model,
+            "input" : input,
+            "dimensions" : dimensions,
+            "encoding_format" : encoding,
         })
         
         return await self._client_post(payload)

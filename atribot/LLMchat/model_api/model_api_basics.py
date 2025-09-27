@@ -95,7 +95,7 @@ class model_api_basics(ABC):
             model, 
             remainder = {
                 'messages': messages,
-                # 'tools': tools,
+                'tools': tools,
                 'temperature' : temperature,
                 'tool_choice': "auto" #有的模型要开启这个才能调用工具
             }

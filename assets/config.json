@@ -22,17 +22,23 @@
     "model":{ 
         "connect":
         {
-            "supplier":"rinkoai",
-            "model_name":"xai/grok-4-fast-reasoning",
+            "supplier":"google",
+            "model_name":"google-ai-studio/gemini-2.5-flash",
             "visual_sense":false,
             "system_review":false
         },
         "chat_parameter":{
-            "temperature":0.2,
-            "frequency_penalty":2.0,
-            "presence_penalty":2.0
+            "temperature":0.2
         },
         "standby_model":[
+            {
+                "supplier":"kourichat",
+                "model_name":"gpt-5-chat-latest"
+            },
+            {
+                "supplier":"xiaohanhan",
+                "model_name":"claude-sonnet-4-20250514:free"
+            },
             {
                 "supplier":"deepseek",
                 "model_name":"deepseek-chat"
@@ -41,7 +47,22 @@
                 "supplier":"bigModel",
                 "model_name":"GLM-4.5-Flash"
             }
-        ]
+        ],
+        "RAG":{
+            "enable":true,
+            "dimensions":1024,
+            "use_embedding_model":{
+                "supplier":"rinkoai",
+                "model_name":"BAAI/bge-m3"
+            },
+            "use_reranker_model":{
+                "supplier":"rinkoai",
+                "model_name":"BAAI/bge-reranker-v2-m3"
+            },
+            "vector_database":{
+
+            }
+        }
     },
     "ai_chat":{
         "playRole":"猫娘",
@@ -50,7 +71,7 @@
         "private_max_record":20
     },
     "group_white_list":[
-        1062704755, 1038698883, 984466158, 235984211, 2169027872, 779096917
+        984466158
     ],
     "mysql":
     {

@@ -123,8 +123,7 @@ class group_manage(message_manage):
             elif data['user_id'] != data['self_id'] and self.permissions_management.check_access(data["user_id"]):
                 try:
 
-                    # await self.event_trigger.dispatch(data,group_id)
-                    pass
+                    await self.event_trigger.dispatch(data,group_id)
                     
                 except Exception as e:
                     self.logger.error(f"群非@事件出现了错误:{e}")

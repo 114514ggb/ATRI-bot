@@ -123,3 +123,23 @@
         },
     }
 },
+{
+    "name":"openrouter",
+    "base_url":"https://openrouter.ai/api/v1/chat/completions",
+    "api_key":"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",
+    "models":{
+        "openai/gpt-oss-120b:free":{
+            "visual_sense":False
+        },
+    }
+},
+{
+    "name":"cloudflare",
+    "base_url":"https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions",
+    "api_key":"AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw",
+    "models":{
+        "google-ai-studio/gemini-2.5-flash":{
+            "visual_sense":True
+        },
+    }
+},

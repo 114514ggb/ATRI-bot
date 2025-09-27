@@ -1,8 +1,16 @@
-import numpy as np
+from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
+from atribot.core.service_container import container
+from atribot.common import common
+from typing import List
+
 
 class RAG_Manager:
-    def __init__(self):
-        pass
+    
+    
+    def __init__(self,embedding_api:universal_ai_api):
+        self.embedding_api = embedding_api
+        self.embedding_model = ""
+
     
     def generate_response(self, question:str, context:str)->str:
         """发起一次请求
@@ -14,23 +22,8 @@ class RAG_Manager:
         Returns:
             str: 回复
         """
-    
-    def calculate_similarity(self, embedding1: list[float], embedding2: list[float]) -> float:
-        """计算两个向量之间的余弦相似度。
 
-        余弦相似度衡量的是两个向量在方向上的一致性，而忽略它们的大小。
-        该值范围在 -1.0 到 1.0 之间。值越接近 1.0，表示两个向量越相似；
-        值越接近 -1.0，表示两个向量越不相似；0.0 表示两者正交（无关）。
-        这在自然语言处理中常用于比较词向量、句子向量或文档向量的语义相似性。
 
-        Args:
-            embedding1: 第一个向量，可以是一个列表或一个 NumPy 数组。
-            embedding2: 第二个向量，可以是一个列表或一个 NumPy 数组。
-
-        Returns:
-            float: 两个输入向量之间的余弦相似度，是一个介于 -1.0 和 1.0 之间的浮点数。
-        """
-        return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
     
     def Split_text(self, text:str)->list[str]:
         """长文本按照规则分割成文本块
@@ -42,15 +35,22 @@ class RAG_Manager:
             list[str]: 分割后的文本块列表
         """
         
-    def calculate_embedding(self, document:str)->list[float]:
-        """用嵌入式模型把文本转换成向量
+    async def calculate_embedding(self, document:str|List[str])->list[float]:
+        """用嵌入式模型把文本转换成向量5
 
         Args:
-            document (str): 要转换成向量的文本
+            document (str|List[str]): 要转换成向量的文本,或是要批量转换的文本列表
 
         Returns:
             list[float]: 包含向量的列表
         """
+        return await self.embedding_api.generate_embedding_vector(
+            model=self.embedding_model,
+            input=document,
+            dimensions=1024,
+            encoding="float"
+        )
+        
         
     def calculate_reranker(self, chunks:list[str], question:str, k:int=1)->list[str]:
         """根据问题对文本块列表进行相关性重排序，并返回得分最高的前 K 个文本块。
@@ -91,3 +91,5 @@ class RAG_Manager:
         Args:
             document (str): 要存储在向量数据库的记忆
         """
+        
+        

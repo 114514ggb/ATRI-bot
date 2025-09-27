@@ -308,6 +308,7 @@ class string_response:
         "礼物":[["img",["ATRI_礼物.gif"]]],
         "哈气":[["img",["ATRI_在哈气.png","ATRI_炸毛.png"]]],
         "老色批":[["img",["ATRI_给老色批一拳.jpg"]]],
+        "笨蛋":[["img",["ATRI_都是笨蛋.jpg"]]],
         "亚托莉生日快乐":[
             ["text",["谢谢你的好意啦！","谢谢你！亚托莉很开心哦！","你也要快乐哦！"]],
             ["mixture",[

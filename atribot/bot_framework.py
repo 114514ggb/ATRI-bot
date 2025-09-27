@@ -1,5 +1,6 @@
 from atribot.core.command.async_permissions_management import permissions_management
 from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
+from atribot.LLMchat.model_api.llm_api_account_pool import ai_api_account_pool
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.LLMsupervisor import large_language_model_supervisor
@@ -90,6 +91,43 @@ class BotFramework:
                 }
             }
         )
+        account_pool = ai_api_account_pool(
+            base_url = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions",
+            api_key_pool = [
+                'AIzaSyDskabP58oDUOfyZPRHopIztPXh2HIt8uI',
+                'AIzaSyDUxuMVytOUCLB0Ut7-IhjCqZqiaeoRoE0',
+                'AIzaSyCQqbd75kD8L-7TogabGjlWN3YIZr-BM1w',
+                'AIzaSyAJO7DQucigZlh4XCqL1NG0txfx7Lh7JZI',
+                'AIzaSyBRJtwjvhPW4gXLWBKmKcEyScHe_yIWyHM',
+                'AIzaSyD-tbcf4lHdSbAEmPgNwhf2Ffe_CctDjRo',
+                'AIzaSyBhDHK-4AxJsX9EUfDNecGcVfzyU2lQ5zs',
+                'AIzaSyADu9cMIsplb_6cOpMlWRZfPfa36qeB6GI',
+                'AIzaSyCgGsYPHZLjeIrocqBarN7fGNJPt1dTv74',
+                'AIzaSyCD17xzsUU6bJgrYlHA3z2MNDyKJDjkb3c',
+                'AIzaSyBPGYUk_CAb7_ueEbo_PjnFxp6RLJf3vBk',
+                'AIzaSyC2vB_wCuRCxngUcb9C63ihNG2jMjKRRvI'
+            ]
+        )
+        await account_pool.initialize()
+        LLMSupplier.add_connection(
+            name = "google",
+            connection_object = account_pool,
+            model_list = {
+                "google-ai-studio/gemini-2.5-flash": {
+                    "visual_sense": True
+                },
+                "google-ai-studio/gemini-2.5-pro": {
+                    "visual_sense": True
+                },
+                "google-ai-studio/gemini-2.0-flash": {
+                    "visual_sense": True
+                },
+                "google-ai-studio/gemini-2.5-flash-image-preview": {
+                    "visual_sense": True
+                },
+            }
+        )
+            
         
         #常用
         # container.register(

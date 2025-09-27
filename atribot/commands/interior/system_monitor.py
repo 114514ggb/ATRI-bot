@@ -171,9 +171,9 @@ class SystemMonitor:
             f"🔄 备用模型:\n"
             f"{spare_text}\n"
             f"⚙️  参数设置:\n"
-            f"   🌡️  温度: {model_parameter['temperature']:.1f}\n"
-            f"   📉  频率惩罚: {model_parameter['frequency_penalty']:.1f}\n"
-            f"   📈  存在惩罚: {model_parameter['presence_penalty']:.1f}\n\n"
+            f"   🌡️  温度: {model_parameter.get('temperature',0):.1f}\n"
+            f"   📉  频率惩罚: {model_parameter.get('frequency_penalty',0):.1f}\n"
+            f"   📈  存在惩罚: {model_parameter.get('presence_penalty',0):.1f}\n\n"
         )
         
     

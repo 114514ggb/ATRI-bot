@@ -101,14 +101,14 @@ class large_language_model_supervisor():
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
             
-            increase_context.add_assistant_message(assistant_message['content'])
+            increase_context.add_assistant_message(assistant_message.get('content',""))
             return  self._update_response(
                 GenerationResponse(messages = increase_context.messages), 
                 assistant_message
             )
             
         increase_context.add_assistant_tool_message(
-            assistant_message['content'],
+            assistant_message.get('content',""),
             assistant_message['tool_calls']
         )
         
@@ -179,11 +179,11 @@ class large_language_model_supervisor():
             assistant_message:Dict = api_reply['choices'][0]['message']
         
             if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
-                increase_context.add_assistant_tool_message(assistant_message['content'])
+                increase_context.add_assistant_tool_message(assistant_message.get('content',""))
                 break
             
             increase_context.add_assistant_tool_message(
-                assistant_message['content'],
+                assistant_message.get('content',""),
                 assistant_message['tool_calls']
             )
         

@@ -2,6 +2,7 @@ from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.core.command.command_parsing import command_system
 from atribot.core.service_container import container
 from atribot.commands.bromidic.get_bilibili import BiliBiliCrawler
+from bilibili_api import video
 
 
 cmd_system:command_system = container.get("CommandSystem")
@@ -24,32 +25,32 @@ send_message:qq_send_message = container.get("SendMessage")
 )
 @cmd_system.flag(
     name="info",
-    short="-i", 
+    short="i", 
     description="获取视频基本信息（标题、UP主、简介等）"
 )
 @cmd_system.flag(
     name="stats", 
-    short="-s",
+    short="s",
     description="获取统计数据（播放量、点赞数等）"
 )
 @cmd_system.flag(
     name="online",
-    short="-o", 
+    short="o", 
     description="获取在线观看人数"
 )
 @cmd_system.flag(
     name="danmaku",
-    short="-d",
+    short="d",
     description="获取弹幕信息"
 )
 @cmd_system.flag(
     name="charging",
-    short="-c",
+    short="c",
     description="获取充电用户信息"
 )
 @cmd_system.flag(
     name="all",
-    short="-a",
+    short="a",
     description="获取所有信息"
 )
 @cmd_system.argument(
@@ -79,14 +80,15 @@ async def bili_crawler_command(
  
         if all or not any([info, stats, online, danmaku, charging]):
             result = await crawler.get_video_information(bvid)
-            await send_message.send_group_merge_forward(group_id, [result])
+            await send_message.send_group_merge_forward(group_id, [result],source = "爬取返回值")
             return
         
         result = []
         
+        v = video.Video(bvid=bvid, credential=crawler.credential)
+        
         if info or stats:
-            from bilibili_api import video
-            v = video.Video(bvid=bvid, credential=crawler.credential)
+            
             video_info = await v.get_info()
             
             if info:
@@ -100,35 +102,32 @@ async def bili_crawler_command(
         
         # 在线人数
         if online:
-            from bilibili_api import video
-            v = video.Video(bvid=bvid, credential=crawler.credential)
+            
             online_data = await v.get_online()
             online_info = crawler.parse_online_info(online_data)
             crawler.add_text(result, online_info)
         
         # 弹幕信息
         if danmaku:
-            from bilibili_api import video
-            v = video.Video(bvid=bvid, credential=crawler.credential)
+            
             danmaku_data = await v.get_danmaku_view(0)
             danmaku_info = crawler.parse_danmaku_info(danmaku_data)
             crawler.add_text(result, danmaku_info)
         
         # 充电信息
         if charging:
-            from bilibili_api import video
-            v = video.Video(bvid=bvid, credential=crawler.credential)
+            
             charging_data = await v.get_chargers()
             charging_info = crawler.parse_charging_info(charging_data)
             result.extend(charging_info)
         
         if result:
-            await send_message.send_group_merge_forward(group_id, [result])
+            await send_message.send_group_merge_forward(group_id, [result],source = "爬取返回值")
         else:
-            await send_message.send_group_merge_text(group_id, "❌ 未获取到任何信息")
+            await send_message.send_group_merge_text(group_id, "❌ 未获取到任何信息",source = "爬取返回值")
             
-    except Exception:
-        raise "❌爬取失败!"
+    except Exception as e:
+        raise ValueError(f"❌爬取失败!\n{e}")
         
 
 

@@ -155,6 +155,24 @@ class common():
         return jaro_sim if common_prefix_len == 0 else jaro_sim + common_prefix_len * p * (1 - jaro_sim)
     
     @staticmethod
+    def calculate_similarity(embedding1: list[float], embedding2: list[float]) -> float:
+        """计算两个向量之间的余弦相似度。
+
+        余弦相似度衡量的是两个向量在方向上的一致性，而忽略它们的大小。
+        该值范围在 -1.0 到 1.0 之间。值越接近 1.0，表示两个向量越相似；
+        值越接近 -1.0，表示两个向量越不相似；0.0 表示两者正交（无关）。
+        这在自然语言处理中常用于比较词向量、句子向量或文档向量的语义相似性。
+
+        Args:
+            embedding1: 第一个向量，可以是一个列表或一个 NumPy 数组。
+            embedding2: 第二个向量，可以是一个列表或一个 NumPy 数组。
+
+        Returns:
+            float: 两个输入向量之间的余弦相似度，是一个介于 -1.0 和 1.0 之间的浮点数。
+        """
+        return np.dot(embedding1, embedding2) / (np.linalg.norm(embedding1) * np.linalg.norm(embedding2))
+    
+    @staticmethod
     def timer(func):
         """计算函数运行时间的装饰器（高精度）"""
         @functools.wraps(func)

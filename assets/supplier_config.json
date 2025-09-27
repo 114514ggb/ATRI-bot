@@ -36,21 +36,33 @@
             }
         },
         {
-            "name":"rinkoai",
-            "base_url":"https://rinkoai.com/v1/chat/completions",
-            "api_key":"sk-QtbNCpq9giS6s6a5Jncob7YTvS93Ikn5j30BkAivfBtDfzvz",
+            "name":"xiaohanhan",
+            "base_url":"https://newapi.hancat.work/v1/chat/completions",
+            "api_key":"sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI",
             "models":{
-                "deepseek-ai/DeepSeek-R1":{
-                    "visual_sense":false
+                "gemini-2.5-pro-preview-03-25": {
+                    "visual_sense": true
                 },
-                "gpt-oss-120b":{
-                    "visual_sense":false
+                "gemini-2.5-pro-preview-06-05": {
+                    "visual_sense": true
                 },
-                "xai/grok-4-fast-non-reasoning":{
-                    "visual_sense":false
+                "gemini-2.5-flash": {
+                    "visual_sense": true
                 },
-                "xai/grok-4-fast-reasoning":{
-                    "visual_sense":false
+                "Gemini-2.5-Flash-Image": {
+                    "visual_sense": true
+                },
+                "anthropic/claude-sonnet-4": {
+                    "visual_sense": false
+                },
+                "claude-sonnet-4-20250514:free": {
+                    "visual_sense": false
+                },
+                "claude-sonnet-4-20250514": {
+                    "visual_sense": false
+                },
+                "openai/gpt-5-chat": {
+                    "visual_sense": false
                 }
             }
         }

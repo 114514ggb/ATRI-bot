@@ -55,8 +55,12 @@ class BiliBiliCrawler:
         """视频信息"""
         online = await v.get_online()
         """在线人数"""
-        chargers = await v.get_chargers()
-        """视频充电用户"""
+        try:
+            chargers = await v.get_chargers()
+            """视频充电用户"""
+        except Exception:
+            chargers = {}
+            pass
         danmaku_info= await v.get_danmaku_view(0)#获取需要传入分P参数
         """弹幕信息"""
         
@@ -304,6 +308,8 @@ class BiliBiliCrawler:
         Returns:
             list: 返回图文混合的list
         """
+        if not charging_info:
+            return []
         try:
             total_count = charging_info.get('total_count', 0)
             count = charging_info.get('count', 0)
