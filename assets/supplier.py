@@ -75,34 +75,22 @@
 {
     "name":"小憨憨",
     "base_url":"https://newapi.hancat.work/v1/chat/completions",
-    # "api_key":"sk-hvNg3oRrFjjzi77kw22XVpLceuykldC7cxYfjcNzmyIEFSJm",#自己的
-    "api_key":"sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI",
+    "api_key":"sk-hvNg3oRrFjjzi77kw22XVpLceuykldC7cxYfjcNzmyIEFSJm",#自己的
+    # "api_key":"sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI",
     "models":{
-        "gemini-2.5-pro-preview-03-25": {
-            "visual_sense": True
-        },
-        "gemini-2.5-pro-preview-06-05": {
-            "visual_sense": True
-        },
         "gemini-2.5-flash": {
             "visual_sense": True
         },
-        "Gemini-2.5-Flash-Image": {
+        "gemini-2.5-pro": {
             "visual_sense": True
         },
-        "anthropic/claude-sonnet-4": {
+        "gpt-5-2025-08-07": {
             "visual_sense": False
         },
-        "claude-sonnet-4-20250514:free": {
+        "claude-4.1-opus": {
             "visual_sense": False
-        },
-        "claude-sonnet-4-20250514": {
-            "visual_sense": False
-        },
-        "openai/gpt-5-chat": {
-            "visual_sense": False
-        }
     }
+}
 },
 {
     "name":"rinkoai",

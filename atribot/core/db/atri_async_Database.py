@@ -2,32 +2,38 @@ import aiomysql
 from aiomysql import IntegrityError, Pool
 from atribot.core.service_container import container
 from contextvars import ContextVar
-from threading import Lock
+from typing import Optional, Tuple
 from logging import Logger
 import asyncio
 
 
 class AtriDB_Async:
-    """异步数据库操作类(连接池)"""
-    _pool: Pool = None
-    _lock = asyncio.Lock()
-    _thread_lock = Lock()
-    _close_lock = asyncio.Lock()
-    _conn_var: ContextVar[aiomysql.Connection] = ContextVar("conn")
-    _cursor_var: ContextVar[aiomysql.Cursor] = ContextVar("cursor")
-
+    """异步数据库连接池"""
+    _pool: Optional[Pool] = None
+    _init_lock = asyncio.Lock()
+    _context_conn: ContextVar[Optional[aiomysql.Connection]] = ContextVar('conn', default=None)
+    _context_cursor: ContextVar[Optional[aiomysql.Cursor]] = ContextVar('cursor', default=None)
+    
     def __init__(self):
-        self.log:Logger = container.get("log")
+        self.log: Logger = container.get("log")
+
     
     @classmethod
-    async def create(cls, host, user, password, pool_minsize=2, pool_maxsize=8):
-        """初始化连接池"""
-        log:Logger = container.get("log")
-        # with cls._thread_lock:
-        log.info("初始化数据库连接池...")
+    async def create(
+        cls, 
+        host: str, 
+        user: str, 
+        password: str, 
+        pool_minsize: int = 2, 
+        pool_maxsize: int = 8
+    ) -> "AtriDB_Async":
+        """推荐初始创建连接池（单例模式）的方法"""
+        log: Logger = container.get("log")
+        
         if cls._pool is None:
-            async with cls._lock:
+            async with cls._init_lock:
                 if cls._pool is None:
+                    log.info("初始化数据库连接池...")
                     cls._pool = await aiomysql.create_pool(
                         host=host,
                         user=user,
@@ -37,170 +43,136 @@ class AtriDB_Async:
                         autocommit=True,
                         minsize=pool_minsize,
                         maxsize=pool_maxsize,
-                        pool_recycle=300  # 重连
+                        pool_recycle=300
                     )
-                    
                     log.info(f"连接池已创建（大小：{pool_minsize}-{pool_maxsize}）")
         return cls()
     
     @classmethod
     async def close_pool(cls):
-        """关闭整个连接池"""
-        async with cls._close_lock:
-            if cls._pool:
-                print("关闭数据库连接池...")
-                cls._pool.close()
-                await cls._pool.wait_closed()
-                cls._pool = None
-                print("连接池已完全关闭")
-                
+        """关闭连接池"""
+        if cls._pool:
+            cls._pool.close()
+            await cls._pool.wait_closed()
+            cls._pool = None
+    
     async def __aenter__(self):
-        """从连接池获取连接并创建游标"""
-        self.conn = await self._pool.acquire()
-        self.cursor = await self.conn.cursor()
+        """获取连接和游标"""
+        if not self._pool:
+            raise RuntimeError("连接池未初始化，请先调用 create() 方法")
+        
+        self._conn = await self._pool.acquire()
+        self._cursor = await self._conn.cursor()
         return self
-     
+    
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """归还连接到池中"""
-        try:
-            await self.cursor.close()
-        except LookupError:
-            pass #如果找不到则忽略
-        finally:
-            try:
-                self._pool.release(self.conn)
-            except LookupError:
-                pass 
-        self.conn = None
-        self.cursor = None
+        """释放连接回池"""
+        if self._cursor:
+            await self._cursor.close()
+            self._cursor = None
         
-    async def error_close(self):
-        """立即触发连接释放"""
-        await self.__aexit__(None, None, None)
+        if self._conn and self._pool:
+            self._pool.release(self._conn)
+            self._conn = None
+    
+    async def _execute_with_pool(
+            self, 
+            query: str,
+            params: Tuple = None, 
+            fetch_type: str = None
+        ) -> any:
+        """使用连接池执行SQL（内部方法）"""
+        if hasattr(self, '_cursor') and self._cursor and not self._cursor.closed:
 
-    async def get_connection(self):
-        """显式获取连接（用于需要长期保持连接的场景）"""
-        if not self.conn:
-            self.conn = await self._pool.acquire()
-        return self.conn
-
-    async def release_connection(self):
-        """显式释放连接"""
-        if self.conn:
-            self._pool.release(self.conn)
-            self.conn = None
-
-    async def reconnect_pool(self,host, user, password, pool_minsize=2, pool_maxsize=8):
-        """重建整个连接池"""
-        async with self._lock:
-            if self._pool:
-                self._pool.close()
-                await self._pool.wait_closed()
-            self._pool = await aiomysql.create_pool(
-                host=host,  
-                user=user,
-                password=password,
-                db="atri",
-                autocommit=True,
-                minsize=pool_minsize,
-                maxsize=pool_maxsize
-            )
-
+            await self._cursor.execute(query, params)
+            if fetch_type == "one":
+                return await self._cursor.fetchone()
+            elif fetch_type == "all":
+                return await self._cursor.fetchall()
+            return True
         
-    async def _get_current_conn(self) -> None:
-        """获取当前协程的数据库conn连接（自动重连）"""
-        try:
-            if self.conn.closed:
-                #刷新conn
-                self.conn.close()
-                self.conn = await self._pool.acquire()
 
-        except LookupError:
-            # 未通过上下文管理器时自动获取
-            self.conn = await self._pool.acquire()
-
-                
-    async def _auto_connect(self):
-        """确保操作前有可用连接"""
-        try:
-            if self.cursor.closed:
-                self.cursor = await self.conn.cursor()
-        except LookupError:
-            await self._get_current_conn()
-            self.cursor = await self.conn.cursor()
-
-            
-    async def add_user(self, user_id, nickname):
+        if not self._pool:
+            raise RuntimeError("连接池未初始化")
+        
+        async with self._pool.acquire() as conn:
+            async with conn.cursor() as cursor:
+                await cursor.execute(query, params)
+                if fetch_type == "one":
+                    return await cursor.fetchone()
+                elif fetch_type == "all":
+                    return await cursor.fetchall()
+                return True
+    
+    async def add_user(self, user_id: int, nickname: str) -> bool:
         """添加用户"""
         try:
-            await self._auto_connect()
-            await self.cursor.execute(
+            await self._execute_with_pool(
                 """
-                    INSERT INTO users (user_id, nickname) 
-                    VALUES (%s, %s) AS new
-                    ON DUPLICATE KEY UPDATE 
-                        nickname = new.nickname,
-                        last_updated = CURRENT_TIMESTAMP
+                INSERT INTO users (user_id, nickname) 
+                VALUES (%s, %s) AS new
+                ON DUPLICATE KEY UPDATE 
+                    nickname = new.nickname,
+                    last_updated = CURRENT_TIMESTAMP
                 """,
                 (user_id, nickname)
             )
             return True
         except IntegrityError as e:
-            print(f"添加用户失败: {e}")
+            self.log.error(f"添加用户失败: {e}")
             return False
-        
-    async def get_user(self, user_id:int)->tuple:
-        """查询单个用户"""
-        await self._auto_connect()
-        await self.cursor.execute(
-            "SELECT * FROM users WHERE user_id = %s",
-            (user_id,)
-        )
-        return await self.cursor.fetchone()
     
-    async def add_group(self, group_id, group_name):
+    async def get_user(self, user_id: int) -> Optional[Tuple]:
+        """查询单个用户"""
+        return await self._execute_with_pool(
+            "SELECT * FROM users WHERE user_id = %s",
+            (user_id,),
+            fetch_type="one"
+        )
+    
+    async def add_group(self, group_id: int, group_name: str) -> bool:
         """添加群组"""
         try:
-            await self._auto_connect()
-            await self.cursor.execute(
+            await self._execute_with_pool(
                 """
-                    INSERT INTO user_group (group_id, group_name) 
-                    VALUES (%s, %s) AS new
-                    ON DUPLICATE KEY UPDATE 
-                        group_name = new.group_name
+                INSERT INTO user_group (group_id, group_name) 
+                VALUES (%s, %s) AS new
+                ON DUPLICATE KEY UPDATE 
+                    group_name = new.group_name
                 """,
                 (group_id, group_name)
             )
             return True
         except IntegrityError as e:
-            print(f"添加群组失败: {e}")
+            self.log.error(f"添加群组失败: {e}")
             return False
-        
-    async def get_group(self, group_id):
-        """查询单个群组"""
-        await self._auto_connect()
-        await self.cursor.execute(
-            "SELECT * FROM user_group WHERE group_id = %s",
-            (group_id,)
-        )
-        return await self.cursor.fetchone()
-
-    async def get_all_group(self)->tuple:
-        """查询所有群组"""
-        await self._auto_connect()
-        await self.cursor.execute(
-            "SELECT * FROM user_group",
-        )
-        return await self.cursor.fetchall()
     
-    async def add_message(self, message_id:int, user_id:int, group_id:int, timestamp:int, content:str)->bool:
-        """
-        添加消息
-        :param timestamp: 支持datetime对象或时间戳（整数）
-        """
+    async def get_group(self, group_id: int) -> Optional[Tuple]:
+        """查询单个群组"""
+        return await self._execute_with_pool(
+            "SELECT * FROM user_group WHERE group_id = %s",
+            (group_id,),
+            fetch_type="one"
+        )
+    
+    async def get_all_group(self) -> Tuple:
+        """查询所有群组"""
+        return await self._execute_with_pool(
+            "SELECT * FROM user_group",
+            fetch_type="all"
+        )
+    
+    async def add_message(
+        self, 
+        message_id: int, 
+        user_id: int, 
+        group_id: int,
+        timestamp: int, 
+        content: str
+    ) -> bool:
+        """添加消息"""
         try:
-            await self._auto_connect()
-            await self.cursor.execute(
+            await self._execute_with_pool(
                 """INSERT INTO message 
                 (message_id, user_id, group_id, time, message_content)
                 VALUES (%s, %s, %s, %s, %s)""",
@@ -208,72 +180,32 @@ class AtriDB_Async:
             )
             return True
         except IntegrityError as e:
-            print(f"添加消息失败，请检查外键约束: {e}")
+            self.log.error(f"添加消息失败: {e}")
             return False
-        
-    async def get_messages_by_user(self, user_id, limit=50)-> tuple:
+    
+    async def get_messages_by_user(self, user_id: int, limit: int = 50) -> Tuple:
         """查询用户最近消息"""
-        await self._auto_connect()
-        await self.cursor.execute(
+        return await self._execute_with_pool(
             """SELECT * FROM message 
             WHERE user_id = %s 
             ORDER BY time DESC 
             LIMIT %s""",
-            (user_id, limit)
+            (user_id, limit),
+            fetch_type="all"
         )
-        return await self.cursor.fetchall()
     
-    async def get_messages_by_group(self, group_id, limit=50)-> tuple:
+    async def get_messages_by_group(self, group_id: int, limit: int = 50) -> Tuple:
         """查询群组最近消息"""
-        await self._auto_connect()
-        await self.cursor.execute(
+        return await self._execute_with_pool(
             """SELECT * FROM message 
             WHERE group_id = %s 
             ORDER BY time DESC 
             LIMIT %s""",
-            (group_id, limit)
+            (group_id, limit),
+            fetch_type="all"
         )
-        return await self.cursor.fetchall()
     
-    async def execute_SQL(self, sql:str, argument:tuple)-> tuple:
+    async def execute_SQL(self, sql: str, argument: Tuple) -> Tuple:
         """执行SQL语句"""
-        await self._auto_connect()
-        await self.cursor.execute(sql, argument)
-        
-        return await self.cursor.fetchall()
-    
-    @property
-    def conn(self):
-        """获取数据库连接"""
-        return self._conn_var.get()
-    
-    @conn.setter
-    def conn(self, value):
-        """设置数据库连接"""
-        self._conn_var.set(value)
-        
-    @property
-    def cursor(self):
-        """获取数据库游标"""
-        return self._cursor_var.get()
+        return await self._execute_with_pool(sql, argument, fetch_type="all")
 
-    @cursor.setter
-    def cursor(self, value):
-        """设置数据库游标"""
-        self._cursor_var.set(value)
-    
-if __name__ == "__main__":
-    async def main():
-        async with await AtriDB_Async.create('localhost', 'root', '180710') as db:
-            # await db.add_user(123, 'test')
-            print(await db.get_user(2631018780))
-    
-    asyncio.run(main())
-    
-"""
-SELECT *
-FROM meassage
-WHERE group_id = group_id_value
-ORDER BY time DESC
-LIMIT 20;
-"""

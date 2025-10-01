@@ -1,6 +1,9 @@
+from typing import List
 import numpy as np
 import functools
+import asyncio
 import aiohttp
+import base64
 import time
 
 """
@@ -197,7 +200,48 @@ class common():
         
         return wrapper
     
-
+    @staticmethod
+    async def urls_to_base64(urls: List[str], prefix:str="data:image/jpeg;base64,",concurrency: int = 5) -> List[str]:
+        """
+        并发下载一组图片 URL，返回对应的 base64 字符串列表。
+        
+        Args:
+            urls: 图片地址列表
+            concurrency: 最大并发量
+            
+        Returns:
+            List[str]: 与输入顺序一致的 base64 字符串列表
+        """
+        semaphore = asyncio.Semaphore(concurrency)
+        
+        async with aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(limit=concurrency * 2),
+            headers={
+                'User-Agent': 'QQ/9.9.21-39038 CFNetwork/1220.1 Darwin/20.3.0',
+                'Accept': 'image/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'Connection': 'keep-alive',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            },
+            timeout=aiohttp.ClientTimeout(total=20)
+        ) as session:
+            
+            async def fetch(url: str) -> str:
+                async with semaphore:
+                    try:
+                        async with session.get(url) as resp:
+                            if resp.status == 200:
+                                content = await resp.read()
+                                if len(content) == 0:
+                                    return ""
+                                return f"{prefix}{base64.b64encode(content).decode('utf-8')}"
+                            else:
+                                return ""
+                    except Exception:
+                        return ""
+                
+            return await asyncio.gather(*(fetch(u) for u in urls))
 
     @staticmethod
     def construction_message_dict(template: list[dict], url_prefix: str = "") -> list[dict]:
@@ -245,3 +289,10 @@ class common():
                     })
         
         return result
+
+# if __name__ == "__main__":
+#     from pprint import pp
+#     import asyncio
+#     pp(asyncio.run(common().urls_to_base64([
+#         "https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=EhRl36i0Ixf49SDmjaxVmdMR8yjTbxiy7gkg_wooi-CA6LqAkAMyBHByb2RQgL2jAVoQLpqJOxD9AwyKKIfSiRqTbnoCqTSCAQJneg&rkey=CAMSMBxmyRdldyYvmTxVpyDAQfvIrP8IrUvbXvIyLFWRP6UZ4-mTM3FdgweFUupCGBBeRg"
+#     ])))

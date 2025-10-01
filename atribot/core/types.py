@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Dict,List,Any
 
 
+
 class ToolCallsStopIteration(Exception):
     """结束工具调用异常"""
     def __init__(self, message:str = ""):
@@ -9,7 +10,7 @@ class ToolCallsStopIteration(Exception):
             super().__init__(f"'tool_calls_end': {message}")
         else:
             super().__init__("end tool call")
-        
+
 
 @dataclass
 class rich_data():
@@ -112,11 +113,11 @@ class Context():
         
     def add_assistant_message(self, content: str|None) -> None:
         """添加助手消息"""
-        self.messages.append({"role": "assistant", "content": content if content else ""})
+        self.messages.append({"role": "assistant", "content": content})
         
     def add_assistant_tool_message(self, content: str|None,tool_calls:List[Dict] = None) -> None:
         """添加助手调用工具消息"""
-        self.messages.append({"role": "assistant", "content": content if content else "", "tool_calls": tool_calls})
+        self.messages.append({"role": "assistant", "content": content, "tool_calls": tool_calls})
         
     def add_system_message(self, content: str) -> None:
         """添加系统消息"""

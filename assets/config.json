@@ -24,7 +24,7 @@
         {
             "supplier":"google",
             "model_name":"google-ai-studio/gemini-2.5-flash",
-            "visual_sense":false,
+            "visual_sense":true,
             "system_review":false
         },
         "chat_parameter":{
@@ -37,7 +37,7 @@
             },
             {
                 "supplier":"xiaohanhan",
-                "model_name":"claude-sonnet-4-20250514:free"
+                "model_name":"claude-4.1-opus"
             },
             {
                 "supplier":"deepseek",

@@ -1,6 +1,7 @@
 from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.commands.bromidic.picture_processing import pictureProcessing
 from atribot.core.service_container import container
-import random
+
 
 
 tool_json = {
@@ -32,14 +33,21 @@ send_message:qq_send_message = container.get("SendMessage")
 
 async def main(group_id, prompt, width="1024", height="1024"):
     """生成发送图片消息"""
-    model = "gptimage" #flux,kontext,turbo,gptimage
-    Token = "56zs_9uGTfe19hUH"
-    Seed = random.randint(1, 65535)
+    #可用模型https://image.pollinations.ai/models
+    # ["flux","kontext","turbo","nanobanana"]
     
     # url = await self.model.generate_image(prompt)
     #&enhance=true
-    url = f"https://image.pollinations.ai/prompt/{prompt}?width={width}&height={height}&private=true&Seed={Seed}&Model={model}&Token={Token}"
+    url_base64 = await pictureProcessing.generate_image_base64(
+        prompt = prompt,
+        width = width,
+        height = height,
+        model = "nanobanana",
+        timeout = 20
+    )
 
-    data = await send_message.send_group_pictures(group_id,url,local_Path_type=False,get_return=True)
+    data = await send_message.send_group_pictures(group_id,f"base64://{url_base64}",local_Path_type=False,get_return=True)
     # print("图片发送成功")
-    return {"send_image_message": {"status":f"{data}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}}
+    return {"send_image_message": {"status":f"发送结果：{data}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}}
+
+

@@ -4,6 +4,13 @@ from logging import Logger
 import json
 import aiohttp
 # import asyncio
+"""
+文件支持的格式：
+- 本地路径: "file://<绝对路径>", 如 "file://D:/a.jpg"
+- 网络路径: "http://<URL>" 或 "https://<URL>", 如 "http://example.com/image.png"
+- Base64编码: "base64://<编码字符串>", 如 "base64://iVBORw0KGgo..."
+"""
+
 
 class qq_send_message():
     """qq接口有关的请求发送器"""

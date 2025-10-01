@@ -2,6 +2,7 @@ from atribot.LLMchat.LLMsupervisor import (
     large_language_model_supervisor,
     GenerationRequest,
     GenerationResponse,
+    LLMSRequestFailed
 )
 from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
 from atribot.core.network_connections.qq_send_message import qq_send_message
@@ -15,9 +16,10 @@ from atribot.LLMchat.emoji_system import emoji_core
 from atribot.core.data_manage import data_manage
 from atribot.core.types import Context
 from abc import ABC, abstractmethod
+from atribot.common import common
 from dataclasses import replace
-from logging import Logger
 from typing import Dict, List
+from logging import Logger
 import asyncio
 
 
@@ -130,8 +132,11 @@ class group_chat(chat_baseics):
         increase_context.add_user_message(user_import)
 
         img_prompt = None
-        if img_list and not self.visual_sense:
-            img_prompt = await self.image_processing(img_list)
+        if img_list:
+            if not self.visual_sense:
+                img_prompt = await self.image_processing(img_list)
+            else:
+                img_list = await common.urls_to_base64(img_list)
 
         prompt = await self.prompt_structure(group_id, img_prompt)
 
@@ -182,7 +187,7 @@ class group_chat(chat_baseics):
         img_list: List[str],
         group_id: int,
     ) -> GenerationResponse:
-        """尝试模型请求，失败时自动降级到配置的备用API
+        """尝试模型请求,失败时自动降级到配置的备用API
 
         Args:
             request (GenerationRequest): 请求体
@@ -196,64 +201,66 @@ class group_chat(chat_baseics):
             # raise ValueError("测试用错误!")
             return await self.model_api_supervisor.step(request)
 
+        except LLMSRequestFailed as e:
+            self.log.error(f"群聊天出现了错误:{e}\n尝试备用api!")
+            request.generation_response = e.get_response()
         except Exception as e:
-            self.log.error(
-                f"错误上下文:{request.messages}\nuser输入:{request.new_message}\n"
-                f"群聊天出现了错误:{e}\n尝试备用api!"
-            )
-            request.model_api = None
-            cached_image_prompt = None
+            self.log.error(f"群聊天出现了错误:{e}\n尝试备用api!")
+            
+        request.model_api = None
+        cached_image_prompt = None
+        
+        for parameter in self.api_order:
+            
+            supplier = parameter["supplier"]
+            model_name = parameter["model_name"]
+            if img_list:
+                visual_sense = self.supplier.get_model_information(
+                    supplier, model_name
+                )["visual_sense"]
 
-            for parameter in self.api_order:
-                
-                supplier = parameter["supplier"]
-                model_name = parameter["model_name"]
-                if img_list:
-                    visual_sense = self.supplier.get_model_information(
-                        supplier, model_name
-                    )["visual_sense"]
-
-                    if visual_sense == self.visual_sense:
-                        new_request = replace(
-                            request,
-                            model=model_name,
-                            supplier_name=supplier,
-                        )
-                    elif visual_sense:
-                        new_request = replace(
-                            request,
-                            model=model_name,
-                            supplier_name=supplier,
-                            image_url_list=img_list,
-                            prompt=await self.prompt_structure(group_id),
-                        )
-                    else:
-                        if not cached_image_prompt:
-                            cached_image_prompt = await self.prompt_structure(
-                                group_id, await self.image_processing(img_list)
-                            )
-
-                        new_request = replace(
-                            request,
-                            model=model_name,
-                            supplier_name=supplier,
-                            image_url_list=[],
-                            prompt=cached_image_prompt,
-                        )
-                else:
+                if visual_sense == self.visual_sense:
                     new_request = replace(
                         request,
                         model=model_name,
                         supplier_name=supplier,
                     )
+                elif visual_sense:
+                    new_request = replace(
+                        request,
+                        model=model_name,
+                        supplier_name=supplier,
+                        image_url_list=img_list,
+                        prompt=await self.prompt_structure(group_id),
+                    )
+                else:
+                    if not cached_image_prompt:
+                        cached_image_prompt = await self.prompt_structure(
+                            group_id, await self.image_processing(img_list)
+                        )
 
-                try:
-                    return await self.model_api_supervisor.step(new_request)
-                except Exception as e:
-                    self.log.error(f"备用api{parameter}出现了错误!:{e}")
+                    new_request = replace(
+                        request,
+                        model=model_name,
+                        supplier_name=supplier,
+                        image_url_list=[],
+                        prompt=cached_image_prompt,
+                    )
+            else:
+                new_request = replace(
+                    request,
+                    model=model_name,
+                    supplier_name=supplier,
+                )
 
-            self.log.error("所有备用api出现错误!")
-            return GenerationResponse(messages=[])
+            try:
+                return await self.model_api_supervisor.step(new_request)
+            except Exception as e:
+                self.log.error(f"备用api{parameter}出现了错误!:{e}")
+
+        self.log.error("所有备用api出现错误!")
+        raise ValueError("所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
+
 
     async def prompt_structure(self, group_id: int, img_prompt: str) -> str:
         """提示词构造方法

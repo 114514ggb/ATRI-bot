@@ -2,12 +2,13 @@ from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.core.command.command_parsing import command_system
 from atribot.core.service_container import container
 from atribot.commands.bromidic.get_bilibili import BiliBiliCrawler
+from atribot.commands.bromidic.picture_processing import pictureProcessing
 from bilibili_api import video
 
 
 cmd_system:command_system = container.get("CommandSystem")
 send_message:qq_send_message = container.get("SendMessage")
-
+image_processing = pictureProcessing()
 
 
 
@@ -130,4 +131,28 @@ async def bili_crawler_command(
         raise ValueError(f"❌爬取失败!\n{e}")
         
 
+
+@cmd_system.register_command(
+    name="picture_processing",
+    description="图片处理命令",
+    aliases=["图片","image","img"],
+    examples=[
+        "/picture_processing 在草地上奔跑的猫咪",
+        "/image 一只戴着眼镜的狐狸 [CQ:image,file=example.jpg]"
+    ],
+    authority_level=1
+)
+@cmd_system.argument(
+    name="prompt",
+    description="图片处理的提示词",
+    required=True,
+    metavar="PROMPT"
+)
+async def picture_processing(message_data: dict, prompt:str):
+    """图片处理命令处理函数"""
+    
+    img_base64 = await image_processing.step(message_data, prompt)
+    group_id = message_data["group_id"]
+    
+    await send_message.send_group_pictures(group_id,f"base64://{img_base64}",local_Path_type=False)
 
