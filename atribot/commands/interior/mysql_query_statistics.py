@@ -1,6 +1,6 @@
 from datetime import datetime,timedelta
 from atribot.core.service_container import container
-from atribot.core.db.atri_async_Database import AtriDB_Async
+from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.common import common
 
@@ -15,7 +15,7 @@ class UserActivityAnalyzer:
     """
     
     def __init__(self):
-        self.db:AtriDB_Async = container.get("database")
+        self.db:AsyncDatabaseBase = container.get("database")
         self.send_message:qq_send_message = container.get("SendMessage")
     
     async def query_mysql(self, message_data: dict, user_id:int = 0)->None:
@@ -48,15 +48,25 @@ class UserActivityAnalyzer:
         Returns:
             bool: 是否成功找到用户
         """
+#         sql_days = """
+# SELECT
+#   SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 86400 THEN 1 ELSE 0 END) AS daily_count,
+#   SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 604800 THEN 1 ELSE 0 END) AS weekly_count,
+#   SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 2592000 THEN 1 ELSE 0 END) AS monthly_count,
+#   COUNT(*) AS total_count,
+#   MIN(time) AS earliest_time
+# FROM message
+# WHERE user_id = %s
+# """
         sql_days = """
 SELECT
-  SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 86400 THEN 1 ELSE 0 END) AS daily_count,
-  SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 604800 THEN 1 ELSE 0 END) AS weekly_count,
-  SUM(CASE WHEN time >= UNIX_TIMESTAMP() - 2592000 THEN 1 ELSE 0 END) AS monthly_count,
+  SUM(CASE WHEN time >= EXTRACT(EPOCH FROM NOW()) - 86400 THEN 1 ELSE 0 END) AS daily_count,
+  SUM(CASE WHEN time >= EXTRACT(EPOCH FROM NOW()) - 604800 THEN 1 ELSE 0 END) AS weekly_count,
+  SUM(CASE WHEN time >= EXTRACT(EPOCH FROM NOW()) - 2592000 THEN 1 ELSE 0 END) AS monthly_count,
   COUNT(*) AS total_count,
   MIN(time) AS earliest_time
 FROM message
-WHERE user_id = %s
+WHERE user_id = $1
 """
         async with self.db as db:
             my_tuple = await db.get_user(user_id)

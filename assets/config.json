@@ -28,7 +28,8 @@
             "system_review":false
         },
         "chat_parameter":{
-            "temperature":0.2
+            "temperature":0.2,
+            "reasoning_effort": "high"
         },
         "standby_model":[
             {
@@ -65,7 +66,7 @@
         }
     },
     "ai_chat":{
-        "playRole":"猫娘",
+        "playRole":"ATRI",
         "ai_max_record":20,
         "group_max_record":20,
         "private_max_record":20
@@ -73,10 +74,10 @@
     "group_white_list":[
         984466158
     ],
-    "mysql":
+    "database":
     {
         "host":"127.0.0.1",
-        "user":"root",
+        "user":"postgres",
         "password":"180710"
     }
 }

@@ -2,7 +2,7 @@ from atribot.core.command.async_permissions_management import permissions_manage
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.command.command_parsing import command_system
-from atribot.core.db.atri_async_Database import AtriDB_Async
+from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 from atribot.core.data_manage import data_manage
 from atribot.LLMchat.chat import group_chat
@@ -16,9 +16,10 @@ class message_router():
     
     def __init__(self):
         self.logger:Logger = container.get("log")
-        self.db:AtriDB_Async = container.get("database")
+        self.db:AsyncDatabaseBase = container.get("database")
         self.send_message:qq_send_message = container.get("SendMessage")
         self.group_manage = group_manage()
+        self.group_set = set()
     
     async def main(self, data:dict):
         """主消息处理逻辑"""
@@ -33,40 +34,46 @@ class message_router():
         if group_id := data.get("group_id"):            
             await self.group_manage.handle_message(_rich_data, group_id)
         else:
-            pass
+            return
         
-        await self.store_data(_rich_data)
+        await self.store_data(_rich_data,group_id)
             
 
-    async def store_data(self, rich_data:rich_data)->None:
+    async def store_data(self, rich_data:rich_data, group_id:int)->None:
         """存储消息"""
         data = rich_data.primeval
     
-        if "post_type" in data and data["post_type"] == "message":
+        if not (data.get("post_type") == "message"):
+            return
+        
+        if group_id not in self.group_set:
+            group_name = (await self.send_message.get_group_info(group_id))["data"]["group_name"]
+            self.group_set.add(group_id)
+            try:
+                user_group = {"group_id": group_id, "group_name": group_name}
+                async with self.db as db:
+                    await db.add_group(**user_group)
+            except Exception as e:
+                self.logger.warning(f"群信息存储失败:{e}")
+        
+        try:
+            users = {"user_id":data["user_id"],"nickname":data['sender']['nickname']}
+            message ={"message_id":data["message_id"],"content":rich_data.text,"timestamp":data["time"],"group_id":group_id,"user_id":data["user_id"]}
+        except Exception as e:
+            self.logger.warning(f"获取db存储参数失败:{e}")
+            return
+        
+        try:
+            async with self.db as db:
+                await db.add_user(**users)
+                await db.add_message(**message)
                 
-                group_name = (await self.send_message.get_group_info(data["group_id"]))["data"]["group_name"]
-                
-                try:
-                    users = {"user_id":data["user_id"],"nickname":data['sender']['nickname']}
-                    message ={"message_id":data["message_id"],"content":rich_data.text,"timestamp":data["time"],"group_id":data["group_id"],"user_id":data["user_id"]}
-                    user_group = {"group_id":data["group_id"],"group_name":group_name}
-                except Exception as e:
-                    self.logger.warning(f"获取db存储参数失败:{e}")
-                    return
-                
-                try:
-                    async with self.db as db:
-                        await db.add_user(**users)
-                        await db.add_group(**user_group)
-                        await db.add_message(**message)
-                        
-                    return
-                    
-                except Exception as e:
-                    self.logger.warning(f"数据存储失败:{e}")
-                    await self.db.error_close()
-                    return
-    
+            return
+            
+        except Exception as e:
+            self.logger.warning(f"数据存储失败:{e}")
+            return
+
     
     
 class message_manage(ABC):

@@ -18,6 +18,20 @@ class model_api_basics(ABC):
 
         'max_tokens': 8192,#介于 1 到 8192 间的整数，限制一次请求中模型生成 completion 的最大 token 数。输入 token 和输出 token 的总长度受模型的上下文长度的限制。
 
+        'reasoning_effort':'high',
+        #推理努力程度，值可以是 "low", "medium", "high", "extreme"。
+        #停用思考功能，可以将 reasoning_effort 设置为 "none"
+        #默认值为 "medium"。更高的推理努力程度通常会导致更准确和详细的回答，但也可能需要更多的计算资源和时间。
+        # "extra_body": {
+        #     "google": {
+        #         "thinking_config": {
+        #             "include_thoughts": True
+        #         }
+        #     }
+        # },
+        #谷歌模型的openai兼容.思考总结是模型原始思考的合成版本，可帮助您深入了解模型的内部推理过程。
+        #请注意，思考预算适用于模型的原始想法，而不适用于想法摘要
+        
         'tool_choice': "auto",#控制模型调用 tool 的行为
         # # none 意味着模型不会调用任何 tool，而是生成一条消息。
         # # auto 意味着模型可以选择生成一条消息或调用一个或多个 tool。
@@ -97,7 +111,15 @@ class model_api_basics(ABC):
                 'messages': messages,
                 'tools': tools,
                 'temperature' : temperature,
-                'tool_choice': "auto" #有的模型要开启这个才能调用工具
+                'tool_choice': "auto", #有的模型要开启这个才能调用工具
+                # "reasoning_effort": "high",
+                # "extra_body": {
+                #     "google": {
+                #         "thinking_config": {
+                #             "include_thoughts": True
+                #         }
+                #     }
+                # }
             }
         )
         try:

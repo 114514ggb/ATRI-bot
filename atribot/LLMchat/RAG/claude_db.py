@@ -328,5 +328,5 @@ async def main():
 
 # 运行示例
 if __name__ == "__main__":
-    # asyncio.run(main())
-    milvus_client = MilvusClient(uri="./milvus_demo.db")
+    asyncio.run(main())
+    # milvus_client = MilvusClient(uri="./milvus_demo.db")

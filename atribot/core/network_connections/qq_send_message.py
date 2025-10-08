@@ -308,13 +308,15 @@ class qq_send_message():
         await self.async_send(api_url,payload)
    
    
-    async def set_group_ban(self,group_id:str|int, user_id:str|int, duration:int = 1800):
+    async def set_group_ban(self,group_id:str|int, user_id:str|int, duration:int = 1800)->dict:
         """
             禁言群成员\n
             Args:
                 group_id: 群号\n
                 user_id: 要禁言的成员QQ号\n
                 duration: 禁言时长(单位:秒)
+            Returns:
+                dict: 返回结果详情
         """
         api_url = "set_group_ban"
 
@@ -324,7 +326,7 @@ class qq_send_message():
             "duration": duration
         }
 
-        await self.async_send(api_url,payload)
+        return await self.async_send(api_url,payload,echo = True)
    
 
     async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True, get_return = False)->dict|None:

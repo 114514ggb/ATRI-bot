@@ -10,8 +10,9 @@ class pictureProcessing:
     
     def __init__(self):
         self.step_lock = asyncio.Lock()
+        
     
-    async def step(self,message_data: dict, prompt:str)-> str:
+    async def step(self,message_data: dict[str,dict], prompt:str)-> str:
         """图片处理主函数
 
         Args:
@@ -29,6 +30,15 @@ class pictureProcessing:
             raise RuntimeError("系统繁忙，请稍后再试。")
         
         image_url_list:List[str] = []
+        
+        if message_data["message"][0]["type"] == "reply":
+            from atribot.core.network_connections.qq_send_message import qq_send_message
+            from atribot.core.service_container import container
+            send_message:qq_send_message = container.get("SendMessage")
+            reply_data = (await send_message.get_msg_details(message_data["message"][0]["data"]["id"]))["data"]
+            for reply_message in reply_data["message"]:
+                if reply_message.get("type") == "image":
+                    image_url_list.append(reply_message["data"]["url"])
         
         for message in message_data["message"]:
             if message.get("type") == "image":

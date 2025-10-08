@@ -5,11 +5,11 @@ from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.LLMsupervisor import large_language_model_supervisor
 from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
+from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from atribot.core.cache.message_buffer_memory import message_cache
 from atribot.core.command.command_parsing import command_system
 from atribot.core.cache.chan_context import context_management
 from atribot.core.command.command_loader import command_loader
-from atribot.core.db.atri_async_Database import AtriDB_Async
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.message_manage import message_router
 from atribot.core.service_container import container
@@ -57,10 +57,10 @@ class BotFramework:
         #数据库
         container.register(
             "database",
-            await AtriDB_Async.create(
-                self.config.mysql.host, 
-                self.config.mysql.user,
-                self.config.mysql.password
+            await atriAsyncPostgreSQL.create(
+                host = self.config.database.host, 
+                user = self.config.database.user,
+                password = self.config.database.password
             )
         )
         
@@ -105,7 +105,19 @@ class BotFramework:
                 'AIzaSyCgGsYPHZLjeIrocqBarN7fGNJPt1dTv74',
                 'AIzaSyCD17xzsUU6bJgrYlHA3z2MNDyKJDjkb3c',
                 'AIzaSyBPGYUk_CAb7_ueEbo_PjnFxp6RLJf3vBk',
-                'AIzaSyC2vB_wCuRCxngUcb9C63ihNG2jMjKRRvI'
+                'AIzaSyC2vB_wCuRCxngUcb9C63ihNG2jMjKRRvI',
+                'AIzaSyARXSt2s4eJVbps5qV-OTRoSaxfV12BGF0',
+                'AIzaSyDXiseA2W76jtgSj7V8rxPEfCbUknqRed8',
+                'AIzaSyD0rvPkt99jFq0clQeSq0OQ0EPy2oWBt2I',
+                'AIzaSyD-bwv5ZYEdrbEN185dN5CHp3b9Avdan0I',
+                'AIzaSyDntb3GIKLQLmyQ1RYFFnc0TQYqkIBtioI',
+                'AIzaSyAtDGoOSrKRJ-RfsNAVb6RsB-FjoBXDC3g',
+                'AIzaSyBK6UQ0iTXy7DTMi-cyveCXNLhRjjgEhEE',
+                'AIzaSyCIi0rv2U9GjvwQYAXpFH8RlULczGIWNIQ',
+                'AIzaSyAuJOUMHzD1bjNC9BQ7Jr5g3sMJRvccmsE',
+                'AIzaSyC9JI2y-K0NB4CuB-WfEwiN67UuTlIEjpY',
+                'AIzaSyDNNqtGlIfhQb94oc7RE2qDZxqf5foZ1vI',
+                'AIzaSyBfvdMyGHjDEL0h8kjFZ07cJMRn2gLlnxg',
             ]
         )
         await account_pool.initialize()

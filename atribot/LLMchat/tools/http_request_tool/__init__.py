@@ -47,4 +47,5 @@ async def get(url):
 
 if __name__ == "__main__":
     print(asyncio.run(main("https://r18.中国/")))
+    # print(asyncio.run(main("https://www.libhunt.com/compare-index-tts-vs-gpt-sovits?ref=compare")))
     # print(asyncio.run(main("https://github.com/bytedance/trae-agent")))

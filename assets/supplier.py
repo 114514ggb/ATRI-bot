@@ -48,7 +48,17 @@
 },
 {
     "name":"ollama",
-    "base_url":"http://localhost:11434/v1/",
+    "base_url":"http://localhost:11434/v1/chat/completions",
+    "api_key":"sk-114514",
+    "models":{
+        "gemma3:27b": {
+            "visual_sense": True
+        }
+    }
+}
+{
+    "name":"ollama_embed",
+    "base_url":"http://localhost:11434/api/embed",
     "api_key":"sk-114514",
     "models":{
         "dengcao/Qwen3-Embedding-0.6B:F16": {
@@ -56,9 +66,6 @@
         },
         "dengcao/Qwen3-Reranker-8B:Q4_K_M": {
             "visual_sense": False
-        },
-        "gemma3:27b": {
-            "visual_sense": True
         }
     }
 }

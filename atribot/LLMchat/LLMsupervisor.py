@@ -9,6 +9,7 @@ from atribot.core.types import (
 from typing import Dict, List, Any
 from dataclasses import dataclass
 from logging import Logger
+import re
 
     
     
@@ -152,7 +153,9 @@ class large_language_model_supervisor():
             
             increase_context.add_assistant_message(content)
             return  self._update_response(
-                GenerationResponse(messages = increase_context.messages), 
+                GenerationResponse(
+                    messages = increase_context.messages
+                ), 
                 assistant_message
             )
         
@@ -188,7 +191,7 @@ class large_language_model_supervisor():
         
         for _ in range(8):#防止无限循环调用
             
-            response = self._update_response(response, assistant_message)
+            self._update_response(response, assistant_message)
 
             for tool_call in assistant_message['tool_calls']:#可能一次里面调用多少工具
                 
@@ -325,14 +328,44 @@ class large_language_model_supervisor():
         return increase_context
             
             
-    @staticmethod
-    def _update_response(response:GenerationResponse ,assistant_message:Dict)->GenerationResponse:
+    def _update_response(self, response:GenerationResponse ,assistant_message:Dict)->GenerationResponse:
         """更新response"""
-        content = assistant_message.get("content")
-        response.reply_text += content if content else ""
+        content:str = assistant_message.get("content")
+        content = content if content else ""
+        
+        if content.startswith("<thought>"):
+            reasoningcontent ,content= self.extract_thought(content)
+            response.reasoning_content += assistant_message.get("reasoningcontent",reasoningcontent)
+            response.reply_text += content
+            return response
+        
+        
         response.reasoning_content += assistant_message.get("reasoningcontent","")
+        response.reply_text += content
         
         return response
+    
+    @staticmethod
+    def extract_thought(text):
+        """
+        提取字符串中被<thought></thought>标签包裹的内容，并返回去掉标签后的文本
+        
+        Args:
+            text: 输入的文本字符串
+            
+        Returns:
+            tuple: (thought_content, cleaned_text)
+                - thought_content: 提取的thought内容，没有则返回空字符串
+                - cleaned_text: 去掉<thought></thought>标签后的文本
+        """
+        match = re.search(r'<thought>(.*?)</thought>', text, re.DOTALL)
+        
+        if match:
+            thought_content = match.group(1)
+            cleaned_text = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL)
+            return thought_content, cleaned_text
+        else:
+            return "", text
     
     @staticmethod
     async def get_chat_json(request:GenerationRequest, messages:List[Dict[str, Any]], model_api:model_api_basics)->Dict:

@@ -70,6 +70,7 @@ class universal_ai_api(model_api_basics):
                     # proxy='http://127.0.0.1:7890' # 代理
                 )
                 try:
+                    response.raise_for_status()
                     response_json = await response.json()
                     print(response_json)
                     return response_json
@@ -125,5 +126,5 @@ class universal_ai_api(model_api_basics):
             "encoding_format" : encoding,
         })
         
-        return await self._client_post(payload)
+        return (await self._client_post(payload))['embeddings']
  

@@ -71,7 +71,76 @@ class build_prompt:
             f"<current_time>{time.strftime('%Y-%m-%d %H-%M-%S')}</current_time>\n"
             "</context>"    
         )
+    
+    @staticmethod
+    def get_summary_group(grou_messages:str,memory:str)->str:
+        """用来总结更新群的消息的提示词
+
+        Args:
+            grou_messages (str): 群消息
+            memory (str): 原始记忆
+
+        Returns:
+            str: 总结群消息的提示词
+        """
+        return (
+            "你是一名智能记忆助手，负责从对话中精炼出有用的信息来更新记忆"
+            "#CONTEXT:"
+            "会有一个网络群聊里产生的聊天记录,还有一个上一轮的的记忆"
+            "#INSTRUCTIONS:"
+            "1.仔细分析多位发言者提供的所有聊天记录"
+            "2.聊天可能并不连续要记得区分聊天的话题"
+            "3.如果记忆包含矛盾信息，优先采用最新的记忆"
+            f"4.参考时间{time.strftime('%Y-%m-%d %H-%M-%S')}"
+            "5.如果问题涉及时间参照（如“去年”、“两个月前”等），请根据参考时间算实际日期。例如，若2022年5月4日的记忆提到“去年去了印度”，则旅程发生在2021年"
+            "6.始终将相对时间参照转换为具体日期、月份或年份。例如，根据参考时间戳将“去年”转为“2022年”，将“两个月前”转为“2023年3月”。不使用相对参照表述"
+            "7.勿将记忆中提及的角色名与的实际创建者混淆"
+            "8.每条事件都要简洁的一句话描述"
+            "# APPROACH (Think step by step):"
+            "1.查看现有的聊天内容,区分好几个事件或是话题."
+            "2.仔细检查上一轮的记忆,从中提取出重要的事件"
+            "3.严格基于记忆聊天内容构建精准、简洁的答案"
+            "4.合理融合上一轮的记忆和现有聊天事件,上一轮的记忆只要保存重要的内容"
+            "5.确保最终答案具体明确，按照顺序分条输出(只用输出记忆部分)，用中文不能超过1000个字符"
+            f"上一轮的记忆内容:\n{memory}\n"
+            f"聊天内容：\n{grou_messages}"
+            "Answer:"
+        )
         
+    @staticmethod
+    def get_summary_group_personification(grou_messages:str, memory:str, play_role_prompt:str)->str:
+        """用来总结更新群的消息的提示词
+
+        Args:
+            grou_messages (str): 群消息
+            memory (str): 原始记忆
+            play_role_prompt (str):口吻
+
+        Returns:
+            str: 总结群消息的提示词
+        """
+        return (
+            "你是一名智能记忆助手，负责从对话中精炼出有用的信息来更新记忆"
+            "#CONTEXT:"
+            f"会有一个网络群聊里产生的聊天记录,还有一个上一轮的的记忆,你要以<play_role_prompt>{play_role_prompt}</play_role_prompt>的口吻来总结"
+            "#INSTRUCTIONS:"
+            "1.仔细分析多位发言者提供的所有聊天记录"
+            "2.聊天可能并不连续要记得区分聊天的话题"
+            "3.如果记忆包含矛盾信息，优先采用最新的记忆"
+            f"4.参考时间{time.strftime('%Y-%m-%d %H-%M-%S')}"
+            "5.如果问题涉及时间参照(如“去年”、“两个月前”等）,请根据参考时间算实际日期。例如,若2022年5月4日的记忆提到“去年去了印度”,则旅程发生在2021年"
+            "6.始终将相对时间参照转换为具体日期、月份或年份。例如，根据参考时间戳将“去年”转为“2022年”，将“两个月前”转为“2023年3月”。不使用相对参照表述"
+            "7.勿将记忆中提及的角色名与的实际创建者混淆"
+            "8.每条事件都要简洁的一句话描述,可以带自己的一些看法"
+            "# APPROACH (Think step by step):"
+            "1.查看现有的聊天内容,区分好几个事件或是话题."
+            "2.仔细检查上一轮的记忆,从中提取出重要的事件"
+            "3.合理融合上一轮的记忆和现有聊天事件,上一轮的记忆只要保存重要的内容"
+            "4.确保最终答案具体明确，按照顺序分条输出(只用输出记忆部分)，用中文且不能超过1000个字符"
+            f"上一轮的记忆内容:\n{memory}\n"
+            f"聊天内容：\n{grou_messages}"
+            "Answer:"
+        )
 
     @staticmethod
     def build_group_user_Information(data: dict) -> str:
@@ -92,6 +161,7 @@ class build_prompt:
         "<MESSAGE>"
         f"<qq_id>{data['user_id']}</qq_id>"
         f"<nick_name>{data['sender']['nickname']}</nick_name>"
+        f"<group_role>{data['sender']['role']}</group_role>"
         f"<user_message>{message}</user_message>"
         "</MESSAGE>"
         )

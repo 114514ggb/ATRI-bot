@@ -153,28 +153,32 @@ class SystemMonitor:
         header = "📡 系统MCP工具列表 (共{}个)\n".format(len(tools_info)) + "="*20
         return header + "\n" + separator.join(tools_info) + "\n" + "="*20
 
-    def get_model_info(self)->str:
-        """返回模型信息"""
-        chief_model= config.model.connect.model_name
+    def get_model_info(self) -> str:
+        """返回模型信息 (通用动态版本)"""
+        chief_model = config.model.connect.model_name
         spare_model_list = config.model.standby_model
-        model_parameter =  config.model.chat_parameter
-        
+        model_parameter = config.model.chat_parameter
+
         spare_emoji = ["①", "②", "③", "④", "⑤", "⑥", "⑦", "⑧", "⑨", "⑩"]
         spare_text = "\n".join([
-            f"   {spare_emoji[i] if i < len(spare_emoji) else i+1} {model['model_name']}\n"
+            f"   {spare_emoji[i] if i < len(spare_emoji) else i+1} {model['model_name']}"
             for i, model in enumerate(spare_model_list)
         ])
-        
+
+        parameter_text = "\n".join([
+            f"   📝 {key}: {value}"
+            for key, value in model_parameter.items()
+        ])
+
         return (
             f"✨ 模型配置信息 ✨\n\n"
             f"🎯 主模型: 🚀 {chief_model}\n\n"
             f"🔄 备用模型:\n"
-            f"{spare_text}\n"
+            f"{spare_text if spare_text else '   (无备用模型)'}\n\n"  
             f"⚙️  参数设置:\n"
-            f"   🌡️  温度: {model_parameter.get('temperature',0):.1f}\n"
-            f"   📉  频率惩罚: {model_parameter.get('frequency_penalty',0):.1f}\n"
-            f"   📈  存在惩罚: {model_parameter.get('presence_penalty',0):.1f}\n\n"
+            f"{parameter_text if parameter_text else '   (无自定义参数)'}\n\n" 
         )
+
         
     
     async def view_list(self, arguments: list[str]) -> str:

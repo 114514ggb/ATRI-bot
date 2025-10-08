@@ -1,0 +1,7 @@
+启动
+
+nohup ./run_atri.sh > /dev/null 2>&1 &
+ps aux | grep main.py
+
+
+tmux kill-session -t atribot

@@ -26,7 +26,7 @@ class song:
         for file in os.listdir(self.base_path):
             file_path = os.path.join(self.base_path, file)
             if os.path.isfile(file_path):
-                if file.lower().endswith(('.mp3', '.wav', '.flac', '.m4a', '.ogg')):
+                if file.lower().endswith(('.mp3', '.wav', '.flac', '.mp4', '.ogg')):
                     self.song_list.append(file)
     
     def _remove_extension(self, filename: str) -> str:

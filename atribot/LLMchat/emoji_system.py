@@ -168,9 +168,9 @@ class emoji_core:
             # 提取标签内容
             tag_content = text[bracket_start + 1:bracket_end]
             
-            # 检查标签是否有效（非空且在字典中）
-            if tag_content and tag_content in emoji_set:
-                # 添加标签前的文本
+
+            if tag_content in emoji_set:
+                
                 if before_text := text[add_start:bracket_start]:
                     segments.append({
                         'type': 'text',
@@ -186,88 +186,87 @@ class emoji_core:
                 # 更新位置
                 add_start = start_pos = bracket_end + 1
             else:
-                # 无效标签，从下一个字符继续查找
+                # 无效标签
+
+                if tag_content.startswith("[CQ:at,qq=" ):
+                    segments.append({'type': 'at', 'data': {'qq': tag_content[10:][:-1]}})
+                
                 start_pos = bracket_start + 1
         
         return segments
 
     def parse_text_with_emotion_tags_separator(self, text: str, emoji_dict: dict, separator:str) -> list:
-            """
-            解析文本并提取表情标签，保留原始位置信息，直接生成结构化输出
-            
-            Args:
-                text: 要处理的字符串
-                emoji_dict: 表情标签字典
-                separator: 分隔符
+        """
+        解析文本并提取表情标签，保留原始位置信息，直接生成结构化输出
+        
+        Args:
+            text: 要处理的字符串
+            emoji_dict: 表情标签字典
+            separator: 分隔符
 
-            Returns:
-                list: 结构化数据列表，包含文本和图片元素
-            """
-            if not text:
-                    return []
-            
-            emoji_set = set(emoji_dict)
-            segments = []
-            text = text.strip(separator)
-            text_len = len(text)
-            current_pos = 0
-                    
-            def add_text_segment(text_content:str):
-                if not text_content:
-                    return
-                    
-                if separator in text_content:
-                    for part in text_content.split(separator):
-                        if part:= part.strip():
-                            segments.append({
-                                'type': 'text',
-                                'data': {'text': part}
-                            })
-                else:
-                    if text_content := text_content.strip():
+        Returns:
+            list: 结构化数据列表，包含文本和图片元素
+        """
+        if not text:
+                return []
+        
+        emoji_set = set(emoji_dict)
+        segments = []
+        text = text.strip(separator)
+        text_len = len(text)
+        current_pos = 0
+        text_outset = 0
+                
+        def add_text_segment(text_content:str):
+            if not text_content:
+                return
+                
+            if separator in text_content:
+                for part in text_content.split(separator):
+                    if part:= part.strip():
                         segments.append({
                             'type': 'text',
-                            'data': {'text': text_content}
+                            'data': {'text': part}
                         })
-            
-            while current_pos < text_len:
-                bracket_start = text.find('[', current_pos)
-                
-                if bracket_start == -1:
-                    # 没有更多标签，添加剩余文本
-                    add_text_segment(text[current_pos:])
-                    break
-                
-                # 添加标签前的文本
-                if bracket_start > current_pos:
-                    add_text_segment(text[current_pos:bracket_start])
-                
-                # 查找对应的 ']'
-                bracket_end = text.find(']', bracket_start + 1)
-                
-                if bracket_end == -1:
-                    # 没有配对的 ']'，将剩余部分作为文本处理
-                    add_text_segment(text[bracket_start:])
-                    break
-                
-                # 提取标签内容
-                tag_content = text[bracket_start + 1:bracket_end]
-                
-                if tag_content in emoji_set:
-                    
-                    # 添加表情图片
+            else:
+                if text_content := text_content.strip():
                     segments.append({
-                        "type": "image",
-                        "data": {"file": self.get_complete_file_path(tag_content)}
+                        'type': 'text',
+                        'data': {'text': text_content}
                     })
-                    
-                    # 更新位置
-                    current_pos = bracket_end + 1
-                else:
-                    # 无效标签，从下一个字符继续查找
-                    current_pos = bracket_start + 1
+        
+        while current_pos < text_len:
+            bracket_start = text.find('[', current_pos)
             
-            return segments
+            if bracket_start == -1:
+                add_text_segment(text[text_outset:])
+                break
+            
+            bracket_end = text.find(']', bracket_start + 1)
+            
+            if bracket_end == -1:
+                add_text_segment(text[text_outset:])
+                break
+            
+            # 提取标签内容
+            tag_content = text[bracket_start + 1 : bracket_end]
+            
+            if tag_content in emoji_set:
+                
+                add_text_segment(text[text_outset:bracket_start])
+                
+                segments.append({
+                    "type": "image",
+                    "data": {"file": self.get_complete_file_path(tag_content)}
+                })
+                
+                # 更新位置
+                text_outset  = current_pos = bracket_end + 1
+            else:
+                # 无效标签，从下一个字符继续查找
+                current_pos = bracket_start + 1
+        
+        return segments
     
     def _levenshtein_distance(self, s1: str, s2: str) -> int:
         """计算两个字符串的编辑距离

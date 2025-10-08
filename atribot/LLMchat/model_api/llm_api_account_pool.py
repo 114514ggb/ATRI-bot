@@ -61,6 +61,7 @@ class ai_api_account_pool(universal_ai_api):
                     # proxy='http://127.0.0.1:7890' # 代理
                 )
                 try:
+                    response.raise_for_status()
                     response_json = await response.json()
                     print(response_json)
                     return response_json

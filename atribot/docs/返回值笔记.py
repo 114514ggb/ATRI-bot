@@ -1209,8 +1209,6 @@ data_music = {'self_id': 168238719,
  'group_id': 984466158}
 
 
-
-
 {'choices': [{'finish_reason': 'tool_calls',
               'index': 0,
               'message': {'content': '\n哼哼~让我帮主人查询一下广州的天气喵！[query]\n',

@@ -39,8 +39,6 @@ ORDER BY
 
 
 
-
-
 # 查询每个群发言次数最多的用户
 SELECT group_id, user_id, COUNT(*) AS message_count
 FROM message

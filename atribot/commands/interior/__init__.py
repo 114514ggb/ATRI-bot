@@ -15,12 +15,12 @@ AIContextCommands()
 
 
 @cmd_system.register_command(
-    name="qmysql",
+    name="psql",
     description="查询数据库并生成用户活跃度报告",
-    aliases=["查询", "mysql"],
+    aliases=["查询", "postgresql"],
     examples=[
-        "/mysql 2631018780",
-        "/qmysql",
+        "/postgresql 2631018780",
+        "/psql",
     ]
 )
 @cmd_system.argument(
@@ -29,9 +29,9 @@ AIContextCommands()
     required=False,
     type=int
 )
-async def query_mysql_command(message_data: dict, user_id: int = 0):
+async def query_database_command(message_data: dict, user_id: int = 0):
     """
-    查询MySQL数据库并生成用户活跃度报告
+    查询数据库并生成用户活跃度报告
     
     参数:
         message_data: 所有命令固定传入参数

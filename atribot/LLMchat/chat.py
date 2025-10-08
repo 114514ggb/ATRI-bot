@@ -162,7 +162,7 @@ class group_chat(chat_baseics):
             await self.send_message.send_group_merge_text(
                 group_id=group_id,
                 message=response.reasoning_content,
-                sourceb="推理内容",
+                source="推理内容",
             )
 
         # 过滤扩展list
@@ -308,7 +308,6 @@ class group_chat(chat_baseics):
         if (
             len(chat_text) <= MAX_SINGLE_MESSAGE_LENGTH
             or MESSAGE_DELIMITER in chat_text
-            or "[CQ:at,qq=" in chat_text
         ):
             # 分条发送
             messages_list = self.emoji_core.parse_text_with_emotion_tags_separator(
@@ -316,12 +315,14 @@ class group_chat(chat_baseics):
                 emoji_dict=self.emoji_core.emoji_file_dict,
                 separator=MESSAGE_DELIMITER,
             )
-            # [CQ:reply,id={message_id}]
 
             message = messages_list[0]
-            await self.send_message.send_group_message(
-                group_id, [{"type": "reply", "data": {"id": message_id}}, message]
-            )
+            if message['type'] == 'text':
+                await self.send_message.send_group_message(group_id, f"[CQ:reply,id={message_id}]{message['data']['text']}")
+            else:
+                await self.send_message.send_group_message(
+                    group_id, [{"type": "reply", "data": {"id": message_id}}, message]
+                )
 
             if len(messages_list) == 1:
                 return

@@ -11,19 +11,19 @@ from pprint import pp
 # http = "https://api.zetatechs.com/v1/chat/completions"
 # key = "sk-1tgN5EnR9QPqHPuh08CfO5R2oWx25Z1UtJJ94FMzUkMlLGJL"
 # http = "https://api.deepseek.com/chat/completions"
-# key = "sk-8403066c2841461491dd0b642a6c44af"
-http = "https://newapi.hancat.work/v1/chat/completions"
-key = "sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI"
+# # key = "sk-8403066c2841461491dd0b642a6c44af"
+# http = "https://newapi.hancat.work/v1/chat/completions"
+# key = "sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI"
 # http = "https://k2sonnet.epiphanymind.com/api/openai/chat/completions"
 # key = "sk-543f17bfa2839c1e2f111ed18d65c0c0506be6899db86e2b"
 # http = "https://rinkoai.com/v1/chat/completions"
 # key = "sk-QtbNCpq9giS6s6a5Jncob7YTvS93Ikn5j30BkAivfBtDfzvz"
 # http = "https://openrouter.ai/api/v1/chat/completions"
 # key = "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"
-# http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
+http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
 # key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
-# key = "AIzaSyDskabP58oDUOfyZPRHopIztPXh2HIt8uI"
+key = "AIzaSyDskabP58oDUOfyZPRHopIztPXh2HIt8uI"
 # key = "AIzaSyC2vB_wCuRCxngUcb9C63ihNG2jMjKRRvI"
 
 
@@ -62,8 +62,8 @@ tools = [
 # model = "xai/grok-4-fast-non-reasoning"
 # model = "xai/grok-4-fast-reasoning"
 # model = "google-ai-studio/gemini-2.5-flash"
-# model = "google-ai-studio/gemini-2.5-pro"
-model = "claude-4.1-opus"
+model = "google-ai-studio/gemini-2.5-pro"
+# model = "claude-4.1-opus"
 
 
 # chat = async_openAI(base_url = http, api_key = key , tools = tools)
@@ -74,8 +74,9 @@ model = "claude-4.1-opus"
 
 messages = [
     # {"role": "user", "content": "还有你看的到你能用的工具吗？你支持函数调用吗？如果支持的话说说有什么工具？没有的话也没关系，这是一条测试消息"}
-    # {"role": "user", "content": "9.11和9.8相比哪个数大?"}
-    {"role": "user", "content": "你好,你是？你能干什么？"}
+    {"role": "user", "content": "9.11和9.8相比哪个数大?"}
+    # {"role": "user", "content": "解决 2025 年 AIME 中的问题 1：求出所有整数基数 b > 9 的和，使得 17b 是 97b 的除数"}
+    # {"role": "user", "content": "你好,你是？你能干什么？"}
     # {
     #     "role": "user",
     #     "content": [
@@ -99,17 +100,3 @@ async def main():
 # if __name__ == "__main__":
 #     asyncio.run(main())
 
-
-
-
-# async def main():
-#     ai_api = await universal_ai_api.create(
-#         base_url="https://rinkoai.com/v1/chat/completions",
-#         api_key="sk-W9KbPxcgvMvLAzOgHDy0d8dJmPMhOw0TKBVDiglUA2g2F4jU",
-#     )
-#     rag = RAG_Manager(ai_api)
-#     embedding = await rag.calculate_embedding("今天天气不行")
-#     print(embedding)
-
-# if __name__ == "__main__":
-#     asyncio.run(main())

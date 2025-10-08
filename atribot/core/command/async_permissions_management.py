@@ -1,4 +1,4 @@
-from atribot.core.db.atri_async_Database import AtriDB_Async
+from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 from atribot.common import common
 
@@ -27,7 +27,7 @@ class permissions_management:
     }
 
     def __init__(self):
-        self.db: AtriDB_Async = container.get("database")
+        self.db: AsyncDatabaseBase = container.get("database")
         self.logging: logging.Logger = container.get("log")
         
         self.root: Set[int] = {2631018780} 
@@ -148,13 +148,21 @@ class permissions_management:
         """
         try:
             if action == 'add':
+                # sql = """
+                #     INSERT INTO permissions (user_id, permission_type, granted_by)
+                #     VALUES (%s, %s, %s)
+                #     ON DUPLICATE KEY UPDATE 
+                #         permission_type = VALUES(permission_type), 
+                #         granted_by = VALUES(granted_by),
+                #         updated_at = CURRENT_TIMESTAMP
+                # """
                 sql = """
                     INSERT INTO permissions (user_id, permission_type, granted_by)
-                    VALUES (%s, %s, %s)
-                    ON DUPLICATE KEY UPDATE 
-                        permission_type = VALUES(permission_type), 
-                        granted_by = VALUES(granted_by),
-                        updated_at = CURRENT_TIMESTAMP
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (user_id) DO UPDATE 
+                        SET permission_type = EXCLUDED.permission_type, 
+                            granted_by = EXCLUDED.granted_by,
+                            updated_at = CURRENT_TIMESTAMP
                 """
                 await self.db.execute_SQL(sql, (user_id, permission_type, operator_id))
             elif action == 'remove':
