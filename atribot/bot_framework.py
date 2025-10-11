@@ -93,32 +93,7 @@ class BotFramework:
         )
         account_pool = ai_api_account_pool(
             base_url = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions",
-            api_key_pool = [
-                'AIzaSyDskabP58oDUOfyZPRHopIztPXh2HIt8uI',
-                'AIzaSyDUxuMVytOUCLB0Ut7-IhjCqZqiaeoRoE0',
-                'AIzaSyCQqbd75kD8L-7TogabGjlWN3YIZr-BM1w',
-                'AIzaSyAJO7DQucigZlh4XCqL1NG0txfx7Lh7JZI',
-                'AIzaSyBRJtwjvhPW4gXLWBKmKcEyScHe_yIWyHM',
-                'AIzaSyD-tbcf4lHdSbAEmPgNwhf2Ffe_CctDjRo',
-                'AIzaSyBhDHK-4AxJsX9EUfDNecGcVfzyU2lQ5zs',
-                'AIzaSyADu9cMIsplb_6cOpMlWRZfPfa36qeB6GI',
-                'AIzaSyCgGsYPHZLjeIrocqBarN7fGNJPt1dTv74',
-                'AIzaSyCD17xzsUU6bJgrYlHA3z2MNDyKJDjkb3c',
-                'AIzaSyBPGYUk_CAb7_ueEbo_PjnFxp6RLJf3vBk',
-                'AIzaSyC2vB_wCuRCxngUcb9C63ihNG2jMjKRRvI',
-                'AIzaSyARXSt2s4eJVbps5qV-OTRoSaxfV12BGF0',
-                'AIzaSyDXiseA2W76jtgSj7V8rxPEfCbUknqRed8',
-                'AIzaSyD0rvPkt99jFq0clQeSq0OQ0EPy2oWBt2I',
-                'AIzaSyD-bwv5ZYEdrbEN185dN5CHp3b9Avdan0I',
-                'AIzaSyDntb3GIKLQLmyQ1RYFFnc0TQYqkIBtioI',
-                'AIzaSyAtDGoOSrKRJ-RfsNAVb6RsB-FjoBXDC3g',
-                'AIzaSyBK6UQ0iTXy7DTMi-cyveCXNLhRjjgEhEE',
-                'AIzaSyCIi0rv2U9GjvwQYAXpFH8RlULczGIWNIQ',
-                'AIzaSyAuJOUMHzD1bjNC9BQ7Jr5g3sMJRvccmsE',
-                'AIzaSyC9JI2y-K0NB4CuB-WfEwiN67UuTlIEjpY',
-                'AIzaSyDNNqtGlIfhQb94oc7RE2qDZxqf5foZ1vI',
-                'AIzaSyBfvdMyGHjDEL0h8kjFZ07cJMRn2gLlnxg',
-            ]
+            api_key_pool = self.config.model.api_key_pool
         )
         await account_pool.initialize()
         LLMSupplier.add_connection(
@@ -195,7 +170,7 @@ class BotFramework:
         """
         
         self.logger.critical("bot作为服务端的连接模块写完后没有测试过最好使用bot_client!")
-        raise ValueError("配置错误")
+        raise ValueError("配置错误!未实现")
         
         _message_router = message_router()
         app = FastAPI()

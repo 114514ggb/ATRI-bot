@@ -334,13 +334,13 @@ class large_language_model_supervisor():
         content = content if content else ""
         
         if content.startswith("<thought>"):
-            reasoningcontent ,content= self.extract_thought(content)
-            response.reasoning_content += assistant_message.get("reasoningcontent",reasoningcontent)
+            reasoning_content ,content= self.extract_thought(content)
+            response.reasoning_content += assistant_message.get("reasoning_content",reasoning_content)
             response.reply_text += content
             return response
         
         
-        response.reasoning_content += assistant_message.get("reasoningcontent","")
+        response.reasoning_content += assistant_message.get("reasoning_content","")
         response.reply_text += content
         
         return response

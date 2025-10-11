@@ -73,9 +73,9 @@ CREATE TRIGGER trigger_update_permissions_updated_at
 -- 创建记忆表
 CREATE TABLE atri_memory (
     memory_id BIGSERIAL PRIMARY KEY,
-    group_id BIGINT DEFAULT 0,  -- 默认值 0 表示私聊/知识库
-    user_id BIGINT,             -- 允许 NULL 表示知识库记忆
-    event_time BIGINT NOT NULL, -- 使用 event_time 避免关键字冲突
+    group_id BIGINT DEFAULT 0,  -- 默认值 0 表示私聊,为0时user_id不能为空
+    user_id BIGINT,             -- 允许和group_id一起为 NULL 表示知识库记忆
+    event_time BIGINT NOT NULL, -- 记忆的时间点
     event TEXT,                 -- TEXT 类型支持更大长度
     event_vector VECTOR(1024),  -- 1024 维向量
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -100,3 +100,11 @@ COMMENT ON TABLE atri_memory IS '记忆存储表，支持群聊、私聊和知�
 -- create extension vector;
 -- 查看插件
 -- SELECT * FROM pg_available_extensions;#
+
+--pgvector支持的距离函数如下:
+-- <-> - L2 distance(欧几里得距离)
+-- <#> - (negative) inner product
+-- <=> - cosine distance(余弦)
+-- <+> - L1 distance (added in 0.7.0)
+-- <~> - Hamming distance (binary vectors, added in 0.7.0)
+-- <%> - Jaccard distance (binary vectors, added in 0.7.0)

@@ -125,6 +125,7 @@ class universal_ai_api(model_api_basics):
             "dimensions" : dimensions,
             "encoding_format" : encoding,
         })
-        
+        # ['embeddings']
+        # ['embedding']
         return (await self._client_post(payload))['embeddings']
  

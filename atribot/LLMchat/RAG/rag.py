@@ -1,16 +1,24 @@
+from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
+from atribot.LLMchat.RAG.text_chunker import RecursiveCharacterTextSplitter
 from atribot.core.service_container import container
-from atribot.common import common
+# from atribot.common import common
 from typing import List
 
 
-class RAG_Manager:
-    
-    
-    def __init__(self,embedding_api:universal_ai_api):
-        self.embedding_api = embedding_api
-        self.embedding_model = ""
 
+class RAGManager:
+    
+    def __init__(self):
+        self.config = container.get("config")
+        self.supplier: ai_connection_manager = container.get("LLMSupplier")
+        self.embedding_model = self.config.model.RAG.use_embedding_model.model_name
+        self.embedding_api:universal_ai_api = self.supplier.get_filtration_connection(
+            supplier_name = self.config.model.RAG.use_embedding_model.supplier
+        )
+        self.text_chunker = RecursiveCharacterTextSplitter(
+            150,50
+        )
     
     def generate_response(self, question:str, context:str)->str:
         """发起一次请求
@@ -22,8 +30,6 @@ class RAG_Manager:
         Returns:
             str: 回复
         """
-
-
     
     def Split_text(self, text:str)->list[str]:
         """长文本按照规则分割成文本块
@@ -34,6 +40,9 @@ class RAG_Manager:
         Returns:
             list[str]: 分割后的文本块列表
         """
+        return self.text_chunker.split_text(text)
+        
+        
         
     async def calculate_embedding(self, document:str|List[str])->list[float]:
         """用嵌入式模型把文本转换成向量5
@@ -50,6 +59,7 @@ class RAG_Manager:
             dimensions=1024,
             encoding="float"
         )
+
         
         
     def calculate_reranker(self, chunks:list[str], question:str, k:int=1)->list[str]:
@@ -91,5 +101,9 @@ class RAG_Manager:
         Args:
             document (str): 要存储在向量数据库的记忆
         """
-        
-        
+
+
+
+
+# if __name__ == "__main__":
+#     print(RAGManager.fixed_size_chunking("abcdefghijklmnopqrsg",3,2))

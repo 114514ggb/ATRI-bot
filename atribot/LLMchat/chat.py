@@ -204,11 +204,16 @@ class group_chat(chat_baseics):
         except LLMSRequestFailed as e:
             self.log.error(f"群聊天出现了错误:{e}\n尝试备用api!")
             request.generation_response = e.get_response()
+            
         except Exception as e:
             self.log.error(f"群聊天出现了错误:{e}\n尝试备用api!")
-            
-        request.model_api = None
+        
         cached_image_prompt = None
+        request.model_api = None
+        request.parameter = {
+            "temperature":0.2,
+            "max_tokens": 8192,
+        }
         
         for parameter in self.api_order:
             

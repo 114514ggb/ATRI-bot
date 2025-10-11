@@ -1,8 +1,13 @@
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
-from atribot.LLMchat.RAG.rag import RAG_Manager
+# from atribot.LLMchat.RAG.rag import RAG_Manager
 import asyncio
 from pprint import pp
 
+# http = "http://localhost:11434/api/embed"
+# http = "http://localhost:11434/v1/embeddings"
+http = "http://localhost:11434/api/embeddings"
+# http = "http://localhost:11434/v1/chat/completions"
+key = "sk-114514"
 
 # http = "https://aihubmix.com/v1"
 # key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4"
@@ -11,7 +16,7 @@ from pprint import pp
 # http = "https://api.zetatechs.com/v1/chat/completions"
 # key = "sk-1tgN5EnR9QPqHPuh08CfO5R2oWx25Z1UtJJ94FMzUkMlLGJL"
 # http = "https://api.deepseek.com/chat/completions"
-# # key = "sk-8403066c2841461491dd0b642a6c44af"
+# key = "sk-8403066c2841461491dd0b642a6c44af"
 # http = "https://newapi.hancat.work/v1/chat/completions"
 # key = "sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI"
 # http = "https://k2sonnet.epiphanymind.com/api/openai/chat/completions"
@@ -22,9 +27,11 @@ from pprint import pp
 # key = "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"
 http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-# key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
-key = "AIzaSyDskabP58oDUOfyZPRHopIztPXh2HIt8uI"
-# key = "AIzaSyC2vB_wCuRCxngUcb9C63ihNG2jMjKRRvI"
+# key = "AIzaSyBJRnGzetsNzgShmWt5Z9j8522Uje21veo"
+key = "AIzaSyCczwFSbyNt8tSyzN1suCgzl9l7urIjT9k"
+
+
+
 
 
 tools = [
@@ -51,7 +58,11 @@ tools = [
     }
 ]
 
-# model = "deepseek-ai/DeepSeek-V3"
+# model = "dengcao/Qwen3-Embedding-0.6B:F16"
+# model = "dengcao/Qwen3-Reranker-8B:Q4_K_M"
+# model = "gpt-oss:20b"
+
+# model = "deepseek-r1"
 # model = "deepseek-ai/DeepSeek-R1"
 # model = "claude-3-5-haiku-20241022"
 # model = "gemini-2.5-flash-05-20"
@@ -61,8 +72,8 @@ tools = [
 # model = "gpt-oss-120b"
 # model = "xai/grok-4-fast-non-reasoning"
 # model = "xai/grok-4-fast-reasoning"
-# model = "google-ai-studio/gemini-2.5-flash"
-model = "google-ai-studio/gemini-2.5-pro"
+model = "google-ai-studio/gemini-2.5-flash"
+# model = "google-ai-studio/gemini-2.5-pro"
 # model = "claude-4.1-opus"
 
 
@@ -74,9 +85,9 @@ model = "google-ai-studio/gemini-2.5-pro"
 
 messages = [
     # {"role": "user", "content": "还有你看的到你能用的工具吗？你支持函数调用吗？如果支持的话说说有什么工具？没有的话也没关系，这是一条测试消息"}
-    {"role": "user", "content": "9.11和9.8相比哪个数大?"}
+    # {"role": "user", "content": "9.11和9.8相比哪个数大?"}
     # {"role": "user", "content": "解决 2025 年 AIME 中的问题 1：求出所有整数基数 b > 9 的和，使得 17b 是 97b 的除数"}
-    # {"role": "user", "content": "你好,你是？你能干什么？"}
+    {"role": "user", "content": "你好,你是？你能干什么？"}
     # {
     #     "role": "user",
     #     "content": [
@@ -93,10 +104,49 @@ messages = [
 async def main():
     chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key , tools = tools)
     text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
+    # text = await chat.generate_embedding_vector(
+    #   model = model,
+    #   input = "ATRI",
+    #   dimensions = 1024
+    # )
     await chat.aclose()
+    # with open("test.txt",'w',encoding = 'utf-8') as file:
+    #   file.write(text)
     pp(text)
 
 
 # if __name__ == "__main__":
 #     asyncio.run(main())
 
+
+def qwq():
+  print("什么")
+  a = yield "?"
+  print("开始")
+  while True:
+    print(f"收到的{a}")
+    if a:
+      yield "True"
+    else:
+      yield "False"
+    print(f"现在是{a}")
+
+a = 10
+q = qwq()
+print(q.send(None))
+# next(q)
+for _ in range(10):
+    print(q.send(a))
+    a -= 1
+    print(a)
+
+# def qwq2(n):
+#   while True:
+#     n -= 1
+#     if n>0:
+#       yield n
+#     else:
+#       break
+  
+# for n in qwq2(10):
+#   print(n)

@@ -29,16 +29,13 @@
         },
         "chat_parameter":{
             "temperature":0.2,
+            "max_tokens": 8192,
             "reasoning_effort": "high"
         },
         "standby_model":[
             {
                 "supplier":"kourichat",
                 "model_name":"gpt-5-chat-latest"
-            },
-            {
-                "supplier":"xiaohanhan",
-                "model_name":"claude-4.1-opus"
             },
             {
                 "supplier":"deepseek",
@@ -53,17 +50,23 @@
             "enable":true,
             "dimensions":1024,
             "use_embedding_model":{
-                "supplier":"rinkoai",
-                "model_name":"BAAI/bge-m3"
+                "supplier":"ollama_embed",
+                "model_name":"dengcao/Qwen3-Embedding-0.6B:F16"
             },
             "use_reranker_model":{
-                "supplier":"rinkoai",
-                "model_name":"BAAI/bge-reranker-v2-m3"
+                "supplier":"ollama_embed",
+                "model_name":"dengcao/Qwen3-Reranker-8B:Q4_K_M"
             },
             "vector_database":{
 
             }
-        }
+        },
+        "api_key_pool":[
+            "AIzaSyBp1LJH-mOgjB6oOjshhWtSRKRq8AHZmJw",
+            "AIzaSyC9AwOvXdkOJq_jHmdUut0uZqB81GIV-p0",
+            "AIzaSyAjJZTWz5QGbGEkIXmsJR_gHR89iBjMbDw",
+            "AIzaSyDxIEbCfbpr5k6D-4jMklOCU06IkWXPL08"
+        ]
     },
     "ai_chat":{
         "playRole":"ATRI",
