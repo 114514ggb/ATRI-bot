@@ -1,6 +1,8 @@
+from atribot.core.service_container import container
 from atribot.core.types import Context
 from collections import defaultdict
 from typing import List, Dict
+from logging import Logger
 import asyncio
 import os
 
@@ -18,6 +20,8 @@ class context_management:
         messages_length_limit:int=20,
         folder_path:str = "atribot/LLMchat/character_setting"
     ):
+        self.logger:Logger = container.get("log")
+        
         self.all_group_messages: Dict[str, Context] = {}
         """所有群消息上下文"""
         
@@ -135,21 +139,16 @@ class context_management:
         for character_setting in os.listdir(self.folder_path):
             if character_setting.endswith(".txt"):
                 key = os.path.splitext(character_setting)[0]
-                with open(os.path.join(self.folder_path, character_setting), "r", encoding="utf-8") as f:
-                    self.play_role_list[key] = f.read()
+                file_path = os.path.join(self.folder_path, character_setting)
+                
+                with open(file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    
+                if len(content) > 20000:
+                    content = content[:20000]
+                    self.logger.warning(f"警告：角色设定文件 '{character_setting}' 内容超过2万字，已自动截断")
+                    
+                self.play_role_list[key] = content
         
         
-        
-if __name__ == "__main__":
-    async def my_main():
-        ACM = context_management("ATRI")
-        print(ACM.play_role_list["ATRI"])
-        await ACM.store_group_chat(123456,["aaaaaa","bbbbb"])
-        print(await ACM.get_group_chat(123456))
-        await ACM.store_group_chat(123456,[])
-        print(await ACM.reset_group_chat(123456))
-        await ACM.set_group_role(123456,"文言文版")
-        await ACM.reset_group_chat(123456)
-        print(await ACM.get_group_chat(123456))
     
-    asyncio.run(my_main())

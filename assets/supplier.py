@@ -80,10 +80,9 @@
     }
 },
 {
-    "name":"小憨憨",
+    "name":"xiaohanhan",
     "base_url":"https://newapi.hancat.work/v1/chat/completions",
-    "api_key":"sk-hvNg3oRrFjjzi77kw22XVpLceuykldC7cxYfjcNzmyIEFSJm",#自己的
-    # "api_key":"sk-g7Hh8gRzgdvIsHoDx5XwEUafVy9wxnEbB4UqdYVKvvAtNaXI",
+    "api_key":"sk-hvNg3oRrFjjzi77kw22XVpLceuykldC7cxYfjcNzmyIEFSJm",
     "models":{
         "gemini-2.5-flash": {
             "visual_sense": True
@@ -96,9 +95,9 @@
         },
         "claude-4.1-opus": {
             "visual_sense": False
+        }
     }
 }
-},
 {
     "name":"rinkoai",
     "base_url":"https://rinkoai.com/v1/chat/completions",
@@ -138,66 +137,44 @@
         },
     }
 },
+{
+    "name":"zaxprisのapi",
+    "base_url":"http://40.83.223.214:3000/v1/chat/completions",
+    "api_key":"sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y",
+    "models":{
+        "moonshotai/kimi-k2-instruct-0905":{
+            "visual_sense":False
+        },
+        "假流式/gemini-2.5-pro":{
+            "visual_sense":True
+        },
+        "流式抗截断/gemini-2.5-flash":{
+            "visual_sense":True
+        },
+    }
+},
 
 
 
 
 
 
+
+
+
+key = """
+AIzaSyBHHXMN27STXvoAxkGIJHdMRlEB_c2mk6o
+AIzaSyCeptasF9nTYoCH-zfr9mG4Y757ClhZ8N0
+AIzaSyBRwweKIsz8bbTagEuPgtEon9VtGtUwAjE
+AIzaSyBa246Ljsb0sMiWWZFSZ-U0899BQQnkl8s
+AIzaSyBAF5X2LDMRtV6xLnt8aC7-bTJ3p7IipFQ
+
+
+"""
 
 [
-            "AIzaSyBp1LJH-mOgjB6oOjshhWtSRKRq8AHZmJw",
-            "AIzaSyC9AwOvXdkOJq_jHmdUut0uZqB81GIV-p0",
-            "AIzaSyA6P0gKht2AkSZmoEkxP3uIrULVraU2zPg",
-            "AIzaSyA5sikJpmJsmmh5P7aYJK6LwEtcizs5_iI",
-            "AIzaSyBUAiUwAsQK51jvNqCD0-cYyVO0zMl0Sus",
-            "AIzaSyC0JMGeBwvHRGNVUyafw0F6kRPQiK4Lf-4",
-            "AIzaSyCTY8zwtsyQxHnJ7S1RMAKzWakuqW7o4BE",
-            "AIzaSyCWySm_rKKYALWFK9j33YCnihVOPKVWW4A",
-            "AIzaSyApuu5ya3_b8qMu0V4rzkSyADxh9m2GBEA",
-            "AIzaSyD7QYe5Ltk8XBj5ICkprUrE4URoG95wWx4",
-            "AIzaSyCHAMCOiNSiRHDTgZ-eq-onsMEXpTvhhiY",
-            "AIzaSyCKF8j25Y-CGBSn2QtMD0QfTYejTlO5Jo0",
-            "AIzaSyD8xBCTT1s4W4ulMVBW7PPBFsvaVpPtad8",
-            "AIzaSyBCFmWfOrM6Q0kGzi9kBeASO2m7EYbEb2I",
-            "AIzaSyAlnIZlcHTPlwnFhxL6sy-XAEUwHgvDXE0",
-            "AIzaSyDJ8Tw3wwhXSmUNpUkNE4O1ioKXWowpYt4",
-            "AIzaSyBK6nSPxh1-wFeJD8XP-3IpZd9tShlTIKA",
-            "AIzaSyDBRTzP2f3BhQuuyb24yTVNNTTCReajBe8",
-            "AIzaSyAPhEjzfZKxiz6K9alhXzQ2-67hcLGrGU4",
-            "AIzaSyBa9CscLN9UAGZdjnpA44tlUMB4KxP8qmI",
-            "AIzaSyBJRnGzetsNzgShmWt5Z9j8522Uje21veo",
-            "AIzaSyBFInLce4IMQO1MhEA0PuSMBJ2z8xR_OUc",
-            "AIzaSyCBzW-Umr_cNtSSc-6a4POEQfDMk1rqvmI",
-            "AIzaSyCtg5zc4tHmRO05tm0Svnd0Z2N-P_QRdO4",
-            "AIzaSyAIlS3EOqgK2k31MFwjqvqm0IomhL9gBXk",
-            "AIzaSyDCtBBjBRu7UI3ggPU22NibSqeqsR0MmZk",
-            "AIzaSyCZrJMkiVYNqogFC-KA_QlpfrVdlpzR3N0",
-            "AIzaSyBR8-kVHNiPtHEwpvTK94A8-FWMKzisT9g",
-            "AIzaSyC8HvmBd3WP2zgEZHLaL3ySzNODZuCZbX8",
-            "AIzaSyANClfmhW6zkZbXft1tciuc-looL5znzpI",
-            "AIzaSyAmJrkmiERpXCEIK0sCAm9Y09qpktxGXCo",
-            "AIzaSyAM4euNw8ZTkqBC6opgYhyHXemrxUrIzjw",
-            "AIzaSyDt8VAKjS4PcCHa6imNnZQ9E208cMwWFvk",
-            "AIzaSyDTv03AHO_rfZsHOt4fHfPjYPXZwJ_N5dU",
-            "AIzaSyBDiPZxm_eNwBq9v9jQ3U3GUl-f8gYo_z8",
-            "AIzaSyAza5zkM9HJ82bO0-w6gR9YBhMSnjM9EYY",
-            "AIzaSyDxe3YHYg8WLW5clAOv4h7YvUnAu3AFGbM",
-            "AIzaSyCOMavtaiYHJDUdrk6lWALy1IpnbN9yMvM",
-            "AIzaSyDOyGTuuF-6geuRIfwvsL6Mxwqg1RyNz_I",
-            "AIzaSyCaKJZ4b-dkpMhAmE2O5b8iHW-HWw3SxkI",
-            "AIzaSyAmMRBntg6qs75gVtNZYsk8laiir-ynnJ0",
-            "AIzaSyAAMZgMXR7v0UZqmW8Ho-SCe8B-JiX7c_A",
-            "AIzaSyDzxzo7xIpHkN6BYvK_b1q8jmwcQLdKD4Q",
-            "AIzaSyA9aC3yk3Me9ZMhTMvWxRhVN58rMLwYUWc",
-            "AIzaSyC-CrE9SPp1Bn1NPdF98AjPdB0JsoL3w0s",
-            "AIzaSyDEHgO3oClMuOuVzbPqtFAadLggyczFjKc",
-            "AIzaSyCNC6E1lJLptFYSyAzOm4TIfNyI82tSw1w",
-            "AIzaSyBY7PFlOGR6UhYce39YBSCkj99yY_Yt9Pw",
-            "AIzaSyCRjkFvXVVFZfIK7UUHnurNJ--feqzJ9LI",
-            "AIzaSyD4OKt4jDNxN1TXK2byBTy_jJ7Rplu9gOk",
-            "AIzaSyC8QqFrtsxjjSl6LXhvZLC5wr0WFlH2SAY",
-            "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM",
+            # "AIzaSyC8QqFrtsxjjSl6LXhvZLC5wr0WFlH2SAY",
+            # "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM",
             "AIzaSyCY0bKgoEJOL0FdSKae3Y_iSok1R54WURI",
             "AIzaSyDtZGDRNAt0zOemhf6n3947KbTI6K8KEJU",
             "AIzaSyAo3T2rP2ZTHwvCrEl3SCeE1Hv2Si3-vko",
@@ -222,7 +199,6 @@
             "AIzaSyDxIEbCfbpr5k6D-4jMklOCU06IkWXPL08"
         ]
 
-
 def extract_api_keys_with_regex(text: str) -> list[str]:
     """
     使用正则表达式从文本中提取所有符合格式的API Key。
@@ -244,3 +220,7 @@ def extract_api_keys_with_regex(text: str) -> list[str]:
     found_keys = re.findall(pattern, text)
     
     return found_keys
+
+from pprint import pp
+
+pp(extract_api_keys_with_regex(key))

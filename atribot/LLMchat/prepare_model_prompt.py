@@ -68,7 +68,6 @@ class build_prompt:
             "<group_chat_history>"
             f"{chat_history}"
             "</group_chat_history>"
-            f"<current_time>{time.strftime('%Y-%m-%d %H-%M-%S')}</current_time>\n"
             "</context>"    
         )
     
@@ -150,6 +149,7 @@ class build_prompt:
         f"<qq_id>{data['user_id']}</qq_id>"
         f"<group_name>{data['group_name']}</group_name>"
         f"<nick_name>{data['sender']['nickname']}</nick_name>"
+        f"<time>{time.strftime('%Y-%m-%d %H-%M-%S')}</time>\n"
         f"<user_message>{data['raw_message']}</user_message>"
         "</MESSAGE>"
         )
@@ -162,6 +162,7 @@ class build_prompt:
         f"<qq_id>{data['user_id']}</qq_id>"
         f"<nick_name>{data['sender']['nickname']}</nick_name>"
         f"<group_role>{data['sender']['role']}</group_role>"
+        f"<time>{time.strftime('%Y-%m-%d %H-%M-%S')}</time>\n"
         f"<user_message>{message}</user_message>"
         "</MESSAGE>"
         )

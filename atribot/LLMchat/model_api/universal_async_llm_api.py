@@ -1,4 +1,5 @@
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
+from typing import List
 import aiohttp
 import asyncio
 import json
@@ -107,7 +108,7 @@ class universal_ai_api(model_api_basics):
         }|remainder)
         return await self._client_post(payload)
     
-    async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024, encoding:str = "float")->dict:
+    async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024, encoding:str = "float")->List[List[float]]:
         """异步调用指定的嵌入模型，将输入的文本转换为向量表示。
 
         Args:
@@ -117,7 +118,7 @@ class universal_ai_api(model_api_basics):
             encoding (str): 向量的编码格式。默认为 "float"。
 
         Returns:
-            dict: _description_
+            List[List[float]]: 返回的向量list,每一个字符串对应一个list
         """
         payload = json.dumps({
             "model" : model,

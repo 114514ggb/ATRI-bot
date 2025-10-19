@@ -5,9 +5,9 @@ from pprint import pp
 
 # http = "http://localhost:11434/api/embed"
 # http = "http://localhost:11434/v1/embeddings"
-http = "http://localhost:11434/api/embeddings"
+# http = "http://localhost:11434/api/embeddings"
 # http = "http://localhost:11434/v1/chat/completions"
-key = "sk-114514"
+# key = "ollama"
 
 # http = "https://aihubmix.com/v1"
 # key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4"
@@ -25,13 +25,17 @@ key = "sk-114514"
 # key = "sk-QtbNCpq9giS6s6a5Jncob7YTvS93Ikn5j30BkAivfBtDfzvz"
 # http = "https://openrouter.ai/api/v1/chat/completions"
 # key = "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"
-http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
+# http = "http://40.83.223.214:3000/v1/chat/completions" #某开发的
+# key = "sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y"
+
+# http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
 # key = "AIzaSyBJRnGzetsNzgShmWt5Z9j8522Uje21veo"
-key = "AIzaSyCczwFSbyNt8tSyzN1suCgzl9l7urIjT9k"
-
-
-
+# key = "AIzaSyC8QqFrtsxjjSl6LXhvZLC5wr0WFlH2SAY"
+# http = "https://integrate.api.nvidia.com/v1/chat/completions"
+# key = "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"
+http = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+key = "5f4cbc0d0eaf4cf79422e7109056fd3d.20R5i62X5nQbFqWC"
 
 
 tools = [
@@ -58,7 +62,7 @@ tools = [
     }
 ]
 
-# model = "dengcao/Qwen3-Embedding-0.6B:F16"
+model = "dengcao/Qwen3-Embedding-0.6B:F16"
 # model = "dengcao/Qwen3-Reranker-8B:Q4_K_M"
 # model = "gpt-oss:20b"
 
@@ -72,9 +76,14 @@ tools = [
 # model = "gpt-oss-120b"
 # model = "xai/grok-4-fast-non-reasoning"
 # model = "xai/grok-4-fast-reasoning"
-model = "google-ai-studio/gemini-2.5-flash"
+# model = "google-ai-studio/gemini-2.5-flash"
 # model = "google-ai-studio/gemini-2.5-pro"
 # model = "claude-4.1-opus"
+# model = "moonshotai/kimi-k2-instruct-0905"
+# model = "假流式/gemini-2.5-pro"
+# model = "流式抗截断/gemini-2.5-flash"
+# model = "moonshotai/kimi-k2-instruct-0905"
+model = "GLM-4.5-Flash"
 
 
 # chat = async_openAI(base_url = http, api_key = key , tools = tools)
@@ -101,52 +110,133 @@ messages = [
 # text = asyncio.run(chat.request_fetch_primary(my_messages = messages, my_model = model))
 # text =  asyncio.run(chat.generate_text(model, messages))['choices'][0]['message']
 
-async def main():
-    chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key , tools = tools)
-    text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
-    # text = await chat.generate_embedding_vector(
-    #   model = model,
-    #   input = "ATRI",
-    #   dimensions = 1024
-    # )
+test_sentences = [
+    "会跳舞的番茄声称自己掌握了时间的秘密。",
+    "我的袜子总在深夜与冰箱里的鸡蛋进行哲学辩论。",
+    "那座山昨天告诉我，它其实是一颗沉睡的星星。",
+    "量子力学证明，猫既是活的也是死的，但我的待办事项列表却一直是死的。",
+    "沉默的蘑菇在月光下策划着一场无声的革命。",
+    "我的键盘学会了叹气，每次我写bug时它都会自动缩进。",
+    "左脚的鞋子和右脚的鞋子拥有完全不同的政治观点。",
+    "水龙头滴下的不是水，是液态的孤独，每分钟十二滴。",
+    "天气预报说，今晚有百分之八十的几率下猫，请带好伞。",
+    "Wi-Fi信号在穿越墙壁时会变成古典乐，只有金鱼能听见。",
+    "影子们决定罢工，要求更好的光源和更有趣的主人。",
+    "这本书的第十七页拒绝被阅读，它认为自己需要更多的隐私。"
+]
+
+
+from atribot.LLMchat.memory.prompts import FACT_RETRIEVAL_PROMPT
+
+import json
+
+from atribot.core.types import Context
+
+async def extract_and_summarize_facts(message:str)->list[str]:
+    """从用户输入文本中提取关键信息，并总结成一个结构化的事实
+
+    Args:
+        message (str): 文本
+
+    Returns:
+        list[str]: 可能为空的总结str
+    """
+    private_context = Context(Play_role = FACT_RETRIEVAL_PROMPT)
+    private_context.add_user_message(
+        f"Input:\n{message}"
+    )
+    
+    chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
+    
+    parameters = {
+        "messages":private_context.get_messages(),
+        "temperature":0.0,
+        "max_tokens": 8192,
+        "response_format":{ "type": "json_object" },
+        "reasoning_effort": "high"
+    }
+    
+    assistant_message :dict[str:str] = (await chat.generate_json_ample(model, parameters))['choices'][0]['message']
+    
     await chat.aclose()
+    
+    if assistant_content := assistant_message.get('content'):
+      return json.loads(assistant_content).get("facts",[]) 
+    else:
+      return []
+    
+    # pp(assistant_json)
+
+
+
+async def main():
+    from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+    import time
+    
+    # chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
+    # text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
+    # psql_db = await atriAsyncPostgreSQL.create(
+    #   user = "postgres",
+    #   database = "atri"
+    # )
+    
+    # sql = """
+    # INSERT INTO atri_memory 
+    #     (group_id, user_id, event_time, event, event_vector) 
+    # VALUES 
+    #     ($1, $2, $3, $4, $5)
+    # """ 
+    # sql = """
+    # SELECT 
+    #     event
+    # FROM atri_memory
+    # ORDER BY event_vector <=> $1::vector(1024) ASC
+    # LIMIT $2
+    # """    
+    sql = """
+    SELECT 
+        event,
+        event_vector <=> $1::vector(1024) as distance
+    FROM atri_memory
+    ORDER BY distance ASC
+    LIMIT $2
+    """
+    
+    # async with psql_db as db:
+    #   for test in test_sentences:
+    #     embedding = await chat.generate_embedding_vector(
+    #       model = model,
+    #       input = test,
+    #       dimensions = 1024
+    #     )
+    #     await db.execute_with_pool(
+    #       sql,
+    #       (None,None,int(time.time()), test, str(embedding[0]))
+    #     )
+    
+    # async with psql_db as db:
+    #   embedding = await chat.generate_embedding_vector(
+    #     model = model,
+    #     input = "影子们不决定罢工，不要求更好的光源和更有趣的主人",
+    #     dimensions = 1024
+    #   )
+    #   ret = await db.execute_with_pool(
+    #     sql,
+    #     (str(embedding[0]),3),
+    #     fetch_type = "all"
+    #   )
+    #   print(ret)
+    # await chat.aclose()
+    
     # with open("test.txt",'w',encoding = 'utf-8') as file:
-    #   file.write(text)
+    #   file.write(str(text))
+    
+    text = await extract_and_summarize_facts("今天和女朋友ATRI看了电影《泰坦尼克号》,我廷喜欢的,她好像也挺喜欢的")
+    
+    
     pp(text)
 
 
-# if __name__ == "__main__":
-#     asyncio.run(main())
 
-
-def qwq():
-  print("什么")
-  a = yield "?"
-  print("开始")
-  while True:
-    print(f"收到的{a}")
-    if a:
-      yield "True"
-    else:
-      yield "False"
-    print(f"现在是{a}")
-
-a = 10
-q = qwq()
-print(q.send(None))
-# next(q)
-for _ in range(10):
-    print(q.send(a))
-    a -= 1
-    print(a)
-
-# def qwq2(n):
-#   while True:
-#     n -= 1
-#     if n>0:
-#       yield n
-#     else:
-#       break
-  
-# for n in qwq2(10):
-#   print(n)
+if __name__ == "__main__":
+    asyncio.run(main())

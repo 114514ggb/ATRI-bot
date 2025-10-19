@@ -40,7 +40,7 @@ class message_cache:
         async with self.private_locks[user_id]:
             self.private_messages[user_id].append(message)
     
-    async def cache_system(self,data:dict,message_test:str):
+    async def cache_system(self,data:dict,message_text:str):
         """存储消息"""
         
         if message_type := data.get("message_type",False): 
@@ -50,14 +50,14 @@ class message_cache:
                 
                 await self._set_group_messages(
                     data['group_id'],
-                    f"{data['user_id']}|{data['sender']['nickname']}发送:{message_test}"
+                    f"{data['user_id']}|{data['sender']['nickname']}发送:{message_text}"
                 )
                 return None
             
             elif message_type == 'private':
                 await self._set_private_messages(
                     data['sender']['user_id'],
-                    message_test
+                    message_text
                 )
                 return None
         

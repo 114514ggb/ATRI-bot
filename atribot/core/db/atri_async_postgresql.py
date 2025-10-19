@@ -18,7 +18,6 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
     def __init__(self):
         super().__init__()
         self._conn_token = None
-        self._cursor_token = None
     
     @classmethod
     async def create(
@@ -66,11 +65,9 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
                         **kwargs
                     )
                 except Exception as e:
-                    cls._pool = None
                     raise Exception(f"创建数据库连接池失败: {e}")
-                c = cls()
-                c.log.info(f"PostgreSQL连接池已创建（大小：{min_size}-{max_size}）")
-            return c
+                cls().log.info(f"PostgreSQL连接池已创建（大小：{min_size}-{max_size}）")
+            return cls()
     
     @classmethod
     async def close_pool(cls):
@@ -96,7 +93,7 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
             self._context_conn.reset(self._conn_token)
             self._conn_token = None
     
-    def _get_connection(self) -> asyncpg.Connection:
+    def get_connection(self) -> asyncpg.Connection:
         """获取当前上下文连接"""
         conn = self._context_conn.get()
         if conn is None:
@@ -112,38 +109,90 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         """使用连接池执行SQL,会自动处理%s转换成$1"""
         
         conn = self._context_conn.get()
-        use_context_conn = conn is not None
-        
-        if not use_context_conn:
-            conn = await self._pool.acquire()
+        temp_conn = None
         
         try:
-            # 处理PostgreSQL参数占位符 ($1, $2)
-            if params:
-                query = self._convert_query_placeholders(query)
-                # params = self._prepare_params(params)
+            # 如果没有上下文连接，临时获取一个
+            if conn is None:
+                temp_conn = await self._pool.acquire()
+                conn = temp_conn
+            
+            # 转换占位符兼容原有语句
+            query = self._convert_query_placeholders(query) if params else query
+            args = params or ()
             
             if fetch_type == "one":
-                result:Record|None = await conn.fetchrow(query, *params) if params else await conn.fetchrow(query)
+                return await conn.fetchrow(query, *args)
             elif fetch_type == "all":
-                result:Record|None = await conn.fetch(query, *params) if params else await conn.fetch(query)
+                return await conn.fetch(query, *args)
             else:
-                result = await conn.execute(query, *params) if params else await conn.execute(query)
-                result:Record|None = True
-            return result
-            
-        except UniqueViolationError as e:
-            self.log.error(f"唯一性约束冲突: {e}")
-            raise
-        except ForeignKeyViolationError as e:
-            self.log.error(f"外键约束冲突: {e}")
+                await conn.execute(query, *args)
+                return True
+                
+        except (UniqueViolationError, ForeignKeyViolationError) as e:
+            self.log.error(f"数据库约束冲突: {e}")
             raise
         except Exception as e:
             self.log.error(f"SQL执行错误: {e}, 查询: {query}, 参数: {params}")
             raise
         finally:
-            if not use_context_conn and conn:
-                await self._pool.release(conn)
+            if temp_conn:
+                await self._pool.release(temp_conn)
+                
+    async def execute_with_pool(
+        self, 
+        query: str,
+        params: Tuple = None, 
+        fetch_type: str = None
+    ) -> Record|None:
+        """使用连接池执行SQL,需要提前获取浮标,用于多条语句的情况下"""
+        
+        conn = self._context_conn.get()
+        
+        try:
+
+            args = params or ()
+            
+            if fetch_type == "one":
+                return await conn.fetchrow(query, *args)
+            elif fetch_type == "all":
+                return await conn.fetch(query, *args)
+            else:
+                await conn.execute(query, *args)
+            
+                return True
+                
+                
+        except (UniqueViolationError, ForeignKeyViolationError) as e:
+            self.log.error(f"数据库约束冲突: {e}")
+            raise
+        except Exception as e:
+            self.log.error(f"SQL执行错误: {e}, 查询: {query}, 参数: {params}")
+            raise
+
+    async def executemany_with_pool(
+        self,
+        query: str,
+        args_list: List[Tuple]
+    ) -> None:
+        """
+        批量执行同一条 SQL，利用 asyncpg 原生 executemany
+        Args:
+            query: 含有占位符的 SQL，例如
+                INSERT INTO atri_memory (group_id,user_id,event_time,event,event_vector)
+                VALUES ($1,$2,$3,$4,$5)
+            args_list: 每条记录对应的参数元组
+        """
+        conn = self._context_conn.get()
+        try:
+            await conn.executemany(query, args_list)
+        except (UniqueViolationError, ForeignKeyViolationError) as e:
+            self.log.error(f"数据库约束冲突: {e}")
+            raise
+        except Exception as e:
+            self.log.error(f"SQL executemany 错误: {e}, 查询: {query}")
+            raise
+    
     
     def _convert_query_placeholders(self, query: str) -> str:
         """将 %s 占位符转换为 $1, $2 格式"""
@@ -158,11 +207,6 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
                 new_parts.append(f"${i+1}")
         
         return ''.join(new_parts)
-    
-    def _prepare_params(self, params: Tuple) -> Tuple:
-        """预处理参数"""
-        return params
-    
 
     async def add_user(self, user_id: int, nickname: str) -> bool:
         """添加用户"""
@@ -210,7 +254,7 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
 
     async def execute_transaction(self, queries: List[Tuple[str, Tuple]]) -> bool:
         """执行事务"""
-        conn = self._get_connection()
+        conn = self.get_connection()
         async with conn.transaction():
             try:
                 for query, params in queries:

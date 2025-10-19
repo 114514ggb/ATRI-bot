@@ -78,7 +78,7 @@ CREATE TABLE atri_memory (
     event_time BIGINT NOT NULL, -- 记忆的时间点
     event TEXT,                 -- TEXT 类型支持更大长度
     event_vector VECTOR(1024),  -- 1024 维向量
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP --创建时间
 );
 
 -- 添加注释说明字段用途

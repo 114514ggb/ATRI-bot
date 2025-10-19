@@ -49,21 +49,18 @@
             }
         },
         {
-            "name":"xiaohanhan",
-            "base_url":"https://newapi.hancat.work/v1/chat/completions",
-            "api_key":"sk-hvNg3oRrFjjzi77kw22XVpLceuykldC7cxYfjcNzmyIEFSJm",
+            "name":"zaxprisのapi",
+            "base_url":"http://40.83.223.214:3000/v1/chat/completions",
+            "api_key":"sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y",
             "models":{
-                "gemini-2.5-flash": {
-                    "visual_sense": true
+                "moonshotai/kimi-k2-instruct-0905":{
+                    "visual_sense":false
                 },
-                "gemini-2.5-pro": {
-                    "visual_sense": true
+                "假流式/gemini-2.5-pro":{
+                    "visual_sense":true
                 },
-                "gpt-5-2025-08-07": {
-                    "visual_sense": false
-                },
-                "claude-4.1-opus": {
-                    "visual_sense": false
+                "流式抗截断/gemini-2.5-flash":{
+                    "visual_sense":true
                 }
             }
         }

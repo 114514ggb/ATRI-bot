@@ -15,7 +15,8 @@ class AsyncDatabaseBase(ABC):
     _context_cursor: ContextVar[Optional[Any]] = ContextVar('cursor', default=None)
     
     def __init__(self):
-        self.log: Logger = container.get("log")
+        # self.log: Logger = container.get("log")
+        self.log: Logger = Logger("atri")
     
     @classmethod
     @abstractmethod
@@ -30,7 +31,7 @@ class AsyncDatabaseBase(ABC):
         pass
     
     @abstractmethod
-    async def __aenter__(self):
+    async def __aenter__(self)->'AsyncDatabaseBase':
         """获取连接和游标"""
         pass
     
@@ -46,7 +47,17 @@ class AsyncDatabaseBase(ABC):
         params: Tuple = None, 
         fetch_type: str = None
     ) -> Any:
-        """使用连接池执行SQL"""
+        """使用连接池执行SQL,会自动获取浮标"""
+        pass
+    
+    @abstractmethod
+    async def execute_with_pool(
+        self, 
+        query: str,
+        params: Tuple = None, 
+        fetch_type: str = None
+    ) -> Any:
+        """使用连接池执行SQL,需要手动获取浮标,用于多条语句的情况下"""
         pass
     
     async def execute_SQL(self, sql: str, argument: Tuple = None) -> Tuple:

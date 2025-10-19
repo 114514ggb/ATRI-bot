@@ -16,7 +16,7 @@ tool_json = {
         },
         "duration": {
             "type": "integer",
-            "description": "禁言时间单位秒,取值范围1~2591999",
+            "description": "禁言时间单位秒,取值范围0~2591999,0就是解禁",
         },
     }
 }

@@ -55,21 +55,29 @@ class pictureProcessing:
             params["image"] = image_url_list[0]
             #还没支持多图片先将就一下
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                        url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}", 
-                        params=params, 
-                        timeout=20
-                    ) as response:
-                    response.raise_for_status()  # 检查状态码
+        for attempt in range(3):
+            try:
+                async with aiohttp.ClientSession() as session:
                     
-                    return base64.b64encode(await response.read()).decode('utf-8')
-                    
-        except aiohttp.ClientError as e:
-            raise aiohttp.ClientError(f"网络请求错误: {e}")
-        except Exception as e:
-            raise Exception(f"图片生成失败: {e}")
+                    async with session.get(
+                            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}", 
+                            params=params, 
+                            timeout=20
+                        ) as response:
+                        
+                        #重试
+                        if response.status >= 500 and attempt < 3 - 1:
+                            await asyncio.sleep(1)
+                            continue
+                        
+                        response.raise_for_status()  # 检查状态码
+                        
+                        return base64.b64encode(await response.read()).decode('utf-8')
+                        
+            except aiohttp.ClientError as e:
+                raise aiohttp.ClientError(f"网络请求错误: {e}")
+            except Exception as e:
+                raise Exception(f"图片生成失败: {e}")
 
     
     @staticmethod

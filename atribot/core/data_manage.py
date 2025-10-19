@@ -14,7 +14,7 @@ class data_manage():
 
     @staticmethod
     def data_processing_text(data:Dict[str, int|str|Dict])->str:
-        """处理原data里的message处理成纯test"""
+        """处理原data里的message处理成纯text"""
         text_parts = []
         
         for message in data["message"]:
@@ -145,8 +145,9 @@ class data_manage():
                         reply_text_parts.append(str(text_data))
                         
                     elif reply_type == "image":
-                        reply_text_parts.append(f"[CQ:图片{img_count}]")
-                        image_urls.append(reply_message["data"]["url"])
+                        url = reply_message["data"]["url"]
+                        reply_text_parts.append(f"[CQ:图片{img_count},url:{url}]")
+                        image_urls.append(url)
                         img_count += 1
                         
                     elif reply_type == "at":
@@ -184,8 +185,9 @@ class data_manage():
                 text_parts.append(f"[CQ:face,prompt:{face_text}]" if face_text else "[CQ:face]")
             
             elif my_type == "image":
-                text_parts.append(f"[CQ:图片{img_count}]")
-                image_urls.append(message["data"]["url"])
+                url = message["data"]["url"]
+                text_parts.append(f"[CQ:图片{img_count},url:{url}]")
+                image_urls.append(url)
                 img_count += 1
                 
             else:

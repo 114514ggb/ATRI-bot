@@ -32,7 +32,26 @@
             "max_tokens": 8192,
             "reasoning_effort": "high"
         },
+        "memiry":{
+            "summarize_model":{
+                "supplier":"bigModel",
+                "model_name":"GLM-4.5-Flash",
+                "visual_sense":false
+            }
+        },
         "standby_model":[
+            {
+                "supplier":"zaxprisのapi",
+                "model_name":"假流式/gemini-2.5-pro"
+            },
+            {
+                "supplier":"zaxprisのapi",
+                "model_name":"流式抗截断/gemini-2.5-flash"
+            },
+            {
+                "supplier":"zaxprisのapi",
+                "model_name":"moonshotai/kimi-k2-instruct-0905"
+            },
             {
                 "supplier":"kourichat",
                 "model_name":"gpt-5-chat-latest"
@@ -62,10 +81,13 @@
             }
         },
         "api_key_pool":[
-            "AIzaSyBp1LJH-mOgjB6oOjshhWtSRKRq8AHZmJw",
-            "AIzaSyC9AwOvXdkOJq_jHmdUut0uZqB81GIV-p0",
-            "AIzaSyAjJZTWz5QGbGEkIXmsJR_gHR89iBjMbDw",
-            "AIzaSyDxIEbCfbpr5k6D-4jMklOCU06IkWXPL08"
+            "AIzaSyBHHXMN27STXvoAxkGIJHdMRlEB_c2mk6o",
+            "AIzaSyCeptasF9nTYoCH-zfr9mG4Y757ClhZ8N0",
+            "AIzaSyC8QqFrtsxjjSl6LXhvZLC5wr0WFlH2SAY",
+            "AIzaSyBRwweKIsz8bbTagEuPgtEon9VtGtUwAjE",
+            "AIzaSyBa246Ljsb0sMiWWZFSZ-U0899BQQnkl8s",
+            "AIzaSyBAF5X2LDMRtV6xLnt8aC7-bTJ3p7IipFQ",
+            "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM"
         ]
     },
     "ai_chat":{

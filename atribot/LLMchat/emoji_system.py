@@ -31,7 +31,7 @@ class emoji_core:
                     self.emoji_file_dict[item] = files
                     
         self.emoji_prompt = build_prompt.append_tag_hint(
-            tag_prompt = "可以在输出中加入被[]包裹的标签,这个格式的标签会解析成对应分类的表情包,标签解析后消失user看不到",
+            tag_prompt = "可以在输出中加入被[]包裹的标签,这个格式的标签会解析成对应分类的表情包,最好只加入一个,而且不要加入没有的标签",
             tag_list = list(self.emoji_file_dict.keys())
         )
     

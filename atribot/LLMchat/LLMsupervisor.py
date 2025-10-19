@@ -339,7 +339,6 @@ class large_language_model_supervisor():
             response.reply_text += content
             return response
         
-        
         response.reasoning_content += assistant_message.get("reasoning_content","")
         response.reply_text += content
         

@@ -65,6 +65,7 @@ class message_router():
         
         try:
             async with self.db as db:
+                db:AsyncDatabaseBase
                 await db.add_user(**users)
                 await db.add_message(**message)
                 

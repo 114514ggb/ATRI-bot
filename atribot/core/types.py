@@ -99,7 +99,7 @@ class Context():
 
         Args:
             role (str): 消息枚举值"user", "assistant", "system", "tool"
-            test (str): 文本内容
+            text (str): 文本内容
             image_urls (list): 图片的 URL 列表，每个 URL 都会被作为独立的图片项添加到 content 
         """
         self.messages.append({
@@ -135,3 +135,11 @@ class Context():
     def clear(self)->None:
         """清除上下文"""
         self.messages.clear()
+
+    def get_context_forecast_token(self)->int:
+        """获取仅供参考的当前上下文的token(默认里面都是中文)
+
+        Returns:
+            int: 大概token数,误差应该挺大的
+        """
+        return int(len(str(self.get_messages()))*1.2)

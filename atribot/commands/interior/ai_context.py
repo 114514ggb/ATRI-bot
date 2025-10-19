@@ -235,6 +235,7 @@ class AIContextCommands:
         message = "📊 当前群上下文状态：\n"
         message += f"当前角色：{current_role}\n"
         message += f"消息数量：{message_count}/{max_messages} ({usage_percentage:.1f}%)\n"
+        message += f"预计上下文token: {context.get_context_forecast_token()}\n"
         
         if usage_percentage < 150:
             status_icon = "🟢"

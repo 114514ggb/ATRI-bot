@@ -28,6 +28,12 @@
       "autoApprove": [],
       "active": true
     },
+    "MS-ImgGen-MCP": {
+      "command": "uvx", 
+      "args": ["ms_image_gen_mcp@latest"], 
+      "env": { "MODELSCOPE_API_KEY": "ms-cdc2aae5-bfe7-48b2-9a42-e67e1bb02736" } ,
+      "active": true
+    },
     "bingcn": {
       "command": "npx",
       "args": [
@@ -44,7 +50,7 @@
       "env": {
         "AMAP_MAPS_API_KEY": "33a63b198b158f9ddf2a8bb5c514130c"
       },
-      "active": true
+      "active": false
     },
     "思维工具-thinking": {
       "command": "npx",
