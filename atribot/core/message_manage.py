@@ -1,5 +1,6 @@
 from atribot.core.command.async_permissions_management import permissions_management
 from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.cache.message_buffer_memory import message_cache
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.command.command_parsing import command_system
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
@@ -18,6 +19,7 @@ class message_router():
         self.logger:Logger = container.get("log")
         self.db:AsyncDatabaseBase = container.get("database")
         self.send_message:qq_send_message = container.get("SendMessage")
+        self.message_cache:message_cache = container.get("MessageCache")
         self.group_manage = group_manage()
         self.group_set = set()
     
@@ -45,6 +47,8 @@ class message_router():
     
         if not (data.get("post_type") == "message"):
             return
+        
+        await self.message_cache.cache_system(data,rich_data.text)
         
         if group_id not in self.group_set:
             group_name = (await self.send_message.get_group_info(group_id))["data"]["group_name"]

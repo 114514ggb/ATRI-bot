@@ -30,7 +30,6 @@ ORDER BY "发言次数" DESC;
 
 
 
-
 SELECT SUM(coalesce(cnt, 0)) AS 出现总次数
 FROM   message m
 CROSS JOIN LATERAL

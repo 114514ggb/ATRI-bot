@@ -146,7 +146,7 @@ class data_manage():
                         
                     elif reply_type == "image":
                         url = reply_message["data"]["url"]
-                        reply_text_parts.append(f"[CQ:图片{img_count},url:{url}]")
+                        reply_text_parts.append(f"[CQ:image{img_count},url:{url}]")
                         image_urls.append(url)
                         img_count += 1
                         
@@ -186,7 +186,7 @@ class data_manage():
             
             elif my_type == "image":
                 url = message["data"]["url"]
-                text_parts.append(f"[CQ:图片{img_count},url:{url}]")
+                text_parts.append(f"[CQ:image{img_count},url:{url}]")
                 image_urls.append(url)
                 img_count += 1
                 

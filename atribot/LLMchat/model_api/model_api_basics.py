@@ -25,10 +25,11 @@ class model_api_basics(ABC):
         # "extra_body": {
         #     "google": {
         #         "thinking_config": {
+        #             "thinking_budget": 800,
         #             "include_thoughts": True
         #         }
         #     }
-        # },
+        # }
         #谷歌模型的openai兼容.思考总结是模型原始思考的合成版本，可帮助您深入了解模型的内部推理过程。
         #请注意，思考预算适用于模型的原始想法，而不适用于想法摘要
         
@@ -109,9 +110,9 @@ class model_api_basics(ABC):
             model, 
             remainder = {
                 'messages': messages,
-                # 'tools': tools,
-                # 'temperature' : temperature,
-                # 'tool_choice': "auto", #有的模型要开启这个才能调用工具
+                'tools': tools,
+                'temperature' : temperature,
+                'tool_choice': "auto", #有的模型要开启这个才能调用工具
                 # "reasoning_effort": "high",
                 # "extra_body": {
                 #     "google": {

@@ -43,23 +43,23 @@ class message_cache:
     async def cache_system(self,data:dict,message_text:str):
         """存储消息"""
         
-        if message_type := data.get("message_type",False): 
+        if message_type := data.get("message_type"): 
             #是带消息的dict
             
             if message_type == 'group':
                 
                 await self._set_group_messages(
                     data['group_id'],
-                    f"{data['user_id']}|{data['sender']['nickname']}发送:{message_text}"
+                    f"{data['user_id']}|{data['sender']['nickname']}发送:{message_text[:1000]}"
                 )
-                return None
+                return
             
             elif message_type == 'private':
                 await self._set_private_messages(
                     data['sender']['user_id'],
                     message_text
                 )
-                return None
+                return
         
         else:
             #应该基本都是非聊天事件

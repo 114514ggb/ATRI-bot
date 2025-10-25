@@ -280,7 +280,7 @@ class group_chat(chat_baseics):
 
         prompt = self.build_prompt.group_chant_template(
             group_id,
-            chat_history=await self.messages_cache.get_group_messages(group_id),
+            chat_history=str(await self.messages_cache.get_group_messages(group_id))[:10000],#简单防止过长
         )
 
         if img_prompt:
@@ -303,7 +303,7 @@ class group_chat(chat_baseics):
             group_id (int): 群号
             message_id (int): 输入消息的id
         """
-        MESSAGE_DELAY = 0.8  # 多条消息间隔时间
+        MESSAGE_DELAY = 1.5  # 多条消息间隔时间
         MESSAGE_DELIMITER = "$"  # 分隔符
         MAX_SINGLE_MESSAGE_LENGTH = 150  # 单条消息最大长度
 

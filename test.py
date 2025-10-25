@@ -3,11 +3,11 @@ from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 import asyncio
 from pprint import pp
 
-# http = "http://localhost:11434/api/embed"
+http = "http://localhost:11434/api/embed"
 # http = "http://localhost:11434/v1/embeddings"
 # http = "http://localhost:11434/api/embeddings"
 # http = "http://localhost:11434/v1/chat/completions"
-# key = "ollama"
+key = "ollama"
 
 # http = "https://aihubmix.com/v1"
 # key = "sk-0NLKe1sBs6ZGw2iD68E6161872544aCdA7E01bE088DdF4F4"
@@ -30,12 +30,13 @@ from pprint import pp
 
 # http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-# key = "AIzaSyBJRnGzetsNzgShmWt5Z9j8522Uje21veo"
-# key = "AIzaSyC8QqFrtsxjjSl6LXhvZLC5wr0WFlH2SAY"
+# key = "AIzaSyAymHwK5Ls9HFK7Iu1oT41H5v2jSZ1gM4Q"
+
 # http = "https://integrate.api.nvidia.com/v1/chat/completions"
 # key = "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"
-http = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-key = "5f4cbc0d0eaf4cf79422e7109056fd3d.20R5i62X5nQbFqWC"
+# http = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+# key = "5f4cbc0d0eaf4cf79422e7109056fd3d.20R5i62X5nQbFqWC"
+
 
 
 tools = [
@@ -83,7 +84,7 @@ model = "dengcao/Qwen3-Embedding-0.6B:F16"
 # model = "假流式/gemini-2.5-pro"
 # model = "流式抗截断/gemini-2.5-flash"
 # model = "moonshotai/kimi-k2-instruct-0905"
-model = "GLM-4.5-Flash"
+# model = "GLM-4.5-Flash"
 
 
 # chat = async_openAI(base_url = http, api_key = key , tools = tools)
@@ -122,7 +123,58 @@ test_sentences = [
     "天气预报说，今晚有百分之八十的几率下猫，请带好伞。",
     "Wi-Fi信号在穿越墙壁时会变成古典乐，只有金鱼能听见。",
     "影子们决定罢工，要求更好的光源和更有趣的主人。",
-    "这本书的第十七页拒绝被阅读，它认为自己需要更多的隐私。"
+    "这本书的第十七页拒绝被阅读，它认为自己需要更多的隐私。",
+    
+    "向量数据库通过高维embedding实现语义搜索",
+    "Milvus支持GPU加速的向量索引构建",
+    "HNSW算法在召回率与延迟之间取得平衡",
+    "IVF_PQ压缩能显著降低内存占用",
+    "向量数据库的相似度计算通常使用余弦距离",
+    "Weaviate内置的text2vec-transformers模型可一键生成向量",
+    "Qdrant的Payload过滤支持嵌套字段查询",
+    "Embedding维度越高，所需存储空间指数级增长",
+    "向量数据库需要定期重建索引以保证召回质量",
+    "在千万级向量场景下，磁盘索引比全内存更经济",
+    "Approximate Nearest Neighbor Search是向量检索的核心",
+    "向量数据库与传统倒排索引互补，实现混合检索",
+    "OpenAI的text-embedding-ada-002输出1536维向量",
+    "余弦相似度计算前需对向量做L2归一化",
+    "PQ（Product Quantization）将向量分段聚类压缩",
+    "ScaNN库在Batch查询下比FAISS快1.5倍",
+    "向量数据库的写入吞吐受限于索引构建速度",
+    "GPU索引构建时可调大nprobe以提升召回",
+    "动态增删向量需要数据库支持增量索引",
+    "向量数据库的CRUD接口逐渐向SQL-like靠拢",
+    "Jina Embedding模型支持中英双语句子级向量",
+    "向量数据库常采用Sharding策略横向扩展",
+    "Raft协议可保证分布式向量数据库的写入一致性",
+    "HNSW的efConstruction参数越大召回越高但建库越慢",
+    "向量数据库的内存占用 ≈ 1.2 × 向量数 × 维度 × 4字节",
+    "在RAG架构里，向量数据库负责上下文语义召回",
+    "LangChain的VectorStore接口统一了多种向量数据库",
+    "向量数据库的标量过滤需要联合Bitmap索引",
+    "ONNX Runtime可用于加速Embedding模型推理",
+    "向量数据库的冷启动问题可用预训练模型缓解",
+    "FAISS的IndexFlatL2提供精确搜索基线效果",
+    "向量数据库的延迟P99应控制在100 ms以内",
+    "Embedding结果需做截断或降维以适配移动端",
+    "向量数据库支持多模态时，CLIP向量是主流选择",
+    "混合检索结合BM25 + 向量召回可提升Ranking",
+    "向量数据库的监控指标包括QPS、Recall@K、IndexSize",
+    "向量数据库的备份需同时保存索引与原始向量",
+    "在k8s中部署向量数据库需挂载SSD提升IO",
+    "向量数据库的GC策略影响长时间运行的稳定性",
+    "向量数据库的权限控制需细化到Collection级别",
+    "Embedding模型版本升级后需要全量Reindex",
+    "向量数据库的BenchMark常用ANN Benchmarks工具",
+    "向量数据库的客户端SDK普遍支持GRPC与HTTP",
+    "向量数据库的Schema需要定义向量维度和距离类型",
+    "向量数据库的异步删除策略可避免段合并阻塞",
+    "向量数据库支持Range Query时可限定相似度阈值",
+    "向量数据库的缓存层常用Redis存放热向量",
+    "向量数据库在电商场景用于商品图片去重",
+    "向量数据库的跨集群同步可用Kafka Connect插件",
+    "向量数据库的未来趋势是云原生Serverless化"
 ]
 
 
@@ -169,41 +221,53 @@ async def extract_and_summarize_facts(message:str)->list[str]:
 
 
 
+
 async def main():
     from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
     import time
     
-    # chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
+    chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
     # text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
-    # psql_db = await atriAsyncPostgreSQL.create(
-    #   user = "postgres",
-    #   database = "atri"
-    # )
+    psql_db = await atriAsyncPostgreSQL.create(
+      user = "postgres",
+      database = "atri"
+    )
     
+    # #存储
     # sql = """
     # INSERT INTO atri_memory 
     #     (group_id, user_id, event_time, event, event_vector) 
     # VALUES 
     #     ($1, $2, $3, $4, $5)
     # """ 
+    
+    #查询
     # sql = """
     # SELECT 
     #     event
     # FROM atri_memory
+    # WHERE event_vector <=> $2::vector(1024) <= 0.7
     # ORDER BY event_vector <=> $1::vector(1024) ASC
     # LIMIT $2
     # """    
+    
     sql = """
     SELECT 
         event,
         event_vector <=> $1::vector(1024) as distance
     FROM atri_memory
+    WHERE event_vector <=> $1::vector(1024) <= 0.5
     ORDER BY distance ASC
     LIMIT $2
     """
+    # from atribot.LLMchat.RAG.text_chunker import RecursiveCharacterTextSplitter
+    # text_chunker = RecursiveCharacterTextSplitter(200,50)
+    
+    # with open("E:/程序文件/python/ATRI-main/document/file/atri_my_dear_moments.txt",'r',encoding = 'utf-8') as file:
+    #   test_list = text_chunker.split_text(file.read())
     
     # async with psql_db as db:
-    #   for test in test_sentences:
+    #   for test in test_list:
     #     embedding = await chat.generate_embedding_vector(
     #       model = model,
     #       input = test,
@@ -214,29 +278,33 @@ async def main():
     #       (None,None,int(time.time()), test, str(embedding[0]))
     #     )
     
-    # async with psql_db as db:
-    #   embedding = await chat.generate_embedding_vector(
-    #     model = model,
-    #     input = "影子们不决定罢工，不要求更好的光源和更有趣的主人",
-    #     dimensions = 1024
-    #   )
-    #   ret = await db.execute_with_pool(
-    #     sql,
-    #     (str(embedding[0]),3),
-    #     fetch_type = "all"
-    #   )
-    #   print(ret)
-    # await chat.aclose()
+    async with psql_db as db:
+      embedding = await chat.generate_embedding_vector(
+        model = model,
+        input = "这个地球怎么了呢",
+        dimensions = 1024
+      )
+      ret = await db.execute_with_pool(
+        sql,
+        (str(embedding[0]),5),
+        fetch_type = "all"
+      )
+      pp(ret)
+    
     
     # with open("test.txt",'w',encoding = 'utf-8') as file:
     #   file.write(str(text))
     
-    text = await extract_and_summarize_facts("今天和女朋友ATRI看了电影《泰坦尼克号》,我廷喜欢的,她好像也挺喜欢的")
+    # text = await extract_and_summarize_facts("今天和女朋友看了电影《泰坦尼克号》,我廷喜欢的,她好像也挺喜欢的")
+    
+    await chat.aclose()
+    
+    # pp(text)
     
     
-    pp(text)
 
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+

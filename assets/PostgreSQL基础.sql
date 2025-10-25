@@ -76,7 +76,7 @@ CREATE TABLE atri_memory (
     group_id BIGINT DEFAULT 0,  -- 默认值 0 表示私聊,为0时user_id不能为空
     user_id BIGINT,             -- 允许和group_id一起为 NULL 表示知识库记忆
     event_time BIGINT NOT NULL, -- 记忆的时间点
-    event TEXT,                 -- TEXT 类型支持更大长度
+    event TEXT,                 -- 记忆文本
     event_vector VECTOR(1024),  -- 1024 维向量
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP --创建时间
 );

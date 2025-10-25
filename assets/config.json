@@ -29,8 +29,15 @@
         },
         "chat_parameter":{
             "temperature":0.2,
-            "max_tokens": 8192,
-            "reasoning_effort": "high"
+            "max_tokens": 65536,
+            "extra_body": {
+                "google": {
+                    "thinking_config": {
+                        "thinking_budget": 24576,
+                        "include_thoughts": true
+                    }
+                }
+            }
         },
         "memiry":{
             "summarize_model":{
@@ -88,10 +95,11 @@
             "AIzaSyBa246Ljsb0sMiWWZFSZ-U0899BQQnkl8s",
             "AIzaSyBAF5X2LDMRtV6xLnt8aC7-bTJ3p7IipFQ",
             "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM"
+
         ]
     },
     "ai_chat":{
-        "playRole":"ATRI",
+        "playRole":"猫娘",
         "ai_max_record":20,
         "group_max_record":20,
         "private_max_record":20

@@ -64,16 +64,16 @@ class RAGManager:
             encoding="float"
         )
         
-    def calculate_reranker(self, chunks:list[str], question:str, k:int=1)->list[str]:
+    def calculate_reranker(self, chunks:list[str], question:str, k:int=2)->list[str]:
         """根据问题对文本块列表进行相关性重排序，并返回得分最高的前 K 个文本块。
 
         Args:
             chunks (list[str]): 候选文本块列表。
-                这些文本块通常由一个快速但精度不高的检索器（如 BM25 或向量检索）
+                这些文本块通常由一个快速但精度不高的检索器
                 初步筛选得出，它们是与问题可能相关的候选答案。
             question (str): 用户提出的问题或查询语句。
                 重排序模型将以此问题为基准，来评估每个文本块的相关性。
-            k (int, optional): 需要返回的、相关性最高的文本块数量。默认为 `1`。
+            k (int, optional): 需要返回的、相关性最高的文本块数量。默认为 `2`。
                 `k` 的值不应大于 `chunks` 列表的长度。
 
         Returns:
@@ -98,6 +98,7 @@ class RAGManager:
         SELECT 
             event
         FROM atri_memory
+        WHERE event_vector <=> $1::vector(1024) <= 0.5
         ORDER BY event_vector <=> $1::vector(1024) ASC
         LIMIT $2
         """

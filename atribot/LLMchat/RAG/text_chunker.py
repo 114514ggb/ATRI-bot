@@ -401,9 +401,9 @@ class MarkdownHeaderTextSplitter:
             "\n\n",  # 段落
             "\n",    # 行
             "。|！|？",  # 中文句末标点
-            "\.\s|\!\s|\?\s", # 英文句末标点加空格
-            "；|;\s",  # 分号
-            "，|,\s"   # 逗号
+            r"\.\s|\!\s|\?\s", # 英文句末标点加空格
+            r"；|;\s",  # 分号
+            r"，|,\s"   # 逗号
         ]
         self._is_separator_regex = is_separator_regex
         # 预编译正则表达式（如果需要）

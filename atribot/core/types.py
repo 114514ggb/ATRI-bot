@@ -127,10 +127,43 @@ class Context():
         """添加工具消息"""
         self.messages.append({"role": "tool", "content": content, "tool_call_id": tool_call_id})
         
-    def record_validity_check(self)->None:
-        """针对消息条数的验证,需要显示调用"""
-        if sum(1 for msg in self.messages if msg["role"] == "user") > self.user_max_record:
-            self.messages = self.messages[-self.user_max_record:]
+    def record_validity_check(self) -> list:
+        """
+        针对消息条数的验证，需要显式调用。
+        如果 user 消息数超过限制，会截取到总长度为 user_max_record，
+        并确保最后一条消息是 user 消息（向下取整）。
+        
+        Returns:
+            list: 被截取掉的消息列表
+        """
+        user_count = sum(1 for msg in self.messages if msg["role"] == "user")
+        
+        if user_count > self.user_max_record:
+            # 先截取到总长度为 user_max_record
+            kept_messages = self.messages[-self.user_max_record:]
+            
+            # 从后往前找到最后一个 user 消息的位置
+            last_user_index = -1
+            for i in range(0, len(kept_messages)):
+                if kept_messages[i]["role"] == "user":
+                    last_user_index = i
+                    break
+            
+            # 截取到最近条 user 消息
+            if last_user_index != -1:
+                kept_messages = kept_messages[last_user_index:]
+            else:
+                import copy
+                removed_messages = copy.copy(self.messages)
+                self.messages.clear()
+                return removed_messages
+            
+            # 计算被删除的消息
+            removed_messages = self.messages[:len(self.messages) - len(kept_messages)]
+            self.messages = kept_messages
+            return removed_messages
+        
+        return []
         
     def clear(self)->None:
         """清除上下文"""
