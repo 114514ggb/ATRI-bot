@@ -49,6 +49,10 @@ CREATE TABLE message (
         ON DELETE SET NULL ON UPDATE CASCADE
 );
 
+--时间索引
+CREATE INDEX idx_message_time_desc
+ON message USING btree ("time" DESC);
+
 
 -- 用户表的last_updated字段更新触发器
 CREATE OR REPLACE FUNCTION update_last_updated()
@@ -98,6 +102,7 @@ COMMENT ON TABLE atri_memory IS '记忆存储表，支持群聊、私聊和知�
 -- sudo apt install postgresql-16-pgvector
 -- 提供向量支持的插件
 -- create extension vector;
+-- CREATE EXTENSION IF NOT EXISTS vector;
 -- 查看插件
 -- SELECT * FROM pg_available_extensions;#
 

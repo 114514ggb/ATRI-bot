@@ -50,7 +50,7 @@
         },
         {
             "name":"zaxprisのapi",
-            "base_url":"http://40.83.223.214:3000/v1/chat/completions",
+            "base_url":"http://43.248.77.254:30044/v1/chat/completions",
             "api_key":"sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y",
             "models":{
                 "moonshotai/kimi-k2-instruct-0905":{

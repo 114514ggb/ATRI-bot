@@ -267,12 +267,13 @@ class group_chat(chat_baseics):
         raise ValueError("所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
 
 
-    async def prompt_structure(self, group_id: int, img_prompt: str) -> str:
+    async def prompt_structure(self, group_id: int, img_prompt: str = None, knowledge_base:str = None) -> str:
         """提示词构造方法
 
         Args:
             group_id (int): 群号
-            img_prompt (str, optional): 图像提示词. Defaults to "".
+            img_prompt (str): 图像提示词. Defaults to "".
+            knowledge_base (str): 知识库返回
 
         Returns:
             str: 完整提示词
@@ -283,6 +284,9 @@ class group_chat(chat_baseics):
             chat_history=str(await self.messages_cache.get_group_messages(group_id))[:10000],#简单防止过长
         )
 
+        if knowledge_base:
+            prompt += f"<knowledge_base>{knowledge_base}</knowledge_base>"
+        
         if img_prompt:
             prompt += f"<image_descriptions>{img_prompt}</image_descriptions>"
 

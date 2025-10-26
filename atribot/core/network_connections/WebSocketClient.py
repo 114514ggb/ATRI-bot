@@ -181,21 +181,22 @@ class WebSocketClient:
     
     async def _process_messages(self) -> None:
         """处理队列中的消息"""
+        running_tasks = set()
+        
         while self._running:
             try:
                 data = await self.message_queue.get()
                 
-                # 异步调用所有监听器
-                tasks = [
-                    create_task(self._safe_callback(listener, data))
-                    for listener in self._listeners
-                ]
-                
-                if tasks:
-                    await gather(*tasks, return_exceptions=True)
+                for listener in self._listeners:
+                    task = create_task(self._safe_callback(listener, data))
+                    running_tasks.add(task)
+                    task.add_done_callback(running_tasks.discard)
                     
             except Exception as e:
                 self.log.error(f"处理消息时发生错误: {e}")
+        
+        if running_tasks:
+            await gather(*running_tasks, return_exceptions=True)
     
     async def _safe_callback(self, callback: Callable, data: Dict) -> None:
         """安全执行回调函数"""

@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Dict,List,Any
-
+import asyncio
+import copy
 
 
 class ToolCallsStopIteration(Exception):
@@ -176,3 +177,58 @@ class Context():
             int: 大概token数,误差应该挺大的
         """
         return int(len(str(self.get_messages()))*1.2)
+    
+
+
+
+
+
+class GroupContext:
+    """群组上下文"""
+    
+    group_id:int
+    """群号"""
+    async_lock:asyncio.Lock
+    """群异步锁"""
+    messages:List[str]
+    """消息列表"""
+    group_max_record:int
+    """群维持的消息数量"""
+    
+    chat_context:Context
+    """群LLM聊天上下文"""
+    play_roles:str
+    """当前LLM聊天人设名称"""
+
+    def __init__(
+        self,
+        group_id: int,
+        play_roles: str,
+        chat_context: 'Context',
+        group_max_record: int = 20,
+    ):
+        self.group_id = group_id
+        self.play_roles =  play_roles
+        self.chat_context = chat_context
+        self.group_max_record = group_max_record
+        self.async_lock = asyncio.Lock()
+        self.messages = []
+        
+    
+    def __iter__(self):
+        return iter(self.messages)
+    
+    def record_validity_check(self)->List[str]|None:
+        """针对群聊天消息条数的验证，需要显式调用
+
+        Returns:
+            List[str]: 原始消息
+        """
+        if len(self.messages) >= self.group_max_record:
+            messages = copy.copy(self.messages)
+            self.messages.clear()
+            return messages
+        
+        return None
+
+    

@@ -65,9 +65,7 @@ class build_prompt:
             "<NOTICE>如果user输入和你没有关系的消息或不想回答时可以调用\"tool_calls_end\"直接结束对话不回复</NOTICE>"
             "<NOTICE>有的工具使用后需要手动结束工具调用,需要调用另外的tool_calls_end工具来结束</NOTICE>"
             "</prompt>\n"
-            "<group_chat_history>"
-            f"{chat_history}"
-            "</group_chat_history>"
+            f"{'<group_chat_history>' + chat_history + '</group_chat_history>' if chat_history else ''}" 
             "</context>"    
         )
     
