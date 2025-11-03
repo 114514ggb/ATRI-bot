@@ -34,16 +34,16 @@
                 "google": {
                     "thinking_config": {
                         "thinking_budget": 24576,
-                        "include_thoughts": true
+                        "include_thoughts": false
                     }
                 }
             }
         },
-        "memiry":{
+        "memory":{
             "summarize_model":{
-                "supplier":"bigModel",
-                "model_name":"GLM-4.5-Flash",
-                "visual_sense":false
+                "supplier":"google",
+                "model_name":"google-ai-studio/gemini-2.5-flash",
+                "visual_sense":true
             }
         },
         "standby_model":[
@@ -94,12 +94,17 @@
             "AIzaSyBRwweKIsz8bbTagEuPgtEon9VtGtUwAjE",
             "AIzaSyBa246Ljsb0sMiWWZFSZ-U0899BQQnkl8s",
             "AIzaSyBAF5X2LDMRtV6xLnt8aC7-bTJ3p7IipFQ",
-            "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM"
+            "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM",
 
+            "AIzaSyCi-OF8nWj61Wjxxa0bKnGEJXqK6JI2YNI",
+            "AIzaSyD03JHoIYaQXT1WaK_yP6uBpPSUkHUojvk",
+            "AIzaSyC6UeE-ZGxZpJUrHA8A0KiesSW9u5BEuTc",
+            "AIzaSyCnn3WFfH6awRO4aV3lxabejBc5sORoMrQ",
+            "AIzaSyBK16g4f4nub1kR1l8BSgoruGVXDlZNWN0"
         ]
     },
     "ai_chat":{
-        "playRole":"猫娘",
+        "playRole":"ATRI",
         "ai_max_record":20,
         "group_max_record":20,
         "private_max_record":20

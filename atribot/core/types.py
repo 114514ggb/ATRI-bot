@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Dict,List,Any
+from collections import deque
 import asyncio
 import copy
 
@@ -135,7 +136,7 @@ class Context():
         并确保最后一条消息是 user 消息（向下取整）。
         
         Returns:
-            list: 被截取掉的消息列表
+            list: 被截取掉的消息列表,如果有的话
         """
         user_count = sum(1 for msg in self.messages if msg["role"] == "user")
         
@@ -164,7 +165,7 @@ class Context():
             self.messages = kept_messages
             return removed_messages
         
-        return []
+        return None
         
     def clear(self)->None:
         """清除上下文"""
@@ -190,7 +191,7 @@ class GroupContext:
     """群号"""
     async_lock:asyncio.Lock
     """群异步锁"""
-    messages:List[str]
+    messages:deque
     """消息列表"""
     group_max_record:int
     """群维持的消息数量"""
@@ -199,6 +200,10 @@ class GroupContext:
     """群LLM聊天上下文"""
     play_roles:str
     """当前LLM聊天人设名称"""
+    group_chat_summary:str = ""
+    """群聊天的总结"""
+    summarize_message_count:int = 0 
+    """未总结的计数"""
 
     def __init__(
         self,
@@ -212,23 +217,35 @@ class GroupContext:
         self.chat_context = chat_context
         self.group_max_record = group_max_record
         self.async_lock = asyncio.Lock()
-        self.messages = []
+        self.messages = deque(maxlen=group_max_record)
         
     
     def __iter__(self):
         return iter(self.messages)
     
-    def record_validity_check(self)->List[str]|None:
-        """针对群聊天消息条数的验证，需要显式调用
+    def _record_validity_check(self)->List[str]|None:
+        """针对群聊天消息条数的验证
 
         Returns:
             List[str]: 原始消息
         """
-        if len(self.messages) >= self.group_max_record:
-            messages = copy.copy(self.messages)
-            self.messages.clear()
-            return messages
+        if self.summarize_message_count >= self.group_max_record:
+            self.summarize_message_count = 0
+            return list(self.messages)
         
         return None
 
-    
+    async def add_group_chat_message(self,message:str)->List[str]|None:
+        """添加群消息,然后做有效性验证,
+
+        Args:
+            message (str): 添加的消息
+
+        Returns:
+            List[str]|None: 如果有的话返回去除的list
+        """
+        async with self.async_lock:
+            self.messages.append(message)
+            self.summarize_message_count += 1
+            
+        return self._record_validity_check()

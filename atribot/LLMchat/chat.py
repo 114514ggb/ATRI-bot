@@ -7,19 +7,21 @@ from atribot.LLMchat.LLMsupervisor import (
 from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
-from atribot.core.cache.message_buffer_memory import message_cache
-from atribot.core.cache.chan_context import context_management
+from atribot.core.cache.management_chat_example import ChatManager
 from atribot.LLMchat.prepare_model_prompt import build_prompt
+from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.service_container import container
 from atribot.LLMchat.emoji_system import emoji_core
 from atribot.core.data_manage import data_manage
+from atribot.core.types import rich_data
 from atribot.core.types import Context
 from abc import ABC, abstractmethod
 from atribot.common import common
 from dataclasses import replace
 from typing import Dict, List
 from logging import Logger
+import datetime
 import asyncio
 
 
@@ -29,9 +31,9 @@ class chat_baseics(ABC):
     def __init__(self):
         self.model_api_supervisor: large_language_model_supervisor = container.get("LLMsupervisor")
         self.supplier: ai_connection_manager = container.get("LLMSupplier")
-        self.messages_cache: message_cache = container.get("MessageCache")
         self.send_message: qq_send_message = container.get("SendMessage")
-        self.context: context_management = container.get("ChatContext")
+        self.memiry_system:memorySystem = container.get("memirySystem")        
+        self.chat_manager: ChatManager = container.get("ChatManager")
         self.emoji_core: emoji_core = container.get("EmojiCore")
         self.mcp_tool: FuncCall = container.get("MCP")
         self.log: Logger = container.get("log")
@@ -110,20 +112,26 @@ class group_chat(chat_baseics):
             parameter=self.config.model.chat_parameter,
         )
 
-    async def step(self, data: Dict) -> None:
+    async def step(self, message: rich_data) -> None:
         """群聊主处理函数"""
-
+        data = message.primeval
         group_id = data["group_id"]
         increase_context = Context()
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
         )
 
-        self.log.debug(f"群聊天处理:{readable_text}")
+        self.log.debug(f"群LLM聊天处理:{readable_text}")
 
-        original_context = await self.context.get_group_chat(group_id)
+        original_context = await self.chat_manager.get_group_chat(group_id)
         original_context.record_validity_check()
         group_context = original_context.get_messages()
+        reminiscence = [
+            (datetime.datetime.fromtimestamp(r[0]),r[1]) for r in await self.memiry_system.query_user_recently_memory(
+                user_id = data['user_id'],
+                text = message.pure_text
+            )
+        ]
 
         user_import = self.build_prompt.build_user_Information(
             data=data, message=readable_text
@@ -138,7 +146,11 @@ class group_chat(chat_baseics):
             else:
                 img_list = await common.urls_to_base64(img_list)
 
-        prompt = await self.prompt_structure(group_id, img_prompt)
+        prompt = await self.prompt_structure(
+            group_id, 
+            img_prompt,
+            knowledge_base = reminiscence
+        )
 
         request = replace(
             self.template_request,
@@ -150,7 +162,7 @@ class group_chat(chat_baseics):
         )
 
         # 获取响应
-        response = await self._try_model_request(request, img_list, group_id)
+        response = await self._try_model_request(request, img_list, group_id, reminiscence)
 
         # 发送基础信息
         await self.send_reply_message(
@@ -164,6 +176,13 @@ class group_chat(chat_baseics):
                 message=response.reasoning_content,
                 source="推理内容",
             )
+        
+        # if reminiscence:
+        #     await self.send_message.send_group_merge_text(
+        #         group_id=group_id,
+        #         message=str(reminiscence),
+        #         source="向量查询返回",
+        #     )
 
         # 过滤扩展list
         increase_context.extend(
@@ -177,7 +196,7 @@ class group_chat(chat_baseics):
 
         # print(original_context)
 
-        await self.context.store_group_chat(group_id=group_id, context=original_context)
+        await self.chat_manager.store_group_chat(group_id=group_id, context=original_context)
 
         self.log.debug("模型结束响应!")
 
@@ -186,6 +205,7 @@ class group_chat(chat_baseics):
         request: GenerationRequest,
         img_list: List[str],
         group_id: int,
+        reminiscence: List
     ) -> GenerationResponse:
         """尝试模型请求,失败时自动降级到配置的备用API
 
@@ -193,6 +213,7 @@ class group_chat(chat_baseics):
             request (GenerationRequest): 请求体
             img_list (list[str]): 图像url list
             group_id (int): 群号
+            reminiscence (list): 数据库查询的记忆
 
         Returns:
             GenerationResponse: 回复
@@ -236,12 +257,17 @@ class group_chat(chat_baseics):
                         model=model_name,
                         supplier_name=supplier,
                         image_url_list=img_list,
-                        prompt=await self.prompt_structure(group_id),
+                        prompt=await self.prompt_structure(
+                            group_id,
+                            knowledge_base = reminiscence
+                        ),
                     )
                 else:
                     if not cached_image_prompt:
                         cached_image_prompt = await self.prompt_structure(
-                            group_id, await self.image_processing(img_list)
+                            group_id, 
+                            await self.image_processing(img_list),
+                            knowledge_base = reminiscence
                         )
 
                     new_request = replace(
@@ -281,7 +307,7 @@ class group_chat(chat_baseics):
 
         prompt = self.build_prompt.group_chant_template(
             group_id,
-            chat_history=str(await self.messages_cache.get_group_messages(group_id))[:10000],#简单防止过长
+            chat_history=str(await self.chat_manager.get_group_messages(group_id))[:10000],#简单防止过长
         )
 
         if knowledge_base:

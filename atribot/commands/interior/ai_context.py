@@ -1,8 +1,8 @@
-from atribot.core.service_container import container
-from atribot.core.command.command_parsing import command_system
-from atribot.core.cache.chan_context import context_management
-from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.core.command.async_permissions_management import permissions_management
+from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.cache.management_chat_example import ChatManager
+from atribot.core.command.command_parsing import command_system
+from atribot.core.service_container import container
 from logging import Logger
 
 
@@ -11,7 +11,7 @@ class AIContextCommands:
     
     def __init__(self):
         self.command_system: command_system = container.get("CommandSystem")
-        self.context_management: context_management = container.get("ChatContext")
+        self.context_management: ChatManager = container.get("ChatManager")
         self.send_message: qq_send_message = container.get("SendMessage")
         self.permissions_management:permissions_management = container.get("PermissionsManagement")
         self.log: Logger = container.get("log")
@@ -111,10 +111,7 @@ class AIContextCommands:
     
     async def _handle_current_role(self, group_id: str):
         """处理查看当前角色"""
-        current_role = self.context_management.group_play_roles.get(
-            group_id, 
-            self.context_management.default_play_role
-        )
+        current_role = self.context_management.get_group_context(group_id).play_roles
         
         role_content = self.context_management.play_role_list.get(current_role, "")
         role_preview = role_content[:100] + "..." if len(role_content) > 100 else role_content
@@ -131,10 +128,7 @@ class AIContextCommands:
     async def _handle_list_roles(self, group_id: str, detail: bool = False):
         """处理列出角色"""
         roles = self.context_management.play_role_list
-        current_role = self.context_management.group_play_roles.get(
-            group_id, 
-            self.context_management.default_play_role
-        )
+        current_role = self.context_management.get_group_context(group_id).play_roles
         
         if not detail:
             role_names = []
@@ -222,13 +216,11 @@ class AIContextCommands:
         """处理查看上下文信息"""
 
         context = await self.context_management.get_group_chat(group_id)
-        current_role = self.context_management.group_play_roles.get(
-            group_id, 
-            self.context_management.default_play_role
-        )
+        group_context = self.context_management.get_group_context(group_id)
+        current_role = group_context.play_roles
         
         message_count = len(context.messages)
-        max_messages = self.context_management.messages_length_limit
+        max_messages = group_context.chat_context.user_max_record
         
         usage_percentage = (message_count / max_messages * 100) if max_messages > 0 else 0
         

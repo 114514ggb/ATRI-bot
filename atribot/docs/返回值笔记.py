@@ -1170,6 +1170,30 @@ data_music = {'self_id': 168238719,
   }
 
 
+bot_消息 ={'self_id': 3930909243,
+ 'user_id': 3930909243,
+ 'time': 1761822407,
+ 'message_id': 1834007169,
+ 'message_seq': 1834007169,
+ 'real_id': 1834007169,
+ 'real_seq': '27107',
+ 'message_type': 'group',
+ 'sender': {'user_id': 3930909243,
+            'nickname': 'atri-bot',
+            'card': '莉基哈',
+            'role': 'member'},
+ 'raw_message': '你又说废物！',
+ 'font': 14,
+ 'sub_type': 'normal',
+ 'message': [{'type': 'text', 'data': {'text': '你又说废物！'}}],
+ 'message_format': 'array',
+ 'post_type': 'message_sent',
+ 'message_sent_type': 'self',
+ 'group_id': 2169027872,
+ 'group_name': '一群泡茶的屑',
+ 'target_id': 2169027872}
+
+
 {'self_id': 168238719,
  'user_id': 2631018780,
  'time': 1753859144,

@@ -1,9 +1,10 @@
 from atribot.core.service_container import container
 from atribot.core.types import Context, GroupContext
 # from collections import defaultdict
+from typing import Dict,List
 from logging import Logger
-from typing import Dict
 import datetime
+
 
 
 
@@ -93,15 +94,12 @@ class ChatManager:
         """
         return self.get_group_context(group_id).chat_context
     
-    
-    async def _set_group_messages(self, group_id: int, message: dict|str):
-        """添加群消息"""
-        group_context = self.get_group_context(group_id)
-        async with group_context.async_lock:
-            group_context.messages.append(message)
+    async def get_group_messages(self, group_id: int) -> List[str]:
+        """返回群消息内容"""
+        return list(self.get_group_context(group_id).messages)
     
     
-    async def add_message_record(self,data:dict,message_text:str) -> None:
+    async def add_message_record(self,data:dict,message_text:str) -> List[str]|None:
         """添加消息到群组上下文
         
         Args:
@@ -112,8 +110,8 @@ class ChatManager:
         
             if message_type == 'group':
                 
-                await self._set_group_messages(
-                    data['group_id'],
+                group_context = self.get_group_context(data['group_id'])
+                return await group_context.add_group_chat_message(
                     (
                         "<MESSAGE>"
                         f"<qq_id>{data['user_id']}</qq_id>"
@@ -123,19 +121,21 @@ class ChatManager:
                         "</MESSAGE>"
                     )
                 )
-                return
             
             elif message_type == 'private':
+                
                 # await self._set_private_messages(
                 #     data['sender']['user_id'],
                 #     message_text
                 # )
-                return
+                
+                return None
+             
 
         else:
             #应该基本都是非聊天事件
-            pass
-
+            return None
+        
     
     async def reset_group_chat(self, group_id: int) -> None:
         """重置指定群的LLM聊天上下文

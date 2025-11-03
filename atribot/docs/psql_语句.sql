@@ -1,3 +1,9 @@
+SELECT memory_id, event, user_id
+FROM atri_memory
+ORDER BY created_at DESC
+LIMIT 50;
+
+
 SELECT
     m.group_id  AS "群号",
     m.user_id   AS "qq号",

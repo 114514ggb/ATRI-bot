@@ -16,7 +16,7 @@ class RAGManager:
         self.embedding_model = self.config.model.RAG.use_embedding_model.model_name
         self.embedding_api:universal_ai_api = self.supplier.get_filtration_connection(
             supplier_name = self.config.model.RAG.use_embedding_model.supplier
-        )
+        )[0].connection_object
         self.text_chunker = RecursiveCharacterTextSplitter(
             200,50
         )

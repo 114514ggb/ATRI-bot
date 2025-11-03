@@ -9,7 +9,7 @@ tts_main = TTSService()
 
 tool_json = {
     "name": "send_draw_image",
-    "description": "在需要你发语音或是有人让你说话的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
+    "description": "在你想发语音或是有人让你说话（发声的那种）的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
     "properties": {
         "group_id": {
             "type": "string",
@@ -17,7 +17,7 @@ tool_json = {
         },
         "text": {
             "type": "string",
-            "description": "需转换为语音的文本内容（支持中文/英文/日语）可以混合语言",
+            "description": "需转换为语音的文本内容（支持中文/日语）可以混合语言",
         },
         "emotion": {
             "type": "string",

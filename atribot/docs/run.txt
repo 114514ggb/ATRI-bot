@@ -5,3 +5,12 @@ ps aux | grep main.py
 
 
 tmux kill-session -t atribot
+
+
+
+
+sudo ./easytier-cli service install \
+    -i 10.126.126.1 \
+    --network-name atri-home \
+    --network-secret 180710hello \
+    -p tcp://public.easytier.cn:11010

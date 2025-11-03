@@ -4,6 +4,7 @@ from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.commands.interior.ai_context import AIContextCommands
 from atribot.commands.interior.system_monitor import SystemMonitor
 from atribot.core.command.command_parsing import command_system
+from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.core.service_container import container
 from typing import Optional
 
@@ -11,6 +12,7 @@ from typing import Optional
 cmd_system:command_system = container.get("CommandSystem")
 send_message:qq_send_message = container.get("SendMessage")
 perm_manager:permissions_management = container.get("PermissionsManagement")
+memiry_system:memorySystem = container.get("memirySystem") 
 AIContextCommands()
 
 
@@ -215,3 +217,178 @@ async def handle_status_command(message_data: dict, components: list):
         source = "查看信息"
     )
 
+
+
+@cmd_system.register_command(
+    name="query",
+    description="查询记忆库中的相关信息，支持向量相似度搜索",
+    aliases=["search", "find"],
+    authority_level=1,
+    examples=[
+        "/query 学校的事情",
+        "/query 上次讨论的话题 --limit 10",
+        "/query 编程相关内容 --group 123456",
+        "/query 某人说过什么 --user 789012 --days 7",
+        "/query 知识库内容 --kb-only",
+        "/query 喜欢的事情 --exclude-kb --threshold 0.3"
+    ]
+)
+@cmd_system.argument(
+    name="query_text",
+    description="要查询的文本内容",
+    required=True,
+    multiple=True,
+    metavar="TEXT"
+)
+@cmd_system.option(
+    name="limit",
+    short="l",
+    long="--limit",
+    description="返回结果数量",
+    type=int,
+    default=5,
+    metavar="NUM"
+)
+@cmd_system.option(
+    name="group",
+    short="g",
+    long="--group",
+    description="筛选指定群组ID",
+    type=str,
+    metavar="GROUP_ID"
+)
+@cmd_system.option(
+    name="user",
+    short="u",
+    long="--user",
+    description="筛选指定用户ID",
+    type=str,
+    metavar="USER_ID"
+)
+@cmd_system.option(
+    name="days",
+    short="d",
+    long="--days",
+    description="查询最近N天的记忆",
+    type=int,
+    metavar="DAYS"
+)
+@cmd_system.option(
+    name="start_time",
+    long="--start",
+    description="开始时间戳",
+    type=int,
+    metavar="TIMESTAMP"
+)
+@cmd_system.option(
+    name="end_time",
+    long="--end",
+    description="结束时间戳",
+    type=int,
+    metavar="TIMESTAMP"
+)
+@cmd_system.flag(
+    name="exclude_kb",
+    long="--exclude-kb",
+    description="排除知识库记忆"
+)
+@cmd_system.flag(
+    name="kb_only",
+    long="--kb-only",
+    description="只查询知识库记忆"
+)
+@cmd_system.option(
+    name="threshold",
+    short="t",
+    long="--threshold",
+    description="向量距离阈值(0-1之间，越小越相似)",
+    type=float,
+    default=0.5,
+    metavar="FLOAT"
+)
+async def cmd_query_memories(
+    query_text: list[str],
+    limit: int,
+    group: str,
+    user: str,
+    days: int,
+    start_time: int,
+    end_time: int,
+    exclude_kb: bool,
+    kb_only: bool,
+    threshold: float,
+    message_data: dict,
+):
+    """查询记忆命令处理函数"""
+    query_string = " ".join(query_text)
+    
+    if days is not None:
+        import time
+        end_time = int(time.time())
+        start_time = end_time - (days * 24 * 60 * 60)
+    
+    group_id = group or None
+    
+    results = await memiry_system.query_memories(
+        query_text=query_string,
+        limit=limit,
+        group_id=group_id if not kb_only else None,
+        user_id=user,
+        start_time=start_time,
+        end_time=end_time,
+        exclude_knowledge_base=exclude_kb,
+        only_knowledge_base=kb_only,
+        distance_threshold=threshold
+    )
+    
+
+    if not results:
+        await send_message.send_group_merge_text(
+            message_data["group_id"], 
+            message = f"🔍 未找到与「{query_string}」相关的记忆",
+            source = "记忆查询结果"
+        )
+        return
+    
+    result_lines = [
+        f"🔍 查询字段: 「{query_string}」",
+        f"📊 找到 {len(results)} 条相关记忆",
+        "=" * 10
+    ]
+    
+    for result in results:
+        
+        timestamp = result["event_time"]
+        if timestamp:
+            from datetime import datetime
+            time_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        else:
+            time_str = "未知时间"
+        
+        memory_info = [
+            f"\n[记忆ID:{result["memory_id"]}]相似度: {result["distance"]}",
+            f"⏰ 时间: {time_str}"
+        ]
+        
+        if result["user_id"]:
+            memory_info.append(f"👤 用户: {result['user_id']}")
+        
+        # 记忆内容
+        content = result.get('event', '无内容')
+        if len(content) > 500:
+            content = content[:100] + "..."
+        memory_info.append(f"💭 内容:\n {content}")
+        
+        if not result['group_id'] and not result['user_id']:
+            memory_info.append("📚 [知识库]")
+        
+        result_lines.extend(memory_info)
+    
+    result_lines.append("=" * 10)
+    
+    await send_message.send_group_merge_text(
+        group_id=message_data["group_id"],
+        message="\n".join(result_lines),
+        source="记忆查询结果"
+    )
+    

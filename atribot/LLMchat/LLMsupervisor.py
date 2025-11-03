@@ -129,9 +129,9 @@ class large_language_model_supervisor():
             model_name=request.model,
         )[0]).connection_object
 
+        #中断继续
         if request.generation_response is not None:
-            self.logger.debug("从中断继续请求!")
-            return self.resume_step(request,model_api,increase_context)
+            return await self.resume_step(request,model_api,increase_context)
                 
         api_reply:Dict = await self.get_chat_json(
             request = request,
@@ -269,6 +269,7 @@ class large_language_model_supervisor():
         Returns:
             GenerationResponse: 返回
         """
+        self.logger.debug("从中断继续请求!")
         response = request.generation_response
         
         for msg in response.messages:

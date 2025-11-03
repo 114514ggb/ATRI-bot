@@ -1,9 +1,10 @@
 from atribot.core.command.async_permissions_management import permissions_management
 from atribot.core.network_connections.qq_send_message import qq_send_message
-from atribot.core.cache.message_buffer_memory import message_cache
+from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.command.command_parsing import command_system
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
+from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.core.service_container import container
 from atribot.core.data_manage import data_manage
 from atribot.LLMchat.chat import group_chat
@@ -19,36 +20,33 @@ class message_router():
         self.logger:Logger = container.get("log")
         self.db:AsyncDatabaseBase = container.get("database")
         self.send_message:qq_send_message = container.get("SendMessage")
-        self.message_cache:message_cache = container.get("MessageCache")
         self.group_manage = group_manage()
         self.group_set = set()
     
     async def main(self, data:dict):
         """主消息处理逻辑"""
         
-        if data.get('post_type') == "message":
+        group_id = data.get("group_id")
+        
+        if data.get('post_type') in ["message","message_sent"]:
             _rich_data = data_manage.rich_data_processing_rich_data(data)
+            await self.store_data(_rich_data,group_id) #存储群消息
         else:
             if data.get("meta_event_type") !=  'heartbeat':
                 self.logger.debug(f"原始消息:\n{data}")
             _rich_data = rich_data(data,"","")
         
-        if group_id := data.get("group_id"):            
+        if group_id:            
             await self.group_manage.handle_message(_rich_data, group_id)
         else:
+            #私聊处理
             return
-        
-        await self.store_data(_rich_data,group_id)
+
             
 
     async def store_data(self, rich_data:rich_data, group_id:int)->None:
         """存储消息"""
         data = rich_data.primeval
-    
-        if not (data.get("post_type") == "message"):
-            return
-        
-        await self.message_cache.cache_system(data,rich_data.text)
         
         if group_id not in self.group_set:
             group_name = (await self.send_message.get_group_info(group_id))["data"]["group_name"]
@@ -82,11 +80,13 @@ class message_router():
     
     
 class message_manage(ABC):
-    """消息基类"""
+    """消息处理基类"""
     def __init__(self):
         self.permissions_management:permissions_management = container.get("PermissionsManagement")
         self.command_system:command_system = container.get("CommandSystem")
         self.send_message:qq_send_message = container.get("SendMessage")
+        self.memiry_system:memorySystem = container.get("memirySystem")
+        self.chat_manager:ChatManager = container.get("ChatManager")
         self.logger:Logger = container.get("log")
     
     @abstractmethod
@@ -124,7 +124,7 @@ class group_manage(message_manage):
                     try:
                         if self.permissions_management.check_access(data["user_id"]):
                             
-                            await self.group_chet.step(data)
+                            await self.group_chet.step(message)
 
                         else:
                             PermissionError("你好像在黑名单里？")
@@ -139,7 +139,18 @@ class group_manage(message_manage):
                     
                 except Exception as e:
                     self.logger.error(f"群非@事件出现了错误:{e}")
-        
+            
+            #存入/总结消息
+            if pending_discard_messages := await self.chat_manager.add_message_record(data,message.text):
+                self.logger.info("开始总结群消息!")
+                try:
+                    await self.memiry_system.extract_stored_group_message(
+                        messages = pending_discard_messages,
+                        bot_id = data['self_id'],
+                        group_id = group_id
+                    )
+                except Exception as e:
+                    self.logger.error(f"总结群消息出现了错误:{e}")
         
 
 class private_manage(message_manage):

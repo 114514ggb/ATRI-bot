@@ -6,10 +6,10 @@ from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.LLMsupervisor import large_language_model_supervisor
 from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
 from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
-from atribot.core.cache.message_buffer_memory import message_cache
+from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.command_parsing import command_system
-from atribot.core.cache.chan_context import context_management
 from atribot.core.command.command_loader import command_loader
+from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.message_manage import message_router
 from atribot.core.service_container import container
@@ -114,7 +114,12 @@ class BotFramework:
                 },
             }
         )
-            
+        
+        #向量数据库实现的记忆系统
+        container.register(
+            "memirySystem",    
+            memorySystem()
+        )
         
         #常用
         # container.register(
@@ -122,22 +127,18 @@ class BotFramework:
         #     common()
         # )
         
-        #缓存
+        #群类管理什么的
         container.register(
-            "MessageCache",
-            message_cache(
-                self.config.ai_chat.group_max_record,
-                self.config.ai_chat.private_max_record
+            "ChatManager",
+            ChatManager(
+                default_play_role = self.config.ai_chat.playRole,
+                group_messages_max_limit = self.config.ai_chat.group_max_record,
+                private_messages_max_limit = self.config.ai_chat.private_max_record,
+                group_LLM_max_limit = self.config.ai_chat.ai_max_record,
+                character_folder = self.config.file_path.chat_manager
             )
         )
-        container.register(
-            "ChatContext",
-            context_management(
-                self.config.ai_chat.playRole,
-                self.config.ai_chat.ai_max_record,
-                self.config.file_path.chat_manager
-            )
-        )
+        
         container.register(
             "EmojiCore",
             emoji_core(
