@@ -99,27 +99,37 @@ class ChatManager:
         return list(self.get_group_context(group_id).messages)
     
     
-    async def add_message_record(self,data:dict,message_text:str) -> List[str]|None:
+    async def add_message_record(
+        self,
+        data: dict,
+        message_text: str,
+    ) -> tuple[List[str],GroupContext] | None:
         """添加消息到群组上下文
         
         Args:
             data: 原始响应数据
             message_text: 消息数据
+        Returns:
+            tuple[List[str],GroupContext]|None: 返回列表和群对象，或是没满足条件返回None
         """
         if message_type := data.get("message_type"): 
         
             if message_type == 'group':
                 
-                group_context = self.get_group_context(data['group_id'])
-                return await group_context.add_group_chat_message(
-                    (
-                        "<MESSAGE>"
-                        f"<qq_id>{data['user_id']}</qq_id>"
-                        f"<nick_name>{data['sender']['nickname']}</nick_name>"
-                        f"<time>{datetime.datetime.fromtimestamp(data['time']).strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-                        f"<user_message>{message_text[:1000] if len(message_text)>1000 else message_text}</user_message>"
-                        "</MESSAGE>"
-                    )
+                group_context: GroupContext = self.get_group_context(data["group_id"])
+                    
+                return (
+                    await group_context.add_group_chat_message(
+                        (
+                            "<MESSAGE>"
+                            f"<qq_id>{data['user_id']}</qq_id>"
+                            f"<nick_name>{data['sender']['nickname']}</nick_name>"
+                            f"<time>{datetime.datetime.fromtimestamp(data['time']).strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
+                            f"<user_message>{message_text[:1000] if len(message_text)>1000 else message_text}</user_message>"
+                            "</MESSAGE>"
+                        )
+                    ),
+                    group_context
                 )
             
             elif message_type == 'private':

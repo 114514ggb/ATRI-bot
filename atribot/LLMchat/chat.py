@@ -133,6 +133,7 @@ class group_chat(chat_baseics):
             )
         ]
 
+
         user_import = self.build_prompt.build_user_Information(
             data=data, message=readable_text
         )

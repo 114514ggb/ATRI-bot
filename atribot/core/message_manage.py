@@ -141,16 +141,17 @@ class group_manage(message_manage):
                     self.logger.error(f"群非@事件出现了错误:{e}")
             
             #存入/总结消息
-            if pending_discard_messages := await self.chat_manager.add_message_record(data,message.text):
-                self.logger.info("开始总结群消息!")
-                try:
-                    await self.memiry_system.extract_stored_group_message(
-                        messages = pending_discard_messages,
-                        bot_id = data['self_id'],
-                        group_id = group_id
-                    )
-                except Exception as e:
-                    self.logger.error(f"总结群消息出现了错误:{e}")
+            if summary_needed := await self.chat_manager.add_message_record(data, message.text):
+                group_context = summary_needed[1]
+                async with group_context.summarizing() as ctx:
+                    if ctx is not None:
+                        self.logger.info(f"开始总结 {group_id} 群消息!")
+                        await self.memiry_system.extract_stored_group_message(
+                            messages=summary_needed[0],
+                            bot_id=data['self_id'],
+                            group_id=group_id
+                        )
+                
         
 
 class private_manage(message_manage):

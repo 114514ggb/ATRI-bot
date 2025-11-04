@@ -1,8 +1,10 @@
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Dict,List,Any
 from collections import deque
 import asyncio
-import copy
+
+
 
 
 class ToolCallsStopIteration(Exception):
@@ -183,7 +185,6 @@ class Context():
 
 
 
-
 class GroupContext:
     """群组上下文"""
     
@@ -200,6 +201,10 @@ class GroupContext:
     """群LLM聊天上下文"""
     play_roles:str
     """当前LLM聊天人设名称"""
+    IS_SUMMARIZING:bool = False
+    """是否在总结"""
+    async_summarize_lock:asyncio.Lock
+    """群异步锁"""
     group_chat_summary:str = ""
     """群聊天的总结"""
     summarize_message_count:int = 0 
@@ -217,6 +222,7 @@ class GroupContext:
         self.chat_context = chat_context
         self.group_max_record = group_max_record
         self.async_lock = asyncio.Lock()
+        self.async_summarize_lock = asyncio.Lock()
         self.messages = deque(maxlen=group_max_record)
         
     
@@ -249,3 +255,25 @@ class GroupContext:
             self.summarize_message_count += 1
             
         return self._record_validity_check()
+    
+    
+    @asynccontextmanager
+    async def summarizing(self):
+        """
+        如果上一轮总结还没跑完，会直接跳过（返回 None），
+        否则把 IS_SUMMARIZING 置 True，退出块时自动复位。
+        """
+        if self.IS_SUMMARIZING:          
+            yield None                  
+            return
+
+        async with self.async_summarize_lock:      
+            if self.IS_SUMMARIZING:      
+                yield None
+                return
+            self.IS_SUMMARIZING = True
+
+        try:
+            yield self                   
+        finally:
+            self.IS_SUMMARIZING = False
