@@ -8,7 +8,7 @@ from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.core.service_container import container
 from atribot.core.data_manage import data_manage
 from atribot.LLMchat.chat import group_chat
-from atribot.core.types import rich_data
+from atribot.core.types import RichData
 from abc import ABC, abstractmethod
 from logging import Logger
 
@@ -34,7 +34,7 @@ class message_router():
         else:
             if data.get("meta_event_type") !=  'heartbeat':
                 self.logger.debug(f"原始消息:\n{data}")
-            _rich_data = rich_data(data,"","")
+            _rich_data = RichData(data,"","")
         
         if group_id:            
             await self.group_manage.handle_message(_rich_data, group_id)
@@ -44,7 +44,7 @@ class message_router():
 
             
 
-    async def store_data(self, rich_data:rich_data, group_id:int)->None:
+    async def store_data(self, rich_data:RichData, group_id:int)->None:
         """存储消息"""
         data = rich_data.primeval
         
@@ -90,7 +90,7 @@ class message_manage(ABC):
         self.logger:Logger = container.get("log")
     
     @abstractmethod
-    async def handle_message(self, message: rich_data) -> None:
+    async def handle_message(self, message: RichData) -> None:
         """处理接收到的消息"""
         pass
 
@@ -103,7 +103,7 @@ class group_manage(message_manage):
         self.group_chet:group_chat = container.get("GroupChat")
         self.event_trigger = EventTrigger()
         
-    async def handle_message(self, message: rich_data, group_id:int) -> None:
+    async def handle_message(self, message: RichData, group_id:int) -> None:
         data = message.primeval
         
         if group_id in self.group_white_list or data.get('user_id') == 2631018780:
@@ -142,16 +142,16 @@ class group_manage(message_manage):
             
             #存入/总结消息
             if summary_needed := await self.chat_manager.add_message_record(data, message.text):
-                group_context = summary_needed[1]
+                messages, group_context = summary_needed
                 async with group_context.summarizing() as ctx:
                     if ctx is not None:
                         self.logger.info(f"开始总结 {group_id} 群消息!")
                         await self.memiry_system.extract_stored_group_message(
-                            messages=summary_needed[0],
+                            messages=messages,
                             bot_id=data['self_id'],
                             group_id=group_id
                         )
-                
+                        
         
 
 class private_manage(message_manage):

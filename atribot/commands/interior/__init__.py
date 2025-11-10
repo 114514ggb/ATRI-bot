@@ -1,6 +1,6 @@
 from atribot.core.command.async_permissions_management import permissions_management
-from atribot.commands.interior.mysql_query_statistics import UserActivityAnalyzer
 from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.commands.interior.query_statistics import UserActivityAnalyzer
 from atribot.commands.interior.ai_context import AIContextCommands
 from atribot.commands.interior.system_monitor import SystemMonitor
 from atribot.core.command.command_parsing import command_system
@@ -27,7 +27,7 @@ AIContextCommands()
 )
 @cmd_system.argument(
     name="user_id",
-    description="要查询的用户ID,qq号",
+    description="要查询的用户ID,qq号,如果没有就会查询命令的执行者",
     required=False,
     type=int
 )
@@ -221,8 +221,8 @@ async def handle_status_command(message_data: dict, components: list):
 
 @cmd_system.register_command(
     name="query",
-    description="查询记忆库中的相关信息，支持向量相似度搜索",
-    aliases=["search", "find"],
+    description="查询记忆库中的相关信息，会把输入转换成向量然后进行余弦距离搜索",
+    aliases=["search", "记忆"],
     authority_level=1,
     examples=[
         "/query 学校的事情",
@@ -254,7 +254,7 @@ async def handle_status_command(message_data: dict, components: list):
     short="g",
     long="--group",
     description="筛选指定群组ID",
-    type=str,
+    type=int,
     metavar="GROUP_ID"
 )
 @cmd_system.option(
@@ -262,7 +262,7 @@ async def handle_status_command(message_data: dict, components: list):
     short="u",
     long="--user",
     description="筛选指定用户ID",
-    type=str,
+    type=int,
     metavar="USER_ID"
 )
 @cmd_system.option(
@@ -309,8 +309,8 @@ async def handle_status_command(message_data: dict, components: list):
 async def cmd_query_memories(
     query_text: list[str],
     limit: int,
-    group: str,
-    user: str,
+    group: int,
+    user: int,
     days: int,
     start_time: int,
     end_time: int,

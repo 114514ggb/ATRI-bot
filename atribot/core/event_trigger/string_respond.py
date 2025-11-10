@@ -1,10 +1,14 @@
+from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.cache.management_chat_example import ChatManager
+from atribot.core.service_container import container
+from typing import Dict, List, Union, Tuple, Any
+from atribot.common import common
+from enum import Enum
 import ahocorasick
 import random
-from enum import Enum
-from typing import Dict, List, Union, Tuple, Any
-from atribot.core.network_connections.qq_send_message import qq_send_message
-from atribot.core.service_container import container
-from atribot.common import common
+import time
+
+
 
 
 class ResponseType(Enum):
@@ -19,6 +23,7 @@ class string_response:
     def __init__(self):
         self.send_message:qq_send_message = container.get("SendMessage")
         self.url_prefi:str = "file://" + container.get("config").file_path.document + "img/"
+        self.context_management: ChatManager = container.get("ChatManager")
         self._build_automaton()
     
     def _build_automaton(self):
@@ -41,7 +46,11 @@ class string_response:
                 await self.send_message.send_group_audio(group_id, document, True)
             elif send_type is ResponseType.MIXTURE:
                 await self.send_message.send_group_message(group_id, common.construction_message_dict(document,self.url_prefi))
-
+        
+        if time.time() - self.context_management.get_group_context(group_id).last_msg_at < 2:
+            #如果间隔太短不处理
+            return 
+        
         if template := self.process_string(data['raw_message']):
             send_type, document = template
             await send(send_type, document)
@@ -159,7 +168,7 @@ class string_response:
         "亲亲":[["img",["ATRI_得意.gif","ATRI_抛星星眼.gif","ATRI_ 亲亲.gif","ATRI_ 啊？.gif","ATRI_自我陶醉.gif","ATRI_爱心.gif"]]],
         "睡觉": [["img",["ATRI_请睡觉.jpg","ATRI_睡觉.jpg","ATRI_睡觉.gif","ATRI_睡觉1.gif"]]],
         "转圈":[["img",["ATRI_转圈.gif","ATRI_原地转圈.gif"]]],
-        "我有一个想法":[["img",["ATRI_我有一个想法.jpg"]]],
+        "我有一个想法":[["img",["ATRI_我有一个想法.jpg","ATRI_有了.png","ATRI_有了2.png"]]],
         "笑":[["img",["ATRI_笑.jpg","ATRI_笑1.jpg"]]],
         "出警":[["img",["ATRI_出警.jpg"]]],
         "探头":[["img",["ATRI_探头.gif"]]],
@@ -183,7 +192,8 @@ class string_response:
         "恭喜发财": [["img",["ATRI_啊乌!.gif","ATRI_恭喜发财.gif"]]],
         "无语": [["img",["ATRI_无语.jpg"]]],
         "🦀": [["text",["是螃蟹！抢来吃掉！"]]],
-        "对": [["img",["ATRI_肯定.jpg","ATRI_肯定1.jpg"]]],
+        "🥰":[["text",["🥰"]]],
+        "对": [["img",["ATRI_肯定.jpg","ATRI_肯定1.jpg","ATRI_点赞.jpg"]]],
         "好": [["text",["好"]],["img",["ATRI_好欸.jpg","ATRI_好.jpg"]]],
         "好吧": [["text",["好吧"]]],
         "不知道": [["text",["不知道呢!","亚托莉不知道呢!","吸纳奶"]]],
@@ -193,8 +203,8 @@ class string_response:
         "不愧是我":[["text",["不愧是你呀！","不愧是我亚!","不愧亚！"]]],
         # "冒泡":[["text",["戳，嘿嘿嘿，被我捉住了呢！"]]],
         "是这样": [["text",["是这样","雀食是这样"]]],
-        # "摸摸头":[["text",["呜呜呜，摸头会长不高的！"]],["img",["ATRI_晃脑.gif"]]],
-        # "爬": [["text",["爬"]],["img",["ATRI_爬.jpg"]]],
+        "摸摸头":[["text",["呜呜呜，摸头会长不高的！"]],["img",["ATRI_晃脑.gif"]]],
+        "爬": [["text",["爬"]],["img",["ATRI_爬.jpg"]]],
         "谢谢": [["img",["ATRI_谢谢.jpg"]]],
         "叫哥哥": [["text",["欧尼～酱","欧尼酱","哥哥","哥哥～"]]],
         # "唱歌": [["img",["ATRI_唱片.gif"]]],
@@ -214,6 +224,7 @@ class string_response:
         "。": [["img",["ATRI_句号.gif"]]],
         "可怕": [["img",["ATRI_惊讶.jpg"]]],
         "催眠": [["img",["ATRI_催眠爱心.gif"]]],
+        "!": [["img",["ATRI_感叹.jpg"]]],
         "男的来了":[["img",["ATRI_捏鼻.gif"]]],
         "涩涩": [["audio",["H是不行的.wav","H是不行的1.wav"]]],
         "到点了": [["img",["ATRI_到点了.jpg","ATRI_到点了1.png"]]],
@@ -251,11 +262,12 @@ class string_response:
         "粽子": [["img",["ATRI_粽子.gif"]]],
         "异议": [["img",["ATRI_我有异议.jpg"]]],
         "qwq": [["img",["ATRI_qwq.jpg"]],["text",["QWQ"]]],
-        "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
+        # "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
         # "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],
         "哭": [["img",["ATRI_哭.gif","ATRI_哭1.gif","ATRI_哭2.gif","ATRI_哭3.jpg","ATRI_哭4.png","ATRI_哭5.png","ATRI_哭6.png","ATRI_哭7.png","ATRI_大哭.gif","ATRI_哇哇大哭.jpg","ATRI_呜哇.jpg","ATRI_喜极而泣.png","ATRI_哭8.png"]]],
-        "👍": [["text",["👍"]]],
+        "👍": [["img",["ATRI_点赞.jpg"]]],
+        "哈哈": [["img",["ATRI_哈哈哈.png"]]],
         "萝卜子":[["text",["萝卜子是对机器人的蔑称！"]]],
         "😭": [["text",["怎么啦怎么啦，不要伤心嘛，来，亚托莉抱抱就好啦！","呜呜呜，不要难过啦!ATRI会一直陪在你身边哒！","不要哭泣，亚托莉会一直支持你的,不要伤心了!","不要伤心了，亚托莉在这里陪着你，一切都会好起来的！"]]],
         "涩涩": [["text",["不可以涩涩","涩涩打咩!","H是不行的！"]]],
@@ -282,7 +294,7 @@ class string_response:
         "不信": [["img",["ATRI_不相信你的鬼话.jpg"]]],
         "猫咪": [["img",["ATRI_猫咪爪子.gif"]]],
         "失败": [["img",["ATRI_加载失败.jpg"]]],
-        "卧槽": [["text",["卧槽"]]],
+        "卧槽": [["text",["你槽"]]],
         "power":[["img",["ATRI_充满power.png"]]],
         "欸嘿": [["img",["ATRI_欸嘿.jpg","ATRI_欸嘿1.jpg"]]],
         "哇袄": [["img",["哇袄.png"]],["text",["哇袄!"]]],
@@ -296,6 +308,7 @@ class string_response:
         "死机":[["img",["ATRI_宕机.jpg"]]],
         "死了":[["img",["ATRI_死了.gif","ATRI_死了.png","ATRI_死了3.gif"]]],
         "锤子":[["img",["ATRI_被锤了.gif"]]],
+        "冒出":[["img",["ATRI_冒出.png"]]],
         "头疼":[["img",["ATRI_头疼.gif"]]],
         "摸鱼":[["img",["ATRI_摸鱼.gif"]]],
         "吃瓜":[["img",["ATRI_吃瓜.jpg","ATRI_吃瓜.gif","ATRI_Q吃瓜.png"]]],
@@ -311,8 +324,13 @@ class string_response:
         "礼物":[["img",["ATRI_礼物.gif"]]],
         "哈气":[["img",["ATRI_在哈气.png","ATRI_炸毛.png"]]],
         "老色批":[["img",["ATRI_给老色批一拳.jpg"]]],
+        "有想法了":[["img",["ATRI_有了.png","ATRI_有了2.png"]]],
+        "不好":[["img",["ATRI_郁闷.png"]]],
         "苦命鸳鸯":[["text",["讨厌苦命鸳鸯,你们怎么天天都在说这个,我不懂呢?"]]],
+        "摇一摇":[["img",["ATGRI_在瑶亚.gif"]]],
         "笨蛋":[["img",["ATRI_都是笨蛋.jpg"]]],
+        "傻傻的":[["img",["ATRI_掉下巴.png"]]],
+        "呆呆的":[["img",["ATRI_掉下巴.png"]]],
         "猪鼻": [["img",["ATRI_猪鼻.png"]]],
         "猪逼": [["img",["ATRI_猪鼻.png"]]],
         "亚托莉生日快乐":[

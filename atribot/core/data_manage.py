@@ -1,6 +1,6 @@
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.core.service_container import container
-from atribot.core.types import rich_data
+from atribot.core.types import RichData
 from typing import Dict, Tuple, List
 import json
 
@@ -56,7 +56,7 @@ class data_manage():
         return "".join(text_parts)
     
     @staticmethod
-    def rich_data_processing_rich_data(data:Dict[str, int|str|Dict])->rich_data:
+    def rich_data_processing_rich_data(data:Dict[str, int|str|Dict])->RichData:
         """处理原data里的message处理成rich_data
 
         Args:
@@ -105,7 +105,7 @@ class data_manage():
             else:
                 text_parts.append(f"[CQ:{my_type}]")
 
-        return rich_data(
+        return RichData(
             data,
             "".join(text_parts),
             "".join(pure_text).strip()

@@ -8,7 +8,7 @@ send_message:qq_send_message = container.get("SendMessage")
 tts_main = TTSService()
 
 tool_json = {
-    "name": "send_draw_image",
+    "name": "send_voice_image",
     "description": "在你想发语音或是有人让你说话（发声的那种）的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
     "properties": {
         "group_id": {

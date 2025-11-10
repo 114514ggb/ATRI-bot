@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Dict,List,Any
 from collections import deque
 import asyncio
+import time
 
 
 
@@ -17,7 +18,7 @@ class ToolCallsStopIteration(Exception):
 
 
 @dataclass
-class rich_data():
+class RichData():
     """一般处理消息"""
     primeval:dict
     """原始消息"""
@@ -182,7 +183,141 @@ class Context():
         return int(len(str(self.get_messages()))*1.2)
     
 
+class Message:
+    """消息基础类，表示系统中的一个消息单元
+    
+    注：目前没有使用,或许在计划中后面这个有用
+        对消息产生和接收到差值太多的消息只进行存储处理，不进行响应
+        对处理过久的消息进行丢弃
+    """
 
+    create_time: int
+    """消息产生时间"""
+    receive_time:float
+    """后端接收到这次消息的时间"""
+    process_time:float
+    """到达当前处理节点的时间"""
+    rich_data:"RichData"
+    """具体的处理数据"""  
+    
+    def __init__(self, rich_data:RichData):
+        self.create_time = rich_data.primeval['time']
+        self.receive_time = self.process_time = time.time()
+        self.rich_data:RichData = rich_data
+        
+    def update_process_time(self) -> None:
+        """更新当前处理节点时间为当前时间戳"""
+        self.process_time = time.time()
+
+
+class TimeWindow:
+    """定义一个时间窗口，用于统计一段时间内的消息数量，作为衡量群活跃度的参考。
+    
+    该类是线程安全的，可以在异步环境中并发调用。
+    """
+    
+    windows_time: int
+    """当前窗口的统计时间，单位秒"""
+    windows_deque: deque
+    """存储在当前窗口时间内的有效时间戳，按照时间降序排列（新->旧）"""
+    _lock: asyncio.Lock
+    """用于保护数据结构的异步锁"""
+    
+    def __init__(self, windows_time: int):
+        """初始化时间窗口。
+        
+        Args:
+            windows_time: 时间窗口的大小，单位秒。必须为正整数。
+            
+        Raises:
+            ValueError: 如果 windows_time 不是正整数
+        """
+        if not isinstance(windows_time, int) or windows_time <= 0:
+            raise ValueError("windows_time 必须为正整数")
+        self.windows_time = windows_time
+        self.windows_deque = deque()
+        self._lock = asyncio.Lock()
+    
+    def _clean_expired(self, cutoff: float):
+        """清理过期数据的内部方法，假设调用者已持有锁。
+        
+        Args:
+            cutoff: 时间戳阈值，小于此值的数据将被移除
+        """
+        while self.windows_deque and self.windows_deque[-1] < cutoff:
+            self.windows_deque.pop()
+    
+    async def add(self):
+        """添加一条当前时间的计数"""
+        now = time.time()
+        async with self._lock:
+            self.windows_deque.appendleft(now)
+            # self._clean_expired(now - self.windows_time)
+    
+    async def get(self) -> int:
+        """返回当前有效的消息数量"""
+        async with self._lock:
+            self._clean_expired(time.time() - self.windows_time)
+            return len(self.windows_deque)
+    
+    async def get_timestamps(self) -> List[float]:
+        """返回当前窗口内所有有效时间戳的副本
+        
+        Returns:
+            按时间降序排列的时间戳列表
+        """
+        async with self._lock:
+            self._clean_expired(time.time() - self.windows_time)
+            return list(self.windows_deque)
+    
+    async def clear(self):
+        """清空所有计数"""
+        async with self._lock:
+            self.windows_deque.clear()
+    
+    async def size(self) -> int:
+        """返回当前队列大小，不清理过期数据"""
+        async with self._lock:
+            return len(self.windows_deque)
+
+
+class LLMGroupChatCondition:
+    """群用LLM发言的一些参数记录,用于决策的参考"""
+    
+    last_msg_at: float
+    """LLM最近一次发言的时间"""
+    last_trigger_user_id: int
+    """最近一次触发@聊天的用户ID"""
+    time_window: TimeWindow
+    """统计群近期bot消息数量的窗口"""
+    
+    def __init__(self, window_time:int = 60):
+        """初始化时间窗口。
+        
+        Args:
+            windows_time: 时间窗口的大小，单位秒。必须为正整数。
+            
+        Raises:
+            ValueError: 如果 windows_time 不是正整数
+        """
+        self.time_window = window_time
+        self.last_msg_at = 0.0
+        self.last_trigger_user_id = 0
+        self._lock = asyncio.Lock()
+    
+    async def update_last_time(self) -> None:
+        """更新LLM最近一次发言时间戳（异步安全）"""
+        async with self._lock:
+            self.last_msg_at = time.time()
+    
+    async def update_trigger_user(self, user_id: int) -> None:
+        """更新最近一次触发@聊天的用户ID"""
+        async with self._lock:
+            self.last_trigger_user_id = user_id
+
+    def get_seconds_since_llm(self) -> float:
+        """获取距离上一次LLM发言时间(秒级)"""
+        return time.time()-self.last_msg_at
 
 
 class GroupContext:
@@ -196,6 +331,9 @@ class GroupContext:
     """消息列表"""
     group_max_record:int
     """群维持的消息数量"""
+    last_msg_at:float
+    """群最后一次消息的处理时间"""
+    
     
     chat_context:Context
     """群LLM聊天上下文"""
@@ -209,6 +347,10 @@ class GroupContext:
     """群聊天的总结"""
     summarize_message_count:int = 0 
     """未总结的计数"""
+    time_window: TimeWindow
+    """统计群近期消息数量的窗口对象"""
+    LLM_chat_decision_parameters:LLMGroupChatCondition
+    """LLM聊天决策使用的一些参数"""
 
     def __init__(
         self,
@@ -216,6 +358,7 @@ class GroupContext:
         play_roles: str,
         chat_context: 'Context',
         group_max_record: int = 20,
+        window_time: int = 60
     ):
         self.group_id = group_id
         self.play_roles =  play_roles
@@ -223,6 +366,9 @@ class GroupContext:
         self.group_max_record = group_max_record
         self.async_lock = asyncio.Lock()
         self.async_summarize_lock = asyncio.Lock()
+        self.time_window = TimeWindow(window_time)
+        self.LLM_chat_decision_parameters = LLMGroupChatCondition(window_time)
+        self.last_msg_at = 0
         self.messages = deque(maxlen=group_max_record)
         
     
@@ -233,7 +379,7 @@ class GroupContext:
         """针对群聊天消息条数的验证
 
         Returns:
-            List[str]: 原始消息
+            List[str]: 要总结的原始消息列表(如果达到阈值)
         """
         if self.summarize_message_count >= self.group_max_record:
             self.summarize_message_count = 0
@@ -241,20 +387,26 @@ class GroupContext:
         
         return None
 
-    async def add_group_chat_message(self,message:str)->List[str]|None:
-        """添加群消息,然后做有效性验证,
+    async def add_group_chat_message(self,message:str)->tuple[List[str], "GroupContext"]|None:
+        """添加群消息,然后做有效性验证
 
         Args:
             message (str): 添加的消息
 
         Returns:
-            List[str]|None: 如果有的话返回去除的list
+            tuple[List[str], GroupContext]|None:  如果需要总结,返回 (消息列表, 上下文对象)
         """
         async with self.async_lock:
+            self.last_msg_at = time.time() #更新群最后处理时间
             self.messages.append(message)
+            await self.time_window.add()
             self.summarize_message_count += 1
+            messages_to_summarize = self._record_validity_check()
             
-        return self._record_validity_check()
+            if messages_to_summarize is not None:
+                return (messages_to_summarize, self)
+        
+        return None
     
     
     @asynccontextmanager

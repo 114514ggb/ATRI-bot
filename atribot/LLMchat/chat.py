@@ -14,7 +14,7 @@ from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.service_container import container
 from atribot.LLMchat.emoji_system import emoji_core
 from atribot.core.data_manage import data_manage
-from atribot.core.types import rich_data
+from atribot.core.types import RichData
 from atribot.core.types import Context
 from abc import ABC, abstractmethod
 from atribot.common import common
@@ -112,7 +112,7 @@ class group_chat(chat_baseics):
             parameter=self.config.model.chat_parameter,
         )
 
-    async def step(self, message: rich_data) -> None:
+    async def step(self, message: RichData) -> None:
         """群聊主处理函数"""
         data = message.primeval
         group_id = data["group_id"]
@@ -165,9 +165,16 @@ class group_chat(chat_baseics):
         # 获取响应
         response = await self._try_model_request(request, img_list, group_id, reminiscence)
 
+        chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
+        await chat_condition.update_last_time()
+        await chat_condition.update_trigger_user(data["user_id"])
+        
         # 发送基础信息
         await self.send_reply_message(
-            response.reply_text, group_id=group_id, message_id=data["message_id"]
+            response.reply_text, 
+            group_id=group_id, 
+            message_id=data["message_id"],
+            since_llm=chat_condition.get_seconds_since_llm()
         )
 
         # 思考的信息
@@ -326,6 +333,7 @@ class group_chat(chat_baseics):
         chat_text: str,
         group_id: int,
         message_id: int,
+        since_llm: float
     ) -> None:
         """发送群文本消息，支持多段分割和表情标签
 
@@ -333,17 +341,19 @@ class group_chat(chat_baseics):
             chat_text (str): 要解析发送的文本
             group_id (int): 群号
             message_id (int): 输入消息的id
+            since_llm (float): 距离上一次llm发言时间
         """
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
         MESSAGE_DELIMITER = "$"  # 分隔符
-        MAX_SINGLE_MESSAGE_LENGTH = 150  # 单条消息最大长度
+        MAX_SINGLE_MESSAGE_LENGTH = 125  # 分条发送长度阈值
 
         if not (chat_text := chat_text.strip()):
             return
 
         if (
             len(chat_text) <= MAX_SINGLE_MESSAGE_LENGTH
-            or MESSAGE_DELIMITER in chat_text
+            and since_llm < 3.5
+            # or MESSAGE_DELIMITER in chat_text
         ):
             # 分条发送
             messages_list = self.emoji_core.parse_text_with_emotion_tags_separator(
@@ -372,6 +382,7 @@ class group_chat(chat_baseics):
                 )
                 await asyncio.sleep(MESSAGE_DELAY)
         else:
+            chat_text = chat_text.replace(MESSAGE_DELIMITER, "\n")
             # 合并发送完
             messages_list = self.emoji_core.parse_text_with_emotion_tags(
                 chat_text, self.emoji_core.emoji_file_dict

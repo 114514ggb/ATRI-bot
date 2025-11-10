@@ -11,7 +11,7 @@ tool_json = {
     "properties": {
         "user_id": {
             "type": "number",
-            "description": "用于筛选user的参数,不添加默认为空，查询用户记忆和知识库",
+            "description": "用于筛选user的参数,不添加默认为空,查询结果包括全部用户记忆和知识库",
             "default": None
         },
         "limit":{

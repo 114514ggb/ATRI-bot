@@ -1,5 +1,5 @@
 from atribot.core.service_container import container
-from atribot.core.types import Context, GroupContext
+from atribot.core.types import Context, GroupContext, LLMGroupChatCondition
 # from collections import defaultdict
 from typing import Dict,List
 from logging import Logger
@@ -97,7 +97,35 @@ class ChatManager:
     async def get_group_messages(self, group_id: int) -> List[str]:
         """返回群消息内容"""
         return list(self.get_group_context(group_id).messages)
+
+    def get_group_LLM_decision_parameters(self, group_id:int)->LLMGroupChatCondition:
+        """返回LLM聊天决策参数对象"""
+        return self.get_group_context(group_id).LLM_chat_decision_parameters
     
+    async def get_group_window_msg_count(self, group_id: int)->int:
+        """返回一个群的近期消息数量统计
+
+        Args:
+            group_id (str): 指定群号
+
+        Returns:
+            int: 消息计数
+        """
+        return await self.get_group_context(group_id).time_window.get()
+    
+    
+    def get_bot_ratio_in_group(self, group_id:int)->float:
+        """获取指定群聊的人机消息占比
+
+        Args:
+            group_id (int): 群号
+
+        Returns:
+            float: 在窗口时间内的bot消息和群总消息的比值
+        """
+        group_context = self.get_group_context(group_id)
+        return group_context.LLM_chat_decision_parameters.time_window.get()/group_context.time_window.get()
+        
     
     async def add_message_record(
         self,
@@ -118,8 +146,7 @@ class ChatManager:
                 
                 group_context: GroupContext = self.get_group_context(data["group_id"])
                     
-                return (
-                    await group_context.add_group_chat_message(
+                return await group_context.add_group_chat_message(
                         (
                             "<MESSAGE>"
                             f"<qq_id>{data['user_id']}</qq_id>"
@@ -128,9 +155,7 @@ class ChatManager:
                             f"<user_message>{message_text[:1000] if len(message_text)>1000 else message_text}</user_message>"
                             "</MESSAGE>"
                         )
-                    ),
-                    group_context
-                )
+                    )
             
             elif message_type == 'private':
                 

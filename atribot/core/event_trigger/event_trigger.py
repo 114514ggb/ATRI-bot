@@ -62,7 +62,7 @@ class EventTrigger:
                 try:
                     await handler(group_id, data)
                 except Exception as e:
-                    self.log.error(f"处理器执行失败: {handler.__name__}, 错误: {e}")
+                    self.log.error(f"分发到处理器后执行失败: {handler.__name__}, 错误: {e}")
     
     
     async def manage_group_inform(self,group_id, data):

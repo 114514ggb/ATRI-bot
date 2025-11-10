@@ -50,8 +50,7 @@ CREATE TABLE message (
 );
 
 --时间索引
-CREATE INDEX idx_message_time_desc
-ON message USING btree ("time" DESC);
+CREATE INDEX idx_message_user_time ON message(user_id, time DESC);
 
 
 -- 用户表的last_updated字段更新触发器
@@ -84,6 +83,18 @@ CREATE TABLE atri_memory (
     event_vector VECTOR(1024),  -- 1024 维向量
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP --创建时间
 );
+
+--记忆表索引
+CREATE INDEX idx_user_time ON atri_memory (user_id, event_time);
+
+CREATE INDEX idx_atri_memory_vector
+ON atri_memory
+USING hnsw (event_vector vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+--索引参数
+ALTER SYSTEM SET hnsw.ef_search = 100;
+SELECT pg_reload_conf();
 
 -- 添加注释说明字段用途
 COMMENT ON COLUMN atri_memory.group_id IS '群组ID，0=私聊，NULL=知识库记忆';
