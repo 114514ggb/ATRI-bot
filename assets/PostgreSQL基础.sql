@@ -82,6 +82,7 @@ CREATE TABLE atri_memory (
     event TEXT,                 -- 记忆文本
     event_vector VECTOR(1024),  -- 1024 维向量
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP --创建时间
+    CONSTRAINT uq_user_event UNIQUE (user_id, event)
 );
 
 --记忆表索引

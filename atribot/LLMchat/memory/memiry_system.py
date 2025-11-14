@@ -117,7 +117,7 @@ class memorySystem:
         Returns:
             Dict: 可能为空的模型返回
         """
-        private_context = Context(Play_role = play_role)
+        private_context = Context(play_role = play_role)
         private_context.add_user_message(
             f"Input:\n{message}"
         )
@@ -129,8 +129,10 @@ class memorySystem:
             "reasoning_effort": "high",
             "response_format":{ "type": "json_object" }
         }
-        
-        assistant_message:dict = (await self.supplier.generate_json_ample(self.model, parameters))['choices'][0]['message']
+        try:
+            assistant_message:dict = (await self.supplier.generate_json_ample(self.model, parameters))['choices'][0]['message']
+        except Exception as e:
+            self.logger.error(f"总结请求出错:{e}")
         
         if assistant_content := assistant_message.get('content'):
             return json.loads(assistant_content)

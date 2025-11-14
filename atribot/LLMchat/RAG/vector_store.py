@@ -207,7 +207,7 @@ class VectorStore(VectorStoreBasics):
 
             
     async def batch_add_memories(self, args_list:List[tuple]):
-        """批量插入user消息
+        """批量插入user消息,如果其中一行出现错误不会报错，会跳过
 
         Args:
             args_list (List[tuple]): 插入tuple
@@ -215,6 +215,7 @@ class VectorStore(VectorStoreBasics):
         sql = """
             INSERT INTO atri_memory (group_id, user_id, event_time, event, event_vector)
             VALUES ($1, $2, $3, $4, $5)
+            DO NOTHING;
         """
         async with self.vector_database as db:
             await db.executemany_with_pool(sql, args_list)

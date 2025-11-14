@@ -1,4 +1,4 @@
-from atri_head.Basics import Basics
+# from atri_head.Basics import Basics
 import time
 
 tool_json = {
@@ -13,7 +13,8 @@ tool_json = {
 }
 
 
-qq_send_message = Basics().QQ_send_message
+# qq_send_message = Basics().QQ_send_message
+qq_send_message = ""
 
 async def main(qq_id):
     qq_data = await qq_send_message.get_stranger_info(qq_id)

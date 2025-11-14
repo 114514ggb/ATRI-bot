@@ -25,12 +25,13 @@ key = "ollama"
 # key = "sk-QtbNCpq9giS6s6a5Jncob7YTvS93Ikn5j30BkAivfBtDfzvz"
 # http = "https://openrouter.ai/api/v1/chat/completions"
 # key = "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"
-# http = "http://40.83.223.214:3000/v1/chat/completions" #某开发的
-# key = "sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y"
+http = "http://43.248.77.254:30044/v1/chat/completions"#某开发的新
+# http = "http://40.83.223.214:3000/v1/chat/completions" #某开发旧
+key = "sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y"
 
-http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
+# http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-key = "AIzaSyBRwweKIsz8bbTagEuPgtEon9VtGtUwAjE"
+# key = "AIzaSyBK16g4f4nub1kR1l8BSgoruGVXDlZNWN0"
 
 # http = "https://integrate.api.nvidia.com/v1/chat/completions"
 # key = "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"
@@ -77,12 +78,13 @@ tools = [
 # model = "gpt-oss-120b"
 # model = "xai/grok-4-fast-non-reasoning"
 # model = "xai/grok-4-fast-reasoning"
-model = "google-ai-studio/gemini-2.5-flash"
+# model = "google-ai-studio/gemini-2.5-flash"
 # model = "google-ai-studio/gemini-2.5-pro"
 # model = "claude-4.1-opus"
 # model = "moonshotai/kimi-k2-instruct-0905"
 # model = "假流式/gemini-2.5-pro"
 # model = "流式抗截断/gemini-2.5-flash"
+model = "githubcopilot/gpt-5"
 # model = "moonshotai/kimi-k2-instruct-0905"
 # model = "GLM-4.5-Flash"
 
@@ -131,7 +133,7 @@ async def extract_and_summarize_facts(message:str)->list[str]:
     Returns:
         list[str]: 可能为空的总结str
     """
-    private_context = Context(Play_role = GROUP_FACT_RETRIEVAL_PROMPT)
+    private_context = Context(play_role = GROUP_FACT_RETRIEVAL_PROMPT)
     private_context.add_user_message(
         str(message)
     )
@@ -249,3 +251,106 @@ async def main():
 #     asyncio.run(main())
 
 
+import asyncio
+import textwrap
+
+async def saync_run_exec(text: str) -> None:
+    """异步执行一段字符串形式的异步代码"""
+    src = f"""
+async def function():
+{textwrap.indent(text, "  ")}
+"""
+    locs = {}
+    exec(src, globals(), locs)
+    coro = locs['function']()
+    await coro
+
+# asyncio.run(saync_run_exec("print(\"开始\")\nawait asyncio.sleep(3.0)\nprint(\"执行结束\")"))
+
+
+def parse_text_with_emotion_tags(text: str, emoji_dict: dict) -> list:
+    """
+    解析文本并提取表情标签，保留原始位置信息，直接生成结构化输出
+    
+    Args:
+        text: 要处理的字符串
+        emoji_dict: 表情标签字典
+
+    Returns:
+        list: 结构化数据列表，包含文本和图片元素
+    """
+    if not text:
+            return []
+    
+    if '[' not in text:
+        return [{'type': 'text', 'data': {'text': text}}]
+    
+    emoji_set = set(emoji_dict)
+    segments = []
+    start_pos = 0
+    add_start = 0
+    text_len = len(text)
+    
+    while start_pos < text_len:
+        bracket_start = text.find('[', start_pos)
+        
+        if bracket_start == -1:
+            # 添加剩余文本
+            if remaining_text := text[add_start:]:
+                segments.append({
+                    'type': 'text',
+                    'data': {'text': remaining_text.strip()}
+                })
+            break
+        
+        # 查找对应的 ']'
+        bracket_end = text.find(']', bracket_start + 1)
+        
+        if bracket_end == -1:
+            # 没有 ']'，剩余部分作为文本
+            if remaining_text := text[add_start:]:
+                segments.append({
+                    'type': 'text',
+                    'data': {'text': remaining_text.strip()}
+                })
+            break
+        
+        # 提取标签内容
+        tag_content = text[bracket_start + 1:bracket_end]
+
+        if tag_content in emoji_set:
+            
+            if before_text := text[add_start:bracket_start]:
+                segments.append({
+                    'type': 'text',
+                    'data': {'text': before_text.strip()}
+                })
+            
+            # 添加表情图片
+            segments.append({
+                "type": "image",
+                "data": {"file": tag_content}
+            })
+            
+            # 更新位置
+            add_start = start_pos = bracket_end + 1
+        else:
+            # 无效标签
+
+            if tag_content.startswith("CQ:at,qq=" ):
+              if before_text := text[add_start:bracket_start]:
+                segments.append({
+                    'type': 'text',
+                    'data': {'text': before_text.strip()}
+                })
+              segments.append({'type': 'at', 'data': {'qq': tag_content[9:]}})
+              add_start = start_pos = bracket_end + 1
+            else:
+              start_pos = bracket_start + 1
+    
+    return segments
+  
+text = "[CQ:at,qq=2631018780] 嗯哼~ ATRI来试试看！$ 把 `function()` 改成[CQ:at,qq=2631018780] `return await coro` 就能拿到结果啦~ $ 再包一层 `asyncio.run()` 就能在终端直接跑！$ 毕竟我是高性能的嘛！[happy]"
+
+list_1 = parse_text_with_emotion_tags(text,{"happy"})
+pp(list_1)

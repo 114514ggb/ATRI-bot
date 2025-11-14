@@ -31,7 +31,7 @@ class emoji_core:
                     self.emoji_file_dict[item] = files
                     
         self.emoji_prompt = build_prompt.append_tag_hint(
-            tag_prompt = "可以在输出中加入被[]包裹的标签,这个格式的标签会解析成对应分类的表情包,最好只加入一个,而且不要加入没有的标签",
+            tag_prompt = "可以在输出中加入被[]包裹的标签,这个格式的标签会解析成对应分类的表情包,建议在对话中自然加入且不超过一个,绝对不要加入没有的标签",
             tag_list = list(self.emoji_file_dict.keys())
         )
     
@@ -187,12 +187,17 @@ class emoji_core:
                 add_start = start_pos = bracket_end + 1
             else:
                 # 无效标签
-
-                if tag_content.startswith("[CQ:at,qq=" ):
-                    segments.append({'type': 'at', 'data': {'qq': tag_content[10:][:-1]}})
-                
-                start_pos = bracket_start + 1
-        
+                if tag_content.startswith("CQ:at,qq=" ):
+                    if before_text := text[add_start:bracket_start]:
+                        segments.append({
+                            'type': 'text',
+                            'data': {'text': before_text.strip()}
+                        })
+                    segments.append({'type': 'at', 'data': {'qq': tag_content[9:]}})
+                    add_start = start_pos = bracket_end + 1
+                else:
+                    start_pos = bracket_start + 1
+            
         return segments
 
     def parse_text_with_emotion_tags_separator(self, text: str, emoji_dict: dict, separator:str) -> list:

@@ -125,14 +125,16 @@ class group_chat(chat_baseics):
 
         original_context = await self.chat_manager.get_group_chat(group_id)
         original_context.record_validity_check()
-        group_context = original_context.get_messages()
-        reminiscence = [
-            (datetime.datetime.fromtimestamp(r[0]),r[1]) for r in await self.memiry_system.query_user_recently_memory(
-                user_id = data['user_id'],
-                text = message.pure_text
-            )
-        ]
-
+        group_context = await self.get_group_context(
+            group_id = group_id,
+            group_context = original_context,
+            knowledge_base = [
+                (datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1]) for r in await self.memiry_system.query_user_recently_memory(
+                    user_id = data['user_id'],
+                    text = message.pure_text
+                )
+            ]
+        )
 
         user_import = self.build_prompt.build_user_Information(
             data=data, message=readable_text
@@ -149,8 +151,7 @@ class group_chat(chat_baseics):
 
         prompt = await self.prompt_structure(
             group_id, 
-            img_prompt,
-            knowledge_base = reminiscence
+            img_prompt
         )
 
         request = replace(
@@ -163,7 +164,7 @@ class group_chat(chat_baseics):
         )
 
         # 获取响应
-        response = await self._try_model_request(request, img_list, group_id, reminiscence)
+        response = await self._try_model_request(request, img_list, group_id)
 
         chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
         await chat_condition.update_last_time()
@@ -212,8 +213,7 @@ class group_chat(chat_baseics):
         self,
         request: GenerationRequest,
         img_list: List[str],
-        group_id: int,
-        reminiscence: List
+        group_id: int
     ) -> GenerationResponse:
         """尝试模型请求,失败时自动降级到配置的备用API
 
@@ -266,16 +266,14 @@ class group_chat(chat_baseics):
                         supplier_name=supplier,
                         image_url_list=img_list,
                         prompt=await self.prompt_structure(
-                            group_id,
-                            knowledge_base = reminiscence
+                            group_id
                         ),
                     )
                 else:
                     if not cached_image_prompt:
                         cached_image_prompt = await self.prompt_structure(
                             group_id, 
-                            await self.image_processing(img_list),
-                            knowledge_base = reminiscence
+                            await self.image_processing(img_list)
                         )
 
                     new_request = replace(
@@ -300,26 +298,45 @@ class group_chat(chat_baseics):
         self.log.error("所有备用api出现错误!")
         raise ValueError("所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
 
+    async def get_group_context(
+        self, 
+        group_id:int ,
+        group_context:Context, 
+        knowledge_base:list = []
+    )->List[Dict[str, str]]:
+        """构造群上下文
 
-    async def prompt_structure(self, group_id: int, img_prompt: str = None, knowledge_base:str = None) -> str:
+        Args:
+            group_id (int): 群号
+            group_context (Context): 群上下文对象
+            knowledge_base (List): 查询的记忆,默认为空
+
+        Returns:
+            List[Dict[str, str]]: 构造好的上下文
+        """
+        prompt = ""
+            
+        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>" #简单防止过长
+        
+        if knowledge_base:
+            prompt += f"\n\n<user_memory_snippet>{knowledge_base}</user_memory_snippet>"
+        
+        return group_context.get_messages(prompt)
+    
+    
+    async def prompt_structure(self, group_id: int, img_prompt: str = None) -> str:
         """提示词构造方法
 
         Args:
             group_id (int): 群号
             img_prompt (str): 图像提示词. Defaults to "".
-            knowledge_base (str): 知识库返回
 
         Returns:
             str: 完整提示词
         """
-
         prompt = self.build_prompt.group_chant_template(
             group_id,
-            chat_history=str(await self.chat_manager.get_group_messages(group_id))[:10000],#简单防止过长
         )
-
-        if knowledge_base:
-            prompt += f"<knowledge_base>{knowledge_base}</knowledge_base>"
         
         if img_prompt:
             prompt += f"<image_descriptions>{img_prompt}</image_descriptions>"

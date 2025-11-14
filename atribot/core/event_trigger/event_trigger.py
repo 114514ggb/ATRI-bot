@@ -52,6 +52,9 @@ class EventTrigger:
     
     async def dispatch(self, data: Dict, group_id:int) -> None:
         """分发事件到不同处理器"""
+        if group_id == 936819059:
+            return
+        
         post_type = data.get('post_type')
         event_type = EventType(post_type)
         
@@ -141,9 +144,10 @@ class EventTrigger:
             "喵星人终极认证：你已成功升级为顶级猫奴！授予金质猫爪勋章喵！(✧▽✧)","警告！本喵的咕噜声已达到扰民级别！邻居要投诉了喵！(>///<)","居然找到喵的终极弱点！本喵决定跟随你一辈子喵！(〃▽〃)","再揉就把你的气味永久保存在喵的记忆芯片中喵！(✧ω✧)",
             "喵星皇家法院裁决：因过度揉猫，判你终身成为本喵的专属铲屎官喵！(╬▔^▔)╯","专业猫体按摩博士学位授予仪式现在开始！恭喜毕业喵！(✧▽✧)","本喵的毛毛是情感载体！每一根都记录了你的爱意喵！(〃'▽'〃)","咕噜咕噜...喵星人幸福协议已签订...你将成为本喵的永久伙伴喵(^人^)"
         ]
+        
         text = random.choice(reactivity_list)
-
         await self.send_message.send_group_message(group_id,text)
+        
         await self.send_message.send_group_poke(group_id,data['user_id'])
 
     

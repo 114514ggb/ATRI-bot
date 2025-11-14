@@ -290,6 +290,19 @@ class common():
         
         return result
 
+    @staticmethod
+    async def saync_run_exec(text: str) -> None:
+        """异步执行一段字符串形式的异步代码"""
+        import textwrap
+        src = f"""
+async def function():
+{textwrap.indent(text, "  ")}
+"""
+        locs = {}
+        exec(src, globals(), locs)
+        coro = locs['function']()
+        await coro
+
 # if __name__ == "__main__":
 #     from pprint import pp
 #     import asyncio

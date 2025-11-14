@@ -91,6 +91,7 @@ ASSISTANT:[如果内容不够支撑回答，接着尝试换关键词搜索，或
 TOOL:[返回网站内容,这里假设返回了足够回复的答案]
 ASSISTANT:[总结回复]
 </example>
+注意工具返回内容user是看不到的,如果那里面有有用的信息一定要你输出列出来.
 </tool_calling> 
 
 # APPROACH (Think step by step):

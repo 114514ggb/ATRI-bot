@@ -217,6 +217,7 @@ class string_response:
         "no": [["img",["ATRI_no.gif","ATRI_no1.jpg"]]],
         "NO": [["img",["ATRI_no.gif","ATRI_no1.jpg"]]],
         "开枪":[["img",["ATRI_拿枪指你.jpg"]]],
+        "好茶":[["img",["ATRI_喝茶.jpg"]]],
         "不要": [["img",["ATRI_摆手.gif","ATRI_不要1.gif"]]],
         # "300颗": [["text",["够吗?又是这个难的过分的..."]]],
         "不行": [["img",["ATRI_垂头丧气.gif","ATRI_不要1.gif"]]],

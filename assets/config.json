@@ -49,14 +49,6 @@
         "standby_model":[
             {
                 "supplier":"zaxprisのapi",
-                "model_name":"假流式/gemini-2.5-pro"
-            },
-            {
-                "supplier":"zaxprisのapi",
-                "model_name":"流式抗截断/gemini-2.5-flash"
-            },
-            {
-                "supplier":"zaxprisのapi",
                 "model_name":"moonshotai/kimi-k2-instruct-0905"
             },
             {
@@ -90,6 +82,12 @@
         "api_key_pool":[
             "AIzaSyC8QqFrtsxjjSl6LXhvZLC5wr0WFlH2SAY",
             "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM",
+
+            "AIzaSyCi-OF8nWj61Wjxxa0bKnGEJXqK6JI2YNI",
+            "AIzaSyD03JHoIYaQXT1WaK_yP6uBpPSUkHUojvk",
+            "AIzaSyC6UeE-ZGxZpJUrHA8A0KiesSW9u5BEuTc",
+            "AIzaSyCnn3WFfH6awRO4aV3lxabejBc5sORoMrQ",
+            "AIzaSyBK16g4f4nub1kR1l8BSgoruGVXDlZNWN0",
 
             "AIzaSyCi-OF8nWj61Wjxxa0bKnGEJXqK6JI2YNI",
             "AIzaSyD03JHoIYaQXT1WaK_yP6uBpPSUkHUojvk",

@@ -54,7 +54,7 @@ class ChatManager:
             chat_context = Context(
                 messages = [],
                 user_max_record = self.LLM_max_record,
-                Play_role = self.play_role_list.get(
+                play_role = self.play_role_list.get(
                     self.default_play_role, 
                     self.play_role_list["none"]
                 )
@@ -113,7 +113,6 @@ class ChatManager:
         """
         return await self.get_group_context(group_id).time_window.get()
     
-    
     def get_bot_ratio_in_group(self, group_id:int)->float:
         """获取指定群聊的人机消息占比
 
@@ -145,7 +144,10 @@ class ChatManager:
             if message_type == 'group':
                 
                 group_context: GroupContext = self.get_group_context(data["group_id"])
-                    
+                
+                if data.get("message_sent_type") == "self":
+                    group_context.LLM_chat_decision_parameters.time_window.add()
+                
                 return await group_context.add_group_chat_message(
                         (
                             "<MESSAGE>"
@@ -199,7 +201,7 @@ class ChatManager:
         async with group_context.async_lock:
             if role_key in self.play_role_list:
                 group_context.play_roles = role_key
-                group_context.chat_context.Play_role = self.play_role_list[role_key]
+                group_context.chat_context.play_role = self.play_role_list[role_key]
             else:
                 raise ValueError("指定了不存在的角色键名!")
             
@@ -218,7 +220,7 @@ class ChatManager:
         async with group_context.async_lock:
             
             group_context.play_roles = self.default_play_role
-            group_context.chat_context.Play_role = self.play_role_list.get(
+            group_context.chat_context.play_role = self.play_role_list.get(
                 self.default_play_role, 
                 self.play_role_list["none"]
             )

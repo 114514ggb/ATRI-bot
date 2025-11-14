@@ -35,7 +35,7 @@ class Context():
     """原始的上下文"""
     user_max_record: int = 20
     """user最多消息条数限制"""
-    Play_role:str = ""
+    play_role:str = ""
     """模型人物提示词"""
 
     def __post_init__(self):
@@ -71,15 +71,17 @@ class Context():
         """用可迭代对象来扩展列表"""
         self.messages.extend(Iterable)
     
-    def get_messages(self)->List[Dict[str, Any]]:
-        """获取当前的上下文
+    def get_messages(self, inject_text:str = "")->List[Dict[str, str]]:
+        """获取当前的上下文List
+        
+        Args:
+            inject_text (str): 要注入到人设后面的提示词.如果没有Play_role会在开头新建一个system
 
         Returns:
             List[Dict[str, Any]]: 上下文list
         """
-        if self.Play_role:
-            return [{"role": "system", "content": self.Play_role}]+self.messages
-        return self.messages
+        system_msg = [{"role": "system", "content": "\n\n".join(filter(None, [self.play_role, inject_text]))}]
+        return system_msg + self.messages if system_msg[0]["content"] else self.messages
     
     def add_message(self, role:str, content:str|list, tool_call_id:int = None)->None:
         """添加消息
@@ -288,8 +290,12 @@ class LLMGroupChatCondition:
     """LLM最近一次发言的时间"""
     last_trigger_user_id: int
     """最近一次触发@聊天的用户ID"""
+    last_trigger_user_time: float
+    """最近一次触发@聊天的用户时间"""
     time_window: TimeWindow
     """统计群近期bot消息数量的窗口"""
+    turns_since_last_llm: int
+    """距离上次触发发言次数"""
     
     def __init__(self, window_time:int = 60):
         """初始化时间窗口。
@@ -300,9 +306,11 @@ class LLMGroupChatCondition:
         Raises:
             ValueError: 如果 windows_time 不是正整数
         """
-        self.time_window = window_time
+        self.time_window = TimeWindow(window_time)
         self.last_msg_at = 0.0
         self.last_trigger_user_id = 0
+        self.last_trigger_user_time = 0
+        self.turns_since_last_llm = 0
         self._lock = asyncio.Lock()
     
     async def update_last_time(self) -> None:
@@ -311,13 +319,25 @@ class LLMGroupChatCondition:
             self.last_msg_at = time.time()
     
     async def update_trigger_user(self, user_id: int) -> None:
-        """更新最近一次触发@聊天的用户ID"""
+        """更新最近一次触发@聊天的用户信息"""
         async with self._lock:
             self.last_trigger_user_id = user_id
+            self.last_trigger_user_time = time.time()
 
     def get_seconds_since_llm(self) -> float:
         """获取距离上一次LLM发言时间(秒级)"""
         return time.time()-self.last_msg_at
+    
+    def get_seconds_since_user(self) -> float:
+        """获取距离上一次user发言时间(秒级)"""
+        return time.time()-self.last_trigger_user_time
+    
+    def alter_turns_since_last_llm(self, add:bool)->None:
+        """增加turns_since_last_llm计数"""
+        if add:
+            self.turns_since_last_llm += self.turns_since_last_llm
+        else:
+            self.turns_since_last_llm = 0
 
 
 class GroupContext:

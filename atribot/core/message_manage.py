@@ -106,39 +106,40 @@ class group_manage(message_manage):
     async def handle_message(self, message: RichData, group_id:int) -> None:
         data = message.primeval
         
-        if group_id in self.group_white_list or data.get('user_id') == 2631018780:
+        if group_id in self.group_white_list or data.get('user_id') == 2631018780 :
             
             pure_text = message.pure_text
             self.logger.debug(f"Received group message:{data}")
             
-            if data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:
-                #@处理
-                
-                if pure_text.startswith("/"):
-                    try:
-                        await self.command_system.dispatch_command(pure_text,data)
-                    except Exception as e:
-                        self.logger.error(f"指令处理出现了错误:{e}")
-                        await self.send_message.send_group_message(group_id,f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}")
-                else:
-                    try:
-                        if self.permissions_management.check_access(data["user_id"]):
-                            
-                            await self.group_chet.step(message)
-
-                        else:
-                            PermissionError("你好像在黑名单里？")
-                    except Exception as e:
-                        self.logger.error(f"聊天出现了错误:{e}")
-                        await self.send_message.send_group_message(group_id,f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}")
-                        
-            elif data['user_id'] != data['self_id'] and self.permissions_management.check_access(data["user_id"]):
-                try:
-
-                    await self.event_trigger.dispatch(data,group_id)
+            if data.get("message_sent_type") != "self":
+                if data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:
+                    #@处理
                     
-                except Exception as e:
-                    self.logger.error(f"群非@事件出现了错误:{e}")
+                    if pure_text.startswith("/"):
+                        try:
+                            await self.command_system.dispatch_command(pure_text,data)
+                        except Exception as e:
+                            self.logger.error(f"指令处理出现了错误:{e}")
+                            await self.send_message.send_group_message(group_id,f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}")
+                    else:
+                        try:
+                            if self.permissions_management.check_access(data["user_id"]):
+                                
+                                await self.group_chet.step(message)
+
+                            else:
+                                PermissionError("你好像在黑名单里？")
+                        except Exception as e:
+                            self.logger.error(f"聊天出现了错误:{e}")
+                            await self.send_message.send_group_message(group_id,f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}")
+                            
+                elif self.permissions_management.check_access(data["user_id"]):
+                    try:
+
+                        await self.event_trigger.dispatch(data,group_id)
+                        
+                    except Exception as e:
+                        self.logger.error(f"群非@事件出现了错误:{e}")
             
             #存入/总结消息
             if summary_needed := await self.chat_manager.add_message_record(data, message.text):

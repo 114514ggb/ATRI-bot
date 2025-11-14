@@ -6,7 +6,7 @@ import json
 
 
 class ai_api_account_pool(universal_ai_api):
-    """通用异步AI API"""
+    """异步号池API"""
     
     def __init__(self, 
             api_key_pool:List[str] = None, 
@@ -50,7 +50,7 @@ class ai_api_account_pool(universal_ai_api):
             }
     
     async def _client_post(self,data:dict)->dict:
-        max_retries = 3
+        max_retries = 5
         retry_delay = 0.5
         for attempt in range(max_retries):
             try:
