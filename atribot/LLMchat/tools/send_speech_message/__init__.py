@@ -8,16 +8,16 @@ send_message:qq_send_message = container.get("SendMessage")
 tts_main = TTSService()
 
 tool_json = {
-    "name": "send_voice_image",
+    "name": "send_speech_message",
     "description": "在你想发语音或是有人让你说话（发声的那种）的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
     "properties": {
         "group_id": {
             "type": "string",
-            "description": "要发送的当前群号",
+            "description": "要发送的当前群号,必须参数",
         },
         "text": {
             "type": "string",
-            "description": "需转换为语音的文本内容（支持中文/日语）可以混合语言",
+            "description": "需转换为语音的文本内容（支持中文/日语）可以混合语言,不要加入英文字母",
         },
         "emotion": {
             "type": "string",
@@ -42,4 +42,4 @@ async def main(group_id, text, emotion="高兴", speed=0.9):
     )
     await send_message.send_group_audio(group_id, audio_path,default=True)
 
-    return {"send_speech_message": f"已发送：{text}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
+    return {"send_speech_message": f"已发送语音：{text},<NOTICE>需要需要结束的话再调用tool_calls_end工具代表工具调用结束</NOTICE>"}

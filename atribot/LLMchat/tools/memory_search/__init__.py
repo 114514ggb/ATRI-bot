@@ -30,9 +30,8 @@ memiry_system:memorySystem = container.get("memirySystem")
 
 async def main(question_text:str,limit:int=5,user_id:str|int=None):
     if user_id:
-        return_list = await memiry_system.query_user_memory(question_text,user_id,limit)
-        return [(datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1]) for r in return_list]
+        formatting_list = [(datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1]) for r in await memiry_system.query_user_memory(question_text,user_id,limit)]
     else:
-        return_list = await memiry_system.query_add_memory(question_text,limit)
-        return [(datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1] if r[1] else "知识库",r[2]) for r in return_list]
-        
+        formatting_list = [(datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1] if r[1] else "知识库",r[2]) for r in await memiry_system.query_add_memory(question_text,limit)]
+    
+    return f"查询记忆返回值:{formatting_list}"

@@ -307,14 +307,13 @@ class LLMGroupChatCondition:
             ValueError: 如果 windows_time 不是正整数
         """
         self.time_window = TimeWindow(window_time)
-        self.last_msg_at = 0.0
+        self.last_msg_at = self.last_trigger_user_time = time.time()
         self.last_trigger_user_id = 0
-        self.last_trigger_user_time = 0
         self.turns_since_last_llm = 0
         self._lock = asyncio.Lock()
     
     async def update_last_time(self) -> None:
-        """更新LLM最近一次发言时间戳（异步安全）"""
+        """更新LLM最近一次发言时间戳"""
         async with self._lock:
             self.last_msg_at = time.time()
     
@@ -324,20 +323,25 @@ class LLMGroupChatCondition:
             self.last_trigger_user_id = user_id
             self.last_trigger_user_time = time.time()
 
-    def get_seconds_since_llm(self) -> float:
+    def get_seconds_since_llm_time(self) -> float:
         """获取距离上一次LLM发言时间(秒级)"""
         return time.time()-self.last_msg_at
     
-    def get_seconds_since_user(self) -> float:
-        """获取距离上一次user发言时间(秒级)"""
+    def get_seconds_since_user_time(self) -> float:
+        """获取距离上一次user触发发言时间(秒级)"""
         return time.time()-self.last_trigger_user_time
     
-    def alter_turns_since_last_llm(self, add:bool)->None:
-        """增加turns_since_last_llm计数"""
-        if add:
-            self.turns_since_last_llm += self.turns_since_last_llm
-        else:
+    async def add_turns_since_last_llm(self) -> None:
+        """增加距离上次触发发言次数计数"""
+        async with self._lock:
+            self.turns_since_last_llm += 1
+        
+    async def reset_turns_since_last_llm(self) -> None:
+        """重置距离上次触发发言次数计数"""
+        async with self._lock:
             self.turns_since_last_llm = 0
+
+
 
 
 class GroupContext:
@@ -357,6 +361,8 @@ class GroupContext:
     
     chat_context:Context
     """群LLM聊天上下文"""
+    # chat_img_url_cache:deque
+    # """图像url缓存"""
     play_roles:str
     """当前LLM聊天人设名称"""
     IS_SUMMARIZING:bool = False
@@ -384,6 +390,7 @@ class GroupContext:
         self.play_roles =  play_roles
         self.chat_context = chat_context
         self.group_max_record = group_max_record
+        # self.chat_img_url_cache = deque(maxlen=2) #接受2张图
         self.async_lock = asyncio.Lock()
         self.async_summarize_lock = asyncio.Lock()
         self.time_window = TimeWindow(window_time)
@@ -428,6 +435,9 @@ class GroupContext:
         
         return None
     
+    # def data_extract_img_url(self, data:Dict)->None:
+    #     (message["data"]["url"] for message in data["message"] if message["type"] == "image")
+
     
     @asynccontextmanager
     async def summarizing(self):

@@ -7,10 +7,13 @@ from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.core.service_container import container
 from atribot.core.data_manage import data_manage
+from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.chat import group_chat
 from atribot.core.types import RichData
 from abc import ABC, abstractmethod
 from logging import Logger
+
+
 
 
 class message_router():
@@ -30,7 +33,6 @@ class message_router():
         
         if data.get('post_type') in ["message","message_sent"]:
             _rich_data = data_manage.rich_data_processing_rich_data(data)
-            await self.store_data(_rich_data,group_id) #存储群消息
         else:
             if data.get("meta_event_type") !=  'heartbeat':
                 self.logger.debug(f"原始消息:\n{data}")
@@ -42,6 +44,8 @@ class message_router():
             #私聊处理
             return
 
+        if _rich_data.pure_text:
+            await self.store_data(_rich_data,group_id) #存储群消息
             
 
     async def store_data(self, rich_data:RichData, group_id:int)->None:
@@ -88,11 +92,23 @@ class message_manage(ABC):
         self.memiry_system:memorySystem = container.get("memirySystem")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.logger:Logger = container.get("log")
+        self.initiative_chat = initiativeChat()
     
     @abstractmethod
     async def handle_message(self, message: RichData) -> None:
         """处理接收到的消息"""
         pass
+    
+    def error_occurred(self, error: Exception, text:str) -> None:
+        """处理消息处理过程中出现的错误"""
+        import traceback
+        self.logger.critical(
+            f"{text}出现了错误:{error}\n"
+            "异常类型: %s\n"
+            "详细回溯:\n%s",
+            type(error).__name__,  
+            ''.join(traceback.format_exception(type(error), error, error.__traceback__)) 
+        )
 
 class group_manage(message_manage):
     """群聊消息处理类"""
@@ -100,49 +116,77 @@ class group_manage(message_manage):
     def __init__(self):
         super().__init__()
         self.group_white_list:list = container.get("config").group_white_list
+        self.self_qq = str(container.get("config").account.id)
         self.group_chet:group_chat = container.get("GroupChat")
         self.event_trigger = EventTrigger()
         
-    async def handle_message(self, message: RichData, group_id:int) -> None:
+    async def handle_message(self, message: RichData, group_id: int) -> None:
         data = message.primeval
+        user_id = data.get('user_id')
         
-        if group_id in self.group_white_list or data.get('user_id') == 2631018780 :
-            
-            pure_text = message.pure_text
-            self.logger.debug(f"Received group message:{data}")
-            
-            if data.get("message_sent_type") != "self":
-                if data.get('message_type','') == 'group' and  {'type': 'at', 'data': {'qq': str(data["self_id"])}} in data['message']:
-                    #@处理
-                    
-                    if pure_text.startswith("/"):
-                        try:
-                            await self.command_system.dispatch_command(pure_text,data)
-                        except Exception as e:
-                            self.logger.error(f"指令处理出现了错误:{e}")
-                            await self.send_message.send_group_message(group_id,f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}")
-                    else:
-                        try:
-                            if self.permissions_management.check_access(data["user_id"]):
-                                
-                                await self.group_chet.step(message)
+        if group_id not in self.group_white_list and not (user_id == 2631018780):
+            return
 
-                            else:
-                                PermissionError("你好像在黑名单里？")
-                        except Exception as e:
-                            self.logger.error(f"聊天出现了错误:{e}")
-                            await self.send_message.send_group_message(group_id,f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}")
-                            
-                elif self.permissions_management.check_access(data["user_id"]):
-                    try:
+        if data.get("message_sent_type") == "self":
+            await self._process_memory_summary(data, message.text, group_id)
+            return
 
-                        await self.event_trigger.dispatch(data,group_id)
-                        
-                    except Exception as e:
-                        self.logger.error(f"群非@事件出现了错误:{e}")
-            
-            #存入/总结消息
-            if summary_needed := await self.chat_manager.add_message_record(data, message.text):
+        self.logger.debug(f"Received group message: {data}")
+
+        has_permission = self.permissions_management.check_access(user_id)
+
+        if self._check_is_mentioned(data):
+            #@处理
+            await self._handle_mentioned_message(message.pure_text, data, group_id, has_permission, message)
+        elif has_permission:
+            try:
+                if not await self.initiative_chat.decision(message):
+                    await self.event_trigger.dispatch(data, group_id)
+            except Exception as e:
+                self.error_occurred(e, "事件触发器")
+        
+        await self._process_memory_summary(data, message.text, group_id)
+
+    def _check_is_mentioned(self, data: dict) -> bool:
+        """辅助函数：检查是否被 @"""
+        for msg in data.get("message", []):
+            if msg.get("type") == "at" and str(msg.get("data", {}).get("qq")) == self.self_qq:
+                return True
+        return False
+    
+    async def _handle_mentioned_message(self, pure_text:str, data, group_id, has_permission, message):
+        """处理被 @ 的消息逻辑"""
+        # 指令处理
+        if pure_text.startswith("/"):
+            try:
+                await self.command_system.dispatch_command(pure_text, data)
+            except Exception as e:
+                self.error_occurred(e, "命令处理模块")
+                await self.send_message.send_group_message(
+                    group_id, 
+                    f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"
+                )
+            return 
+
+        #聊天处理
+        if has_permission:
+            try:
+                # await self.group_chet.step(message)
+                await self.initiative_chat.decision(message, at=True)
+            except Exception as e:
+                self.error_occurred(e, "群聊聊天模块")
+                await self.send_message.send_group_message(
+                    group_id, 
+                    f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}"
+                )
+        else:
+            raise PermissionError("你好像在黑名单里？") 
+
+
+    async def _process_memory_summary(self, data, text, group_id):
+        """处理记忆存储与总结"""
+        try:
+            if summary_needed := await self.chat_manager.add_message_record(data, text):
                 messages, group_context = summary_needed
                 async with group_context.summarizing() as ctx:
                     if ctx is not None:
@@ -152,6 +196,8 @@ class group_manage(message_manage):
                             bot_id=data['self_id'],
                             group_id=group_id
                         )
+        except Exception as e:
+            self.error_occurred(e, "记忆总结模块")
                         
         
 
@@ -160,3 +206,4 @@ class private_manage(message_manage):
     
     def __init__(self):
         super().__init__()
+

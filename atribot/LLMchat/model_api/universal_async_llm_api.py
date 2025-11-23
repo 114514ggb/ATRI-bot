@@ -61,7 +61,7 @@ class universal_ai_api(model_api_basics):
 
     async def _client_post(self,data:dict)->dict:
         max_retries = 3
-        retry_delay = 0.5
+        retry_delay = 0.2
         for attempt in range(max_retries):
             try:
                 response = await self.client.post(
@@ -72,8 +72,8 @@ class universal_ai_api(model_api_basics):
                 )
                 try:
                     response.raise_for_status()
-                    response_json = await response.json()
-                    print(response_json)
+                    response_json:dict = await response.json()
+                    # print(response_json)
                     return response_json
                 except aiohttp.ContentTypeError:
                     return json.loads(await response.text())
@@ -92,7 +92,15 @@ class universal_ai_api(model_api_basics):
         } | self.model_parameters
         )
         
-        return await self._client_post(payload)
+        for _ in range(3):
+            try:
+                ret = await self._client_post(payload)
+                if ret["choices"]:#fuck None return
+                    return ret
+            except Exception:
+                await asyncio.sleep(0.1)
+                
+        raise ValueError("LLMapi返回值错误!")
 
     async def generate_text_lightweight(self, model:str, messages:list):
         """请求生成文本,轻量参数,无工具调用,返回全部内容"""
@@ -106,7 +114,22 @@ class universal_ai_api(model_api_basics):
         payload = json.dumps({
             "model": model,
         }|remainder)
-        return await self._client_post(payload)
+        
+        # from pprint import pp
+        # pp({
+        #     "model": model,
+        # }|remainder)
+        # while True:
+        for _ in range(3):
+            try:
+                ret = await self._client_post(payload)
+                if ret['choices']:#fuck None return
+                    return ret
+            except Exception as e:
+                print(e)
+                await asyncio.sleep(0.1)
+        
+        raise ValueError("LLMapi返回值错误!")
     
     async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024, encoding:str = "float")->List[List[float]]:
         """异步调用指定的嵌入模型，将输入的文本转换为向量表示。

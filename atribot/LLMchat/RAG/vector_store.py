@@ -215,7 +215,7 @@ class VectorStore(VectorStoreBasics):
         sql = """
             INSERT INTO atri_memory (group_id, user_id, event_time, event, event_vector)
             VALUES ($1, $2, $3, $4, $5)
-            DO NOTHING;
+            ON CONFLICT (user_id, event) DO NOTHING;
         """
         async with self.vector_database as db:
             await db.executemany_with_pool(sql, args_list)

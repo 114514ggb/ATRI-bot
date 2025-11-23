@@ -207,7 +207,6 @@ class WebSocketClient:
             #     await asyncio.get_event_loop().run_in_executor(None, callback, data)
         except Exception as e:
             import traceback
-            tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
 
             self.log.critical(
                 "回调执行错误\n"
@@ -216,7 +215,7 @@ class WebSocketClient:
                 "详细回溯:\n%s",
                 callback,              # 函数对象
                 type(e).__name__,      # 异常类型名
-                tb_str                 # 带行号的完整栈
+                ''.join(traceback.format_exception(type(e), e, e.__traceback__))                 # 带行号的完整栈
             )
     
     async def send(self, data: Dict, with_echo: bool = False) -> Optional[Dict]:

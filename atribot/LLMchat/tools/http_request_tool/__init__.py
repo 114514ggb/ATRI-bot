@@ -39,7 +39,7 @@ async def get(url):
                 response.raise_for_status()
                 html = await response.text()
                 soup = BeautifulSoup(html, 'html.parser')
-                return soup.get_text(separator=' ', strip=True)
+                return f"请求到清洗后的纯文本:{soup.get_text(separator=' ', strip=True)}"
         except aiohttp.ClientResponseError as e:
             return f"请求到非200状态码: {e.status}"
         except aiohttp.ClientError as e:

@@ -53,13 +53,22 @@
             "base_url":"http://43.248.77.254:30044/v1/chat/completions",
             "api_key":"sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y",
             "models":{
-                "moonshotai/kimi-k2-instruct-0905":{
+                "Nvidia/moonshotai/kimi-k2-instruct-0905":{
                     "visual_sense":false
                 },
-                "假流式/gemini-2.5-pro":{
+                "公益站转发/claude-sonnet-4-5":{
+                    "visual_sense":false
+                },                
+                "公益站转发/gpt-5.1":{
+                    "visual_sense":false
+                },
+                "GeminiCLI/gemini-2.5-pro":{
                     "visual_sense":true
                 },
-                "流式抗截断/gemini-2.5-flash":{
+                "GeminiCLI/gemini-2.5-pro-nothinking":{
+                    "visual_sense":true
+                },
+                "GeminiCLI/gemini-2.5-flash-search":{
                     "visual_sense":true
                 }
             }

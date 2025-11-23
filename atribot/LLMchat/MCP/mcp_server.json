@@ -32,7 +32,7 @@
       "command": "uvx", 
       "args": ["ms_image_gen_mcp@latest"], 
       "env": { "MODELSCOPE_API_KEY": "ms-cdc2aae5-bfe7-48b2-9a42-e67e1bb02736" } ,
-      "active": true
+      "active": false
     },
     "bingcn": {
       "command": "npx",

@@ -142,15 +142,24 @@
     "base_url":"http://40.83.223.214:3000/v1/chat/completions",
     "api_key":"sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y",
     "models":{
-        "moonshotai/kimi-k2-instruct-0905":{
+        "Nvidia/moonshotai/kimi-k2-instruct-0905":{
             "visual_sense":False
         },
-        "假流式/gemini-2.5-pro":{
+        "公益站转发/claude-sonnet-4-5":{
+            "visual_sense":False
+        },                
+        "公益站转发/gpt-5.1":{
+            "visual_sense":False
+        },
+        "GeminiCLI/gemini-2.5-pro":{
             "visual_sense":True
         },
-        "流式抗截断/gemini-2.5-flash":{
+        "GeminiCLI/gemini-2.5-pro-nothinking":{
             "visual_sense":True
         },
+        "GeminiCLI/gemini-2.5-flash-search":{
+            "visual_sense":True
+        }
     }
 },
 
@@ -158,7 +167,19 @@
 
 
 
+"""
+AIzaSyDyYzXfpgL3rnOw3p_VDRG3OOf1-1nLNoo
+AIzaSyBYeQkjagJfKFVLzr0fnkP72PmMJfMDUUg
+AIzaSyBxOsfeDO28cvjdR2FJfF39DQLszMX-d5o
+AIzaSyBnhSiv9R0ozOQBWU5mkFKeNcku1cfpyiM
+AIzaSyBqUlNI2ZJktGD2sbDwenLXID6Nd6C9QQ0
 
+4AIzaSyAKEISXJG4fbWB0iGsUq76YD2sZrx7xAs4
+AIzaSyCADRVBg7AvF9mL3B1y5dTcvTKsoeD5_CQ
+AIzaSyBg04fwbH5VG8yc9E-z7uo0al1OWZsfbs8
+AIzaSyAt0KyY0WD-GfdPkxGBeEjR26yVMFVbh5A
+AIzaSyADjmYQGjzMa-op0-rkvveZbvisZTtV6bo
+"""
 
 
 #50/40
@@ -173,16 +194,6 @@ AIzaSyBAF5X2LDMRtV6xLnt8aC7-bTJ3p7IipFQ
 
 """
 
-
-"""
-挂了，有待测试2025年11月9日
-            "AIzaSyBRwweKIsz8bbTagEuPgtEon9VtGtUwAjE",
-            "AIzaSyBa246Ljsb0sMiWWZFSZ-U0899BQQnkl8s",
-            "AIzaSyBAF5X2LDMRtV6xLnt8aC7-bTJ3p7IipFQ",
-            "AIzaSyBHHXMN27STXvoAxkGIJHdMRlEB_c2mk6o",
-            "AIzaSyCeptasF9nTYoCH-zfr9mG4Y757ClhZ8N0",
-"""
-
 ['AIzaSyCi-OF8nWj61Wjxxa0bKnGEJXqK6JI2YNI',
  'AIzaSyD03JHoIYaQXT1WaK_yP6uBpPSUkHUojvk',
  'AIzaSyC6UeE-ZGxZpJUrHA8A0KiesSW9u5BEuTc',
@@ -192,6 +203,7 @@ AIzaSyBAF5X2LDMRtV6xLnt8aC7-bTJ3p7IipFQ
 [
             # "AIzaSyC8QqFrtsxjjSl6LXhvZLC5wr0WFlH2SAY",
             # "AIzaSyBiUZRJ4y-YUcebLJIn3BfWIh8-BwoKpaM",
+            
             "AIzaSyCY0bKgoEJOL0FdSKae3Y_iSok1R54WURI",
             "AIzaSyDtZGDRNAt0zOemhf6n3947KbTI6K8KEJU",
             "AIzaSyAo3T2rP2ZTHwvCrEl3SCeE1Hv2Si3-vko",

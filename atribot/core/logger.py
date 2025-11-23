@@ -6,12 +6,12 @@ import os
 class ColoredFormatter(logging.Formatter):
     """自定义带颜色的日志格式化器"""
 
-    grey = "\x1b[38;20m"
-    green = "\x1b[32;20m"
-    yellow = "\x1b[33;20m"
-    red = "\x1b[31;20m"
-    bold_red = "\x1b[31;1m"
-    reset = "\x1b[0m"
+    grey = "\x1b[38;20m"      # 灰色 (浅黑色)
+    green = "\x1b[32;20m"     # 绿色
+    yellow = "\x1b[33;20m"    # 黄色
+    red = "\x1b[31;20m"       # 红色
+    bold_red = "\x1b[31;1m"   # 粗体红色
+    reset = "\x1b[0m"         # 重置颜色和样式
     
     format_str = "%(asctime)s [%(levelname)s] %(name)s | %(message)s"
     

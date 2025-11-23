@@ -85,7 +85,10 @@ class data_manage():
             elif my_type == "at":
                 qq = message.get("data", {}).get("qq", "")
                 text_parts.append(f"[CQ:at,qq={qq}]")
-                
+            
+            elif my_type == "reply":
+                text_parts.append(f"[CQ:reply,id={message.get("data", {}).get("id", None)}]")
+            
             elif my_type == "file":
                 file = message.get("data", {}).get("file", "")
                 text_parts.append(f"[CQ:file,name:{file}]")
@@ -153,7 +156,10 @@ class data_manage():
                     elif reply_type == "at":
                         qq = reply_message.get("data", {}).get("qq", "")
                         reply_text_parts.append(f"[CQ:at,qq={qq}]")
-                        
+                    
+                    elif my_type == "reply":
+                        text_parts.append(f"[CQ:reply,id={message.get("data", {}).get("id", None)}]")
+                    
                     elif reply_type == "file":
                         file = reply_message.get("data", {}).get("file", "")
                         reply_text_parts.append(f"[CQ:file,name:{file}]")
@@ -175,7 +181,6 @@ class data_manage():
                         
                 text_parts.append("".join(reply_text_parts)+"</reply_message>")
                     
-            
             elif my_type == "at":
                 qq = message.get("data", {}).get("qq", "")
                 text_parts.append(f"[CQ:at,qq={qq}]")

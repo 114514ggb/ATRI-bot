@@ -112,20 +112,7 @@ class ChatManager:
             int: 消息计数
         """
         return await self.get_group_context(group_id).time_window.get()
-    
-    def get_bot_ratio_in_group(self, group_id:int)->float:
-        """获取指定群聊的人机消息占比
-
-        Args:
-            group_id (int): 群号
-
-        Returns:
-            float: 在窗口时间内的bot消息和群总消息的比值
-        """
-        group_context = self.get_group_context(group_id)
-        return group_context.LLM_chat_decision_parameters.time_window.get()/group_context.time_window.get()
         
-    
     async def add_message_record(
         self,
         data: dict,
@@ -146,7 +133,10 @@ class ChatManager:
                 group_context: GroupContext = self.get_group_context(data["group_id"])
                 
                 if data.get("message_sent_type") == "self":
-                    group_context.LLM_chat_decision_parameters.time_window.add()
+                    await group_context.LLM_chat_decision_parameters.time_window.add()
+                # else:
+                #     #提取图像url到缓存
+                #     group_context.data_extract_img_url(data)
                 
                 return await group_context.add_group_chat_message(
                         (
@@ -208,7 +198,17 @@ class ChatManager:
         await self.reset_group_chat(group_id)
         self.logger.info(f"已设置群{group_id}的角色为: {role_key}")
         return
-            
+    
+    async def get_group_role_str(self, group_id: int)->str:
+        """获取指定群聊的聊天人设
+
+        Args:
+            group_id (int): 群组ID
+
+        Returns:
+            str: 人设文本
+        """
+        return self.get_group_context(group_id).chat_context.play_role
     
     async def clear_group_role(self, group_id: int) -> None:
         """清除指定群的自定义角色，恢复为默认角色

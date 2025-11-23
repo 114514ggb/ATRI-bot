@@ -29,4 +29,4 @@ async def main(group_id, url):
             get_return=True
         )
 
-    return {"send_speech_message": f"执行结果:{text}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
+    return {"send_speech_message": f"发送图像执行结果:{text}"}

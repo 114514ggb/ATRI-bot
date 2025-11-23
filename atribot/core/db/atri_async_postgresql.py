@@ -2,7 +2,7 @@ import asyncpg
 from typing import Optional, Tuple, Any, List
 import asyncio
 from asyncpg import Record
-from contextvars import ContextVar
+from contextvars import ContextVar,Token
 from asyncpg.exceptions import UniqueViolationError, ForeignKeyViolationError
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 
@@ -13,7 +13,7 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
     _pool: Optional[asyncpg.Pool] = None
     _init_lock = asyncio.Lock()
     _context_conn: ContextVar[Optional[asyncpg.Connection]] = ContextVar('conn', default=None)
-    _context_cursor: ContextVar[Optional[Any]] = ContextVar('cursor', default=None)
+    _context_token: ContextVar[Optional[Token]] = ContextVar('token', default=None)
     
     def __init__(self):
         super().__init__()
@@ -81,17 +81,23 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         if self._pool is None:
             raise RuntimeError("数据库连接池未初始化")
         
+        if self._context_conn.get() is not None:
+            return self
+        
         conn = await self._pool.acquire()
-        self._conn_token = self._context_conn.set(conn)
+        token = self._context_conn.set(conn)
+        self._context_token.set(token)
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """释放连接回池"""
-        conn = self._context_conn.get()
-        if conn:
-            await self._pool.release(conn)
-            self._context_conn.reset(self._conn_token)
-            self._conn_token = None
+        token = self._context_token.get()
+        if token is not None:
+            conn = self._context_conn.get()
+            if conn:
+                await self._pool.release(conn)
+            self._context_conn.reset(token)
+            self._context_token.set(None)
     
     def get_connection(self) -> asyncpg.Connection:
         """获取当前上下文连接"""

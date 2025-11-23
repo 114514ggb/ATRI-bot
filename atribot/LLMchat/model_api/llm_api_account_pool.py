@@ -50,8 +50,8 @@ class ai_api_account_pool(universal_ai_api):
             }
     
     async def _client_post(self,data:dict)->dict:
-        max_retries = 5
-        retry_delay = 0.5
+        max_retries = 3
+        retry_delay = 0.2
         for attempt in range(max_retries):
             try:
                 response = await self.client.post(

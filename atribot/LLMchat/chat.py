@@ -19,10 +19,13 @@ from atribot.core.types import Context
 from abc import ABC, abstractmethod
 from atribot.common import common
 from dataclasses import replace
-from typing import Dict, List
+from typing import Dict, List, Coroutine
 from logging import Logger
 import datetime
 import asyncio
+import json
+
+
 
 
 class chat_baseics(ABC):
@@ -32,7 +35,7 @@ class chat_baseics(ABC):
         self.model_api_supervisor: large_language_model_supervisor = container.get("LLMsupervisor")
         self.supplier: ai_connection_manager = container.get("LLMSupplier")
         self.send_message: qq_send_message = container.get("SendMessage")
-        self.memiry_system:memorySystem = container.get("memirySystem")        
+        self.memiry_system: memorySystem = container.get("memirySystem")        
         self.chat_manager: ChatManager = container.get("ChatManager")
         self.emoji_core: emoji_core = container.get("EmojiCore")
         self.mcp_tool: FuncCall = container.get("MCP")
@@ -100,6 +103,7 @@ class group_chat(chat_baseics):
             self.config.model.connect.supplier
         ].connection_object
         self.visual_sense = self.config.model.connect.visual_sense
+        self.emoji_file_dict = self.emoji_core.emoji_file_dict
         self.api_order: list[dict[str, str]] = self.config.model.standby_model
         """备用api调用list"""
 
@@ -111,11 +115,20 @@ class group_chat(chat_baseics):
             system_review=self.config.model.connect.system_review,
             parameter=self.config.model.chat_parameter,
         )
+        
+        self.decision_function:Dict[str,Coroutine[Dict]] = {
+            "reply" : self.reply_conduct,
+            "silence" : self.silence_conduct,
+            "use_tools" : self.use_tools_conduct,
+        }
+        
+        
 
     async def step(self, message: RichData) -> None:
         """群聊主处理函数"""
         data = message.primeval
         group_id = data["group_id"]
+        user_id =  data['user_id']
         increase_context = Context()
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
@@ -129,8 +142,8 @@ class group_chat(chat_baseics):
             group_id = group_id,
             group_context = original_context,
             knowledge_base = [
-                (datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1]) for r in await self.memiry_system.query_user_recently_memory(
-                    user_id = data['user_id'],
+                (datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),user_id,r[1]) for r in await self.memiry_system.query_user_recently_memory(
+                    user_id = user_id,
                     text = message.pure_text
                 )
             ]
@@ -160,6 +173,7 @@ class group_chat(chat_baseics):
             prompt=prompt,
             new_message=user_import,
             tool_json=self.mcp_tool.get_func_desc_openai_style(),
+            # tool_json=[],
             image_url_list=img_list if (img_list and self.visual_sense) else None,
         )
 
@@ -167,22 +181,22 @@ class group_chat(chat_baseics):
         response = await self._try_model_request(request, img_list, group_id)
 
         chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
-        await chat_condition.update_last_time()
         await chat_condition.update_trigger_user(data["user_id"])
         
         # 发送基础信息
         await self.send_reply_message(
-            response.reply_text, 
+            "".join(response.reply_text), 
             group_id=group_id, 
             message_id=data["message_id"],
-            since_llm=chat_condition.get_seconds_since_llm()
+            since_llm=chat_condition.get_seconds_since_llm_time()
         )
+        await chat_condition.update_last_time()
 
         # 思考的信息
         if response.reasoning_content:
             await self.send_message.send_group_merge_text(
                 group_id=group_id,
-                message=response.reasoning_content,
+                message="".join(response.reasoning_content),
                 source="推理内容",
             )
         
@@ -208,6 +222,118 @@ class group_chat(chat_baseics):
         await self.chat_manager.store_group_chat(group_id=group_id, context=original_context)
 
         self.log.debug("模型结束响应!")
+        
+    async def step_json(
+        self, 
+        message: RichData, 
+        prompt:str,
+        group_id: int,
+        user_id: int
+    ) -> None:
+        """群聊天用的json处理版"""
+        
+        self.log.info("群LLM聊天json处理")
+        
+        data = message.primeval
+        group_id = data["group_id"]
+        user_id =  data['user_id']
+        
+        readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
+            data
+        )
+        
+        img_prompt = None
+        if img_list:
+            if not self.visual_sense:
+                img_prompt = await self.image_processing(img_list)
+            else:
+                img_list = await common.urls_to_base64(img_list)
+        
+        user_import = self.build_prompt.build_user_Information(
+            data = data, 
+            message = readable_text,
+            memory = [
+                (datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),user_id,r[1]) for r in await self.memiry_system.query_user_recently_memory(
+                    user_id = user_id,
+                    text = message.pure_text
+                )
+            ]
+        )
+        
+        original_context = await self.chat_manager.get_group_chat(group_id)
+        original_context.record_validity_check()
+        
+        request = replace(
+            self.template_request,
+            messages=original_context.get_messages(),
+            new_message=self.prompt_structure_json(
+                group_id = group_id,
+                user_import = user_import,
+                chat_record = str(await self.chat_manager.get_group_messages(group_id))[:10000],
+                img_prompt = img_prompt
+            ),
+            tool_json=self.mcp_tool.get_func_desc_openai_style(),
+            image_url_list=img_list if (img_list and self.visual_sense) else None
+        )
+        
+        response = await self._try_model_request(
+            request = request, 
+            group_id = group_id, 
+            img_list= img_list 
+        )
+
+        for response_json in (json.loads(s.replace("json\n", "").replace("```", "").strip()) for s in response.reply_text):
+            response_json:dict[str: str|int]
+            
+            if decision := response_json.get("decision"):
+                
+                if fun := self.decision_function.get(decision):
+                    
+                    await fun(response_json, data)
+                    
+                else:
+                    self.log.error(f"无效decision:{response_json}")
+                
+            else:
+                self.log.error(f"返回json错误:{response_json}")
+        
+        
+        #存储更新等,因为直接返回的是那个对象所以可以直接改变
+        original_context.add_user_message(prompt+user_import)
+        original_context.extend(
+            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+        )
+        
+        if response.reasoning_content:
+            self.log.info("存储推理内容:\n"+ "".join(response.reasoning_content))
+        
+        self.log.info("结束json处理!")
+        
+    
+    async def reply_conduct(self, response_json:Dict, data:Dict)->None:
+        
+        self.log.info(f"LLM决定回复消息。理由:{response_json.get("reason")}")
+        group_id = data["group_id"]
+        
+
+        chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
+        await chat_condition.update_trigger_user(data["user_id"])
+        
+        await self.send_reply_message(
+            chat_text = response_json["content"],
+            message_id = response_json.get("target_message_id"),
+            group_id = group_id,
+            since_llm = chat_condition.get_seconds_since_llm_time()
+        )
+        
+        await chat_condition.update_last_time()
+        
+    
+    async def silence_conduct(self, response_json:Dict, data:Dict)->None:
+        self.log.info(f"LLM决定静默。理由:{response_json.get("reason")}")
+    
+    async def use_tools_conduct(self, response_json:Dict, data:Dict)->None:
+        self.log.info(f"LLM决定调用工具。理由:{response_json.get("reason")}")
 
     async def _try_model_request(
         self,
@@ -316,7 +442,7 @@ class group_chat(chat_baseics):
         """
         prompt = ""
             
-        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>" #简单防止过长
+        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>Please do not repeat the above information" #简单防止过长
         
         if knowledge_base:
             prompt += f"\n\n<user_memory_snippet>{knowledge_base}</user_memory_snippet>"
@@ -345,66 +471,113 @@ class group_chat(chat_baseics):
 
         return prompt + "Please do not repeat the above information"
 
+    def prompt_structure_json(
+        self,
+        group_id:str, 
+        user_import:str,
+        chat_record:str,
+        img_prompt:str 
+    )->str:
+        """json处理使用的提示词构造方法
+
+        Args:
+            group_id (str): 群号
+            user_import (str): 用户输入
+            chat_record (str): 历史记录
+            img_prompt (str): 文本图像提示
+
+        Returns:
+            str: 构造完成的prompt
+        """
+        prompt = self.build_prompt.decision_whether_responses(
+            group_id = group_id,
+            prompt = user_import,
+            chat_record = chat_record
+        )
+        if img_prompt:
+            prompt += f"<image_descriptions>{img_prompt}</image_descriptions>"
+        
+        return prompt + self.emoji_core.emoji_prompt + "Please do not repeat the above information"
+        
+
     async def send_reply_message(
         self,
         chat_text: str,
         group_id: int,
-        message_id: int,
-        since_llm: float
+        since_llm: float,
+        message_id: int = None,
     ) -> None:
         """发送群文本消息，支持多段分割和表情标签
 
         Args:
             chat_text (str): 要解析发送的文本
             group_id (int): 群号
-            message_id (int): 输入消息的id
+            message_id (int): 回复引用消息的id
             since_llm (float): 距离上一次llm发言时间
         """
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
         MESSAGE_DELIMITER = "$"  # 分隔符
         MAX_SINGLE_MESSAGE_LENGTH = 125  # 分条发送长度阈值
-
+        LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
+        
         if not (chat_text := chat_text.strip()):
             return
 
         if (
             len(chat_text) <= MAX_SINGLE_MESSAGE_LENGTH
-            and since_llm < 3.5
+            and since_llm >= LLM_COOLDOWN_THRESHOLD
             # or MESSAGE_DELIMITER in chat_text
         ):
             # 分条发送
             messages_list = self.emoji_core.parse_text_with_emotion_tags_separator(
                 text=chat_text,
-                emoji_dict=self.emoji_core.emoji_file_dict,
+                emoji_dict=self.emoji_file_dict,
                 separator=MESSAGE_DELIMITER,
             )
+            
+            if message_id:
+                message = messages_list[0]
+                if message['type'] == 'text':
+                    await self.send_message.send_group_message(group_id, f"[CQ:reply,id={message_id}]{message['data']['text']}")
+                else:
+                    await self.send_message.send_group_message(
+                        group_id, [{"type": "reply", "data": {"id": message_id}}, message]
+                    )
 
-            message = messages_list[0]
-            if message['type'] == 'text':
-                await self.send_message.send_group_message(group_id, f"[CQ:reply,id={message_id}]{message['data']['text']}")
-            else:
-                await self.send_message.send_group_message(
-                    group_id, [{"type": "reply", "data": {"id": message_id}}, message]
-                )
+                if len(messages_list) == 1:
+                    return
 
-            if len(messages_list) == 1:
-                return
-
-            await asyncio.sleep(MESSAGE_DELAY)
-
-            for message in messages_list[1:]:
-                await self.send_message.send_group_message(
-                    group_id,
-                    message["data"]["text"] if message["type"] == "text" else [message],
-                )
                 await asyncio.sleep(MESSAGE_DELAY)
+
+                for message in messages_list[1:]:
+                    await self.send_message.send_group_message(
+                        group_id,
+                        message["data"]["text"] if message["type"] == "text" else [message],
+                    )
+                    await asyncio.sleep(MESSAGE_DELAY)
+                return
+            else:
+                for message in messages_list:
+                    await self.send_message.send_group_message(
+                        group_id,
+                        message["data"]["text"] if message["type"] == "text" else [message],
+                    )
+                    await asyncio.sleep(MESSAGE_DELAY)
+                return
         else:
             chat_text = chat_text.replace(MESSAGE_DELIMITER, "\n")
             # 合并发送完
             messages_list = self.emoji_core.parse_text_with_emotion_tags(
-                chat_text, self.emoji_core.emoji_file_dict
+                chat_text, self.emoji_file_dict
             )
-            await self.send_message.send_group_message(
-                group_id,
-                [{"type": "reply", "data": {"id": message_id}}, *messages_list],
-            )
+            if message_id:
+                await self.send_message.send_group_message(
+                    group_id,
+                    [{"type": "reply", "data": {"id": message_id}}, *messages_list],
+                )
+            else:
+                await self.send_message.send_group_message(
+                    group_id,
+                    messages_list,
+                )
+            return

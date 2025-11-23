@@ -25,9 +25,10 @@ tool_json = {
 send_message:qq_send_message = container.get("SendMessage")
 
 async def main(group_id:int|str, user_id:int, duration:int):
-    return await send_message.set_group_ban(
+    return (f"执行禁言返回值:{await send_message.set_group_ban(
         group_id,
         user_id,
         duration
+    )}"
     )
 

@@ -7,6 +7,7 @@ from atribot.core.types import Context
 from typing import List,Dict,Any
 from datetime import datetime
 from logging import Logger
+import asyncio
 import json
 import time
 
@@ -125,16 +126,22 @@ class memorySystem:
         parameters = {
             "messages":private_context.get_messages(),
             "temperature":0.0,
-            "max_tokens": 65536,
-            "reasoning_effort": "high",
+            # "max_tokens": 65536,
+            # "reasoning_effort": "high",
             "response_format":{ "type": "json_object" }
         }
-        try:
-            assistant_message:dict = (await self.supplier.generate_json_ample(self.model, parameters))['choices'][0]['message']
-        except Exception as e:
-            self.logger.error(f"总结请求出错:{e}")
         
-        if assistant_content := assistant_message.get('content'):
+        assistant_message = {}
+        
+        for i in range(3):
+            try:
+                assistant_message:Dict[str, Any] = (await self.supplier.generate_json_ample(self.model, parameters))['choices'][0]['message']
+                break
+            except Exception as e:
+                self.logger.error(f"第{i}次总结请求出错:{e}")
+                await asyncio.sleep(1)
+        
+        if assistant_content := assistant_message.get('content',"").strip():
             return json.loads(assistant_content)
         else:
             return {}

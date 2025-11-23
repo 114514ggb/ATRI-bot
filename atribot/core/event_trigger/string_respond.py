@@ -222,6 +222,7 @@ class string_response:
         # "300颗": [["text",["够吗?又是这个难的过分的..."]]],
         "不行": [["img",["ATRI_垂头丧气.gif","ATRI_不要1.gif"]]],
         "爱学习": [["img",["ATRI_学习.jpg"]]],
+        "要抱抱": [["audio",["大坏蛋.wav"]]],
         "。": [["img",["ATRI_句号.gif"]]],
         "可怕": [["img",["ATRI_惊讶.jpg"]]],
         "催眠": [["img",["ATRI_催眠爱心.gif"]]],

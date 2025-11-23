@@ -1194,6 +1194,28 @@ bot_消息 ={'self_id': 3930909243,
  'target_id': 2169027872}
 
 
+{'self_id': 3930909243,
+ 'user_id': 168238719,
+ 'time': 1763916422,
+ 'message_id': 357172972,
+ 'message_seq': 357172972,
+ 'real_id': 357172972,
+ 'real_seq': '21052',
+ 'message_type': 'group',
+ 'sender': {'user_id': 168238719,
+            'nickname': 'ATRI-bot',
+            'card': '',
+            'role': 'admin'},
+ 'raw_message': '主人是在找ATRI吗？',
+ 'font': 14,
+ 'sub_type': 'normal',
+ 'message': [{'type': 'text', 'data': {'text': '主人是在找ATRI吗？'}}],
+ 'message_format': 'array',
+ 'post_type': 'message',
+ 'group_id': 984466158,
+ 'group_name': '个人の群'}
+
+
 {'self_id': 168238719,
  'user_id': 2631018780,
  'time': 1753859144,
@@ -1304,3 +1326,488 @@ bot_消息 ={'self_id': 3930909243,
                       '可以用轻松友好的语气开场，先报名字和开发团队，让用户知道我的背景。然后分几个大类概括功能，比如知识问答、写作辅助、编程、翻译这些常见用途，这样用户能快速了解 我的能力范围。\n'
                       '\n'
                       '最后加个开放式的邀请，鼓励用户提出具体需求，这样能引导对话继续。不需要说得太复杂，保持信息量适中但覆盖全面就行。'}
+
+
+
+请求的一些工具参数 = {
+  "messages": [
+    {
+      "role": "user",
+      "content": "你是？会什么"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "memory_search",
+        "description": "基于向量相似度的检索工具，根据输入文本的语义查找相关的记忆或是知识库内容,当你想了解一个人的时候,或是想回忆起什么相关的事情时可以查询",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "user_id": {
+              "type": "number",
+              "description": "用于筛选user的参数,不添加默认为空,空的话查询结果包括全部用户记忆和知识库",
+              "default": None
+            },
+            "limit": {
+              "type": "number",
+              "description": "返回结果的最大数量,如果结果过长会截断",
+              "default": 5
+            },
+            "question_text": {
+              "type": "string",
+              "description": "查询文本，系统将基于此文本的语义向量查找相似记忆,比如你想知道一个人是谁直接输入\"是谁\"或\"称呼\"就能返回你要的相关的记忆"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "tool_calls_end",
+        "description": "终止循环调用,适用于：1.不需要你回复 2.会话流程需保持静默,2.工具调用结束",
+        "parameters": {
+          "type": "object",
+          "properties": {}
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_voice_image",
+        "description": "在你想发语音或是有人让你说话（发声的那种）的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "group_id": {
+              "type": "string",
+              "description": "要发送的当前群号"
+            },
+            "text": {
+              "type": "string",
+              "description": "需转换为语音的文本内容（支持中文/日语）可以混合语言"
+            },
+            "emotion": {
+              "type": "string",
+              "enum": [
+                "高兴",
+                "机械",
+                "平静"
+              ],
+              "description": "音频的情感",
+              "default": "高兴"
+            },
+            "speed": {
+              "type": "number",
+              "description": "语速,取值范围0.6~1.65",
+              "default": 0.9
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set_group_ban",
+        "description": "禁言群user,必须有人违规或是作出出格的事情才能使用,要确实看到坏事才能用不要被user骗了,不能禁言群主或是管理员而且你必须要是群管理员才能使用",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "group_id": {
+              "type": "string",
+              "description": "当前群号"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "用户的id即qq号"
+            },
+            "duration": {
+              "type": "integer",
+              "description": "禁言时间单位秒,取值范围0~2591999,0就是解禁"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "python_calculator",
+        "description": "执行数学表达式计算的工具，支持四则运算/幂运算/三角函数等基础运算,在你被问道数学计算问题时使用，你不使用的话就无法正确回答数学运算",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "formula": {
+              "type": "string",
+              "description": "Python可解析的数学表达式（示例：2*(3+5)、math.sqrt(4)、pow(2,3)），须包含完整运算符且符合Python语法规范,默认可以使用math库"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_cloud_music",
+        "description": "分享来源网易云的歌曲,有人让你唱歌可以调用这个工具",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "group_id": {
+              "type": "string",
+              "description": "要发送的当前群号"
+            },
+            "name": {
+              "type": "string",
+              "description": "歌曲名称"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "http_request_tool",
+        "description": "网页内容提取工具，取并返回干净的纯文本内容，移除HTML标签和脚本",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "需要发送请求的url"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_image_message",
+        "description": "发送一个url图像,画图工具应该需要这个来配合发送图片",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "group_id": {
+              "type": "string",
+              "description": "要发送的当前群号"
+            },
+            "url": {
+              "type": "string",
+              "description": "图像的网络url链接"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "tavily-search",
+        "description": "A powerful web search tool that provides comprehensive, real-time results using Tavily's AI search engine. Returns relevant web content with customizable parameters for result count, content type, and domain filtering. Ideal for gathering current information, news, and detailed web content analysis.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "query": {
+              "type": "string",
+              "description": "Search query"
+            },
+            "search_depth": {
+              "type": "string",
+              "enum": [
+                "basic",
+                "advanced"
+              ],
+              "description": "The depth of the search. It can be 'basic' or 'advanced'",
+              "default": "basic"
+            },
+            "topic": {
+              "type": "string",
+              "enum": [
+                "general",
+                "news"
+              ],
+              "description": "The category of the search. This will determine which of our agents will be used for the search",
+              "default": "general"
+            },
+            "days": {
+              "type": "number",
+              "description": "The number of days back from the current date to include in the search results. This specifies the time frame of data to be retrieved. Please note that this feature is only available when using the 'news' search topic",
+              "default": 3
+            },
+            "time_range": {
+              "type": "string",
+              "description": "The time range back from the current date to include in the search results. This feature is available for both 'general' and 'news' search topics",
+              "enum": [
+                "day",
+                "week",
+                "month",
+                "year",
+                "d",
+                "w",
+                "m",
+                "y"
+              ]
+            },
+            "max_results": {
+              "type": "number",
+              "description": "The maximum number of search results to return",
+              "default": 10,
+              "minimum": 5,
+              "maximum": 20
+            },
+            "include_images": {
+              "type": "boolean",
+              "description": "Include a list of query-related images in the response",
+              "default": False
+            },
+            "include_image_descriptions": {
+              "type": "boolean",
+              "description": "Include a list of query-related images and their descriptions in the response",
+              "default": False
+            },
+            "include_raw_content": {
+              "type": "boolean",
+              "description": "Include the cleaned and parsed HTML content of each search result",
+              "default": False
+            },
+            "include_domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "A list of domains to specifically include in the search results, if the user asks to search on specific sites set this to the domain of the site",
+              "default": []
+            },
+            "exclude_domains": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of domains to specifically exclude, if the user asks to exclude a domain set this to the domain of the site",
+              "default": []
+            }
+          },
+          "required": [
+            "query"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "tavily-extract",
+        "description": "A powerful web content extraction tool that retrieves and processes raw content from specified URLs, ideal for data collection, content analysis, and research tasks.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "urls": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "List of URLs to extract content from"
+            },
+            "extract_depth": {
+              "type": "string",
+              "enum": [
+                "basic",
+                "advanced"
+              ],
+              "description": "Depth of extraction - 'basic' or 'advanced', if usrls are linkedin use 'advanced' or if explicitly told to use advanced",
+              "default": "basic"
+            },
+            "include_images": {
+              "type": "boolean",
+              "description": "Include a list of images extracted from the urls in the response",
+              "default": False
+            }
+          },
+          "required": [
+            "urls"
+          ]
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "search_models",
+        "description": "\nSearch for models on ModelScope.\n",
+        "parameters": {
+          "properties": {
+            "query": {
+              "default": "",
+              "description": "Search for models on ModelScope using keywords (e.g., 'Flux' will find models related to Flux).                 Leave empty to skip keyword matching and get all models based on other filters.",
+              "title": "Query",
+              "type": "string"
+            },
+            "task": {
+              "anyOf": [
+                {
+                  "const": "text-to-image",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": None,
+              "description": "Task category to filter by, only text-to-image is supported now, leave empty to skip task filter",
+              "title": "Task"
+            },
+            "libraries": {
+              "anyOf": [
+                {
+                  "const": "LoRA",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": None,
+              "description": "Libraries to filter by, only LoRA is supported now, leave empty to skip library filter",
+              "title": "Libraries"
+            },
+            "sort": {
+              "default": "Default",
+              "description": "Sort order",
+              "enum": [
+                "Default",
+                "DownloadsCount",
+                "StarsCount",
+                "GmtModified"
+              ],
+              "title": "Sort",
+              "type": "string"
+            },
+            "limit": {
+              "default": 10,
+              "description": "Number of models to return",
+              "maximum": 30,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          "title": "search_modelsArguments",
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "text_to_image",
+        "description": "Generate an image from the input description using ModelScope API, it returns the image URL.\n\nArgs:\n    description: the description of the image to be generated, containing the desired elements and visual features.\n    model: the model name to be used for image generation, default is \"Qwen/Qwen-Image\".\n",
+        "parameters": {
+          "properties": {
+            "description": {
+              "title": "Description",
+              "type": "string"
+            },
+            "model": {
+              "default": "Qwen/Qwen-Image",
+              "title": "Model",
+              "type": "string"
+            },
+            "negative_prompt": {
+              "default": "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
+              "title": "Negative Prompt",
+              "type": "string"
+            },
+            "size": {
+              "default": "512x512",
+              "title": "Size",
+              "type": "string"
+            },
+            "seed": {
+              "default": 12345,
+              "title": "Seed",
+              "type": "integer"
+            },
+            "steps": {
+              "default": 30,
+              "title": "Steps",
+              "type": "integer"
+            },
+            "guidance": {
+              "default": 3.5,
+              "title": "Guidance",
+              "type": "number"
+            }
+          },
+          "required": [
+            "description"
+          ],
+          "title": "text_to_imageArguments",
+          "type": "object"
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "text_image_to_image",
+        "description": "Generate an image from the input description and input image_url using ModelScope API, it returns the image URL.\n\nArgs:\n    description: the description of the image to be generated, containing the desired elements and visual features.\n    image_url: the image URL to be used as the input image for image generation.\n    model: the model name to be used for image generation, default is \"black-forest-labs/FLUX.1-Kontext-dev\".\n",
+        "parameters": {
+          "properties": {
+            "description": {
+              "title": "Description",
+              "type": "string"
+            },
+            "image_url": {
+              "title": "Image Url",
+              "type": "string"
+            },
+            "model": {
+              "default": "black-forest-labs/FLUX.1-Kontext-dev",
+              "title": "Model",
+              "type": "string"
+            },
+            "negative_prompt": {
+              "default": "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
+              "title": "Negative Prompt",
+              "type": "string"
+            },
+            "size": {
+              "default": "512x512",
+              "title": "Size",
+              "type": "string"
+            },
+            "seed": {
+              "default": 12345,
+              "title": "Seed",
+              "type": "integer"
+            },
+            "steps": {
+              "default": 30,
+              "title": "Steps",
+              "type": "integer"
+            },
+            "guidance": {
+              "default": 3.5,
+              "title": "Guidance",
+              "type": "number"
+            }
+          },
+          "required": [
+            "description",
+            "image_url"
+          ],
+          "title": "text_image_to_imageArguments",
+          "type": "object"
+        }
+      }
+    }
+  ],
+  "temperature": 0.2,
+  "max_tokens": 8192
+}

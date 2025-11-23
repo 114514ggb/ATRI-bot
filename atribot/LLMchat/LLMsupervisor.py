@@ -7,7 +7,7 @@ from atribot.core.types import (
     Context
 )
 from typing import Dict, List, Any
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import Logger
 import re
 
@@ -18,14 +18,16 @@ import re
 class GenerationResponse():
     """响应后再更新状态"""
     
-    messages: List[Dict[str, Any]] = None
+    messages: List[Dict[str, Any]] = field(default_factory=list)
     """新增上下文"""
-    reply_text: str = ""
-    """合并后的模型回复的文本"""
-    reasoning_content: str = ""
-    """合并后的推理模型的思考过程"""
+    reply_text: List[str] = field(default_factory=list)
+    """未合并模型回复的文本"""
+    reasoning_content: List[str] = field(default_factory=list)
+    """未合并的推理模型的思考过程"""
     metadata: Dict[str, Any] = None
     """基本信息"""
+    
+    
 
 
 @dataclass
@@ -49,7 +51,7 @@ class GenerationRequest():
     system_review:bool = False
     """prompt嵌入时是否单独使用system而不是采用直接拼接"""
     tool_json: List[Dict] = None
-    """可供模型调用的json"""
+    """可供模型调用工具json"""
     parameter: Dict = None
     """模型参数"""
     generation_response: GenerationResponse|None = None
@@ -337,11 +339,11 @@ class large_language_model_supervisor():
         if content.startswith("<thought>"):
             reasoning_content ,content= self.extract_thought(content)
             response.reasoning_content += assistant_message.get("reasoning_content",reasoning_content)
-            response.reply_text += content
+            response.reply_text.append(content)
             return response
         
         response.reasoning_content += assistant_message.get("reasoning_content","")
-        response.reply_text += content
+        response.reply_text.append(content)
         
         return response
     
