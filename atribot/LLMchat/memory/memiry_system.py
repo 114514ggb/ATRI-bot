@@ -146,12 +146,11 @@ class memorySystem:
         else:
             return {}
     
-    async def query_user_recently_memory(self, text:str, user_id:int, limit:int = 5)->List[tuple[dict[str,str]]]:
+    async def query_user_recently_memory(self, text:str, limit:int = 5)->List[tuple[dict[str,str]]]:
         """简单根据文本向量和user_id查询数据库最相似消息,返回余弦距离<0.5,和最近30天内的消息
 
         Args:
             text (str): 要文本搜索的文本,太长会截取
-            user_id (int | str): 筛选的ID
             limit (int): 返回最大数量
 
         Returns:
@@ -161,78 +160,126 @@ class memorySystem:
         
             sql = """
             SELECT 
+                user_id,
                 event_time,
                 event
             FROM atri_memory
-            WHERE user_id = $1
-            AND event_vector <=> $2::vector(1024) <= 0.5
+            WHERE event_vector <=> $1::vector(1024) <= 0.5
             AND event_time >= EXTRACT(EPOCH FROM CURRENT_TIMESTAMP - INTERVAL '30 days')::bigint
-            ORDER BY event_vector <=> $2::vector(1024) ASC
-            LIMIT $3
+            ORDER BY event_vector <=> $1::vector(1024) ASC
+            LIMIT $2
             """
             
             async with self.vector_store.vector_database as db:
                 return await db.execute_with_pool(
                     query = sql,
-                    params = (user_id, str(embeddin_list[0]), limit),
+                    params = (str(embeddin_list[0]), limit),
                     fetch_type = "all"
                 )
         
         return []
     
-    async def query_user_memory(self, text:str, user_id:int, limit:int = 5)->List[tuple[dict[str,str]]]:
-        """简单根据文本向量和user_id查询数据库最相似消息,返回余弦距离<0.5
-
+    async def query_user_memory(self, user_id: int, limit: int = 5, text: str | None = None) -> List[tuple[dict[str, str]]]:
+        """根据文本向量或创建时间查询用户记忆
+        
+        当提供文本时,使用向量相似度搜索(余弦距离<0.5);
+        当不提供文本时,按创建时间降序返回最近记忆
+        
         Args:
-            text (str): 要文本搜索的文本,太长会截取
-            user_id (int | str): 筛选的ID
-            limit (int): 返回最大数量
+            user_id (int): 筛选的用户ID
+            limit (int): 返回最大数量,默认为5
+            text (str | None): 要文本搜索的文本,太长会截取.如果为None或空,则按创建时间降序返回最近记忆
 
         Returns:
-            List[tuple[dict[str,str]]]: 返回查询到的表行最多5条
+            List[tuple[dict[str,str]]]: 返回查询到的表行,每项包含(event_time, event)
         """
-        if embeddin_list := await self.rag.calculate_embedding(text[:500]):
-            sql = """
-            SELECT 
-                event_time,
-                event
-            FROM atri_memory
-            WHERE user_id = $1
-            AND event_vector <=> $2::vector(1024) <= 0.5
-            ORDER BY event_vector <=> $2::vector(1024) ASC
-            LIMIT $3
-            """
-            async with self.vector_store.vector_database as db:
-                return await db.execute_with_pool(
-                    query = sql,
-                    params = (user_id, str(embeddin_list[0]), limit),
-                    fetch_type = "all"
-                )
+        if text:
+            if embeddin_list := await self.rag.calculate_embedding(text[:500]):
+                sql = """
+                SELECT 
+                    event_time,
+                    event
+                FROM atri_memory
+                WHERE user_id = $1
+                AND event_vector <=> $2::vector(1024) <= 0.5
+                ORDER BY event_vector <=> $2::vector(1024) ASC
+                LIMIT $3
+                """
+                async with self.vector_store.vector_database as db:
+                    return await db.execute_with_pool(
+                        query = sql,
+                        params = (user_id, str(embeddin_list[0]), limit),
+                        fetch_type = "all"
+                    )
 
-        return []
-    
-    async def query_add_memory(self, text:str, limit:int = 5)->List[tuple[dict[str,str]]]:
-        """查询全部记忆"""
-        if embeddin_list := await self.rag.calculate_embedding(text[:500]):
-        
-            sql = """   
-            SELECT 
-                event_time,
-                user_id,
-                event
-            FROM atri_memory
-            WHERE event_vector <=> $1::vector(1024) <= 0.6
-            ORDER BY event_vector <=> $1::vector(1024) ASC
-            LIMIT $2
+            return []
+        else:
+            sql = """
+                SELECT 
+                    event_time,
+                    event
+                FROM atri_memory
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                LIMIT $2
             """
             async with self.vector_store.vector_database as db:
                 return await db.execute_with_pool(
                     query = sql,
-                    params = (str(embeddin_list[0]),limit),
+                    params = (user_id, limit),
                     fetch_type = "all"
                 )
+    
+    async def query_add_memory(self, limit: int = 5, text: str | None = None) -> List[tuple[dict[str, str]]]:
+        """根据文本向量或创建时间查询所有记忆
         
-        return []
+        当提供文本时,使用向量相似度搜索(余弦距离<0.6);
+        当不提供文本时,按创建时间降序返回最近记忆
+        
+        Args:
+            limit (int): 返回最大数量,默认为5
+            text (str | None): 要文本搜索的文本,太长会截取.如果为None或空,则按创建时间降序返回最近记忆
+
+        Returns:
+            List[tuple[dict[str,str]]]: 返回查询到的表行,每项包含(event_time, user_id, event)
+        """
+        if text:
+            if embeddin_list := await self.rag.calculate_embedding(text[:500]):
+
+                sql = """   
+                SELECT 
+                    event_time,
+                    user_id,
+                    event
+                FROM atri_memory
+                WHERE event_vector <=> $1::vector(1024) <= 0.6
+                ORDER BY event_vector <=> $1::vector(1024) ASC
+                LIMIT $2
+                """
+                async with self.vector_store.vector_database as db:
+                    return await db.execute_with_pool(
+                        query = sql,
+                        params = (str(embeddin_list[0]),limit),
+                        fetch_type = "all"
+                    )
+            
+            return []
+        else:
+            sql = """
+                SELECT 
+                    event_time,
+                    user_id,
+                    event
+                FROM atri_memory
+                ORDER BY created_at DESC
+                LIMIT $1
+            """
+            async with self.vector_store.vector_database as db:
+                return await db.execute_with_pool(
+                    query = sql,
+                    params = (limit,),
+                    fetch_type = "all"
+                )
     
     async def query_memories(
         self,

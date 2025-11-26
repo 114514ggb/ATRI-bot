@@ -158,8 +158,9 @@ async def main():
       model=model,
       remainder = {
         'messages': messages,
-        'tools': tools,
-        # "response_format":{ "type": "json_object" }
+        # 'tools': tools,
+        # 'tool_choice': "auto",
+        # "response_format": { "type": "json_object" }
       }
     )
     # psql_db = await atriAsyncPostgreSQL.create(
@@ -259,22 +260,4 @@ import textwrap
 
 # asyncio.run(saync_run_exec("print(\"开始\")\nawait asyncio.sleep(3.0)\nprint(\"执行结束\")"))
 
-{'id': '9546aa36-8bda-4247-9abd-160b7d41e99f',
- 'object': 'chat.completion',
- 'created': 1763917960,
- 'model': 'gemini-2.5-flash-search',
- 'choices': [{'index': 0,
-              'message': {'role': 'assistant',
-                          'content': '```json\n'
-                                     '{\n'
-                                     '    "decision": "reply",\n'
-                                     '    "target_message_id": 1362008833,\n'
-                                     '    "reason": "用户在群 聊中@了我，我需要回应表示我在。",\n'
-                                     '    "content": "我在呢！[happy] '
-                                     '主人有什么事要吩咐ATRI吗？♪"\n'
-                                     '}\n'
-                                     '```'},
-              'finish_reason': 'stop'}],
- 'usage': {'prompt_tokens': 4887,
-           'completion_tokens': 82,
-           'total_tokens': 5268}}
+

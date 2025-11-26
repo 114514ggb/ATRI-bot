@@ -128,7 +128,7 @@ class data_manage():
         image_urls = []
         img_count = 1
         
-        for message in data["message"]:
+        for message in data.get("message", []):
             message:Dict[str,str|dict]
             my_type:str = message.get("type")
             

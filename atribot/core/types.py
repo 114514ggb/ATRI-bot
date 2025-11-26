@@ -318,7 +318,7 @@ class LLMGroupChatCondition:
             self.last_msg_at = time.time()
     
     async def update_trigger_user(self, user_id: int) -> None:
-        """更新最近一次触发@聊天的用户信息"""
+        """更新最近一次触发聊天的用户信息"""
         async with self._lock:
             self.last_trigger_user_id = user_id
             self.last_trigger_user_time = time.time()

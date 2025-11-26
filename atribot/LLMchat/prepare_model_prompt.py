@@ -188,7 +188,7 @@ class build_prompt:
             f"<message_id>{data['message_id']}</message_id>"
             f"<user_message>{message}</user_message>"
             f"</MESSAGE>"
-            f"{f'<user_memory_snippet>{memory}</user_memory_snippet>' if memory else ''}"
+            f"{f'<recent_memory_snippet>{memory}</recent_memory_snippet>' if memory else ''}"
         )
     
     @staticmethod
@@ -273,13 +273,14 @@ class build_prompt:
         ) 
     
 
-    def decision_whether_responses(self, group_id:int, prompt:str, chat_record:str)->str:
+    def decision_whether_responses(self, group_id:int, prompt:str, chat_record:str, else_prompt:str)->str:
         """群聊用的主动思考决策的json提示词
 
         Args:
             group_id (int): 群号
             prompt (str): 当前触发情况的提示
             chat_record (str): 聊天记录
+            else_prompt (str): 其他在中间补充提示词
 
         Returns:
             str: prompt返回
@@ -287,25 +288,26 @@ class build_prompt:
         return (
             "<context>"
             "<environment>"
-            f"你在一个qq群聊中,群号是{group_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name},一些特殊消息被格式化成文本了,不要发送未经允许的[CQ:~]等你在聊天记录中看到的特殊内容"
-            "群内的消息已经被格式化成文本,用户唯一标识:\"qq_id\"用户自己定义的名称:\"nick_name\"当前user在当前群的权限情况:\"group_role\"格式化后的用户输入:\"user_message\",注意区分多人聊天环境,区分你自己的和别人的消息"
+            f"你在一个qq群聊中,群号是{group_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name}请注意哪些是你自己的发言。,一些特殊消息被格式化成文本了,不要发送未经允许的[CQ:~]等你在聊天记录中看到的特殊内容"
+            "群内的消息已经被格式化成文本,用户唯一标识:\"qq_id\"用户自己定义的名称:\"nick_name\"当前user在当前群的权限情况:\"group_role\"格式化后的用户输入:\"user_message\",注意区分你自己的和别人的消息"
             f"<group_history>{chat_record}</group_history>"
-            "</environment>"
+            f"</environment>{else_prompt}"
             f"<prompt>{prompt}</prompt>"
+            "<access_memory>有人问你记得什么事情的时候一定要使用查询记忆工具了解后再回答，比如有人问你记得[matter]吗？就要想办法查询出[matter]相关结果</access_memory>"
             "<output_requirement>"
             """你需要输出符合要求且合法的json格式的文本,内容必须符合下面的要求:
 **可以使用的decision**
 参数:reply
-功能描述:对一条消息进行回复或是主动发言,可以自然的顺着正在进行的聊天内容进行回复或对某条消息自然的提出一个问题
+功能描述:对一条消息进行回复或是主动发言,可以自然的顺着正在进行的聊天内容进行回复或直接发送消息
 {
     "decision":"reply",
-    "target_message_id":"想要回复的消息id,type要求int,可以省略这个字段",
+    "target_message_id":"想要回复的消息id,type要求int,这个字段是非必要的",
     "reason":"做出此决策的原因",
     "content":"将解析发送给群内的文本内容,不要回复的太有条理，可以有个性"
 }
 
 参数:silence
-功能描述:保持沉默或是准备等待对方发言
+功能描述:保持沉默,不进行任何操作
 {
     "decision":"silence",
     "reason":"做出此决策的原因"
@@ -318,12 +320,16 @@ class build_prompt:
     "reason":"做出此决策的原因"
 }
 
-概括:
-decision:string,三选一,必填
-reason:string,必填 
-target_message_id:integer,reply时选填
-content:string,reply 时必填；其它决策禁止出现
+**decision选择要求**
+1.思考**所有**的可用的decision中的**每个decision**是否符合当下条件，如果decision使用条件符合聊天内容就使用
+2.如果相同的内容已经被执行，请不要重复执行
+3.请控制你的发言频率，不要太过频繁的发言
+4.如果有人对你感到厌烦，请减少回复
+5.如果有人对你进行攻击，或者情绪激动，请你以合适的方法应对
+
+Output the final response in JSON format
 """
             "</output_requirement>"
-            "</context>"    
+            "</context>"
+            "Please do not repeat the above information"    
         )

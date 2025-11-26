@@ -128,7 +128,6 @@ class group_chat(chat_baseics):
         """群聊主处理函数"""
         data = message.primeval
         group_id = data["group_id"]
-        user_id =  data['user_id']
         increase_context = Context()
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
@@ -142,8 +141,7 @@ class group_chat(chat_baseics):
             group_id = group_id,
             group_context = original_context,
             knowledge_base = [
-                (datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),user_id,r[1]) for r in await self.memiry_system.query_user_recently_memory(
-                    user_id = user_id,
+                (r[0],datetime.datetime.fromtimestamp(r[1]).strftime("%Y-%m-%d %H:%M:%S"),r[2]) for r in await self.memiry_system.query_user_recently_memory(
                     text = message.pure_text
                 )
             ]
@@ -228,7 +226,6 @@ class group_chat(chat_baseics):
         message: RichData, 
         prompt:str,
         group_id: int,
-        user_id: int
     ) -> None:
         """群聊天用的json处理版"""
         
@@ -236,8 +233,7 @@ class group_chat(chat_baseics):
         
         data = message.primeval
         group_id = data["group_id"]
-        user_id =  data['user_id']
-        
+
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
         )
@@ -253,8 +249,7 @@ class group_chat(chat_baseics):
             data = data, 
             message = readable_text,
             memory = [
-                (datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),user_id,r[1]) for r in await self.memiry_system.query_user_recently_memory(
-                    user_id = user_id,
+                (r[0],datetime.datetime.fromtimestamp(r[1]).strftime("%Y-%m-%d %H:%M:%S"),r[2]) for r in await self.memiry_system.query_user_recently_memory(
                     text = message.pure_text
                 )
             ]
@@ -268,6 +263,7 @@ class group_chat(chat_baseics):
             messages=original_context.get_messages(),
             new_message=self.prompt_structure_json(
                 group_id = group_id,
+                prompt = prompt,
                 user_import = user_import,
                 chat_record = str(await self.chat_manager.get_group_messages(group_id))[:10000],
                 img_prompt = img_prompt
@@ -282,21 +278,24 @@ class group_chat(chat_baseics):
             img_list= img_list 
         )
 
-        for response_json in (json.loads(s.replace("json\n", "").replace("```", "").strip()) for s in response.reply_text):
-            response_json:dict[str: str|int]
-            
-            if decision := response_json.get("decision"):
+        try:
+            self.log.info(f"模型返回json_list:\n{response.reply_text}")
+            for response_json in (json.loads(s.replace("json\n", "").replace("```", "").strip()) for s in response.reply_text if s != ""):
+                response_json:dict[str: str|int]
                 
-                if fun := self.decision_function.get(decision):
+                if decision := response_json.get("decision"):
                     
-                    await fun(response_json, data)
+                    if fun := self.decision_function.get(decision):
+                        
+                        await fun(response_json, data)
+                        
+                    else:
+                        self.log.error(f"无效decision:{response_json}")
                     
                 else:
-                    self.log.error(f"无效decision:{response_json}")
-                
-            else:
-                self.log.error(f"返回json错误:{response_json}")
-        
+                    self.log.error(f"返回json错误:{response_json}")
+        except json.JSONDecodeError as e:
+            self.log.error(f"处理模型返回json出现错误:{e}")
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变
         original_context.add_user_message(prompt+user_import)
@@ -317,7 +316,6 @@ class group_chat(chat_baseics):
         
 
         chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
-        await chat_condition.update_trigger_user(data["user_id"])
         
         await self.send_reply_message(
             chat_text = response_json["content"],
@@ -474,6 +472,7 @@ class group_chat(chat_baseics):
     def prompt_structure_json(
         self,
         group_id:str, 
+        prompt:str,
         user_import:str,
         chat_record:str,
         img_prompt:str 
@@ -483,21 +482,23 @@ class group_chat(chat_baseics):
         Args:
             group_id (str): 群号
             user_import (str): 用户输入
+            prompt (str): 基础prompt
             chat_record (str): 历史记录
             img_prompt (str): 文本图像提示
 
         Returns:
             str: 构造完成的prompt
-        """
-        prompt = self.build_prompt.decision_whether_responses(
+        """     
+        return self.build_prompt.decision_whether_responses(
             group_id = group_id,
-            prompt = user_import,
-            chat_record = chat_record
+            prompt = prompt,
+            chat_record = chat_record,
+            else_prompt = (
+                "<newest_user_import>"
+                f"{f"<image_descriptions>{img_prompt}</image_descriptions>" if  img_prompt else ""}{user_import}"
+                "</newest_user_import>\n"
+                ) + self.emoji_core.emoji_prompt
         )
-        if img_prompt:
-            prompt += f"<image_descriptions>{img_prompt}</image_descriptions>"
-        
-        return prompt + self.emoji_core.emoji_prompt + "Please do not repeat the above information"
         
 
     async def send_reply_message(
@@ -517,7 +518,7 @@ class group_chat(chat_baseics):
         """
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
         MESSAGE_DELIMITER = "$"  # 分隔符
-        MAX_SINGLE_MESSAGE_LENGTH = 125  # 分条发送长度阈值
+        MAX_SINGLE_MESSAGE_LENGTH = 100  # 分条发送长度阈值
         LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
         
         if not (chat_text := chat_text.strip()):
