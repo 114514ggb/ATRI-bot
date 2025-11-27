@@ -30,12 +30,13 @@ class initiativeChat:
 
         #被@检测
         if at:
-            await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
-            return await self._execute_reply(
+            decision =  await self._execute_reply(
                 message, group_id, params,
                 log_msg=f"Bot was @ed by user {user_id}, preparing to respond.",
                 prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或是发送了过多的消息,就选择不回复"
             )
+            await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
+            return decision
 
         #关键词触发检测
         if value := self.find_first_match(message.pure_text, self.keyword_trigger_list):
@@ -50,12 +51,13 @@ class initiativeChat:
             
             #追问检测
             if params.get_seconds_since_user_time() < 6 and user_id == params.last_trigger_user_id:
-                await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
-                return await self._execute_reply(
+                decision = await self._execute_reply(
                     message, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",
                     prompt="尝试考虑用户在你回复后，是否下一句是想接着聊天的情况,你应观察是否应该进行回复,确定是接你的话就进行回复，不然就保持沉默"
                 )
+                await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
+                return decision
             
             #"现在你的消息被引用，你需要好好想想要不要回复或是怎么回复"暂时不做
             
@@ -73,11 +75,11 @@ class initiativeChat:
     
     async def _execute_reply(
         self, 
-        message, 
-        group_id,  
-        prompt, 
-        log_msg, 
-        decision_params:LLMGroupChatCondition
+        message: RichData, 
+        group_id:int,  
+        decision_params:LLMGroupChatCondition,
+        log_msg:str, 
+        prompt:str
     ) -> Literal[True]:
             """回复执行逻辑"""
             self.logger.info(f"Group {group_id} {log_msg}")

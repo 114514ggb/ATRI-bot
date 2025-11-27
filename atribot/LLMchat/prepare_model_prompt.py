@@ -320,6 +320,12 @@ class build_prompt:
     "reason":"做出此决策的原因"
 }
 
+概括:
+decision:string,三选一,必填
+reason:string,必填 
+target_message_id:integer,reply时选填
+content:string,reply 时必填；其它决策禁止出现
+
 **decision选择要求**
 1.思考**所有**的可用的decision中的**每个decision**是否符合当下条件，如果decision使用条件符合聊天内容就使用
 2.如果相同的内容已经被执行，请不要重复执行

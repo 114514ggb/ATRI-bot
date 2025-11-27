@@ -249,8 +249,9 @@ class group_chat(chat_baseics):
             data = data, 
             message = readable_text,
             memory = [
-                (r[0],datetime.datetime.fromtimestamp(r[1]).strftime("%Y-%m-%d %H:%M:%S"),r[2]) for r in await self.memiry_system.query_user_recently_memory(
-                    text = message.pure_text
+                (f"user_id:{r[0]}",datetime.datetime.fromtimestamp(r[1]).strftime("%Y-%m-%d %H:%M:%S"),r[2]) for r in await self.memiry_system.query_user_recently_memory(
+                    text = message.pure_text,
+                    limit = 10
                 )
             ]
         )
@@ -279,7 +280,7 @@ class group_chat(chat_baseics):
         )
 
         try:
-            self.log.info(f"模型返回json_list:\n{response.reply_text}")
+            self.log.info("模型返回json_list:\n"+"".join(response.reply_text))
             for response_json in (json.loads(s.replace("json\n", "").replace("```", "").strip()) for s in response.reply_text if s != ""):
                 response_json:dict[str: str|int]
                 
