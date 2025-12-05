@@ -17,7 +17,7 @@ tool_json = {
         "limit":{
             "type": "number",
             "description": "返回结果的最大数量,如果结果过长会截断",
-            "default": 5
+            "default": 10
         },
         "question_text": {
             "type": "string",
@@ -29,7 +29,7 @@ tool_json = {
 
 memiry_system:memorySystem = container.get("memirySystem")
 
-async def main(question_text:str=None,limit:int=5,user_id:str|int=None):
+async def main(question_text:str=None,limit:int=10,user_id:str|int=None):
     if user_id:
         formatting_list = [(datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1]) for r in await memiry_system.query_user_memory(user_id,limit, question_text)]
     else:

@@ -10,6 +10,7 @@ from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.command_parsing import command_system
 from atribot.core.command.command_loader import command_loader
 from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.message_manage import message_router
 from atribot.core.service_container import container
@@ -63,6 +64,14 @@ class BotFramework:
                 password = self.config.database.password
             )
         )
+        
+        #时间触发器
+        TriggerSupervisor = TimeTriggerSupervisor()
+        container.register(
+            "TimeTriggerSupervisor",
+            TriggerSupervisor
+        )
+        asyncio.create_task(TriggerSupervisor.start())
         
         #模型供应商
         LLMSupplier = ai_connection_manager()
@@ -151,6 +160,10 @@ class BotFramework:
         container.register(
             "PermissionsManagement",
             await permissions_management.create()
+        )
+        
+        asyncio.gather(
+            
         )
 
         #连接配置

@@ -135,20 +135,21 @@ class large_language_model_supervisor():
         if request.generation_response is not None:
             return await self.resume_step(request,model_api,increase_context)
                 
-        api_reply:Dict = await self.get_chat_json(
-            request = request,
-            messages = increase_context.get_messages(),
-            model_api = model_api
-        )
-        
-        self.logger.debug(f"模型返回:{api_reply}")
-        
-        assistant_message:Dict = api_reply['choices'][0]['message']
-        
-        if content := assistant_message.get('content'):
-            pass
-        else:
-            content = ""
+        while True:       
+            api_reply:Dict = await self.get_chat_json(
+                request = request,
+                messages = increase_context.get_messages(),
+                model_api = model_api
+            )
+            
+            self.logger.debug(f"模型返回:{api_reply}")
+            
+            assistant_message:Dict = api_reply['choices'][0]['message']
+            
+            if content := assistant_message.get('content'):
+                break
+            elif "tool_calls" in assistant_message:
+                break
         
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
@@ -223,24 +224,25 @@ class large_language_model_supervisor():
                     tool_call['id']
                 )
             
-            try:
-                api_reply = await self.get_chat_json(
-                    request = request,
-                    messages = increase_context.get_messages(),
-                    model_api = model_api
-                )
-            except Exception as e:
-                response.messages = increase_context.messages
-                raise LLMSRequestFailed(e, response)
-            
-            self.logger.debug(f"工具调用后模型返回:{api_reply}")
-            
-            assistant_message:Dict = api_reply['choices'][0]['message']
-
-            if content := assistant_message.get('content'):
-                pass
-            else:
-                content = ""
+            while True:       
+                try:
+                    api_reply = await self.get_chat_json(
+                        request = request,
+                        messages = increase_context.get_messages(),
+                        model_api = model_api
+                    )
+                except Exception as e:
+                    response.messages = increase_context.messages
+                    raise LLMSRequestFailed(e, response)
+                
+                self.logger.debug(f"模型返回:{api_reply}")
+                
+                assistant_message:Dict = api_reply['choices'][0]['message']
+                
+                if content := assistant_message.get('content'):
+                    break
+                elif "tool_calls" in assistant_message:
+                    break
             
             if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
                 increase_context.add_assistant_tool_message(content)
@@ -277,21 +279,22 @@ class large_language_model_supervisor():
         for msg in response.messages:
             if msg['role'] in ['assistant','tool']:
                 increase_context.messages.append(msg)
-                
-        api_reply:Dict = await self.get_chat_json(
-            request = request,
-            messages = increase_context.get_messages(),
-            model_api = model_api
-        )
         
-        self.logger.debug(f"模型返回:{api_reply}")
-        
-        assistant_message:Dict = api_reply['choices'][0]['message']
-        
-        if content := assistant_message.get('content'):
-            pass
-        else:
-            content = ""
+        while True:       
+            api_reply:Dict = await self.get_chat_json(
+                request = request,
+                messages = increase_context.get_messages(),
+                model_api = model_api
+            )
+            
+            self.logger.debug(f"模型返回:{api_reply}")
+            
+            assistant_message:Dict = api_reply['choices'][0]['message']
+            
+            if content := assistant_message.get('content'):
+                break
+            elif "tool_calls" in assistant_message:
+                break
         
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             

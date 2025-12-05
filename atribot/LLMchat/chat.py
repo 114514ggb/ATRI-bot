@@ -181,14 +181,16 @@ class group_chat(chat_baseics):
         chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
         await chat_condition.update_trigger_user(data["user_id"])
         
+        since = chat_condition.get_seconds_since_llm_time()
+        await chat_condition.update_last_time()
+        
         # 发送基础信息
         await self.send_reply_message(
             "".join(response.reply_text), 
             group_id=group_id, 
             message_id=data["message_id"],
-            since_llm=chat_condition.get_seconds_since_llm_time()
+            since_llm=since
         )
-        await chat_condition.update_last_time()
 
         # 思考的信息
         if response.reasoning_content:
@@ -318,14 +320,16 @@ class group_chat(chat_baseics):
 
         chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
         
+        since = chat_condition.get_seconds_since_llm_time()
+        await chat_condition.update_last_time()
+        
         await self.send_reply_message(
             chat_text = response_json["content"],
             message_id = response_json.get("target_message_id"),
             group_id = group_id,
-            since_llm = chat_condition.get_seconds_since_llm_time()
+            since_llm = since
         )
         
-        await chat_condition.update_last_time()
         
     
     async def silence_conduct(self, response_json:Dict, data:Dict)->None:
@@ -519,7 +523,7 @@ class group_chat(chat_baseics):
         """
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
         MESSAGE_DELIMITER = "$"  # 分隔符
-        MAX_SINGLE_MESSAGE_LENGTH = 100  # 分条发送长度阈值
+        MAX_SINGLE_MESSAGE_LENGTH = 70  # 分条发送长度阈值
         LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
         
         if not (chat_text := chat_text.strip()):

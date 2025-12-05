@@ -324,7 +324,7 @@ class common():
 
     @staticmethod
     async def saync_run_exec(text: str) -> None:
-        """异步执行一段字符串形式的异步代码"""
+        """在当前携程中异步执行一段字符串形式的异步代码"""
         import textwrap
         src = f"""
 async def function():

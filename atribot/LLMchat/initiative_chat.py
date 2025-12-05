@@ -33,7 +33,7 @@ class initiativeChat:
             decision =  await self._execute_reply(
                 message, group_id, params,
                 log_msg=f"Bot was @ed by user {user_id}, preparing to respond.",
-                prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或是发送了过多的消息,就选择不回复"
+                prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或是你发送了过多的消息，面对多次重复输入,就选择静默不回复"
             )
             await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
             return decision
@@ -46,11 +46,11 @@ class initiativeChat:
                 prompt=f"现在群里触发了关键词:{value},你该考虑一下是否回复他的消息了,无关就保持沉默"
             )
 
-        #活跃度限制
-        if await self.get_bot_active_reference(group_context, 3) < 0.5:
+        #活跃度限制而且消息要由文本部分
+        if await self.get_bot_active_reference(group_context, 3) < 0.5 and message.pure_text.strip():
             
             #追问检测
-            if params.get_seconds_since_user_time() < 6 and user_id == params.last_trigger_user_id:
+            if params.get_seconds_since_user_time() < 10 and user_id == params.last_trigger_user_id:
                 decision = await self._execute_reply(
                     message, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",
@@ -65,7 +65,7 @@ class initiativeChat:
                 return await self._execute_reply(
                     message, group_id, params,
                     log_msg="Random trigger activated, preparing to respond.",
-                    prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复."
+                    prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默."
                     "推荐在群里当卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为能完美解决的问题,不要打断或打扰到别人的聊天,不要在话中带上或问有什么需要帮忙,如果你看不懂建议就保持静默,不要频繁发言，尽量保持低调"
                 )
 
@@ -116,10 +116,9 @@ class initiativeChat:
         """
         if (
             decision_parameters.turns_since_last_llm > 30 
-            and await group_context.time_window.get() > 2
+            and await group_context.time_window.get() >= 2
             and decision_parameters.get_seconds_since_user_time() > 300
             and decision_parameters.get_seconds_since_llm_time() > 120
-            # and (await self.get_bot_active_reference(group_context)) < 0.6
         ):
             return True
         

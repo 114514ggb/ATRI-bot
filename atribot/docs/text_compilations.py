@@ -138,3 +138,5 @@ async def model_api():
     await chat.aclose()
     
     pp(text)
+    
+

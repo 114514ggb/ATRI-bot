@@ -28,7 +28,7 @@
             "system_review":false
         },
         "chat_parameter":{
-            "temperature":0.1,
+            "temperature":0.3,
             "max_tokens": 65536
         },
         "memory":{

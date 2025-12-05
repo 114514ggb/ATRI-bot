@@ -77,3 +77,12 @@ CROSS JOIN LATERAL
       (SELECT array_length(regexp_matches(m.message_content, '亚托莉', 'g'), 1) AS cnt) AS t
 GROUP BY m.group_id, g.group_name, m.user_id, u.nickname
 ORDER BY "次数" DESC;
+
+
+
+-- 查询数据库中所有表的大小，并按大小降序排列
+SELECT schemaname,
+       tablename,
+       pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
+FROM pg_tables
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;

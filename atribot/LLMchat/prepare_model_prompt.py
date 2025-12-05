@@ -293,7 +293,7 @@ class build_prompt:
             f"<group_history>{chat_record}</group_history>"
             f"</environment>{else_prompt}"
             f"<prompt>{prompt}</prompt>"
-            "<access_memory>有人问你记得什么事情的时候一定要使用查询记忆工具了解后再回答，比如有人问你记得[matter]吗？就要想办法查询出[matter]相关结果</access_memory>"
+            "<access_memory>有人问你记得什么事情或是问你某个人或事情的时候一定要使用查询记忆工具了解后再回答，比如有人问你记得[matter]吗？或是和某个人或事情相关问题就要想办法查询出[matter]相关结果</access_memory>"
             "<output_requirement>"
             """你需要输出符合要求且合法的json格式的文本,内容必须符合下面的要求:
 **可以使用的decision**
@@ -313,15 +313,8 @@ class build_prompt:
     "reason":"做出此决策的原因"
 }
 
-参数:use_tools
-功能描述:标识着你正在使用工具
-{
-    "decision":"use_tools",
-    "reason":"做出此决策的原因"
-}
-
 概括:
-decision:string,三选一,必填
+decision:string,尔选一,必填
 reason:string,必填 
 target_message_id:integer,reply时选填
 content:string,reply 时必填；其它决策禁止出现
