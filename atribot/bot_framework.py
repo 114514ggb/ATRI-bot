@@ -8,6 +8,7 @@ from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
 from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.command_parsing import command_system
+from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.core.command.command_loader import command_loader
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.core.time_trigger import TimeTriggerSupervisor
@@ -130,6 +131,12 @@ class BotFramework:
             memorySystem()
         )
         
+        #用户信息系统
+        container.register(
+            "UserSystem",    
+            UserSystem()
+        )
+        
         #常用
         # container.register(
         #     "Common",
@@ -160,10 +167,6 @@ class BotFramework:
         container.register(
             "PermissionsManagement",
             await permissions_management.create()
-        )
-        
-        asyncio.gather(
-            
         )
 
         #连接配置

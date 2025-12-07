@@ -15,7 +15,7 @@ class initiativeChat:
         self.logger:Logger = container.get("log")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.group_chat:group_chat = container.get("GroupChat")
-        self.keyword_trigger_list = ["ATRI","哈基莉"]
+        self.keyword_trigger_list = ["亚托莉","哈基莉"]
     
     async def decision(self, message: RichData, at: bool = False) -> bool:
         """决策是否应该发言"""
@@ -65,7 +65,7 @@ class initiativeChat:
                 return await self._execute_reply(
                     message, group_id, params,
                     log_msg="Random trigger activated, preparing to respond.",
-                    prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默."
+                    prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默.如果传入了图像是当前群里发送最新一条消息的所带或最新消息引用消息里的图像，并不是专门发送给你的,不要弄错了"
                     "推荐在群里当卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为能完美解决的问题,不要打断或打扰到别人的聊天,不要在话中带上或问有什么需要帮忙,如果你看不懂建议就保持静默,不要频繁发言，尽量保持低调"
                 )
 

@@ -8,23 +8,22 @@ from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manage
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
 from atribot.core.cache.management_chat_example import ChatManager
+from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.service_container import container
 from atribot.LLMchat.emoji_system import emoji_core
 from atribot.core.data_manage import data_manage
+from typing import Dict, List, Coroutine
 from atribot.core.types import RichData
 from atribot.core.types import Context
 from abc import ABC, abstractmethod
 from atribot.common import common
 from dataclasses import replace
-from typing import Dict, List, Coroutine
 from logging import Logger
 import datetime
 import asyncio
-import json
-
 
 
 
@@ -35,8 +34,9 @@ class chat_baseics(ABC):
         self.model_api_supervisor: large_language_model_supervisor = container.get("LLMsupervisor")
         self.supplier: ai_connection_manager = container.get("LLMSupplier")
         self.send_message: qq_send_message = container.get("SendMessage")
-        self.memiry_system: memorySystem = container.get("memirySystem")        
+        self.memiry_system: memorySystem = container.get("memirySystem")       
         self.chat_manager: ChatManager = container.get("ChatManager")
+        self.user_system: UserSystem = container.get("UserSystem")
         self.emoji_core: emoji_core = container.get("EmojiCore")
         self.mcp_tool: FuncCall = container.get("MCP")
         self.log: Logger = container.get("log")
@@ -59,7 +59,7 @@ class chat_baseics(ABC):
         """构建模型提示词"""
 
     @abstractmethod
-    async def send_reply_message(self) -> None:
+    async def send_reply_message_separator(self) -> None:
         """模型响应结束最终回复部分"""
 
     async def image_processing(self, image_urls: list) -> str:
@@ -118,6 +118,7 @@ class group_chat(chat_baseics):
         
         self.decision_function:Dict[str,Coroutine[Dict]] = {
             "reply" : self.reply_conduct,
+            "update" : self.update_conduct,
             "silence" : self.silence_conduct,
             "use_tools" : self.use_tools_conduct,
         }
@@ -185,7 +186,7 @@ class group_chat(chat_baseics):
         await chat_condition.update_last_time()
         
         # 发送基础信息
-        await self.send_reply_message(
+        await self.send_reply_message_separator(
             "".join(response.reply_text), 
             group_id=group_id, 
             message_id=data["message_id"],
@@ -235,6 +236,7 @@ class group_chat(chat_baseics):
         
         data = message.primeval
         group_id = data["group_id"]
+        user_id = data["user_id"]
 
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
@@ -267,6 +269,7 @@ class group_chat(chat_baseics):
             new_message=self.prompt_structure_json(
                 group_id = group_id,
                 prompt = prompt,
+                user_info = await self.user_system.get_user_info(user_id),
                 user_import = user_import,
                 chat_record = str(await self.chat_manager.get_group_messages(group_id))[:10000],
                 img_prompt = img_prompt
@@ -281,24 +284,41 @@ class group_chat(chat_baseics):
             img_list= img_list 
         )
 
-        try:
-            self.log.info("模型返回json_list:\n"+"".join(response.reply_text))
-            for response_json in (json.loads(s.replace("json\n", "").replace("```", "").strip()) for s in response.reply_text if s != ""):
-                response_json:dict[str: str|int]
+        self.log.info("模型返回json_list:\n"+"".join(response.reply_text))
+            
+        for response_json in (common.extract_json_from_text(s) for s in response.reply_text if s != ""):
+            
+            if isinstance(response_json, dict):
                 
-                if decision := response_json.get("decision"):
+                for response_json in response_json.get("return",[]):
                     
-                    if fun := self.decision_function.get(decision):
+                    response_json:dict[str: str|int]
+                    if decision := response_json.get("decision"):
                         
-                        await fun(response_json, data)
+                        if fun := self.decision_function.get(decision):
+                            
+                            await fun(response_json, data)
+                            
+                        else:
+                            self.log.error(f"无效decision:{response_json}")
                         
                     else:
-                        self.log.error(f"无效decision:{response_json}")
-                    
-                else:
-                    self.log.error(f"返回json错误:{response_json}")
-        except json.JSONDecodeError as e:
-            self.log.error(f"处理模型返回json出现错误:{e}")
+                        self.log.error(f"返回json错误:{response_json}")
+            # else:
+            #     # 错误的话直接发送吧
+            #     self.log.error(f"返回json解析错误:{response_json}")
+            #     chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
+                
+            #     since = chat_condition.get_seconds_since_llm_time()
+            #     await chat_condition.update_last_time()
+                
+            #     await self.send_reply_message_separator(
+            #         chat_text = response_json,
+            #         message_id = data["message_id"],
+            #         group_id = group_id,
+            #         since_llm = since
+            #     )
+            #     continue
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变
         original_context.add_user_message(prompt+user_import)
@@ -324,12 +344,28 @@ class group_chat(chat_baseics):
         await chat_condition.update_last_time()
         
         await self.send_reply_message(
-            chat_text = response_json["content"],
+            chat_text_list = response_json["content"],
             message_id = response_json.get("target_message_id"),
             group_id = group_id,
             since_llm = since
         )
+    
+    async def update_conduct(self, response_json:Dict, data:Dict)->None:
+        self.log.info(f"LLM决定更新用户信息。理由:{response_json.get("reason")}")
         
+        if user_id := response_json.get("user_id"):
+            pass
+        else:
+            user_id = data["user_id"]
+
+        if await self.user_system.update_user_info(
+            user_id = user_id,
+            current_info = await self.user_system.get_user_info(user_id),
+            new_info_json = response_json.get("update_field")
+        ):
+            self.log.info(f"用户信息更新成功!user_id:{user_id}")
+        else:
+            self.log.info(f"用户信息无变化无需更新!user_id:{user_id}")
         
     
     async def silence_conduct(self, response_json:Dict, data:Dict)->None:
@@ -480,7 +516,8 @@ class group_chat(chat_baseics):
         prompt:str,
         user_import:str,
         chat_record:str,
-        img_prompt:str 
+        user_info:str,
+        img_prompt:str
     )->str:
         """json处理使用的提示词构造方法
 
@@ -489,6 +526,7 @@ class group_chat(chat_baseics):
             user_import (str): 用户输入
             prompt (str): 基础prompt
             chat_record (str): 历史记录
+            user_info (str): 用户信息
             img_prompt (str): 文本图像提示
 
         Returns:
@@ -502,11 +540,12 @@ class group_chat(chat_baseics):
                 "<newest_user_import>"
                 f"{f"<image_descriptions>{img_prompt}</image_descriptions>" if  img_prompt else ""}{user_import}"
                 "</newest_user_import>\n"
-                ) + self.emoji_core.emoji_prompt
+                f"<current_user_info>{user_info}</current_user_info>"
+            ) + self.emoji_core.emoji_prompt
         )
         
 
-    async def send_reply_message(
+    async def send_reply_message_separator(
         self,
         chat_text: str,
         group_id: int,
@@ -558,7 +597,7 @@ class group_chat(chat_baseics):
                 for message in messages_list[1:]:
                     await self.send_message.send_group_message(
                         group_id,
-                        message["data"]["text"] if message["type"] == "text" else [message],
+                        [message],
                     )
                     await asyncio.sleep(MESSAGE_DELAY)
                 return
@@ -566,12 +605,92 @@ class group_chat(chat_baseics):
                 for message in messages_list:
                     await self.send_message.send_group_message(
                         group_id,
-                        message["data"]["text"] if message["type"] == "text" else [message],
+                        [message],
                     )
                     await asyncio.sleep(MESSAGE_DELAY)
                 return
         else:
             chat_text = chat_text.replace(MESSAGE_DELIMITER, "\n")
+            # 合并发送完
+            messages_list = self.emoji_core.parse_text_with_emotion_tags(
+                chat_text, self.emoji_file_dict
+            )
+            if message_id:
+                await self.send_message.send_group_message(
+                    group_id,
+                    [{"type": "reply", "data": {"id": message_id}}, *messages_list],
+                )
+            else:
+                await self.send_message.send_group_message(
+                    group_id,
+                    messages_list,
+                )
+            return
+
+    async def send_reply_message(
+        self,
+        chat_text_list: List[str],
+        group_id: int,
+        since_llm: float,
+        message_id: int = None,
+    ) -> None:
+        """发送群文本消息，支持表情标签
+
+        Args:
+            chat_text (str): 要解析发送的文本
+            group_id (int): 群号
+            message_id (int): 回复引用消息的id
+            since_llm (float): 距离上一次llm发言时间
+        """
+        MESSAGE_DELAY = 1.5  # 多条消息间隔时间
+        MAX_SINGLE_MESSAGE_LENGTH = 100  # 分条发送长度阈值
+        LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
+        
+        if not chat_text_list:
+            return
+
+        if (
+            len(str(chat_text_list)) <= MAX_SINGLE_MESSAGE_LENGTH
+            and since_llm >= LLM_COOLDOWN_THRESHOLD
+            # or MESSAGE_DELIMITER in chat_text
+        ):
+            # 分条发送
+            messages_list = self.emoji_core.parse_list_with_emotion_tags(
+                chat_text_list,
+                self.emoji_file_dict
+            )
+            
+            if message_id:
+                message = messages_list[0]
+                if message['type'] == 'text':
+                    await self.send_message.send_group_message(group_id, f"[CQ:reply,id={message_id}]{message['data']['text']}")
+                else:
+                    await self.send_message.send_group_message(
+                        group_id, [{"type": "reply", "data": {"id": message_id}}, message]
+                    )
+
+                if len(messages_list) == 1:
+                    return
+
+                await asyncio.sleep(MESSAGE_DELAY)
+
+                for message in messages_list[1:]:
+                    await self.send_message.send_group_message(
+                        group_id,
+                        [message],
+                    )
+                    await asyncio.sleep(MESSAGE_DELAY)
+                return
+            else:
+                for message in messages_list:
+                    await self.send_message.send_group_message(
+                        group_id,
+                        [message],
+                    )
+                    await asyncio.sleep(MESSAGE_DELAY)
+                return
+        else:
+            chat_text = "\n".join(chat_text_list)
             # 合并发送完
             messages_list = self.emoji_core.parse_text_with_emotion_tags(
                 chat_text, self.emoji_file_dict

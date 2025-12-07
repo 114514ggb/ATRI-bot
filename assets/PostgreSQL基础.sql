@@ -18,6 +18,14 @@ CREATE TABLE users (
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+--用户信息json表
+CREATE TABLE user_info (
+    user_id BIGINT NOT NULL PRIMARY KEY,
+    info JSONB,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
 
 CREATE TYPE permission_type AS ENUM ('blacklist', 'administrator', 'root');
 
@@ -49,9 +57,26 @@ CREATE TABLE message (
         ON DELETE SET NULL ON UPDATE CASCADE
 );
 
---时间索引
+
+-- 创建记忆表
+CREATE TABLE atri_memory (
+    memory_id BIGSERIAL PRIMARY KEY,
+    group_id BIGINT DEFAULT 0,  -- 默认值 0 表示私聊,为0时user_id不能为空
+    user_id BIGINT,             -- 允许和group_id一起为 NULL 表示知识库记忆
+    event_time BIGINT NOT NULL, -- 记忆的时间点
+    event TEXT,                 -- 记忆文本
+    event_vector VECTOR(1024),  -- 1024 维向量
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP --创建时间
+    CONSTRAINT uq_user_event UNIQUE (user_id, event)
+);
+
+
+--消息表时间索引
 CREATE INDEX idx_message_user_time ON message(user_id, time DESC);
 
+-- 用户信息创建GIN索引作为基础索引
+CREATE INDEX idx_user_info_info_gin ON user_info 
+USING GIN (info);
 
 -- 用户表的last_updated字段更新触发器
 CREATE OR REPLACE FUNCTION update_last_updated()
@@ -67,23 +92,26 @@ CREATE TRIGGER trigger_update_users_last_updated
     FOR EACH ROW
     EXECUTE FUNCTION update_last_updated();
 
+-- 用户信息表的last_updated字段更新触发器
+CREATE OR REPLACE FUNCTION update_user_info_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_updated = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_user_info_last_updated
+BEFORE UPDATE ON user_info
+FOR EACH ROW
+EXECUTE FUNCTION update_user_info_timestamp(); 
+
+
 -- 为权限表的updated_at字段创建更新触发器
 CREATE TRIGGER trigger_update_permissions_updated_at
     BEFORE UPDATE ON permissions
     FOR EACH ROW
     EXECUTE FUNCTION update_last_updated();
-
--- 创建记忆表
-CREATE TABLE atri_memory (
-    memory_id BIGSERIAL PRIMARY KEY,
-    group_id BIGINT DEFAULT 0,  -- 默认值 0 表示私聊,为0时user_id不能为空
-    user_id BIGINT,             -- 允许和group_id一起为 NULL 表示知识库记忆
-    event_time BIGINT NOT NULL, -- 记忆的时间点
-    event TEXT,                 -- 记忆文本
-    event_vector VECTOR(1024),  -- 1024 维向量
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP --创建时间
-    CONSTRAINT uq_user_event UNIQUE (user_id, event)
-);
 
 --记忆表索引
 CREATE INDEX idx_user_time ON atri_memory (user_id, event_time);

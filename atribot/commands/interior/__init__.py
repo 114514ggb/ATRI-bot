@@ -78,7 +78,7 @@ async def help_command(message_data: dict, list: bool = False):
         )
     else:
         basic_help = (
-            "ATRIbot,版本 2.0.0.1"
+            "ATRIbot,版本 2.0.0.1 2025.08.28\n"
             "所有命令以开头要@bot再以\"/\"开头才能使用\n"
             "输入 /help --list 查看完整命令列表\n"
             "输入 /help <命令名> 查看特定命令帮助\n\n"

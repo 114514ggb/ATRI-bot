@@ -3,6 +3,7 @@ from atribot.core.service_container import container
 from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from logging import Logger
 from typing import List, Dict, Any
+import time
 
 
 
@@ -142,8 +143,8 @@ class VectorStore(VectorStoreBasics):
             conditions.append(f"event_time <= ${len(params) + 1}")
             params.append(end_time)
         
-        # 只查询非NULL的向量
-        conditions.append("event_vector IS NOT NULL")
+        # 只查询非NULL的向量,目前应该没有空的吧
+        # conditions.append("event_vector IS NOT NULL")
         
         params.append(limit)
         limit_param = len(params)
@@ -192,7 +193,6 @@ class VectorStore(VectorStoreBasics):
             text_list (List[str]): 文本
             embedding_list (List[List[float]]): 文本对应向量
         """
-        import time
         sql = """
             INSERT INTO atri_memory (group_id, user_id, event_time, event, event_vector)
             VALUES (NULL, NULL, $1, $2, $3)
@@ -338,7 +338,7 @@ class VectorStore(VectorStoreBasics):
         """
         查询私聊记忆 (group_id=0)
         
-        参数:
+        Args:
             query_vector: 查询向量
             user_id: 用户ID
             limit: 返回结果数量
@@ -366,7 +366,7 @@ class VectorStore(VectorStoreBasics):
         """
         查询群聊记忆
         
-        参数:
+        Args:
             query_vector: 查询向量
             group_id: 群组ID (非0)
             limit: 返回结果数量
@@ -395,7 +395,7 @@ class VectorStore(VectorStoreBasics):
         """
         查询知识库记忆 (group_id和user_id都为NULL)
         
-        参数:
+        Args:
             query_vector: 查询向量
             limit: 返回结果数量
             distance_threshold: 距离阈值

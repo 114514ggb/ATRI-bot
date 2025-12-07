@@ -255,7 +255,7 @@ class string_response:
         "暴富": [["img",["ATRI_春联天天暴富.gif"]]],
         "有意思": [["img",["ATRI_有点意思.jpg"]]],
         "嘲讽": [["img",["ATRI_嘲笑.jpg","ATRI_下蹲.gif"]]],
-        "哈基米": [["audio",["哈基米.wav"]],["text",["不要再哈基米了！喵！"]]],
+        # "哈基米": [["audio",["哈基米.wav"]],["text",["不要再哈基米了！喵！"]]],
         "吃饭": [["img",["ATRI_吃饭高兴.jpg","ATRI_吃饭第一名.jpg"]]],
         "好吃": [["img",["ATRI_看起来好吃.jpg"]]],
         "进攻": [["img",["ATRI_拿火箭筒.jpg"]]],

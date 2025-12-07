@@ -32,7 +32,7 @@ key = "ollama"
 
 http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-key = "AIzaSyADjmYQGjzMa-op0-rkvveZbvisZTtV6bo"
+key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
 
 # http = "https://integrate.api.nvidia.com/v1/chat/completions"
 # key = "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"
@@ -152,21 +152,36 @@ async def main():
   
     
     
-    chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
+    # chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
     # text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
-    text = await chat.generate_json_ample(
-      model=model,
-      remainder = {
-        'messages': messages,
+    # text = await chat.generate_json_ample(
+    #   model=model,
+    #   remainder = {
+    #     'messages': messages,
         # 'tools': tools,
         # 'tool_choice': "auto",
         # "response_format": { "type": "json_object" }
-      }
-    )
-    # psql_db = await atriAsyncPostgreSQL.create(
-    #   user = "postgres",
-    #   database = "atri"
+    #   }
     # )
+    psql_db = await atriAsyncPostgreSQL.create(
+      user = "postgres",
+      database = "atri"
+    )
+    
+
+    sql = """
+    SELECT 
+        info
+    FROM user_info
+    WHERE user_id = $1
+    """
+    async with psql_db as db:
+        text = (await db.execute_with_pool(
+            query = sql,
+            params = (1,),
+            fetch_type = "one"
+        ))[0]
+    
     
     # #存储
     # sql = """
@@ -234,14 +249,14 @@ async def main():
     
     # text = await extract_and_summarize_facts(test_sentences)
     
-    await chat.aclose()
+    # await chat.aclose()
     
-    pp(text)
+    pp(json.loads(text))
     
     
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
 
 
 import asyncio
@@ -258,6 +273,7 @@ import textwrap
 #     coro = locs['function']()
 #     await coro
 
-# asyncio.run(saync_run_exec("print(\"开始\")\nawait asyncio.sleep(3.0)\nprint(\"执行结束\")"))
+# asyncio.run(saync_run_exec("print(\"开始\")\nawait asyncio.sleep(3.0)\nprint(\"执行结束\")")
+
 
 

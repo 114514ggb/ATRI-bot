@@ -295,7 +295,25 @@ class build_prompt:
             f"<prompt>{prompt}</prompt>"
             "<access_memory>有人问你记得什么事情或是问你某个人或事情的时候一定要使用查询记忆工具了解后再回答，比如有人问你记得[matter]吗？或是和某个人或事情相关问题就要想办法查询出[matter]相关结果</access_memory>"
             "<output_requirement>"
-            """你需要输出符合要求且合法的json格式的文本,内容必须符合下面的要求:
+            """要求输出带有合法的被```json包裹的JSON文本,内容必须符合下面的要求:
+**示例**
+// 一些思考文本,对于简单问题可以直接输出json文本，不被```json包裹直接输出JSON也行
+```json
+{
+    "return":[
+        {
+            "decision":"参数值",
+            //对应参数
+        },
+        {
+            "decision":"参数值",
+            //对应参数
+        }
+    ]
+}
+```
+
+JSON里要求是一个包含"return"键及其对应的JSON列表,JSON列表里面可以使用一个或多个decision。
 **可以使用的decision**
 参数:reply
 功能描述:对一条消息进行回复或是主动发言,可以自然的顺着正在进行的聊天内容进行回复或直接发送消息
@@ -303,7 +321,7 @@ class build_prompt:
     "decision":"reply",
     "target_message_id":"想要回复的消息id,type要求int,这个字段是非必要的",
     "reason":"做出此决策的原因",
-    "content":"将解析发送给群内的文本内容,不要回复的太有条理，可以有个性"
+    "content":"将解析发送给群内的文本list,里面会分条发送对应的str(注意不应分的太多,要正常自然,不能超过4个),内容可以有个性,可以带点情绪,可以带点幽默感,内容要和当前的聊天内容相关联"
 }
 
 参数:silence
@@ -313,11 +331,22 @@ class build_prompt:
     "reason":"做出此决策的原因"
 }
 
-概括:
+参数:update
+功能描述:更新的用户的<user_info>信息
+{
+    "decision":"update",
+    "reason":"做出此决策的原因",
+    "user_id":"需要更新信息的用户qq_id,选填没有的默认是当前对话用户",
+    "update_field":"这个必须是一个json对象,里面的key是需要更新的字段名,value是对应更新后的值, 只能按照要求更新已有的字段,对于没有出现的<user_info>可以查询工具了解后再更新"
+}
+
+规则:
 decision:string,尔选一,必填
 reason:string,必填 
 target_message_id:integer,reply时选填
-content:string,reply 时必填；其它决策禁止出现
+content:list[str],reply 时必填；其它决策禁止出现
+user_id:integer,update时选填
+update_field:dict[str,any],update时必填,其它决策禁止出现
 
 **decision选择要求**
 1.思考**所有**的可用的decision中的**每个decision**是否符合当下条件，如果decision使用条件符合聊天内容就使用
@@ -326,7 +355,7 @@ content:string,reply 时必填；其它决策禁止出现
 4.如果有人对你感到厌烦，请减少回复
 5.如果有人对你进行攻击，或者情绪激动，请你以合适的方法应对
 
-Output the final response in JSON format
+输出一定要携带有要求的JSON格式
 """
             "</output_requirement>"
             "</context>"

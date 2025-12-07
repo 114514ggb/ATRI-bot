@@ -22,14 +22,13 @@
     "model":{ 
         "connect":
         {
-            "supplier":"google",
-            "model_name":"google-ai-studio/gemini-2.5-flash",
-            "visual_sense":true,
+            "supplier":"deepseek",
+            "model_name":"deepseek-chat",
+            "visual_sense":false,
             "system_review":false
         },
         "chat_parameter":{
-            "temperature":0.3,
-            "max_tokens": 65536
+            "temperature":0.3
         },
         "memory":{
             "summarize_model":{
@@ -80,11 +79,8 @@
             }
         },
         "api_key_pool":[
-            "AIzaSyDyYzXfpgL3rnOw3p_VDRG3OOf1-1nLNoo",
-            "AIzaSyBYeQkjagJfKFVLzr0fnkP72PmMJfMDUUg",
-            "AIzaSyBxOsfeDO28cvjdR2FJfF39DQLszMX-d5o",
-            "AIzaSyBnhSiv9R0ozOQBWU5mkFKeNcku1cfpyiM",
-            "AIzaSyBqUlNI2ZJktGD2sbDwenLXID6Nd6C9QQ0"
+
+            "AIzaSyADjmYQGjzMa-op0-rkvveZbvisZTtV6bo"
         ]
     },
     "ai_chat":{

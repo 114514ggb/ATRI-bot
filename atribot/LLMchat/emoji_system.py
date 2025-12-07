@@ -273,6 +273,23 @@ class emoji_core:
         
         return segments
     
+    def parse_list_with_emotion_tags(self, text_list: list, emoji_dict: dict) -> list:
+        """解析文本并提取表情标签，保留原始位置信息，直接生成结构化输出"""
+        
+        # return [
+        #     segment
+        #     for text in text_list
+        #     for segment in self.parse_text_with_emotion_tags(text, emoji_dict)
+        # ]
+        #双重循环展开引入的性能开销较大，改为普通循环
+        
+        segments = []
+        for text in text_list:
+            segments.extend(self.parse_text_with_emotion_tags(text, emoji_dict))
+        return segments
+        
+
+    
     def _levenshtein_distance(self, s1: str, s2: str) -> int:
         """计算两个字符串的编辑距离
 

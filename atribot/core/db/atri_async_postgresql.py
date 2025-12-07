@@ -1,5 +1,5 @@
 import asyncpg
-from typing import Optional, Tuple, Any, List
+from typing import Optional, Tuple, List
 import asyncio
 from asyncpg import Record
 from contextvars import ContextVar,Token
