@@ -134,7 +134,7 @@ class pictureProcessing:
             "private": str(private).lower(),
             "enhance": str(enhance).lower(),
             "safe": str(safe).lower(),
-            "token": "56zs_9uGTfe19hUH"
+            # "token": "56zs_9uGTfe19hUH"
         }
         
         if seed is not None:
@@ -143,15 +143,21 @@ class pictureProcessing:
             params["image"] = image_url
         if referrer:
             params["referrer"] = referrer
+    
+        last_exception = None
         
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, timeout=timeout, headers=headers) as response:
-                    response.raise_for_status()  # 检查状态码
-                    
-                    return base64.b64encode(await response.read()).decode('utf-8')
-                    
-        except aiohttp.ClientError as e:
-            raise aiohttp.ClientError(f"网络请求错误: {e}")
-        except Exception as e:
-            raise Exception(f"图片生成失败: {e}")
+        for _ in range(3):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, params=params, timeout=timeout, headers=headers) as response:
+                        response.raise_for_status()  # 检查状态码
+                        return base64.b64encode(await response.read()).decode('utf-8')
+                        
+            except (aiohttp.ClientError, Exception) as e:
+                last_exception = e
+                await asyncio.sleep(0.5)
+
+        if isinstance(last_exception, aiohttp.ClientError):
+            raise aiohttp.ClientError(f"网络请求失败: {last_exception}")
+        else:
+            raise Exception(f"图片生成失败: {last_exception}")

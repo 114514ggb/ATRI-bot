@@ -340,10 +340,10 @@ class common():
         Returns:
             Dict[str, Any]: 解析成功的字典，或在失败时返回 {}
         """
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            pass  
+        # try:
+        #     return json.loads(text)
+        # except json.JSONDecodeError:
+        #     pass  
         
         extracted_str = None
         

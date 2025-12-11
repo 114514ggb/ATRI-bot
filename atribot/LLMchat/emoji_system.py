@@ -281,7 +281,7 @@ class emoji_core:
         #     for text in text_list
         #     for segment in self.parse_text_with_emotion_tags(text, emoji_dict)
         # ]
-        #双重循环展开引入的性能开销较大，改为普通循环
+        #双重循环引入的性能开销较大，改为普通循环
         
         segments = []
         for text in text_list:

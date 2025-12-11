@@ -305,7 +305,7 @@ class group_chat(chat_baseics):
                     else:
                         self.log.error(f"返回json错误:{response_json}")
             # else:
-            #     # 错误的话直接发送吧
+            #     # 错误的话考虑直接发送?
             #     self.log.error(f"返回json解析错误:{response_json}")
             #     chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
                 
@@ -327,7 +327,7 @@ class group_chat(chat_baseics):
         )
         
         if response.reasoning_content:
-            self.log.info("存储推理内容:\n"+ "".join(response.reasoning_content))
+            self.log.info("推理内容:\n"+ "".join(response.reasoning_content))
         
         self.log.info("结束json处理!")
         
@@ -643,14 +643,14 @@ class group_chat(chat_baseics):
             since_llm (float): 距离上一次llm发言时间
         """
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
-        MAX_SINGLE_MESSAGE_LENGTH = 100  # 分条发送长度阈值
+        MAX_SINGLE_MESSAGE_LENGTH = 4  # 分条发送长度阈值
         LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
         
         if not chat_text_list:
             return
 
         if (
-            len(str(chat_text_list)) <= MAX_SINGLE_MESSAGE_LENGTH
+            len(chat_text_list) <= MAX_SINGLE_MESSAGE_LENGTH
             and since_llm >= LLM_COOLDOWN_THRESHOLD
             # or MESSAGE_DELIMITER in chat_text
         ):

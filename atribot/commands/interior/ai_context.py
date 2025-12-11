@@ -2,8 +2,11 @@ from atribot.core.command.async_permissions_management import permissions_manage
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.command_parsing import command_system
+from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.core.service_container import container
 from logging import Logger
+
+
 
 
 class AIContextCommands:
@@ -14,6 +17,7 @@ class AIContextCommands:
         self.context_management: ChatManager = container.get("ChatManager")
         self.send_message: qq_send_message = container.get("SendMessage")
         self.permissions_management:permissions_management = container.get("PermissionsManagement")
+        self.user_system: UserSystem = container.get("UserSystem")
         self.log: Logger = container.get("log")
         
         self._register_command()
@@ -32,7 +36,8 @@ class AIContextCommands:
                 "/chat list -d             # 详细列出所有角色",
                 "/chat reload              # 重载角色配置",
                 "/chat reset               # 重置上下文",
-                "/chat info                # 查看上下文信息"
+                "/chat info                # 查看上下文信息",
+                "/chat user 2631018780     # 查看LLM维护的user_info"
             ],
             authority_level=1
         )
@@ -40,12 +45,12 @@ class AIContextCommands:
             name="action",
             description="要执行的操作",
             required=True,
-            choices=["role", "current", "list", "reload", "reset", "info"],
+            choices=["role", "current", "list", "reload", "reset", "info", "user"],
             metavar="ACTION"
         )
         @self.command_system.argument(
             name="target",
-            description="目标角色名称（仅在action为role时需要）",
+            description="目标角色名称（仅在action为role和user时需要）",
             required=False,
             metavar="ROLE_NAME"
         )
@@ -57,12 +62,6 @@ class AIContextCommands:
         )
         async def ai_context_handler(message_data:dict, action: str, target: str = None, detail: bool = False):
             group_id = message_data.get('group_id', '')
-            
-            if not group_id:
-                await self.send_message.send_group_message(
-                    group_id, "错误：无法获取群组ID"
-                )
-                return
             
             if action == "role":
                 await self._handle_set_role(group_id, target, user_id=message_data['user_id'])
@@ -76,6 +75,9 @@ class AIContextCommands:
                 await self._handle_reset_context(group_id, user_id=message_data['user_id'])
             elif action == "info":
                 await self._handle_context_info(group_id)
+            elif action == "user":
+                await self._handle_get_user_info(group_id, target, user_id=message_data['user_id'])
+                
     
     async def _handle_set_role(self, group_id: str, role_name: str, user_id:int):
         """处理角色切换"""
@@ -243,3 +245,31 @@ class AIContextCommands:
         message += "\n💡 使用 /chat reset 可重置上下文"
         
         await self.send_message.send_group_message(group_id, message)
+        
+    async def _handle_get_user_info(self, group_id: str, target:str, user_id:int):
+        """获取维护的user_info文档"""
+
+        user_info = await self.user_system.get_user_info(int(target) if target else user_id)
+        
+        message = (
+            "👤 维护的user_info\n"
+            f"• 称呼：{'、'.join(user_info['call_me'])} 👋\n"
+            f"• 关系：{user_info['relation']} 🤝\n"
+            f"• 性格：{user_info['personality']} 💭\n\n"
+            
+            "🗣️ 近期对话\n"
+            f"{user_info['recent_topics']} 💬\n\n"
+            
+            "📝 观察记录\n"
+            f"{user_info['evaluation']} 🔍\n\n"
+            
+            "❤️ 偏好设置\n"
+            f"• 交流风格：{user_info['prefs']['style']} ✨\n"
+            f"• 避免事项：{user_info['prefs']['avoid']} ⚠️"
+        )
+        
+        await self.send_message.send_group_merge_text(
+            group_id = group_id,
+            message = message,
+            source = "便于阅读的user_info"
+        )

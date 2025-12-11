@@ -135,21 +135,11 @@ class large_language_model_supervisor():
         if request.generation_response is not None:
             return await self.resume_step(request,model_api,increase_context)
                 
-        while True:       
-            api_reply:Dict = await self.get_chat_json(
-                request = request,
-                messages = increase_context.get_messages(),
-                model_api = model_api
-            )
-            
-            self.logger.debug(f"模型返回:{api_reply}")
-            
-            assistant_message:Dict = api_reply['choices'][0]['message']
-            
-            if content := assistant_message.get('content'):
-                break
-            elif "tool_calls" in assistant_message:
-                break
+        assistant_message, content = await self._get_assistant_message_with_retry(
+            request = request,
+            increase_context  = increase_context,
+            model_api  = model_api
+        )
         
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
@@ -223,26 +213,16 @@ class large_language_model_supervisor():
                     tool_output[:20000],#截断防止有的工具返回过长的结果
                     tool_call['id']
                 )
-            
-            while True:       
-                try:
-                    api_reply = await self.get_chat_json(
-                        request = request,
-                        messages = increase_context.get_messages(),
-                        model_api = model_api
-                    )
-                except Exception as e:
-                    response.messages = increase_context.messages
-                    raise LLMSRequestFailed(e, response)
-                
-                self.logger.debug(f"模型返回:{api_reply}")
-                
-                assistant_message:Dict = api_reply['choices'][0]['message']
-                
-                if content := assistant_message.get('content'):
-                    break
-                elif "tool_calls" in assistant_message:
-                    break
+              
+            try:
+                assistant_message, content = await self._get_assistant_message_with_retry(
+                    request = request,
+                    increase_context  = increase_context,
+                    model_api  = model_api
+                )
+            except Exception as e:
+                response.messages = increase_context.messages
+                raise LLMSRequestFailed(e, response)
             
             if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
                 increase_context.add_assistant_tool_message(content)
@@ -280,21 +260,11 @@ class large_language_model_supervisor():
             if msg['role'] in ['assistant','tool']:
                 increase_context.messages.append(msg)
         
-        while True:       
-            api_reply:Dict = await self.get_chat_json(
-                request = request,
-                messages = increase_context.get_messages(),
-                model_api = model_api
-            )
-            
-            self.logger.debug(f"模型返回:{api_reply}")
-            
-            assistant_message:Dict = api_reply['choices'][0]['message']
-            
-            if content := assistant_message.get('content'):
-                break
-            elif "tool_calls" in assistant_message:
-                break
+        assistant_message, content = await self._get_assistant_message_with_retry(
+            request = request,
+            increase_context  = increase_context,
+            model_api  = model_api
+        )
         
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             
@@ -340,7 +310,7 @@ class large_language_model_supervisor():
         content = content if content else ""
         
         if content.startswith("<thought>"):
-            reasoning_content ,content= self.extract_thought(content)
+            reasoning_content ,content = self.extract_thought(content)
             response.reasoning_content += assistant_message.get("reasoning_content",reasoning_content)
             response.reply_text.append(content)
             return response
@@ -349,6 +319,46 @@ class large_language_model_supervisor():
         response.reply_text.append(content)
         
         return response
+    
+    async def _get_assistant_message_with_retry(
+        self,
+        request: GenerationRequest,
+        increase_context: Context,
+        model_api: model_api_basics,
+        max_retries: int = 3
+    ) -> tuple[Dict,str|None]:
+        """获取模型回复，包含重试机制
+        
+        Args:
+            request (GenerationRequest): 生成请求
+            increase_context (Context): 上下文
+            model_api (model_api_basics): 模型API实例
+            max_retries (int): 最大重试次数
+        
+        Returns:
+            tuple[Dict,str|None]: 助手消息和助手文本组成的Tuple
+        
+        Raises:
+            ValueError: 当空回复次数超过阈值时抛出
+        """
+        for _ in range(max_retries):       
+            api_reply:Dict = await self.get_chat_json(
+                request = request,
+                messages = increase_context.get_messages(),
+                model_api = model_api
+            )
+            
+            self.logger.debug(f"模型返回:{api_reply}")
+            
+            assistant_message:Dict = api_reply['choices'][0]['message']
+            
+            if content := assistant_message.get('content'):
+                return assistant_message, content
+            elif "tool_calls" in assistant_message:
+                return assistant_message, None
+        
+        raise ValueError(f"在{max_retries}次尝试后仍未能获取有效回复")
+    
     
     @staticmethod
     def extract_thought(text):
