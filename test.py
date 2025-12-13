@@ -32,7 +32,7 @@ key = "ollama"
 
 http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
+key = "AIzaSyAKEISXJG4fbWB0iGsUq76YD2sZrx7xAs4"
 
 # http = "https://integrate.api.nvidia.com/v1/chat/completions"
 # key = "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"
@@ -148,12 +148,8 @@ async def main():
     from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
     import time
     
-    
-  
-    
-    
-    # chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
-    # text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
+    chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
+    text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
     # text = await chat.generate_json_ample(
     #   model=model,
     #   remainder = {
@@ -163,24 +159,24 @@ async def main():
         # "response_format": { "type": "json_object" }
     #   }
     # )
-    psql_db = await atriAsyncPostgreSQL.create(
-      user = "postgres",
-      database = "atri"
-    )
+    # psql_db = await atriAsyncPostgreSQL.create(
+    #   user = "postgres",
+    #   database = "atri"
+    # )
     
 
-    sql = """
-    SELECT 
-        info
-    FROM user_info
-    WHERE user_id = $1
-    """
-    async with psql_db as db:
-        text = (await db.execute_with_pool(
-            query = sql,
-            params = (1,),
-            fetch_type = "one"
-        ))[0]
+    # sql = """
+    # SELECT 
+    #     info
+    # FROM user_info
+    # WHERE user_id = $1
+    # """
+    # async with psql_db as db:
+    #     text = (await db.execute_with_pool(
+    #         query = sql,
+    #         params = (1,),
+    #         fetch_type = "one"
+    #     ))[0]
     
     
     # #存储
@@ -249,9 +245,10 @@ async def main():
     
     # text = await extract_and_summarize_facts(test_sentences)
     
-    # await chat.aclose()
+    await chat.aclose()
     
-    pp(json.loads(text))
+    # pp(json.loads(text))
+    pp(text)
     
     
 
@@ -259,20 +256,24 @@ async def main():
 #     asyncio.run(main())
 
 
-import asyncio
-import textwrap
 
-# async def saync_run_exec(text: str) -> None:
-#     """异步执行一段字符串形式的异步代码"""
-#     src = f"""
-# async def function():
-# {textwrap.indent(text, "  ")}
-# """
-#     locs = {}
-#     exec(src, globals(), locs)
-#     coro = locs['function']()
-#     await coro
+            # "AIzaSyDyYzXfpgL3rnOw3p_VDRG3OOf1-1nLNoo",
+            # "AIzaSyBYeQkjagJfKFVLzr0fnkP72PmMJfMDUUg",
+            # "AIzaSyBxOsfeDO28cvjdR2FJfF39DQLszMX-d5o",
+            # "AIzaSyBnhSiv9R0ozOQBWU5mkFKeNcku1cfpyiM",
+            # "AIzaSyBqUlNI2ZJktGD2sbDwenLXID6Nd6C9QQ0",
 
-# asyncio.run(saync_run_exec("print(\"开始\")\nawait asyncio.sleep(3.0)\nprint(\"执行结束\")")
+            # "AIzaSyAKEISXJG4fbWB0iGsUq76YD2sZrx7xAs4",
+            # "AIzaSyCADRVBg7AvF9mL3B1y5dTcvTKsoeD5_CQ",
+            # "AIzaSyBg04fwbH5VG8yc9E-z7uo0al1OWZsfbs8",
+            # "AIzaSyAt0KyY0WD-GfdPkxGBeEjR26yVMFVbh5A",
+            # "AIzaSyADjmYQGjzMa-op0-rkvveZbvisZTtV6bo",
+
+            # "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
 
 
+
+
+b = 1 + 1 + 1
+
+print(b)

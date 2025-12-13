@@ -28,7 +28,7 @@ class UserSystem:
         
         Returns:
             dict: 包含用户信息的字典，结构如下：
-                - call_me: list[str] - 用户的称呼列表
+                - appellation: list[str] - 用户的称呼列表
                 - relation: str - 用户与AI的关系描述
                 - personality: str - 用户性格简要描述
                 - recent_topics: str - 最近讨论的话题摘要
@@ -38,7 +38,7 @@ class UserSystem:
                     - avoid: str - 需要避免的内容
         """
         return {
-            "call_me": ["用户常用称呼1", "用户常用称呼2"],
+            "appellation": ["用户常用称呼1", "用户常用称呼2"],
             "relation": "例如：朋友/助手/导师/同学等关系描述",
             "personality": "简要描述性格特点，如：外向幽默、内敛谨慎等",
             "recent_topics": "最近几次对话的主要话题，用自然语言描述。",
