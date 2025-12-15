@@ -32,7 +32,7 @@ key = "ollama"
 
 http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-key = "AIzaSyAKEISXJG4fbWB0iGsUq76YD2sZrx7xAs4"
+key = "AIzaSyCADRVBg7AvF9mL3B1y5dTcvTKsoeD5_CQ"
 
 # http = "https://integrate.api.nvidia.com/v1/chat/completions"
 # key = "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"
@@ -270,10 +270,3 @@ async def main():
             # "AIzaSyADjmYQGjzMa-op0-rkvveZbvisZTtV6bo",
 
             # "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
-
-
-
-
-b = 1 + 1 + 1
-
-print(b)

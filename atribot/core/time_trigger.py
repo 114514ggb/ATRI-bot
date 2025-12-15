@@ -96,7 +96,7 @@ class TimeTriggerSupervisor:
             return
         self._running = True
         self._main_task = asyncio.create_task(self._loop())
-        self.logger.info("TimeTriggerSupervisor started.")
+        self.logger.info("时间触发器管理已启动!")
         
     async def stop(self):
         """停止调度器"""
@@ -104,7 +104,7 @@ class TimeTriggerSupervisor:
         self._wakeup_event.set() 
         if self._main_task:
             await self._main_task
-        self.logger.info("TimeTriggerSupervisor stopped.")
+        self.logger.info("时间触发器管理已关闭")
 
     def add_task(self, task: TimedTask):
         """

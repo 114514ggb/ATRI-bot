@@ -2,6 +2,7 @@ from atribot.core.command.async_permissions_management import permissions_manage
 from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
 from atribot.LLMchat.model_api.llm_api_account_pool import ai_api_account_pool
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
+from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.LLMsupervisor import large_language_model_supervisor
 from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
@@ -18,9 +19,9 @@ from atribot.core.service_container import container
 from atribot.LLMchat.emoji_system import emoji_core
 from atribot.core.atri_config import atri_config
 from atribot.LLMchat.chat import group_chat
-from fastapi import FastAPI, WebSocket
 # from atribot.common import common
 from typing import Dict, Any
+from fastapi import FastAPI
 from logging import Logger
 import uvicorn
 import asyncio
@@ -185,51 +186,46 @@ class BotFramework:
         Args:
             type (str): 连接类型
         """
-        
-        self.logger.critical("bot作为服务端的连接模块写完后没有测试过最好使用bot_client!")
-        raise ValueError("配置错误!未实现")
-        
-        _message_router = message_router()
-        app = FastAPI()
-        
-        if server_type == "http":
+        if server_type == "WebSocket_server":
+            WSServer = WebSocketServer(
+                    host = self.config.network.host, 
+                    port = self.config.network.server_port,
+                    access_token = self.config.network.access_token, 
+            )
             
-            @app.post("/")
-            async def handle_http_event(data: Dict[str, Any]):
-                """处理HTTP事件"""
-                asyncio.create_task(_message_router.main(data))
-                return {"status": "OK", "code": 200}
+            container.register(
+                "WebSocket",
+                WSServer
+            )
             
-        else:
-            self.logger.critical("这个WebSocket_server应该更是完全不能工作!")
-            @app.websocket("/ws")
-            async def websocket_endpoint(websocket: WebSocket):
-                """WebSocket连接（服务端模式）"""
-                token = websocket.query_params.get("access_token")
-                if token != self.config.network.access_token:
-                    await websocket.close(code=1008)  # 1008 表示权限错误
-                    return
-                
-                await websocket.accept()
-                try:
-                    while True:
-                        data = await websocket.receive_json()
-                        await _message_router.main(data)
-                        await websocket.send_json({"status": "processed"})
-                except Exception as e:
-                    self.logger.error(f"WebSocket error: {e}")
-                finally:
-                    await websocket.close()
+            self.creation_send_message()
+            
+            WSServer.add_listener(message_router().main)
+        
+            await WSServer.start()
+            
+            await WSServer.wait_for_connection()
+            return
         
         
         self.creation_send_message()
+        _message_router = message_router()
         
+        app = FastAPI() 
+        
+        @app.post("/")
+        async def handle_http_event(data: Dict[str, Any]):
+            """处理HTTP事件"""
+            asyncio.create_task(_message_router.main(data))
+            return {"status": "OK", "code": 200}
+                
         uvicorn_app = uvicorn.Config(
             app, 
             host="localhost", 
-            port=self.config.network.Server_port,
+            port=self.config.network.server_port,
             workers=8 #进程数
         )
+        
         server = uvicorn.Server(uvicorn_app)
         await server.serve()
         
@@ -241,25 +237,23 @@ class BotFramework:
         )
         
         container.register(
-            "WebSocketClient",
+            "WebSocket",
             WSClient
         )
         
         self.creation_send_message()
-        _message_router = message_router()
-        
 
-        WSClient.add_listener(_message_router.main)
+        WSClient.add_listener(message_router().main)
         
         await WSClient.start()
     
     def creation_send_message(self)->None:
         """初始化发送消息class,还有环节最后的加载"""
         send_message = qq_send_message(
-            self.config.network.access_token, 
-            self.config.network.url, 
-            self.config.network.connection_type,
-            self.config.file_path.document
+            token = self.config.network.access_token, 
+            http_base_url = self.config.network.url, 
+            connection_type = self.config.network.connection_type,
+            File_root_directory = self.config.file_path.document
         )
         container.register("SendMessage",send_message)
         

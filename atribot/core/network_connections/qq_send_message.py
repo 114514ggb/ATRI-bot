@@ -1,5 +1,7 @@
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
+from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
+from typing import Optional
 from logging import Logger
 import json
 import aiohttp
@@ -33,6 +35,7 @@ class qq_send_message():
             self.logger:Logger = container.get("log")
             
             if connection_type == "http":
+                
                 self.access_token = token
                 self.http_base_url = http_base_url
                 self.headers = {
@@ -40,48 +43,55 @@ class qq_send_message():
                     'Authorization': 'Bearer '+self.access_token,
                 }
                 self.client = aiohttp.ClientSession(headers=self.headers)
-
+                self._send_impl = self._send_http_strategy
+                
             elif connection_type in ["WebSocket","WebSocket_client","WebSocket_server"]:
-                self.websocketClient:WebSocketClient = container.get("WebSocketClient")
+                
+                self.websocket:WebSocketClient | WebSocketServer = container.get("WebSocket")
+                self._send_impl = self._send_ws_strategy
+                
             else:
                 raise Exception("连接类型错误")
                 
             self.connection_type = connection_type # 连接类型
             self.logger.info("当前连接类型为"+connection_type+"\n")
             self._initialized = True
-        
+    
+    async def _send_http_strategy(self, url: str, payload: dict, echo: bool = False) -> Optional[dict]:
+        """HTTP 发送策略"""
+        try:
+            async with self.client.post(f"{self.http_base_url}/{url}", json=payload) as response:
+                if response.status == 200:
+                    self.logger.info("http请求发送成功")
+                    return await response.json()
+                else:
+                    self.logger.info(f"http发送请求失败 {response.status} {await response.text()}")
+                    return None
+        except aiohttp.ClientError as e:
+            self.logger.error("http请求失败:", e)
+            return None
+
+    async def _send_ws_strategy(self, url: str, payload: dict, echo: bool = False) -> Optional[dict]:
+        """WebSocket 发送策略"""
+        message = {
+            "action": url,
+                # 'access_token': self.access_token,
+            "params": payload
+        }
+
+        try:
+
+            if reply := await self.websocket.send(message,echo):
+                return reply
+            # self.logger.info("WC请求发送成功")
+            return None
+            
+        except Exception as e:
+            self.logger.error("WC发送请求失败:", e)
+    
     async def async_send(self, url, payload, echo = False)->dict|None:
-        """发送异步请求,返回json"""
-        if self.connection_type == "http":
-            url = f"{self.http_base_url}/{url}"
-            try:
-                async with self.client.post(url, json=payload) as response:
-                    if response.status == 200:
-                        self.logger.info("http请求发送成功")
-                        return await response.json()
-                    else:
-                        self.logger.info(f"http发送请求失败 {response.status} {await response.text()}")
-                        return None
-            except aiohttp.ClientError as e:
-                self.logger.error("http请求失败:", e)
-                return None
-        else:
-
-            message = {
-                "action": url,
-                 # 'access_token': self.access_token,
-                "params": payload
-            }
-
-            try:
-
-                if reply := await self.websocketClient.send(message,echo):
-                    return reply
-                # self.logger.info("WC请求发送成功")
-                return None
-                
-            except Exception as e:
-                self.logger.error("WC发送请求失败:", e)
+        """通用的发送异步请求,返回json"""
+        return await self._send_impl(url, payload, echo)
 
     async def send_group_message(self,group_id: int, message:str|list):
         """

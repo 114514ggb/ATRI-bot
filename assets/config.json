@@ -1,10 +1,11 @@
 {
     "network":
     {
-        "connection_type":"WebSocket_client",
-        "url":"127.0.0.1:8888",
+        "connection_type":"WebSocket_server",
         "access_token":"ATRI114514",
-        "server_port":3000
+        "url":"127.0.0.1:8888",
+        "host":"127.0.0.1",
+        "server_port":8888
     },
     "account":{
         "id":3930909243,

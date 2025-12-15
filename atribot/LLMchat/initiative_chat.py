@@ -40,34 +40,37 @@ class initiativeChat:
 
         #关键词触发检测
         if value := self.find_first_match(message.pure_text, self.keyword_trigger_list):
-            return await self._execute_reply(
+            decision = await self._execute_reply(
                 message, group_id, params,
                 log_msg=f"Keyword '{value}' triggered by user {user_id}, preparing to respond.",
                 prompt=f"现在群里触发了关键词:{value},你该考虑一下是否回复他的消息了,无关就保持沉默"
             )
+            await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
+            return decision
 
-        #活跃度限制而且消息要由文本部分
-        if await self.get_bot_active_reference(group_context, 3) < 0.5 and message.pure_text.strip():
+        #纯文本
+        if message.pure_text.strip():
             
             #追问检测
-            if params.get_seconds_since_user_time() < 10 and user_id == params.last_trigger_user_id:
-                decision = await self._execute_reply(
+            if params.get_seconds_since_user_time() < 15 and user_id == params.last_trigger_user_id:
+                return await self._execute_reply(
                     message, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",
                     prompt="尝试考虑用户在你回复后，是否下一句是想接着聊天的情况,你应观察是否应该进行回复,确定是接你的话就进行回复，不然就保持沉默"
                 )
-                await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
-                return decision
-            
-            #"现在你的消息被引用，你需要好好想想要不要回复或是怎么回复"暂时不做
-            
-            if await self.roll_trigger_probability(group_context, params):
-                return await self._execute_reply(
-                    message, group_id, params,
-                    log_msg="Random trigger activated, preparing to respond.",
-                    prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默.如果传入了图像是当前群里发送最新一条消息的所带或最新消息引用消息里的图像，这种情况下的消息都不是专门发送给你的,大多消息不是明确针对你的就不要回答了"
-                    "推荐在群里当卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为能完美解决的问题,不要打断或打扰到别人的聊天,不要在话中带上或问有什么需要帮忙,如果你看不懂建议就保持静默,不要频繁发言，尽量保持低调"
-                )
+
+            #活跃度限制
+            if await self.get_bot_active_reference(group_context, 3) < 0.5:
+                
+                #"现在你的消息被引用，你需要好好想想要不要回复或是怎么回复"暂时不做
+                
+                if await self.roll_trigger_probability(group_context, params):
+                    return await self._execute_reply(
+                        message, group_id, params,
+                        log_msg="Random trigger activated, preparing to respond.",
+                        prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默.如果传入了图像是当前群里发送最新一条消息的所带或最新消息引用消息里的图像，这种情况下的消息都不是专门发送给你的,大多消息不是明确针对你的就不要回答了"
+                        "推荐在群里当卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为能完美解决的问题,不要打断或打扰到别人的聊天,不要在话中带上或问有什么需要帮忙,如果你看不懂建议就保持静默,不要频繁发言，尽量保持低调"
+                    )
 
         await params.add_turns_since_last_llm()
         return False

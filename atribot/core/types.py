@@ -196,10 +196,10 @@ class Message:
         对处理过久的消息进行丢弃
     """
 
-    create_time: int
+    create_time: float
     """消息产生时间"""
     receive_time:float
-    """后端接收到这次消息的时间"""
+    """消息处理器首次接收到这次消息的时间"""
     process_time:float
     """到达当前处理节点的时间"""
     rich_data:"RichData"

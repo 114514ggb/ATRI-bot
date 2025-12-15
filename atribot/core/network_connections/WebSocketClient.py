@@ -1,5 +1,6 @@
-from typing import Optional, Dict, List, Callable, Any
 from asyncio import Queue, Event, create_task, sleep, gather, CancelledError, Task
+from websockets.legacy.client import WebSocketClientProtocol
+from typing import Optional, Dict, List, Callable, Any
 from atribot.core.service_container import container
 from contextlib import asynccontextmanager
 from logging import Logger
@@ -8,6 +9,8 @@ import asyncio
 import uuid
 import json
 import sys
+
+
 
 
 class WebSocketClient:
@@ -57,7 +60,7 @@ class WebSocketClient:
         self._retry_count = 0
         
         # 运行状态
-        self.websocket: Optional[websockets.WebSocketClientProtocol] = None
+        self.websocket: Optional[WebSocketClientProtocol] = None
         self._running = False
         """标志客户端启停"""
         self._connected = Event()
