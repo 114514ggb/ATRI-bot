@@ -293,7 +293,7 @@ class build_prompt:
             f"<group_history>{chat_record}</group_history>"
             f"</environment>{else_prompt}"
             f"<prompt>{prompt}</prompt>"
-            "<access_memory>有人问你记得什么事情或是问你某个人或事情的时候一定要使用查询记忆工具了解后再回答，比如有人问你记得[matter]吗？或是和某个人或事情相关问题就要想办法查询出[matter]相关结果</access_memory>"
+            "<access_memory>有人问你记得什么事情或是问你某个人或事情的时候一定要使用查询记忆工具了解后再回答，比如有人问你记得matter吗？或是和某个人或事情相关问题就要想办法查询出matter相关结果</access_memory>"
             "<output_requirement>"
             """
 **可用的decision**
@@ -319,7 +319,7 @@ class build_prompt:
     "decision":"update",
     "reason":"做出此决策的原因",
     "user_id":"需要更新信息的用户qq_id,没有这个参数默认是当前消息的用户",
-    "update_field":"这个必须是一个json对象,里面的key是需要更新的字段名,value是对应更新后的值, 参考原有的user_info给出你觉得需要更新的字段,对于没有出现的user_info可以查询工具了解后再更新"
+    "update_field":"这个必须是一个json对象,里面的key是需要更新的字段名,value是对应更新后的值, 参考原有的user_info给出你觉得需要更新的字段,记得不要太长,要简洁精炼不过200字"
 }
 
 规则:

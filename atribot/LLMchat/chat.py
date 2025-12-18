@@ -396,11 +396,11 @@ class group_chat(chat_baseics):
             return await self.model_api_supervisor.step(request)
 
         except LLMSRequestFailed as e:
-            self.log.error(f"群聊天出现了错误:{e}\n尝试备用api!")
+            self.log.exception(f"群聊天调用工具中途出现了错误:{e}\n尝试备用api!")
             request.generation_response = e.get_response()
             
         except Exception as e:
-            self.log.error(f"群聊天出现了错误:{e}\n尝试备用api!")
+            self.log.exception(f"群聊天出现了错误:{e}\n尝试备用api!")
         
         cached_image_prompt = None
         request.model_api = None
@@ -414,9 +414,9 @@ class group_chat(chat_baseics):
             supplier = parameter["supplier"]
             model_name = parameter["model_name"]
             if img_list:
-                visual_sense = self.supplier.get_model_information(
+                visual_sense:bool = self.supplier.get_model_information(
                     supplier, model_name
-                )["visual_sense"]
+                ).get("visual_sense",False)
 
                 if visual_sense == self.visual_sense:
                     new_request = replace(

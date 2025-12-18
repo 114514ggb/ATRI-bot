@@ -9,7 +9,8 @@ tmux kill-session -t atribot
 
 ffmpeg -i input.mp4 -c:v libx264 -b:v 2000k -c:a copy output.mp4
 ffmpeg -i video.mp4 -vf scale=1920:1080 -c:v libx264 -crf 15 -preset fast -r 30 video_1080_no_audio.mp4
-ffmpeg -i video.mp4 -vf scale=2560:1440 -c:v libx264 -crf 15 -preset fast -r 30 video_1080_no_audio.mp4
+2560:1440
+3840:2160
 -an #去声音
 
 ps aux | grep main.py

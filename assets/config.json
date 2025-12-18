@@ -29,7 +29,9 @@
             "system_review":false
         },
         "chat_parameter":{
-            "temperature":0.3
+            "temperature":0.3,
+            "max_tokens": 8000,
+            "tool_choice": "auto"
         },
         "memory":{
             "summarize_model":{

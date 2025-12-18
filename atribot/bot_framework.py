@@ -87,18 +87,18 @@ class BotFramework:
         LLMSupplier.add_connection(
             name = "bigModel",
             connection_object = bigModel,
-            model_list = {
+            model_dict = {
                 "GLM-4.5-Flash": {
-                "visual_sense": False
+                    "visual_sense": False
                 },
                 "GLM-4V-Flash": {
-                "visual_sense": True
+                    "visual_sense": True
                 },
                 "GLM-4.1V-Thinking-Flash": {
-                "visual_sense": True
+                    "visual_sense": True
                 },
                 "GLM-Z1-Flash": {
-                "visual_sense": False
+                    "visual_sense": False
                 }
             }
         )
@@ -110,14 +110,14 @@ class BotFramework:
         LLMSupplier.add_connection(
             name = "google",
             connection_object = account_pool,
-            model_list = {
+            model_dict = {
                 "google-ai-studio/gemini-2.5-flash": {
                     "visual_sense": True
                 },
                 "google-ai-studio/gemini-2.5-pro": {
                     "visual_sense": True
                 },
-                "google-ai-studio/gemini-2.0-flash": {
+                "google-ai-studio/gemini-3-flash-preview": {
                     "visual_sense": True
                 },
                 "google-ai-studio/gemini-2.5-flash-image-preview": {

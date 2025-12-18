@@ -1,4 +1,5 @@
-# from atri_head.Basics import Basics
+from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.service_container import container
 import time
 
 tool_json = {
@@ -13,11 +14,11 @@ tool_json = {
 }
 
 
-# qq_send_message = Basics().QQ_send_message
-qq_send_message = ""
+send_message:qq_send_message = container.get("SendMessage")
+
 
 async def main(qq_id):
-    qq_data = await qq_send_message.get_stranger_info(qq_id)
+    qq_data = await send_message.get_stranger_info(qq_id)
     return {"get_stranger_info": parse_qq_profile(qq_data)}
 
 

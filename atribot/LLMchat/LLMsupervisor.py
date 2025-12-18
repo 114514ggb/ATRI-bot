@@ -186,7 +186,7 @@ class large_language_model_supervisor():
             
             self._update_response(response, assistant_message)
 
-            for tool_call in assistant_message['tool_calls']:#可能一次里面调用多少工具
+            for tool_call in assistant_message['tool_calls']:#可能一次里面调用多少工具 
                 
                 try:
                     function = tool_call['function']
@@ -256,7 +256,7 @@ class large_language_model_supervisor():
         self.logger.debug("从中断继续请求!")
         response = request.generation_response
         
-        for msg in response.messages:
+        for msg in response.messages: 
             if msg['role'] in ['assistant','tool']:
                 increase_context.messages.append(msg)
         
@@ -302,24 +302,23 @@ class large_language_model_supervisor():
             increase_context.add_user_message(base_message)
         
         return increase_context
-            
-            
-    def _update_response(self, response:GenerationResponse ,assistant_message:Dict)->GenerationResponse:
+
+    def _update_response(self, response: GenerationResponse, assistant_message: Dict) -> GenerationResponse:
         """更新response"""
-        content:str = assistant_message.get("content")
-        content = content if content else ""
         
-        if content.startswith("<thought>"):
-            reasoning_content ,content = self.extract_thought(content)
-            response.reasoning_content += assistant_message.get("reasoning_content",reasoning_content)
-            response.reply_text.append(content)
-            return response
+        extracted_thought, cleaned_content = self.extract_thought(assistant_message.get("content") or "")
         
-        response.reasoning_content += assistant_message.get("reasoning_content","")
-        response.reply_text.append(content)
-        
+        if explicit_reasoning:= assistant_message.get("reasoning_content"):
+            response.reasoning_content.append(explicit_reasoning)
+        elif extracted_thought:
+            response.reasoning_content.append(extracted_thought)
+
+        if cleaned_content:
+            response.reply_text.append(cleaned_content)
+            
         return response
-    
+
+
     async def _get_assistant_message_with_retry(
         self,
         request: GenerationRequest,
@@ -387,7 +386,7 @@ class large_language_model_supervisor():
         """发起向api的请求"""
         if request.parameter:
             parameter = {
-                "messages": request.messages + messages,
+                "messages": request.messages + messages, 
                 "tools":  request.tool_json,
             } | request.parameter
             
@@ -398,6 +397,6 @@ class large_language_model_supervisor():
         else:
             return await model_api.generate_text_tools(
                 model = request.model,
-                messages = request.messages+messages,
+                messages = request.messages + messages, 
                 tools = request.tool_json
             )

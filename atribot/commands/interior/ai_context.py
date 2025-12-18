@@ -249,11 +249,13 @@ class AIContextCommands:
     async def _handle_get_user_info(self, group_id: str, target:str, user_id:int):
         """获取维护的user_info文档"""
 
+        self.permissions_management.has_permission(user_id, 2)
+        
         user_info = await self.user_system.get_user_info(int(target) if target else user_id)
         
         message = (
             "👤 维护的user_info\n"
-            f"• 称呼：{'、'.join(user_info['call_me'])} 👋\n"
+            f"• 称呼：{'、'.join(user_info['appellation'])} 👋\n"
             f"• 关系：{user_info['relation']} 🤝\n"
             f"• 性格：{user_info['personality']} 💭\n\n"
             

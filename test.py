@@ -32,13 +32,17 @@ key = "ollama"
 
 http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-key = "AIzaSyCADRVBg7AvF9mL3B1y5dTcvTKsoeD5_CQ"
+# key = "AIzaSyBZcbUz0lxzukU8z9Vu39IlG7M8t__VAxU"
+key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
 
 # http = "https://integrate.api.nvidia.com/v1/chat/completions"
 # key = "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"
 # http = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
 # key = "5f4cbc0d0eaf4cf79422e7109056fd3d.20R5i62X5nQbFqWC"
-
+# http = "https://api.xiaomimimo.com/v1/chat/completions"
+# key = "sk-cfuxvirf7af8otyrm9brgut7gfsax2cjtgjxu765pqyohs1y"
+# http = "https://api.34ku.com/v1/chat/completions"
+# key = "sk-7RLm4Zc4b9nq8FsraVBzacWyUCYM3u7bAOFU8XLXDVzrlF6x"
 
 
 tools = [
@@ -80,7 +84,8 @@ tools = [
 # model = "xai/grok-4-fast-non-reasoning"
 # model = "xai/grok-4-fast-reasoning"
 # model = "google-ai-studio/gemini-3-pro-preview"
-model = "google-ai-studio/gemini-2.5-flash"
+model = "google-ai-studio/gemini-3-flash-preview"
+# model = "google-ai-studio/gemini-2.5-flash"
 # model = "google-ai-studio/gemini-2.5-pro"
 # model = "claude-4.1-opus"
 # model = "moonshotai/kimi-k2-instruct-0905"
@@ -91,7 +96,8 @@ model = "google-ai-studio/gemini-2.5-flash"
 # model = "githubcopilot/gpt-5"
 # model = "moonshotai/kimi-k2-instruct-0905"
 # model = "GLM-4.5-Flash"
-
+# model = "mimo-v2-flash"
+# model = "gemini-3-flash-preview"
 
 # chat = async_openAI(base_url = http, api_key = key , tools = tools)
 
@@ -103,8 +109,8 @@ messages = [
     # {"role": "user", "content": "还有你看的到你能用的工具吗？你支持函数调用吗？如果支持的话说说有什么工具？没有的话也没关系，这是一条测试消息"}
     # {"role": "user", "content": "9.11和9.8相比哪个数大?"}
     # {"role": "user", "content": "解决 2025 年 AIME 中的问题 1：求出所有整数基数 b > 9 的和，使得 17b 是 97b 的除数"}
-    # {"role": "user", "content": "你好,你是？你能干什么？"}
-    {"role": "user", "content": "直接给我一个关于人工智能的诗歌，要求押韵且有深度，要求放在一个json对象的value里返回给我，key是‘poem’"}
+    {"role": "user", "content": "你好,你是？你能干什么？"}
+    # {"role": "user", "content": "直接给我一个关于人工智能的诗歌，要求押韵且有深度，要求放在一个json对象的value里返回给我，key是‘poem’"}
     # {
     #     "role": "user",
     #     "content": [
@@ -145,8 +151,8 @@ from atribot.core.types import Context
 
 
 async def main():
-    from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
-    import time
+    # from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+    # import time
     
     chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
     text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
@@ -252,8 +258,8 @@ async def main():
     
     
 
-# if __name__ == "__main__":
-#     asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
 
 
 
@@ -270,3 +276,6 @@ async def main():
             # "AIzaSyADjmYQGjzMa-op0-rkvveZbvisZTtV6bo",
 
             # "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
+
+
+      

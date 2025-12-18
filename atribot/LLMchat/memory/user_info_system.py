@@ -49,7 +49,25 @@ class UserSystem:
             }
         }
     
-    def _recursive_update(self, base: dict, update: dict) -> bool:
+    
+    def _safe_truncate(self, text: str, max_bytes: int) -> str:
+        """
+        按字节数限制截断字符串，保留末尾部分。
+        处理中英文混合情况，防止半个字符乱码。
+        """
+        if not isinstance(text, str):
+            return text
+            
+        encoded = text.encode('utf-8')
+        
+        if len(encoded) <= max_bytes:
+            return text
+
+        truncated_bytes = encoded[-max_bytes:]
+        
+        return truncated_bytes.decode('utf-8', errors='ignore')
+    
+    def _recursive_update(self, base: dict, update: dict, max_bytes: int = 900) -> bool:
         """
         递归更新字典，只更新base中已存在的键值对。
         
@@ -58,6 +76,7 @@ class UserSystem:
         2. 只有新旧值的类型一致时才进行更新，防止类型错误
         3. 如果值是字典类型，则递归进入内部进行更新
         4. 只有当值确实发生变化时才视为更新
+        5. 则保留最新的 max_bytes 大小的内容,注:一个中文字符3byte英文1byte
         
         Args:
             base (dict): 基础字典，将被更新的目标字典
@@ -92,8 +111,13 @@ class UserSystem:
                     has_changed = True
             
             elif isinstance(current_val, type(new_val)):
-                if current_val != new_val:
-                    base[key] = new_val
+                final_val = new_val
+                
+                if isinstance(new_val, str):
+                    final_val = self._safe_truncate(new_val, max_bytes)
+                    
+                if current_val != final_val:
+                    base[key] = final_val
                     has_changed = True
 
         return has_changed

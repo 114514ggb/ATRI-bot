@@ -19,19 +19,19 @@
             "api_key":"sk-gTimJsqOxEZZI1b8o9YqMI9Pr3URiEN4Icj1Q2Ph895TXME1",
             "models":{
                 "gemini-2.5-auto": {
-                "visual_sense": true
+                    "visual_sense": true
                 },
                 "gemini-2.5-flash": {
-                "visual_sense": true
+                    "visual_sense": true
                 },
                 "gemini-2.5-pro-old": {
-                "visual_sense": true
+                    "visual_sense": true
                 },
                 "claude-sonnet-4-20250514": {
-                "visual_sense": false
+                    "visual_sense": false
                 },
                 "gpt-5-chat-latest": {
-                "visual_sense": false
+                    "visual_sense": false
                 }
             }
         },
@@ -70,6 +70,16 @@
                 },
                 "GeminiCLI/gemini-2.5-flash-search":{
                     "visual_sense":true
+                }
+            }
+        },
+        {
+            "name":"xiaomi_mini",
+            "base_url":"https://api.xiaomimimo.com/v1/chat/completions",
+            "api_key":"sk-cfuxvirf7af8otyrm9brgut7gfsax2cjtgjxu765pqyohs1y",
+            "models":{
+                "mimo-v2-flash":{
+                    "visual_sense":false
                 }
             }
         }

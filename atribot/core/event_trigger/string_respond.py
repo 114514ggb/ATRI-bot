@@ -289,7 +289,7 @@ class string_response:
         "这么强": [["img",["ATRI_厉害.jpg"]]],
         "yes": [["img",["ATRI_yes.jpg","ATRI_YES1.jpg","ATRI_YES2.jpg","ATRI_yes.gif"]]],
         "YES": [["img",["ATRI_yes.jpg","ATRI_YES1.jpg","ATRI_YES2.jpg","ATRI_yes.gif"]]],
-        "杂鱼": [["img",["ATRI_杂鱼.jpg"]]],
+        "杂鱼": [["img",["ATRI_杂鱼.jpg","ATRI_杂鱼1.jpg"]]],
         "蚌埠": [["text",["难蚌"]],["img",["ATRI_流汗.jpg","ATRI_扣脸.gif"]]],
         "星期四":[["img",["ATRI_V我50.jpg"]]],
         "鬼": [["img",["ATRI_当鬼.gif","ATRI_鬼脸.gif"]]],
