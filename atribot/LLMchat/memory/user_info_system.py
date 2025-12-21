@@ -219,5 +219,5 @@ class UserSystem:
         async with self.database as db:
             await db.execute_with_pool(
                 query = sql,
-                params = (user_id, json.dumps(info))
+                params = (int(user_id), json.dumps(info))
             )

@@ -1,7 +1,7 @@
 #include <Python.h>
 #include <string.h>
 #include <stdlib.h>
-
+#include <stdio.h>
 
 int levenshtein_distance(const char* s1, const char* s2) {
     int len1 = strlen(s1);

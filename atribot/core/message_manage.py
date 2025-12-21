@@ -180,7 +180,7 @@ class group_manage(message_manage):
                     f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}"
                 )
         else:
-            raise PermissionError("你好像在黑名单里？") 
+            self.logger.info(f"黑名单人员被拒绝聊天{data["user_id"]}!") 
 
 
     async def _process_memory_summary(self, data, text, group_id):

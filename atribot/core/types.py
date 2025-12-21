@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Dict,List,Any
 from collections import deque
 import asyncio
+import bisect
 import time
 
 
@@ -122,6 +123,14 @@ class Context():
         """添加助手消息"""
         self.messages.append({"role": "assistant", "content": content})
         
+    def add_assistant_message_flexible(self, assistant_message:Dict):
+        """灵活的添加user消息
+
+        Args:
+            assistant_message (Dict): 模型返回原始消息字段
+        """
+        self.messages.append(assistant_message)
+        
     def add_assistant_tool_message(self, content: str|None,tool_calls:List[Dict] = None) -> None:
         """添加助手调用工具消息"""
         if content:
@@ -133,9 +142,14 @@ class Context():
         """添加系统消息"""
         self.messages.append({"role": "system", "content": content})
         
-    def add_tool_message(self, content: str, tool_call_id:int = None) -> None:
+    def add_tool_message(self, naem:str ,tool_call_id:str , content: str) -> None:
         """添加工具消息"""
-        self.messages.append({"role": "tool", "content": content, "tool_call_id": tool_call_id})
+        self.messages.append({
+            "role": "tool",
+            "name": naem, 
+            "tool_call_id": tool_call_id,
+            "content": content
+        })
         
     def record_validity_check(self) -> list:
         """
@@ -216,74 +230,90 @@ class Message:
 
 
 class TimeWindow:
-    """定义一个时间窗口，用于统计一段时间内的消息数量，作为衡量群活跃度的参考。
-    
-    该类是线程安全的，可以在异步环境中并发调用。
+    """定义一个时间窗口，用于统计一段时间内的消息数量
+        作为衡量一些东西在一段时间内的跃度参考
     """
+    __slots__ = ('window_seconds', 'events')
     
-    windows_time: int
+    window_seconds: int
     """当前窗口的统计时间，单位秒"""
-    windows_deque: deque
-    """存储在当前窗口时间内的有效时间戳，按照时间降序排列（新->旧）"""
-    _lock: asyncio.Lock
-    """用于保护数据结构的异步锁"""
+    events: deque
+    """存储在当前窗口时间内的有效时间戳,顺序：[旧 -> 新]"""
     
-    def __init__(self, windows_time: int):
+    def __init__(self, window_seconds: int = 60):
         """初始化时间窗口。
         
         Args:
-            windows_time: 时间窗口的大小，单位秒。必须为正整数。
+            window_seconds: 时间窗口的大小，单位秒。必须为正整数。
             
         Raises:
-            ValueError: 如果 windows_time 不是正整数
+            ValueError: 如果 window_seconds 不是正整数
         """
-        if not isinstance(windows_time, int) or windows_time <= 0:
-            raise ValueError("windows_time 必须为正整数")
-        self.windows_time = windows_time
-        self.windows_deque = deque()
-        self._lock = asyncio.Lock()
+        if not isinstance(window_seconds, int) or window_seconds <= 0:
+            raise ValueError("window_seconds 必须为正整数")
+        self.window_seconds = window_seconds
+        self.events = deque()
     
-    def _clean_expired(self, cutoff: float):
-        """清理过期数据的内部方法，假设调用者已持有锁。
+    def _clean_expired(self, now: float):
+        """清理过期数据：移除所有早于 (now - window) 的时间戳"""
+        cutoff = now - self.window_seconds
+        while self.events and self.events[0] < cutoff:
+            self.events.popleft()
+    
+    def add(self):
+        """添加一条当前时间的计数"""
+        now = time.monotonic()
+        self.events.append(now)
+        self._clean_expired(now)
+    
+    def get(self) -> int:
+        """返回当前有效的消息数量"""
+        self._clean_expired(time.monotonic())
+        return len(self.events)
+    
+    def clear(self):
+        """清空所有计数"""
+        self.events.clear()
+    
+    def get_sub_window(self, sub_seconds: int) -> 'TimeWindow':
+        """
+        创建一个更短时间的子窗口，并继承当前窗口内的有效数据。
         
         Args:
-            cutoff: 时间戳阈值，小于此值的数据将被移除
+            sub_seconds: 子窗口的时间长度（秒）。必须小于等于当前窗口长度。
         """
-        while self.windows_deque and self.windows_deque[-1] < cutoff:
-            self.windows_deque.pop()
-    
-    async def add(self):
-        """添加一条当前时间的计数"""
-        now = time.time()
-        async with self._lock:
-            self.windows_deque.appendleft(now)
-            # self._clean_expired(now - self.windows_time)
-    
-    async def get(self) -> int:
-        """返回当前有效的消息数量"""
-        async with self._lock:
-            self._clean_expired(time.time() - self.windows_time)
-            return len(self.windows_deque)
-    
-    async def get_timestamps(self) -> List[float]:
-        """返回当前窗口内所有有效时间戳的副本
+        if sub_seconds > self.window_seconds:
+            raise ValueError("子窗口时间不能大于父窗口时间")
         
-        Returns:
-            按时间降序排列的时间戳列表
-        """
-        async with self._lock:
-            self._clean_expired(time.time() - self.windows_time)
-            return list(self.windows_deque)
+        sub_win = TimeWindow(sub_seconds)
+        now = time.monotonic()
+        self._clean_expired(now) 
+        
+        count = len(self.events)
+        if count == 0:
+            return sub_win
+            
+        cutoff = now - sub_seconds
+
+        if sub_seconds / self.window_seconds < 0.15:
+            temp = []
+            for t in reversed(self.events):
+                if t < cutoff:
+                    break
+                temp.append(t)
+            sub_win.events.extend(reversed(temp))
+
+        else:
+            events_list = list(self.events)
+            idx = bisect.bisect_left(events_list, cutoff)
+            sub_win.events.extend(events_list[idx:])
+            
+        return sub_win
     
-    async def clear(self):
-        """清空所有计数"""
-        async with self._lock:
-            self.windows_deque.clear()
-    
-    async def size(self) -> int:
-        """返回当前队列大小，不清理过期数据"""
-        async with self._lock:
-            return len(self.windows_deque)
+    @property
+    def size(self) -> int:
+        """返回当前队列大小（不触发清理）"""
+        return len(self.events)
 
 
 class LLMGroupChatCondition:
@@ -429,7 +459,7 @@ class GroupContext:
         async with self.async_lock:
             self.last_msg_at = time.time() #更新群最后处理时间
             self.messages.append(message)
-            await self.time_window.add()
+            self.time_window.add()
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
             

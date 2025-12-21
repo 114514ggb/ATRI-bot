@@ -29,6 +29,5 @@ async def main(group_id:int|str, user_id:int, duration:int):
         group_id,
         user_id,
         duration
-    )}"
-    )
+    )}")
 

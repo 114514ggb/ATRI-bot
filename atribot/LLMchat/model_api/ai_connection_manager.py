@@ -1,4 +1,5 @@
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
+from atribot.LLMchat.model_api.llm_api_account_pool import ai_api_account_pool
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from dataclasses import dataclass
 from typing import Dict
@@ -58,10 +59,19 @@ class ai_connection_manager:
             for api_config in config_data.get("api", []):
                 api_config:dict
                 try:
-                    connection_object = await universal_ai_api.create(
-                        base_url=api_config["base_url"],
-                        api_key=api_config["api_key"]
-                    )
+                    api_key = api_config["api_key"]
+                    
+                    if isinstance(api_key,list):
+                        #list就使用号池
+                        connection_object = await ai_api_account_pool(
+                            base_url=api_config["base_url"],
+                            api_key_pool=api_key
+                        ).initialize()
+                    else:
+                        connection_object = await universal_ai_api.create(
+                            base_url=api_config["base_url"],
+                            api_key=api_key
+                        )
 
                     connection = ai_api_connection(
                         name=api_config["name"],

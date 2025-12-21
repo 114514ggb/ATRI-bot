@@ -1,6 +1,5 @@
 from atribot.core.command.async_permissions_management import permissions_management
 from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
-from atribot.LLMchat.model_api.llm_api_account_pool import ai_api_account_pool
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.network_connections.qq_send_message import qq_send_message
@@ -63,6 +62,7 @@ class BotFramework:
             await atriAsyncPostgreSQL.create(
                 host = self.config.database.host, 
                 user = self.config.database.user,
+                port = self.config.database.port,
                 password = self.config.database.password
             )
         )
@@ -100,29 +100,6 @@ class BotFramework:
                 "GLM-Z1-Flash": {
                     "visual_sense": False
                 }
-            }
-        )
-        account_pool = ai_api_account_pool(
-            base_url = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions",
-            api_key_pool = self.config.model.api_key_pool
-        )
-        await account_pool.initialize()
-        LLMSupplier.add_connection(
-            name = "google",
-            connection_object = account_pool,
-            model_dict = {
-                "google-ai-studio/gemini-2.5-flash": {
-                    "visual_sense": True
-                },
-                "google-ai-studio/gemini-2.5-pro": {
-                    "visual_sense": True
-                },
-                "google-ai-studio/gemini-3-flash-preview": {
-                    "visual_sense": True
-                },
-                "google-ai-studio/gemini-2.5-flash-image-preview": {
-                    "visual_sense": True
-                },
             }
         )
         

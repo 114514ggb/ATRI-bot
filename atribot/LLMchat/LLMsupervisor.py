@@ -144,7 +144,7 @@ class large_language_model_supervisor():
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
             
-            increase_context.add_assistant_message(content)
+            increase_context.add_assistant_message_flexible(assistant_message)
             return  self._update_response(
                 GenerationResponse(
                     messages = increase_context.messages
@@ -197,7 +197,7 @@ class large_language_model_supervisor():
                     tool_output = str(await self.tool_management.calls(tool_name,tool_input))
                     
                 except ToolCallsStopIteration:
-                    increase_context.add_tool_message(tool_output,tool_call['id'])
+                    increase_context.add_tool_message(tool_name,tool_call['id'],tool_output)
                     self.logger.info("模型主动结束工具调用!")
                     response.messages = increase_context.messages
                     return response
@@ -210,8 +210,9 @@ class large_language_model_supervisor():
                 self.logger.debug(f"工具调用输出:{tool_output}")
                 
                 increase_context.add_tool_message(
+                    tool_name,
+                    tool_call['id'],
                     tool_output[:20000],#截断防止有的工具返回过长的结果
-                    tool_call['id']
                 )
               
             try:
@@ -269,7 +270,7 @@ class large_language_model_supervisor():
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             
             self._update_response(response, assistant_message)
-            increase_context.add_assistant_message(content)
+            increase_context.add_assistant_message_flexible(assistant_message)
             response.messages = increase_context.messages
             return response
         
@@ -306,14 +307,20 @@ class large_language_model_supervisor():
     def _update_response(self, response: GenerationResponse, assistant_message: Dict) -> GenerationResponse:
         """更新response"""
         
-        extracted_thought, cleaned_content = self.extract_thought(assistant_message.get("content") or "")
+        # extracted_thought, cleaned_content = self.extract_thought(assistant_message.get("content") or "")
         
-        if explicit_reasoning:= assistant_message.get("reasoning_content"):
-            response.reasoning_content.append(explicit_reasoning)
-        elif extracted_thought:
-            response.reasoning_content.append(extracted_thought)
+        # if explicit_reasoning:= assistant_message.get("reasoning_content"):
+        #     response.reasoning_content.append(explicit_reasoning)
+        # elif extracted_thought:
+        #     response.reasoning_content.append(extracted_thought)
 
-        if cleaned_content:
+        # if cleaned_content:
+        #     response.reply_text.append(cleaned_content)
+        
+        if explicit_reasoning := assistant_message.get("reasoning_content"):
+            response.reasoning_content.append(explicit_reasoning)
+            
+        if cleaned_content := assistant_message.get("content") or "":
             response.reply_text.append(cleaned_content)
             
         return response
@@ -372,9 +379,7 @@ class large_language_model_supervisor():
                 - thought_content: 提取的thought内容，没有则返回空字符串
                 - cleaned_text: 去掉<thought></thought>标签后的文本
         """
-        match = re.search(r'<thought>(.*?)</thought>', text, re.DOTALL)
-        
-        if match:
+        if match:= re.search(r'<thought>(.*?)</thought>', text, re.DOTALL):
             thought_content = match.group(1)
             cleaned_text = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL)
             return thought_content, cleaned_text

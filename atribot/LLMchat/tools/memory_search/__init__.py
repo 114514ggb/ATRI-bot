@@ -34,6 +34,5 @@ async def main(question_text:str=None,limit:int=10,user_id:str|int=None):
         formatting_list = [(datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1]) for r in await memiry_system.query_user_memory(user_id,limit, question_text)]
     else:
         formatting_list = [(datetime.datetime.fromtimestamp(r[0]).strftime("%Y-%m-%d %H:%M:%S"),r[1] if r[1] else "知识库",r[2]) for r in await memiry_system.query_add_memory(limit, question_text)]
-
     
     return f"查询记忆返回值:{formatting_list}"

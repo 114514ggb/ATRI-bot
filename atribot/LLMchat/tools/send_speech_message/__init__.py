@@ -42,4 +42,4 @@ async def main(group_id, text, emotion="高兴", speed=0.9):
     )
     await send_message.send_group_audio(group_id, audio_path,default=True)
 
-    return {"send_speech_message": f"已发送语音：{text},<NOTICE>需要需要结束的话再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
+    return f"已发送语音：{text},<NOTICE>需要需要结束的话再调用tool_calls_end工具代表工具调用结束</NOTICE>"

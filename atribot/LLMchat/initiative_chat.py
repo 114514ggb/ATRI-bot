@@ -38,21 +38,11 @@ class initiativeChat:
             await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
             return decision
 
-        #关键词触发检测
-        if value := self.find_first_match(message.pure_text, self.keyword_trigger_list):
-            decision = await self._execute_reply(
-                message, group_id, params,
-                log_msg=f"Keyword '{value}' triggered by user {user_id}, preparing to respond.",
-                prompt=f"现在群里触发了关键词:{value},你该考虑一下是否回复他的消息了,无关就保持沉默"
-            )
-            await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
-            return decision
-
         #纯文本
         if message.pure_text.strip():
             
             #追问检测
-            if params.get_seconds_since_user_time() < 15 and user_id == params.last_trigger_user_id:
+            if params.get_seconds_since_user_time() < 10 and user_id == params.last_trigger_user_id:
                 return await self._execute_reply(
                     message, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",
@@ -60,11 +50,21 @@ class initiativeChat:
                 )
 
             #活跃度限制
-            if await self.get_bot_active_reference(group_context, 3) < 0.5:
+            if self.get_bot_active_reference(group_context, 3) < 0.5:
+                
+                #关键词触发检测
+                if value := self.find_first_match(message.pure_text, self.keyword_trigger_list):
+                    decision = await self._execute_reply(
+                        message, group_id, params,
+                        log_msg=f"Keyword '{value}' triggered by user {user_id}, preparing to respond.",
+                        prompt=f"现在群里触发了关键词:{value},你该考虑一下是否回复他的消息了,无关就保持沉默"
+                    )
+                    await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
+                    return decision
                 
                 #"现在你的消息被引用，你需要好好想想要不要回复或是怎么回复"暂时不做
                 
-                if await self.roll_trigger_probability(group_context, params):
+                if self.roll_trigger_probability(group_context, params):
                     return await self._execute_reply(
                         message, group_id, params,
                         log_msg="Random trigger activated, preparing to respond.",
@@ -113,14 +113,14 @@ class initiativeChat:
                 return pattern
         return None
     
-    async def roll_trigger_probability(self, group_context:GroupContext, decision_parameters:LLMGroupChatCondition) -> bool:
+    def roll_trigger_probability(self, group_context:GroupContext, decision_parameters:LLMGroupChatCondition) -> bool:
         """
         根据一些条件决定是否触发聊天
         """
         if (
-            decision_parameters.turns_since_last_llm > 30 
-            and await group_context.time_window.get() >= 2
-            and decision_parameters.get_seconds_since_user_time() > 300
+            decision_parameters.turns_since_last_llm > 30 #距离的消息条数
+            and 2 <= group_context.time_window.get() <= 30 #群活跃要在一个区间
+            and decision_parameters.get_seconds_since_user_time() > 300 #回复时间冷却
             and decision_parameters.get_seconds_since_llm_time() > 120
         ):
             return True
@@ -128,7 +128,7 @@ class initiativeChat:
         return False
     
     
-    async def get_bot_active_reference(self, group_context:GroupContext, bayesian_smoothing_correction:int = 1)->float:
+    def get_bot_active_reference(self, group_context:GroupContext, bayesian_smoothing_correction:int = 1)->float:
         """获取指定群聊的人机消息占比的参考值
 
         Args:
@@ -138,8 +138,8 @@ class initiativeChat:
         Returns:
             float: 在窗口时间内的bot消息和群总消息的大约比值
         """
-        if total_msgs := await group_context.time_window.get():
-            if bot_msgs := await group_context.LLM_chat_decision_parameters.time_window.get():
+        if total_msgs := group_context.time_window.get():
+            if bot_msgs := group_context.LLM_chat_decision_parameters.time_window.get():
                 return bot_msgs / (total_msgs + bayesian_smoothing_correction)
         
         return 0.0

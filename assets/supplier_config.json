@@ -74,6 +74,28 @@
             }
         },
         {
+            "name":"google",
+            "base_url":"https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions",
+            "api_key":[
+                "AIzaSyADjmYQGjzMa-op0-rkvveZbvisZTtV6bo"
+
+            ],
+            "models":{
+                "google-ai-studio/gemini-2.5-flash": {
+                    "visual_sense": true
+                },
+                "google-ai-studio/gemini-2.5-pro": {
+                    "visual_sense": true
+                },
+                "google-ai-studio/gemini-3-flash-preview": {
+                    "visual_sense": true
+                },
+                "google-ai-studio/gemini-2.5-flash-image-preview": {
+                    "visual_sense": true
+                }
+            }
+        },
+        {
             "name":"xiaomi_mini",
             "base_url":"https://api.xiaomimimo.com/v1/chat/completions",
             "api_key":"sk-cfuxvirf7af8otyrm9brgut7gfsax2cjtgjxu765pqyohs1y",

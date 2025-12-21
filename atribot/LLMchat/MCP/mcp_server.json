@@ -7,14 +7,14 @@
     },
     "魔塔-fetch": {
       "type": "sse",
-      "url": "https://mcp.api-inference.modelscope.net/fe8ec4fddb9847/sse",
+      "url": "",
       "active": false
     },
     "mcp-server-firecrawl": {
       "command": "npx",
       "args": ["-y", "firecrawl-mcp"],
       "env": {
-        "FIRECRAWL_API_KEY": "fc-e1084899b29d4528ae047d0a7df91318"
+        "FIRECRAWL_API_KEY": ""
       },
       "active": false
     },
@@ -22,7 +22,7 @@
       "command": "npx",
       "args": ["-y", "tavily-mcp@0.1.4"],
       "env": {
-        "TAVILY_API_KEY": "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"
+        "TAVILY_API_KEY": ""
       },
       "disabled": false,
       "autoApprove": [],
@@ -31,7 +31,7 @@
     "MS-ImgGen-MCP": {
       "command": "uvx", 
       "args": ["ms_image_gen_mcp@latest"], 
-      "env": { "MODELSCOPE_API_KEY": "ms-cdc2aae5-bfe7-48b2-9a42-e67e1bb02736" } ,
+      "env": { "MODELSCOPE_API_KEY": "" } ,
       "active": false
     },
     "bingcn": {
@@ -48,7 +48,7 @@
         "@amap/amap-maps-mcp-server"
       ],
       "env": {
-        "AMAP_MAPS_API_KEY": "33a63b198b158f9ddf2a8bb5c514130c"
+        "AMAP_MAPS_API_KEY": ""
       },
       "active": false
     },

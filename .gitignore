@@ -1,12 +1,27 @@
 # Python-generated files
-__pycache__/
+__pycache__
+*.pyc
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
-document/
+/document/**/*.wav
+/document/**/*.mp3
+/document/**/*.mp4
+/document/**/*.flac
+/document/**/*.jpg
+/document/**/*.gif
+/document/**/*.png
+/document/**/*.jpeg
+/document/**/*.docx
+/document/**/*.txt
+privacy/
+.vscode/
+test.py
 *.log
+assets/config.json
+assets/supplier_config.json
 
 # Virtual environments
 .venv

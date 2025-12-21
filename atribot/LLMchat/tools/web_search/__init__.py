@@ -1,11 +1,10 @@
 import aiohttp
 from typing import List, Dict, Optional, Any
+from atribot.core.service_container import container
 
-
-tokey = "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"
 
 headers = {
-    "Authorization": f"Bearer {tokey}",
+    "Authorization": f"Bearer {container.get("config").model.tavily_search_API_key}",
     "Content-Type": "application/json"
 }
 

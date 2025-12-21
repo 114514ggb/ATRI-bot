@@ -29,4 +29,4 @@ async def main(group_id, url):
             get_return=True
         )
 
-    return {"send_speech_message": f"发送图像执行结果:{text}"}
+    return f"发送图像执行结果:{text}"

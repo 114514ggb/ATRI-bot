@@ -1284,6 +1284,36 @@ bot_消息 ={'self_id': 3930909243,
            'prompt_tokens_details': {'cached_tokens': 43},
            'total_tokens': 5547}}
 
+
+
+{
+"role": "assistant",
+        "tool_calls": [
+          {
+            "extra_content": {
+              "google": {
+                "thought_signature": "<Signature A>" #Signature returned
+              }
+            },
+            "function": {
+              "arguments": "{\"location\":\"Paris\"}",
+              "name": "get_current_temperature"
+            },
+            "id": "function-call-f3b9ecb3-d55f-4076-98c8-b13e9d1c0e01",
+            "type": "function"
+          },
+          {
+            "function": {
+              "arguments": "{\"location\":\"London\"}",
+              "name": "get_current_temperature"
+            },
+            "id": "function-call-335673ad-913e-42d1-bbf5-387c8ab80f44",
+            "type": "function" # No signature on Parallel FC
+          }
+        ]
+}
+
+
 {'id': 'chatcmpl-CFglK8cufxIO7bVpJ23pHQClCx3oj',
  'model': 'gpt-5-chat-latest',
  'object': 'chat.completion',

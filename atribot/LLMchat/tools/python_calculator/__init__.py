@@ -11,6 +11,7 @@ tool_json = {
     }
 }
 
+#其实这个不太安全
 async def main(formula):
     return {"python_calculator":f"{formula} == {eval(formula)}"}
 

@@ -32,8 +32,8 @@ key = "ollama"
 
 http = "https://jiashu.1win.eu.org/https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions"
 # http = "https://my-openai-gemini-1wivjpw53-114514ggbs-projects.vercel.app/v1/chat/completions"
-# key = "AIzaSyBZcbUz0lxzukU8z9Vu39IlG7M8t__VAxU"
-key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
+key = "AIzaSyDUdwvolX1kJiHUDRVERGSj-2MIe0BDKPA"
+# key = "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
 
 # http = "https://integrate.api.nvidia.com/v1/chat/completions"
 # key = "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"
@@ -84,8 +84,8 @@ tools = [
 # model = "xai/grok-4-fast-non-reasoning"
 # model = "xai/grok-4-fast-reasoning"
 # model = "google-ai-studio/gemini-3-pro-preview"
-model = "google-ai-studio/gemini-3-flash-preview"
-# model = "google-ai-studio/gemini-2.5-flash"
+# model = "google-ai-studio/gemini-3-flash-preview"
+model = "google-ai-studio/gemini-2.5-flash"
 # model = "google-ai-studio/gemini-2.5-pro"
 # model = "claude-4.1-opus"
 # model = "moonshotai/kimi-k2-instruct-0905"
@@ -248,7 +248,6 @@ async def main():
     # with open("test.txt",'w',encoding = 'utf-8') as file:
     #   file.write(str(text))
     
-    
     # text = await extract_and_summarize_facts(test_sentences)
     
     await chat.aclose()
@@ -258,8 +257,8 @@ async def main():
     
     
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
 
 
 
@@ -277,5 +276,3 @@ if __name__ == "__main__":
 
             # "AIzaSyDBpQlwwBuAU7clGvZaW0HkpYmkOmnJoaw"
 
-
-      

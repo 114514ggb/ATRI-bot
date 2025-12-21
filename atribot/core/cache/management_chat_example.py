@@ -111,7 +111,7 @@ class ChatManager:
         Returns:
             int: 消息计数
         """
-        return await self.get_group_context(group_id).time_window.get()
+        return (await self.get_group_context(group_id)).time_window.get()
         
     async def add_message_record(
         self,
@@ -133,7 +133,7 @@ class ChatManager:
                 group_context: GroupContext = self.get_group_context(data["group_id"])
                 
                 if data.get("message_sent_type") == "self":
-                    await group_context.LLM_chat_decision_parameters.time_window.add()
+                    group_context.LLM_chat_decision_parameters.time_window.add()
                 # else:
                 #     #提取图像url到缓存
                 #     group_context.data_extract_img_url(data)

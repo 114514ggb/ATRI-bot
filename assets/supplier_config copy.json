@@ -1,0 +1,17 @@
+{
+    "api":[
+        {
+            "name":"deepseek",
+            "base_url":"https://api.deepseek.com/chat/completions",
+            "api_key":"",
+            "models":{
+                "deepseek-chat": {
+                    "visual_sense": false
+                },
+                "deepseek-reasoner": {
+                    "visual_sense": false
+                }
+            }
+        }
+    ]
+}

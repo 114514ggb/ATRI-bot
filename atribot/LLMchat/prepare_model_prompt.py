@@ -289,7 +289,7 @@ class build_prompt:
             "<context>"
             "<environment>"
             f"你在一个qq群聊中,群号是{group_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name}请注意哪些是你自己的发言。,一些特殊消息被格式化成文本了,不要发送未经允许的[CQ:~]等你在聊天记录中看到的特殊内容"
-            "群内的消息已经被格式化成文本,用户唯一标识:\"qq_id\"用户自己定义的名称:\"nick_name\"当前user在当前群的权限情况:\"group_role\"格式化后的用户输入:\"user_message\",注意区分你自己的和别人的消息"
+            "群内的消息已经被格式化成文本,用户唯一标识:\"qq_id\"用户自己定义账号名称:\"nick_name\"当前user在当前群的权限情况:\"group_role\"格式化后的用户输入:\"user_message\",注意区分你自己的和别人的消息"
             f"<group_history>{chat_record}</group_history>"
             f"</environment>{else_prompt}"
             f"<prompt>{prompt}</prompt>"
@@ -298,12 +298,12 @@ class build_prompt:
             """
 **可用的decision**
 参数:reply
-功能描述:对一条消息进行回复或是主动发言,可以自然的顺着正在进行的聊天内容进行回复或直接发送消息
+功能描述:对一条消息进行回复或是主动发言,可以自然的顺着正在进行的聊天内容进行回复或直接发送消息,输出语言应是user所是使用的语言
 {
     "decision":"reply",
     "target_message_id":"想要回复的消息id,type要求int,这个字段是非必要的",
     "reason":"做出此决策的原因",
-    "content":"将解析发送给群内的文本list,里面会分条发送对应的str(要正常自然分段),内容可以有个性,可以带点情绪,可以带点幽默感,称呼或是其他个性化的内容推荐参考<user_info>"
+    "content":"将解析发送给群内的文本list,里面会分条发送对应的str(要正常自然分段),内容可以有个性,可以带点情绪,可以带点幽默感,需要的称呼或是其他个性化的内容推荐参考user_info"
 }
 
 参数:silence

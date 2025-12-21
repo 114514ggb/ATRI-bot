@@ -48,6 +48,6 @@ async def main(group_id, prompt, width="1024", height="1024"):
 
     data = await send_message.send_group_pictures(group_id,f"base64://{url_base64}",local_Path_type=False,get_return=True)
     # print("图片发送成功")
-    return {"send_image_message": {"status":f"发送结果：{data}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}}
+    return {"status":f"发送结果：{data}<NOTICE>需要再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
 
 

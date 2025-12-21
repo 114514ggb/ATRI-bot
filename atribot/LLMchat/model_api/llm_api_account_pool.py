@@ -10,7 +10,7 @@ class ai_api_account_pool(universal_ai_api):
     
     def __init__(self, 
             api_key_pool:List[str] = None, 
-            base_url:str = "https://gateway.ai.cloudflare.com/v1/824184f590d653076279e09f520d4c41/atri/compat/v1/chat/completions", 
+            base_url:str = "https://api.deepseek.com/chat/completions", 
             tools = None
         ):
         
@@ -88,3 +88,4 @@ class ai_api_account_pool(universal_ai_api):
             ),
             timeout=aiohttp.ClientTimeout(total=120),  # 总超时设置
         )
+        return self

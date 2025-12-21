@@ -37,7 +37,7 @@ async def main(group_id:int|str, name:str,):
             str(music_lsit[0]["id"])
         )
         
-        return {"send_cloud_music":f"已发送歌曲:{music_lsit[0]["name"]},<NOTICE>需要需要结束的话再调用tool_calls_end工具代表工具调用结束</NOTICE>"}
+        return f"已发送歌曲:{music_lsit[0]["name"]},<NOTICE>需要需要结束的话再调用tool_calls_end工具代表工具调用结束</NOTICE>"
     else:
-        return {"send_cloud_music":"没有这首歌"}
+        return "没有这首歌"
 

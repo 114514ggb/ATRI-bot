@@ -1,5 +1,5 @@
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
-from .api_key_bigModel import api_key
+from atribot.core.service_container import container
 import base64
 # try:
 #     from zhipuai import ZhipuAI
@@ -117,6 +117,7 @@ class async_bigModel_api():
     # chat_model = "GLM-4.1V-Thinking-Flash"
     
     def __init__(self):
+        api_key = container.get("config").model.bigModel_key
         self.client = universal_ai_api(
             api_key=api_key,
             base_url="https://open.bigmodel.cn/api/paas/v4/chat/completions"
