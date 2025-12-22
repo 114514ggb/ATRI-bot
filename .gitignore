@@ -6,22 +6,28 @@ build/
 dist/
 wheels/
 *.egg-info
-/document/**/*.wav
-/document/**/*.mp3
-/document/**/*.mp4
-/document/**/*.flac
-/document/**/*.jpg
-/document/**/*.gif
-/document/**/*.png
-/document/**/*.jpeg
-/document/**/*.docx
-/document/**/*.txt
 privacy/
 .vscode/
 test.py
 *.log
 assets/config.json
 assets/supplier_config.json
+
+# 图片
+/document/**/*.jpg
+/document/**/*.jpeg
+/document/**/*.png
+/document/**/*.gif
+
+# 音频/视频
+/document/**/*.wav
+/document/**/*.mp3
+/document/**/*.mp4
+/document/**/*.flac
+
+# 文档
+/document/**/*.docx
+/document/**/*.txt
 
 # Virtual environments
 .venv
