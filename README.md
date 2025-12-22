@@ -17,7 +17,7 @@
 
 来自萌新到处学习(抄袭，不对是集百家之长 ✨)做出来私用的神秘项目.
 主要是**按照自己的需求**编写一个专到狭窄的学习性质的项目(专注于提供一个深度定制化的群聊机器人体验),发出来是用来交流学习的.
-项目名称致敬了一个游戏，希望这个 Bot 能像亚托莉一样成为你珍贵的伙伴
+项目名称致敬了一个游戏，希望这个 Bot 能像亚托莉一样成为你珍贵的伙伴(虽然现在还不是很完善)
 
 ---
 
@@ -39,7 +39,7 @@
   - 支持人设切换等基础功能。
 
 ### 💻 类 Unix 命令系统
-拥有一套完善的命令机制，在群里 `@bot` 后以 `/` 开头即可触发（例如 `@atri-bot /help --list`）：
+拥有一套可用的命令机制，在群里 `@bot` 后以 `/` 开头即可触发（例如 `@atri-bot /help --list`一定要是qq的那个@而不是@+名字文本）：
 - **参数解析**：支持 `-` 和 `--` 等参数风格，内置参数类型验证。
 - **权限管理**：内置权限系统，支持拉黑或授予管理员权限。可在任意处理环节校验 User 权限，拒绝非法执行。
 - **自动帮助文档**：只要在代码中使用装饰器并添加参数说明，即可自动生成详细的 `--help` 提示。
@@ -55,10 +55,10 @@
 ## 🚀 快速开始 (How to Run)
 
 ### 1. 前端连接 (NapCat)
-首先需要一个能够与 QQ 服务器通信的前端，推荐使用 NapCat：
+首先需要一个能够与 QQ 服务器通信的前端，推荐使用 NapCat连接QQ：
 [NapCat 安装指南](https://napneko.github.io/guide/napcat)
 [NapCat 项目地址](https://github.com/NapNeko/NapCatQQ)
-> *注：你也可以自己实现其他 QQ 协议端，只要能对接上即可。*
+> *注：你也可以自己实现前端，只要能对接上即可。*
 
 ### 2. 数据库配置 (PostgreSQL)
 项目仅支持 PostgreSQL 数据库。
@@ -85,7 +85,23 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 
 #### 🗣️ 语音合成 (TTS) - 可选
-支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)，实现 Bot 主动发送语音或通过命令调用语音功能。
+支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)
+实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速情感等常用参数
+然后再修改`atribot\commands\audio\TTS.py`文件里的参考音频路径,还有GPT-SoVITS接口的端口地址
+```json
+{
+    "这里是对应的情感": {
+        "refer_wav_path": "这里是参考音频的完整路径",
+        "prompt_text": "参考音频的对应文本",
+        "prompt_language": "参考文本对应的语言"
+    },           
+    "平静": {
+        "refer_wav_path": "/home/atri/tts_reference/夏生さんが望むのでしたら.mp3",
+        "prompt_text": "夏生さんが望むのでしたら",
+        "prompt_language": "ja"
+    }
+}
+```
 
 
 #### ⚙️ 配置文件
@@ -94,6 +110,7 @@ ollama run Qwen3-Embedding-0.6B:F16
 2.  配置 `supplier_config.json` (模型供应商配置)。
 3.  配置 `config.json` (项目基础配置)。
 4.  **MCP 配置**：默认路径在 `atribot\LLMchat\MCP\mcp_server.json`，可通过 `"active": false` 开关特定的 MCP 工具。
+5.  根目录`document/`下面可参照项目结构添加对应的音频表情包文件配置
 
 ### 4. 启动项目
 项目依赖 **Python 3.13** 环境。推荐使用 `uv` 进行包管理。
@@ -150,7 +167,9 @@ ATRI-main/
 │  ├─audio/                     # 音频素材
 │  ├─file/                      # 通用文件
 │  ├─img/                       # 图片素材
-│  │  └─emojis/                 # Bot 发送的表情包
+│  │  └─emojis/                 # Bot 发送的表情包文件夹
+│  │     ├─RocketPunch          # Bot 发送的表情包对应的分类表情可添加配置多个文件夹
+│  │     └─happy
 │  └─video/                     # 视频素材
 ```
 
@@ -160,9 +179,9 @@ ATRI-main/
 
 非常欢迎你参与到这个项目中来！无论是提交 Bug、修补代码还是提出新功能建议。
 让我们一起把 ATRI 变得更聪明、更可爱！
+虽然这个目前其实很烂
 
 ---
 <div align="center">
 ❤️ ATRI-bot ❤️
 </div>
-```
