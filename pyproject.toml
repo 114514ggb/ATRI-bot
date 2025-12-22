@@ -1,5 +1,5 @@
 [project]
-name = "atri"
+name = "atri-bot"
 version = "1.2.4"
 description = "一个叫ATRI的qq机器人"
 readme = "README.md"
