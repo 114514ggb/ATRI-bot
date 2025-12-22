@@ -11,9 +11,9 @@ Received_event={
 'real_id': 1941209958,  # 消息真实id
 'message_type': 'group', # 消息类型
 'sender': {'user_id': 2631018780, # 发送者qq号
-    'nickname': '除了摸鱼什么都做不到', # 发送者昵称
-    'card': '',  # 发送者群名片
-    'role': 'owner' # 发送者角色
+      'nickname': '除了摸鱼什么都做不到', # 发送者昵称
+      'card': '',  # 发送者群名片
+      'role': 'owner' # 发送者角色
     },
 'raw_message': '?', # 消息内容
 'font': 14,  # 字体

@@ -46,7 +46,7 @@ class initiativeChat:
                 return await self._execute_reply(
                     message, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",
-                    prompt="尝试考虑用户在你回复后，是否下一句是想接着聊天的情况,你应观察是否应该进行回复,确定是接你的话就进行回复，不然就保持沉默"
+                    prompt="尝试考虑用户在你回复后，是否下一句是想接着聊天的情况,你应观察是否应该进行回复,如果有人在追问你，或者话题没有说完，请你继续回复"
                 )
 
             #活跃度限制

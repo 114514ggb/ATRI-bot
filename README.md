@@ -85,9 +85,9 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 
 #### 🗣️ 语音合成 (TTS) - 可选
-支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)
-实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速情感等常用参数
-然后再修改`atribot\commands\audio\TTS.py`文件里的参考音频路径,还有GPT-SoVITS接口的端口地址
+支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)\n
+实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速情感等常用参数\n
+使用前需要修改`atribot\commands\audio\TTS.py`文件里的参考音频路径,还有GPT-SoVITS接口的端口地址
 ```json
 {
     "这里是对应的情感": {

@@ -492,3 +492,24 @@ class GroupContext:
             yield self                   
         finally:
             self.IS_SUMMARIZING = False
+
+
+@dataclass
+class messageBase:
+    
+    message_id:int
+    """消息id"""
+    user_id:int
+    """发送者id"""
+    nickname:str
+    """发送者账户名"""
+    raw_message:str = ""
+    """文本消息内容"""
+    message:Dict = None
+    """完整格式化消息内容"""
+
+
+class groupMessage(messageBase):
+    
+    def __init_subclass__(cls):
+        return super().__init_subclass__()

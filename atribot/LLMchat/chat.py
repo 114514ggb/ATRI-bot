@@ -404,9 +404,11 @@ class group_chat(chat_baseics):
         
         cached_image_prompt = None
         request.model_api = None
-        request.parameter = {
-            "temperature":0.2,
+        request.parameter = { #一个绝大多数模型可用的通用配置
+            "temperature":0.1,
+            "top_p":0.95,
             "max_tokens": 8192,
+            "tool_choice": "auto"
         }
         
         for parameter in self.api_order:
