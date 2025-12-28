@@ -216,9 +216,9 @@ class AIContextCommands:
     
     async def _handle_context_info(self, group_id: str):
         """处理查看上下文信息"""
-
-        context = await self.context_management.get_group_chat(group_id)
+        
         group_context = self.context_management.get_group_context(group_id)
+        context = group_context.chat_context
         current_role = group_context.play_roles
         
         message_count = len(context.messages)

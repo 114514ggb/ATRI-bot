@@ -36,7 +36,7 @@ class message_router():
         else:
             if data.get("meta_event_type") !=  'heartbeat':
                 self.logger.debug(f"原始消息:\n{data}")
-            _rich_data = RichData(data,"","")
+            _rich_data = RichData(data)
         
         if group_id:            
             await self.group_manage.handle_message(_rich_data, group_id)
@@ -44,7 +44,7 @@ class message_router():
             #私聊处理
             return
 
-        if _rich_data.pure_text:
+        if _rich_data.text:
             await self.store_data(_rich_data,group_id) #存储群消息
             
 
@@ -63,8 +63,8 @@ class message_router():
                 self.logger.warning(f"群信息存储失败:{e}")
         
         try:
-            users = {"user_id":data["user_id"],"nickname":data['sender']['nickname']}
-            message ={"message_id":data["message_id"],"content":rich_data.text,"timestamp":data["time"],"group_id":group_id,"user_id":data["user_id"]}
+            users = {"user_id":rich_data.user_id,"nickname":data['sender']['nickname']}
+            message ={"message_id":data["message_id"],"content":rich_data.text,"timestamp":data["time"],"group_id":group_id,"user_id":rich_data.user_id}
         except Exception as e:
             self.logger.warning(f"获取db存储参数失败:{e}")
             return
@@ -122,7 +122,7 @@ class group_manage(message_manage):
         
     async def handle_message(self, message: RichData, group_id: int) -> None:
         data = message.primeval
-        user_id = data.get('user_id')
+        user_id = message.user_id
         
         if group_id not in self.group_white_list and not (user_id == 2631018780):
             return

@@ -23,8 +23,8 @@ class initiativeChat:
         if not data.get("message"):
             return False
 
-        group_id = data["group_id"]
-        user_id: int = data["user_id"]
+        group_id = message.group_id
+        user_id: int = message.user_id
         group_context = self.chat_manager.get_group_context(group_id)
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
 

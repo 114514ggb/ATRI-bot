@@ -91,6 +91,9 @@ class BotFramework:
                 "GLM-4.5-Flash": {
                     "visual_sense": False
                 },
+                "GLM-4.6V-Flash": {
+                    "visual_sense": True
+                },
                 "GLM-4V-Flash": {
                     "visual_sense": True
                 },

@@ -76,10 +76,10 @@ class chat_baseics(ABC):
         """
         try:
             descriptions = await asyncio.gather(
-                *[
+                *(
                     self.bigModel.get_image_recognition(url, file_path=False)
                     for url in image_urls[:5]
-                ]
+                )
             )
 
         except Exception as e:
@@ -123,12 +123,15 @@ class group_chat(chat_baseics):
             "use_tools" : self.use_tools_conduct,
         }
         
-        
+        if self.config.model.connect.user_global_context:
+            self.get_context = lambda group_id,user_id : self.chat_manager.get_private_context(user_id).chat_context
+        else:
+            self.get_context = lambda group_id,user_id : self.chat_manager.get_group_context(group_id).chat_context
 
     async def step(self, message: RichData) -> None:
         """群聊主处理函数"""
         data = message.primeval
-        group_id = data["group_id"]
+        group_id = message.group_id
         increase_context = Context()
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
@@ -136,7 +139,7 @@ class group_chat(chat_baseics):
 
         self.log.debug(f"群LLM聊天处理:{readable_text}")
 
-        original_context = await self.chat_manager.get_group_chat(group_id)
+        original_context = self.chat_manager.get_group_context(group_id).chat_context
         original_context.record_validity_check()
         group_context = await self.get_group_context(
             group_id = group_id,
@@ -235,8 +238,8 @@ class group_chat(chat_baseics):
         self.log.info("群LLM聊天json处理")
         
         data = message.primeval
-        group_id = data["group_id"]
-        user_id = data["user_id"]
+        group_id = message.group_id
+        user_id = message.user_id
 
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
@@ -260,7 +263,7 @@ class group_chat(chat_baseics):
             ]
         )
         
-        original_context = await self.chat_manager.get_group_chat(group_id)
+        original_context:Context = self.get_chat_context(group_id)
         original_context.record_validity_check()
         
         request = replace(
@@ -320,7 +323,7 @@ class group_chat(chat_baseics):
             #     )
             #     continue
         
-        #存储更新等,因为直接返回的是那个对象所以可以直接改变
+        #存储更新等,因为直接返回的是那个对象所以可以直接改变,不是很清楚是否有竞态条件
         original_context.add_user_message(prompt+user_import)
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
@@ -464,6 +467,18 @@ class group_chat(chat_baseics):
 
         self.log.error("所有备用api出现错误!")
         raise ValueError("所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
+
+    def get_chat_context(self, group_id:int, user_id:int)->Context:
+        """获取需要的聊天
+
+        Args:
+            group_id (int): 群号
+            user_id (int): 用户id
+
+        Returns:
+            Context: 上下文
+        """
+        return self.get_context(group_id,user_id)
 
     async def get_group_context(
         self, 

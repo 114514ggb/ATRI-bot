@@ -28,7 +28,8 @@
             "supplier":"deepseek",#配置的聊天模型来自的供应商
             "model_name":"deepseek-chat",#配置的聊天模型名称
             "visual_sense":False,#模型是否有视觉，能接收图片吗
-            "system_review":False#决定统提示词的嵌入方式一般不用动
+            "system_review":False,#决定统提示词的嵌入方式一般不用动
+            "user_global_context":True #决定了上下文的纯在形式
         },
         "chat_parameter":{#聊天模型会使用的参数配置
             "temperature":0.3,
@@ -44,7 +45,7 @@
                 "visual_sense":True
             }
         },
-        "standby_model":[#当主聊天模型尝试失败后会使用的其他供应商或其他的模型
+        "standby_model":[#当主聊天模型尝试失败后会使用的其他供应商或其他的模型,但是备用模型会使用的model参数是一个默认的通用参数硬编码在里面
             {
                 "supplier":"zaxprisのapi",
                 "model_name":"GeminiCLI/gemini-2.5-flash-search"

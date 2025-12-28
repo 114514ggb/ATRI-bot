@@ -98,7 +98,7 @@ tool_json = {
 
 async def main(
         query: str,
-        search_depth: str = "advanced",
+        search_depth: str = "basic",
         topic: str = "general",
         days: int = 3,
         time_range: Optional[str] = None,

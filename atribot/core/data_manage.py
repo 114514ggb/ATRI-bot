@@ -111,7 +111,9 @@ class data_manage():
         return RichData(
             data,
             "".join(text_parts),
-            "".join(pure_text).strip()
+            "".join(pure_text).strip(),
+            user_id = data.get("user_id"),
+            group_id = data.get("group_id")
         )
     
     

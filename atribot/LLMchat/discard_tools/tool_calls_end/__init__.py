@@ -2,7 +2,7 @@ from atribot.core.types import ToolCallsStopIteration
 
 tool_json = {
     "name": "tool_calls_end",
-    "description": "终止循环调用,适用于：1.不需要你回复 2.会话流程需保持静默,2.工具调用结束",
+    "description": "停止当前回复,适用于:调用一些工具后已经完成任务,不需要继续回复用户的场景",
     "properties": None
 }
 

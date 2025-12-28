@@ -1,5 +1,6 @@
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.core.event_trigger.string_respond import string_response
+from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 from logging import Logger
 from typing import Dict
@@ -77,6 +78,12 @@ class EventTrigger:
         if sub_type == "approve":
             
             await self.send_message.send_group_message(group_id,f"欢迎[CQ:at,qq={user_id}]加入群聊！")
+            DatabaseBase:AsyncDatabaseBase = container.get("database")
+            async with DatabaseBase as db:
+                await db.add_user(
+                    user_id= user_id,
+                    nickname = "NOT_SET"#感觉还是不查询名字吧，一般来说以后会发消息更新的
+                ) 
 
         elif sub_type == 'kick':
             

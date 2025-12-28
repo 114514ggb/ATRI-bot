@@ -1,5 +1,5 @@
 from atribot.core.service_container import container
-from atribot.core.types import Context, GroupContext, LLMGroupChatCondition
+from atribot.core.types import Context, GroupContext, PrivateContext, LLMGroupChatCondition
 # from collections import defaultdict
 from typing import Dict,List
 from logging import Logger
@@ -22,7 +22,7 @@ class ChatManager:
         self.logger: Logger = container.get("log")
         self.group_dict: Dict[int, GroupContext] = {}
         """存储群组上下文实例"""
-        self.private_dict:Dict #目前没考虑这个
+        self.private_dict:Dict[int, PrivateContext] = {}
         """存储私聊上下文实例"""
         self.default_play_role = default_play_role
         """默认扮演角色"""
@@ -39,6 +39,35 @@ class ChatManager:
         
         self._load_character_settings()
     
+    def get_private_context(self, user_id: int) -> PrivateContext:
+        """获取指定群的PrivateContext实例
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            PrivateContext: 私聊上下文实例
+        """
+        if private_example := self.private_dict.get(user_id):
+            return private_example
+        else:
+            chat_context = Context(
+                messages = [],
+                user_max_record = self.private_max_record,
+                play_role = self.play_role_list.get(
+                    self.default_play_role, 
+                    self.play_role_list["none"]
+                )
+            )
+            
+            private_example = self.private_dict[user_id] = \
+            PrivateContext(
+                user_id = user_id,
+                chat_context = chat_context
+            )
+            
+            return private_example
+        
     def get_group_context(self, group_id: int) -> GroupContext:
         """获取指定群的GroupContext实例
         
@@ -83,16 +112,16 @@ class ChatManager:
                 group_context.chat_context = context
 
 
-    async def get_group_chat(self, group_id: str) -> Context:
-        """获取指定群的AI聊天上下文
+    async def store_private_chat(self, user_id: int, context: Context) -> None:
+        """存储指定用户的私聊聊天上下文
         
         Args:
-            group_id: 群组ID
-            
-        Returns:
-            Context: 上下文实例
+            user_id: 用户ID
+            context: 要存储的上下文对象
         """
-        return self.get_group_context(group_id).chat_context
+        private_context = self.get_private_context(user_id)
+        async with private_context.async_lock:
+            private_context.chat_context = context
     
     async def get_group_messages(self, group_id: int) -> List[str]:
         """返回群消息内容"""

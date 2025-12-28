@@ -1,5 +1,6 @@
+from dataclasses import dataclass, field, asdict
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from abc import ABC, abstractmethod
 from typing import Dict,List,Any
 from collections import deque
 import asyncio
@@ -18,7 +19,7 @@ class ToolCallsStopIteration(Exception):
             super().__init__("end tool call")
 
 
-@dataclass
+@dataclass(slots=True)
 class RichData():
     """一般处理消息"""
     primeval:dict
@@ -27,9 +28,13 @@ class RichData():
     """解析过的qq的文本"""
     pure_text:str = ""
     """消息的文本部分"""
+    user_id:int|None = None
+    """发送者id"""
+    group_id:int|None = None
+    """群号"""
     
     
-@dataclass
+@dataclass(slots=True)
 class Context():
     """对话上下文"""
     messages: List[Dict[str, Any]] = None
@@ -38,6 +43,8 @@ class Context():
     """user最多消息条数限制"""
     play_role:str = ""
     """模型人物提示词"""
+    async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
+    """异步锁"""
 
     def __post_init__(self):
         if self.messages is None:
@@ -319,6 +326,8 @@ class TimeWindow:
 class LLMGroupChatCondition:
     """群用LLM发言的一些参数记录,用于决策的参考"""
     
+    __slots__ = ('last_msg_at', 'last_trigger_user_id', 'last_trigger_user_time', 'time_window', 'turns_since_last_llm', '_lock')
+    
     last_msg_at: float
     """LLM最近一次发言的时间"""
     last_trigger_user_id: int
@@ -377,19 +386,20 @@ class LLMGroupChatCondition:
 
 
 
+@dataclass(slots=True)
 class GroupContext:
     """群组上下文"""
     
     group_id:int
     """群号"""
-    async_lock:asyncio.Lock
-    """群异步锁"""
-    messages:deque
+    messages:deque = field(init=False)
     """消息列表"""
-    group_max_record:int
+    group_max_record:int = 20
     """群维持的消息数量"""
-    last_msg_at:float
+    last_msg_at:float = field(default=time.time(), init=False)
     """群最后一次消息的处理时间"""
+    initiative_chat:bool = field(default=False, init=False)
+    """是否启用主动加入聊天"""
     
     
     chat_context:Context
@@ -398,39 +408,25 @@ class GroupContext:
     # """图像url缓存"""
     play_roles:str
     """当前LLM聊天人设名称"""
-    IS_SUMMARIZING:bool = False
+    IS_SUMMARIZING:bool = field(default=False, init=False)
     """是否在总结"""
-    async_summarize_lock:asyncio.Lock
-    """群异步锁"""
-    group_chat_summary:str = ""
+    group_chat_summary:str = field(default="", init=False)
     """群聊天的总结"""
-    summarize_message_count:int = 0 
+    summarize_message_count:int = field(default=0, init=False)
     """未总结的计数"""
-    time_window: TimeWindow
+    time_window: TimeWindow = field(init=False)
     """统计群近期消息数量的窗口对象"""
-    LLM_chat_decision_parameters:LLMGroupChatCondition
+    LLM_chat_decision_parameters:LLMGroupChatCondition = field(init=False)
     """LLM聊天决策使用的一些参数"""
+    async_summarize_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
+    """群异步总结锁"""
+    async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
+    """群异步锁"""
 
-    def __init__(
-        self,
-        group_id: int,
-        play_roles: str,
-        chat_context: 'Context',
-        group_max_record: int = 20,
-        window_time: int = 60
-    ):
-        self.group_id = group_id
-        self.play_roles =  play_roles
-        self.chat_context = chat_context
-        self.group_max_record = group_max_record
-        # self.chat_img_url_cache = deque(maxlen=2) #接受2张图
-        self.async_lock = asyncio.Lock()
-        self.async_summarize_lock = asyncio.Lock()
+    def __post_init__(self, window_time: int):
+        self.messages = deque(maxlen=self.group_max_record)
         self.time_window = TimeWindow(window_time)
         self.LLM_chat_decision_parameters = LLMGroupChatCondition(window_time)
-        self.last_msg_at = 0
-        self.messages = deque(maxlen=group_max_record)
-        
     
     def __iter__(self):
         return iter(self.messages)
@@ -494,8 +490,32 @@ class GroupContext:
             self.IS_SUMMARIZING = False
 
 
-@dataclass
-class messageBase:
+
+
+@dataclass(slots=True)
+class PrivateContext:
+    
+    user_id:int
+    """user的qq号"""
+    chat_context:Context
+    """群LLM聊天上下文"""
+    
+    async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
+    """异步锁"""
+    last_msg_at:float = field(default=time.time(), init=False)
+    """最后一次消息的处理时间"""
+    time_window: TimeWindow = field(init=False)
+    """统计群近期消息数量的窗口对象"""
+    
+    def __post_init__(self, window_time:int = 60):
+        self.time_window = TimeWindow(window_time)
+
+
+
+
+@dataclass(slots=True)
+class MessageBase():
+    """基础消息类"""
     
     message_id:int
     """消息id"""
@@ -503,13 +523,49 @@ class messageBase:
     """发送者id"""
     nickname:str
     """发送者账户名"""
-    raw_message:str = ""
-    """文本消息内容"""
-    message:Dict = None
-    """完整格式化消息内容"""
+    user_message:str
+    """消息有效的文本内容"""
+    # message:Dict = field(default_factory=dict)
+    # """原始格式化消息内容"""
+    message_time:str = field(default_factory=lambda: time.strftime('%Y-%m-%d %H:%M:%S'))
+    """创建的时间"""
 
-
-class groupMessage(messageBase):
+    # def __post_init__(self):
+    #     """在 dataclass 初始化后调用"""
+    #     self.user_message = self.get_user_message_str()
     
-    def __init_subclass__(cls):
-        return super().__init_subclass__()
+    def to_dict(self,extend_dict:dict = {}) -> dict:
+        """获取自己属性的字典"""
+        return {
+            "message_id": self.message_id,
+            "time": self.message_time,
+            "user_id": self.user_id,
+            "nickname": self.nickname,
+            "user_message": self.user_message
+        } | extend_dict
+    
+    # @abstractmethod
+    # def get_user_message_str() -> str:
+    #     """获取纯文本的user消息"""
+    #     pass
+    
+    def __str__(self):
+        return str(self.to_dict())
+    
+    def __repr__(self):
+        return str(self.to_dict())
+    
+    def __getitem__(self, item):
+        return getattr(self, item)
+    
+    def get(self, item, default=None):
+        return getattr(self, item, default)
+
+
+@dataclass(slots=True)
+class GroupMessage(MessageBase):
+    """群消息"""
+
+@dataclass(slots=True)  
+class PrivateMessage(MessageBase):
+    """私聊消息"""

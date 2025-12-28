@@ -181,7 +181,7 @@ class build_prompt:
         """构造用户消息（XML格式）"""
         return (
             f"<MESSAGE>"
-            f"<qq_id>{data['user_id']}</qq_id>"
+            f"<user_id>{data['user_id']}</user_id>"
             f"<nick_name>{data['sender']['nickname']}</nick_name>"
             f"<group_role>{data['sender']['role']}</group_role>"
             f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"

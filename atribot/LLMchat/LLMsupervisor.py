@@ -182,7 +182,7 @@ class large_language_model_supervisor():
         
         response = request.generation_response or GenerationResponse()
         
-        for _ in range(8):#防止无限循环调用
+        for _ in range(20):#防止无限循环调用
             
             self._update_response(response, assistant_message)
 
@@ -233,6 +233,8 @@ class large_language_model_supervisor():
                 content,
                 assistant_message['tool_calls']
             )
+        
+        self.logger.debug("工具调用强制结束!")
         
         response.messages = increase_context.messages
         
