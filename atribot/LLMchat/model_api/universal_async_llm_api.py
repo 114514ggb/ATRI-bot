@@ -64,20 +64,25 @@ class universal_ai_api(model_api_basics):
         retry_delay = 0.2
         for attempt in range(max_retries):
             try:
-                response = await self.client.post(
+
+                async with self.client.post(
                     self.base_url,
                     # headers=self.headers,
-                    data=data,
+                    data=data, 
                     # proxy='http://127.0.0.1:7890' # 代理
-                )
-                try:
-                    response.raise_for_status()
-                    response_json:dict = await response.json()
-                    # print(response_json)
+                ) as response:
+                    try:
+                        response_json:dict = await response.json()
+                        print(response_json)
+                    except aiohttp.ContentTypeError:
+                        response_json = json.loads(await response.text())#fuck怎么会有字符串发过来?
+
+                    if response.status != 200:
+                        print(f"API Error {response.status}: {response_json}")
+                        response.raise_for_status()
+                    
                     return response_json
-                except aiohttp.ContentTypeError:
-                    return json.loads(await response.text())
-                
+                    
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise  e

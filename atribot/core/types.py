@@ -1,6 +1,5 @@
-from dataclasses import dataclass, field, asdict
 from contextlib import asynccontextmanager
-from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from typing import Dict,List,Any
 from collections import deque
 import asyncio
@@ -278,6 +277,7 @@ class TimeWindow:
         self._clean_expired(time.monotonic())
         return len(self.events)
     
+    
     def clear(self):
         """清空所有计数"""
         self.events.clear()
@@ -322,6 +322,36 @@ class TimeWindow:
         """返回当前队列大小（不触发清理）"""
         return len(self.events)
 
+    def get_messages_per_second(self)->float:
+        """获取总平均每秒消息数量
+
+        Returns:
+            float: 当前有效消息数量/窗口统计秒数
+        """
+        return self.get() / self.window_seconds
+
+    def get_recent_avg_interval(self, sample_count: int = 5) -> float:
+        """获取最近几条消息的平均时间间隔
+        
+        用于判断瞬时流量密度。如果返回的时间极短，说明发生了突发流量。
+        
+        Args:
+            sample_count: 采样数量。默认为5，即计算最近5条消息（4个间隔）的平均值。
+                          如果队列长度不足，则计算所有现有消息。
+        
+        Returns:
+            float: 平均间隔秒数。
+                   如果消息不足2条，返回 float('inf') (表示无限大，即不拥堵)。
+        """
+        n = len(self.events)
+        if n < 2:
+            return float('inf')
+            
+        real_count = min(n, sample_count)
+        if real_count < 2:
+            return float('inf')
+        
+        return (self.events[-1] - self.events[-real_count]) / (real_count - 1)
 
 class LLMGroupChatCondition:
     """群用LLM发言的一些参数记录,用于决策的参考"""
@@ -394,13 +424,10 @@ class GroupContext:
     """群号"""
     messages:deque = field(init=False)
     """消息列表"""
-    group_max_record:int = 20
+    group_max_record:int
     """群维持的消息数量"""
     last_msg_at:float = field(default=time.time(), init=False)
     """群最后一次消息的处理时间"""
-    initiative_chat:bool = field(default=False, init=False)
-    """是否启用主动加入聊天"""
-    
     
     chat_context:Context
     """群LLM聊天上下文"""
@@ -410,8 +437,8 @@ class GroupContext:
     """当前LLM聊天人设名称"""
     IS_SUMMARIZING:bool = field(default=False, init=False)
     """是否在总结"""
-    group_chat_summary:str = field(default="", init=False)
-    """群聊天的总结"""
+    # group_chat_summary:str = field(default="", init=False)
+    # """群聊天的总结"""
     summarize_message_count:int = field(default=0, init=False)
     """未总结的计数"""
     time_window: TimeWindow = field(init=False)
@@ -422,8 +449,10 @@ class GroupContext:
     """群异步总结锁"""
     async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """群异步锁"""
+    initiative_chat:bool = field(default=False)
+    """是否启用主动加入聊天"""
 
-    def __post_init__(self, window_time: int):
+    def __post_init__(self, window_time: int = 60):
         self.messages = deque(maxlen=self.group_max_record)
         self.time_window = TimeWindow(window_time)
         self.LLM_chat_decision_parameters = LLMGroupChatCondition(window_time)

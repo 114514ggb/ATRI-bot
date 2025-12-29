@@ -1,5 +1,5 @@
-from atribot.core.service_container import container
 from atribot.core.types import Context, GroupContext, PrivateContext, LLMGroupChatCondition
+from atribot.core.service_container import container
 # from collections import defaultdict
 from typing import Dict,List
 from logging import Logger
@@ -17,7 +17,8 @@ class ChatManager:
         group_messages_max_limit: int = 20,
         private_messages_max_limit: int = 20,
         group_LLM_max_limit: int = 20,
-        character_folder: str = "atribot/LLMchat/character_setting"
+        character_folder: str = "atribot/LLMchat/character_setting",
+        initiative_white_list: List = None
     ):
         self.logger: Logger = container.get("log")
         self.group_dict: Dict[int, GroupContext] = {}
@@ -36,11 +37,13 @@ class ChatManager:
         """角色设定文件夹路径"""
         self.play_role_list: Dict[str, str] = {"none": ""}
         """角色预设字典"""
+        self.initiative_white_list:list = initiative_white_list if initiative_white_list else []
+        """配置文件里的群主动聊天白名单(非动态)"""
         
         self._load_character_settings()
     
     def get_private_context(self, user_id: int) -> PrivateContext:
-        """获取指定群的PrivateContext实例
+        """获取指定user的PrivateContext实例
         
         Args:
             user_id: 用户ID
@@ -94,7 +97,8 @@ class ChatManager:
                 group_id=group_id,
                 play_roles=self.default_play_role,
                 chat_context=chat_context,
-                group_max_record=self.group_max_record
+                group_max_record=self.group_max_record,
+                initiative_chat = group_id in self.initiative_white_list
             )
             
             return group_example
@@ -199,11 +203,21 @@ class ChatManager:
         Args:
             group_id: 群组ID
         """
-        group_context = self.get_group_context(group_id)
-        async with group_context.async_lock:
-            group_context.chat_context.clear()
+        context = self.get_group_context(group_id)
+        async with context.async_lock:
+            context.chat_context.clear()
             self.logger.info(f"已重置群{group_id}的聊天上下文")
 
+    async def reset_private_chat(self, user_id: int) -> None:
+        """重置指定用户的LLM聊天上下文
+        
+        Args:
+            user_id: 用户id及qq号
+        """
+        context = self.get_private_context(user_id)
+        async with context.async_lock:
+            context.chat_context.clear()
+            self.logger.info(f"已重置user:{user_id}的聊天上下文")
     
     async def set_group_role(self, group_id: int, role_key: str) -> bool:
         """设置指定群的扮演角色

@@ -77,6 +77,8 @@
     },
     "group_white_list":[
     ],
+    "group_initiative_chat_white_list":[
+    ],
     "database":
     {
         "host":"127.0.0.1",

@@ -23,11 +23,14 @@ class initiativeChat:
         if not data.get("message"):
             return False
 
-        group_id = message.group_id
+        group_id: int = message.group_id
         user_id: int = message.user_id
-        group_context = self.chat_manager.get_group_context(group_id)
+        group_context: GroupContext = self.chat_manager.get_group_context(group_id)
+        if group_context.LLM_chat_decision_parameters.time_window.get_recent_avg_interval(4) < 1:
+            #如果消息过多(超过每秒一条)不考虑
+            return False
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
-
+        
         #被@检测
         if at:
             decision =  await self._execute_reply(
@@ -38,7 +41,7 @@ class initiativeChat:
             await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
             return decision
 
-        #纯文本
+        #要存在文本
         if message.pure_text.strip():
             
             #追问检测
@@ -50,7 +53,7 @@ class initiativeChat:
                 )
 
             #活跃度限制
-            if self.get_bot_active_reference(group_context, 3) < 0.5:
+            if group_context.initiative_chat and self.get_bot_active_reference(group_context, 3) < 0.5:
                 
                 #关键词触发检测
                 if value := self.find_first_match(message.pure_text, self.keyword_trigger_list):

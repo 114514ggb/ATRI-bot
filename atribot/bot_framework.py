@@ -132,7 +132,8 @@ class BotFramework:
                 group_messages_max_limit = self.config.ai_chat.group_max_record,
                 private_messages_max_limit = self.config.ai_chat.private_max_record,
                 group_LLM_max_limit = self.config.ai_chat.ai_max_record,
-                character_folder = self.config.file_path.chat_manager
+                character_folder = self.config.file_path.chat_manager,
+                initiative_white_list = self.config.group_initiative_chat_white_list
             )
         )
         

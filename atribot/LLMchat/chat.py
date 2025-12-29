@@ -263,7 +263,10 @@ class group_chat(chat_baseics):
             ]
         )
         
-        original_context:Context = self.get_chat_context(group_id)
+        original_context:Context = self.get_chat_context(
+            group_id = group_id,
+            user_id = user_id
+        )
         original_context.record_validity_check()
         
         request = replace(
