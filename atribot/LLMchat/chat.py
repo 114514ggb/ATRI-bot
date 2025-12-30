@@ -360,10 +360,10 @@ class group_chat(chat_baseics):
         self.log.info(f"LLM决定更新用户信息。理由:{response_json.get("reason")}")
         
         if user_id := response_json.get("user_id"):
-            pass
+            user_id = int(user_id)
         else:
             user_id = data["user_id"]
-
+        
         if await self.user_system.update_user_info(
             user_id = user_id,
             current_info = await self.user_system.get_user_info(user_id),

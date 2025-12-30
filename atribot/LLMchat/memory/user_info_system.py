@@ -38,7 +38,7 @@ class UserSystem:
                     - avoid: str - 需要避免的内容
         """
         return {
-            "appellation": ["用户常用称呼1", "用户常用称呼2"],
+            "appellation": ["这是一个没有确认称呼的群友"],
             "relation": "例如：朋友/助手/导师/同学等关系描述",
             "personality": "简要描述性格特点，如：外向幽默、内敛谨慎等",
             "recent_topics": "最近几次对话的主要话题，用自然语言描述。",

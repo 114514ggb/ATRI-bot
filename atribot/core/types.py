@@ -330,28 +330,37 @@ class TimeWindow:
         """
         return self.get() / self.window_seconds
 
-    def get_recent_avg_interval(self, sample_count: int = 5) -> float:
+    def get_recent_avg_interval(
+        self, 
+        sample_count: int = 5,
+        default_interval: float = 1.1
+    ) -> float:
         """获取最近几条消息的平均时间间隔
         
-        用于判断瞬时流量密度。如果返回的时间极短，说明发生了突发流量。
+        用于判断瞬时流量密度。如果返回的时间极短，说明发生了突发流量
         
         Args:
-            sample_count: 采样数量。默认为5，即计算最近5条消息（4个间隔）的平均值。
-                          如果队列长度不足，则计算所有现有消息。
+            sample_count: 采样数量。默认为5，即计算最近5条消息（4个间隔）的平均值
+            default_interval: 缺省时的补偿间隔（秒）
         
         Returns:
             float: 平均间隔秒数。
-                   如果消息不足2条，返回 float('inf') (表示无限大，即不拥堵)。
+                   如果消息不足2条，返回 float('inf')
         """
-        n = len(self.events)
-        if n < 2:
-            return float('inf')
-            
-        real_count = min(n, sample_count)
+        real_count = len(self.events)
+        
         if real_count < 2:
             return float('inf')
         
-        return (self.events[-1] - self.events[-real_count]) / (real_count - 1)
+        calc_count = min(real_count, sample_count)
+        real_duration = self.events[-1] - self.events[-calc_count]
+        real_intervals = calc_count - 1
+        target_intervals = sample_count - 1
+        
+        if real_intervals < target_intervals:
+            return (real_duration + (target_intervals - real_intervals) * default_interval) / target_intervals
+        else:
+            return real_duration / real_intervals
 
 class LLMGroupChatCondition:
     """群用LLM发言的一些参数记录,用于决策的参考"""
@@ -451,6 +460,8 @@ class GroupContext:
     """群异步锁"""
     initiative_chat:bool = field(default=False)
     """是否启用主动加入聊天"""
+    information_extraction:bool = field(default=False)
+    """是否启用群信息提取"""
 
     def __post_init__(self, window_time: int = 60):
         self.messages = deque(maxlen=self.group_max_record)
@@ -488,7 +499,7 @@ class GroupContext:
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
             
-            if messages_to_summarize is not None:
+            if self.information_extraction and messages_to_summarize is not None:
                 return (messages_to_summarize, self)
         
         return None
@@ -528,6 +539,8 @@ class PrivateContext:
     """user的qq号"""
     chat_context:Context
     """群LLM聊天上下文"""
+    play_roles:str
+    """当前LLM聊天人设名称"""
     
     async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """异步锁"""

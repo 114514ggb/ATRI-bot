@@ -18,7 +18,8 @@ class ChatManager:
         private_messages_max_limit: int = 20,
         group_LLM_max_limit: int = 20,
         character_folder: str = "atribot/LLMchat/character_setting",
-        initiative_white_list: List = None
+        initiative_white_list: List = None,
+        information_extraction: List = None,
     ):
         self.logger: Logger = container.get("log")
         self.group_dict: Dict[int, GroupContext] = {}
@@ -39,6 +40,8 @@ class ChatManager:
         """角色预设字典"""
         self.initiative_white_list:list = initiative_white_list if initiative_white_list else []
         """配置文件里的群主动聊天白名单(非动态)"""
+        self.information_extraction:list = information_extraction if information_extraction else []
+        """配置文件里的是否启用群信息提取白名单"""
         
         self._load_character_settings()
     
@@ -66,7 +69,8 @@ class ChatManager:
             private_example = self.private_dict[user_id] = \
             PrivateContext(
                 user_id = user_id,
-                chat_context = chat_context
+                chat_context = chat_context,
+                play_roles = self.default_play_role
             )
             
             return private_example
@@ -98,7 +102,8 @@ class ChatManager:
                 play_roles=self.default_play_role,
                 chat_context=chat_context,
                 group_max_record=self.group_max_record,
-                initiative_chat = group_id in self.initiative_white_list
+                initiative_chat = group_id in self.initiative_white_list,
+                information_extraction = group_id in self.information_extraction
             )
             
             return group_example
@@ -207,6 +212,7 @@ class ChatManager:
         async with context.async_lock:
             context.chat_context.clear()
             self.logger.info(f"已重置群{group_id}的聊天上下文")
+            
 
     async def reset_private_chat(self, user_id: int) -> None:
         """重置指定用户的LLM聊天上下文
@@ -240,6 +246,29 @@ class ChatManager:
             
         await self.reset_group_chat(group_id)
         self.logger.info(f"已设置群{group_id}的角色为: {role_key}")
+        return
+
+    async def set_private_role(self, user_id: int, role_key: str) -> bool:
+        """设置指定私聊扮演角色
+        
+        Args:
+            user_id: 用户ID
+            role_key: 角色键名
+            
+        Returns:
+            bool: 是否设置成功
+        """
+        group_context = self.get_private_context(user_id)
+        
+        async with group_context.async_lock:
+            if role_key in self.play_role_list:
+                group_context.play_roles = role_key
+                group_context.chat_context.play_role = self.play_role_list[role_key]
+            else:
+                raise ValueError("指定了不存在的角色键名!")
+            
+        await self.reset_private_chat(user_id)
+        self.logger.info(f"已设置user:{user_id}的聊天角色为: {role_key}")
         return
     
     async def get_group_role_str(self, group_id: int)->str:
@@ -291,12 +320,13 @@ class ChatManager:
                 file_path = os.path.join(self.character_folder, character_setting)
                 
                 try:
+                    file_size = os.path.getsize(file_path)
+                    if file_size > 40 * 1024:
+                        self.logger.warning(f"文件过大({file_size/1024:.1f}KB)，跳过: {character_setting}")
+                        continue
+                    
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
-                    
-                    if len(content) > 20000:
-                        content = content[:20000]
-                        self.logger.warning(f"角色设定文件 '{character_setting}' 内容超过2万字，已自动截断")
                     
                     self.play_role_list[key] = content
                     self.logger.debug(f"已加载角色设定: {key}")

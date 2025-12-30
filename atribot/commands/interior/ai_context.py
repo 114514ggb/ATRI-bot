@@ -27,64 +27,120 @@ class AIContextCommands:
     
     def _register_command(self):
         """注册AI上下文管理统一命令"""
-        
-        @self.command_system.register_command(
-            name="chat",
-            description="AI上下文和角色管理命令",
-            aliases=["context", "聊天管理"],
-            examples=[
-                "/chat role ATRI           # 切换角色",
-                "/chat current             # 查看当前角色", 
-                "/chat list                # 列出所有角色",
-                "/chat list -d             # 详细列出所有角色",
-                "/chat reload              # 重载角色配置",
-                "/chat reset               # 重置上下文",
-                "/chat info                # 查看上下文信息",
-                "/chat user 2631018780     # 查看LLM维护的user_info"
-                "/chat active 1038698883   # 切换群聊的主动参与聊天参数"
-            ],
-            authority_level=1
-        )
-        @self.command_system.argument(
-            name="action",
-            description="要执行的操作",
-            required=True,
-            choices=["role", "current", "list", "reload", "reset", "info", "user", "active"],
-            metavar="ACTION"
-        )
-        @self.command_system.argument(
-            name="target",
-            description="目标操作名称（仅在action为role,info,user和reset时需要）",
-            required=False,
-            metavar="ROLE_NAME"
-        )
-        @self.command_system.flag(
-            name="detail",
-            short="d",
-            long="--detail", 
-            description="显示详细信息（适用于list操作）"
-        )
-        async def ai_context_handler(message_data:dict, action: str, target: str = None, detail: bool = False):
-            group_id = message_data.get('group_id', '')
-            
-            if action == "role":
-                await self._handle_set_role(group_id, target, user_id=message_data['user_id'])
-            elif action == "current":
-                await self._handle_current_role(group_id)
-            elif action == "list":
-                await self._handle_list_roles(group_id, detail)
-            elif action == "reload":
-                await self._handle_reload_roles(group_id, user_id=message_data['user_id'])
-            elif action == "reset":
-                await self._handle_reset_context(group_id, target, user_id=message_data['user_id'])
-            elif action == "info":
-                await self._handle_context_info(group_id, target, user_id=message_data['user_id'])
-            elif action == "user":
-                await self._handle_get_user_info(group_id, target, user_id=message_data['user_id'])
-            elif action == "active":
-                await self._handle_group_active_chat(group_id, target, user_id=message_data['user_id'])
+        if self.user_global_context:
+            @self.command_system.register_command(
+                name="chat",
+                description="AI上下文和角色管理命令",
+                aliases=["context", "聊天管理"],
+                examples=[
+                    "/chat role ATRI           # 切换角色",
+                    "/chat current             # 查看当前角色", 
+                    "/chat list                # 列出所有角色",
+                    "/chat list -d             # 详细列出所有角色",
+                    "/chat reload              # 重载角色配置",
+                    "/chat reset               # 重置上下文",
+                    "/chat info                # 查看上下文信息",
+                    "/chat user 2631018780     # 查看LLM维护的user_info",
+                    "/chat active 1038698883   # 切换群聊的主动参与聊天参数",
+                ],
+                authority_level=1
+            )
+            @self.command_system.argument(
+                name="action",
+                description="要执行的操作",
+                required=True,
+                choices=["role", "current", "list", "reload", "reset", "info", "user", "active"],
+                metavar="ACTION"
+            )
+            @self.command_system.argument(
+                name="target",
+                description="目标操作参数（仅在action为role,info,user,current和reset时需要）",
+                required=False,
+                metavar="ROLE_NAME"
+            )
+            @self.command_system.flag(
+                name="detail",
+                short="d",
+                long="--detail", 
+                description="显示详细信息（适用于list操作）"
+            )
+            async def ai_context_handler(message_data:dict, action: str, target: str = None, detail: bool = False):
+                group_id = message_data.get('group_id', '')
                 
-    
+                if action == "role":
+                    await self._handle_set_role_user(group_id, target, user_id=message_data['user_id'])
+                elif action == "current":
+                    await self._handle_current_role_user_(group_id, target, user_id=message_data['user_id'])
+                elif action == "list":
+                    await self._handle_list_roles(group_id, detail)
+                elif action == "reload":
+                    await self._handle_reload_roles(group_id, user_id=message_data['user_id'])
+                elif action == "reset":
+                    await self._handle_reset_context_user_(group_id, target, user_id=message_data['user_id'])
+                elif action == "info":
+                    await self._handle_context_info_user(group_id, target, user_id=message_data['user_id'])
+                elif action == "user":
+                    await self._handle_get_user_info(group_id, target, user_id=message_data['user_id'])
+                elif action == "active":
+                    await self._handle_group_active_chat(group_id, target, user_id=message_data['user_id'])
+        else:
+            @self.command_system.register_command(
+                name="chat",
+                description="AI上下文和角色管理命令",
+                aliases=["context", "聊天管理"],
+                examples=[
+                    "/chat role ATRI           # 切换角色",
+                    "/chat current             # 查看当前角色", 
+                    "/chat list                # 列出所有角色",
+                    "/chat list -d             # 详细列出所有角色",
+                    "/chat reload              # 重载角色配置",
+                    "/chat reset               # 重置上下文",
+                    "/chat info                # 查看上下文信息",
+                    "/chat user 2631018780     # 查看LLM维护的user_info",
+                    "/chat active 1038698883   # 切换群聊的主动参与聊天参数",
+                ],
+                authority_level=1
+            )
+            @self.command_system.argument(
+                name="action",
+                description="要执行的操作",
+                required=True,
+                choices=["role", "current", "list", "reload", "reset", "info", "user", "active"],
+                metavar="ACTION"
+            )
+            @self.command_system.argument(
+                name="target",
+                description="目标操作参数（仅在action为role,info,user,current和reset时需要）",
+                required=False,
+                metavar="ROLE_NAME"
+            )
+            @self.command_system.flag(
+                name="detail",
+                short="d",
+                long="--detail", 
+                description="显示详细信息（适用于list操作）"
+            )
+            async def ai_context_handler(message_data:dict, action: str, target: str = None, detail: bool = False):
+                group_id = message_data.get('group_id', '')
+                
+                if action == "role":
+                    await self._handle_set_role(group_id, target, user_id=message_data['user_id'])
+                elif action == "current":
+                    await self._handle_current_role(group_id)
+                elif action == "list":
+                    await self._handle_list_roles(group_id, detail)
+                elif action == "reload":
+                    await self._handle_reload_roles(group_id, user_id=message_data['user_id'])
+                elif action == "reset":
+                    await self._handle_reset_context(group_id, target, user_id=message_data['user_id'])
+                elif action == "info":
+                    await self._handle_context_info(group_id, target, user_id=message_data['user_id'])
+                elif action == "user":
+                    await self._handle_get_user_info(group_id, target, user_id=message_data['user_id'])
+                elif action == "active":
+                    await self._handle_group_active_chat(group_id, target, user_id=message_data['user_id'])
+
+
     async def _handle_set_role(self, group_id: str, role_name: str, user_id:int):
         """处理角色切换"""
         if not role_name:
@@ -117,14 +173,68 @@ class AIContextCommands:
         
         self.log.info(f"群 {group_id} 切换角色为：{role_name}")
     
-    async def _handle_current_role(self, group_id: str):
+    async def _handle_set_role_user(self, group_id: str, role_name: str, user_id:int):
+        """处理角色切换,全局上下文版本"""
+        if not role_name:
+            await self.send_message.send_group_message(
+                group_id, 
+                "❌ 错误：切换角色需要指定角色名称\n"
+                "用法：/chat role <角色名>\n"
+                "使用 /chat list 查看可用角色"
+            )
+            return
+        
+        # 检查角色是否存在
+        if role_name not in self.context_management.play_role_list:
+            await self.send_message.send_group_message(
+                group_id, 
+                f"❌ 错误：角色 '{role_name}' 不存在\n"
+                f"使用 /chat list 查看完整列表"
+            )
+            return
+        
+        await self.context_management.set_private_role(user_id, role_name)
+        
+        await self.send_message.send_group_message(
+            group_id, 
+            f"✅ 已将{user_id}上下文角色切换为：{role_name}\n"
+            f"上下文已重置，开始新的对话。"
+        )
+        
+        self.log.info(f"user:{user_id} 切换角色为：{role_name}")
+    
+    async def _handle_current_role(self, group_id: int):
         """处理查看当前角色"""
+        
         current_role = self.context_management.get_group_context(group_id).play_roles
         
         role_content = self.context_management.play_role_list.get(current_role, "")
         role_preview = role_content[:100] + "..." if len(role_content) > 100 else role_content
         
         message = "📋 当前群角色信息：\n"
+        message += f"角色名：{current_role}\n"
+        if role_content:
+            message += f"角色提示词：{role_preview}"
+        else:
+            message += "角色提示词：无"
+        
+        await self.send_message.send_group_message(group_id, message)
+
+    async def _handle_current_role_user_(self, group_id: int, target:str, user_id:int):
+        """处理查看当前角色_user"""
+        if target:
+            self.permissions_management.has_permission(user_id, 2)
+            try:
+                user_id = int(target)
+            except Exception:
+                raise ValueError("提供账号错误")
+        
+        current_role = self.context_management.get_private_context(user_id).play_roles
+        
+        role_content = self.context_management.play_role_list.get(current_role, "")
+        role_preview = role_content[:100] + "..." if len(role_content) > 100 else role_content
+        
+        message = f"📋 {user_id}上下文角色信息：\n"
         message += f"角色名：{current_role}\n"
         if role_content:
             message += f"角色提示词：{role_preview}"
@@ -207,22 +317,33 @@ class AIContextCommands:
             await self.send_message.send_group_message(group_id, error_message)
             self.log.error(f"角色配置重载失败：{e}")
     
-    async def _handle_reset_context(self, group_id: str, target:str, user_id:int):
+    async def _handle_reset_context(self, group_id: int, target:str, user_id:int):
         """处理重置上下文"""
+
+        if target:
+            self.permissions_management.has_permission(user_id, 2)
+            try:
+                group_id = int(target)
+            except Exception:
+                raise ValueError("提供账号错误")
+
+        await self.context_management.reset_group_chat(group_id)
+        message = "✅ 已重置当前群的对话上下文\n可以开始新的对话了！"
         
-        if self.user_global_context:
-            if target:
-                self.permissions_management.has_permission(user_id, 2)
-                try:
-                    user_id = int(target)
-                except Exception:
-                    raise ValueError("提供账号错误")
-            
-            await self.context_management.reset_private_chat(user_id)
-            message = f"已重置当前{user_id}的对话上下文！"
-        else:
-            await self.context_management.reset_group_chat(group_id)
-            message = "✅ 已重置当前群的对话上下文\n可以开始新的对话了！"
+        await self.send_message.send_group_message(group_id, message)
+    
+    async def _handle_reset_context_user_(self, group_id: int, target:str, user_id:int):
+        """处理重置上下文,user版本"""
+        
+        if target:
+            self.permissions_management.has_permission(user_id, 2)
+            try:
+                user_id = int(target)
+            except Exception:
+                raise ValueError("提供账号错误")
+        
+        await self.context_management.reset_private_chat(user_id)
+        message = f"已重置当前{user_id}的对话上下文！"
             
         await self.send_message.send_group_message(group_id, message)
     
@@ -248,10 +369,69 @@ class AIContextCommands:
         message = "📊 当前群状态：\n"
         message += f"最后消息处理时间: {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(group_context.last_msg_at))}\n"
         message += f"是否启用主动发言: {group_context.initiative_chat}\n"
+        message += f"turns_since_last_llm: {group_context.LLM_chat_decision_parameters.turns_since_last_llm}\n"
+        message += f"last_trigger_user_time: {group_context.LLM_chat_decision_parameters.last_trigger_user_time}\n"
+        message += f"last_msg_at: {group_context.LLM_chat_decision_parameters.last_msg_at}\n"
         message += f"时间窗口统计时间: {group_context.time_window.window_seconds}/s\n"
         message += f"时间窗口统计范围内消息数量: {group_context.time_window.get()}\n"
         message += f"未总结计数: {group_context.summarize_message_count}\n\n"
-        message += f"当前角色：{current_role}\n"
+        
+        message += f"当前群聊角色：{current_role}\n"
+        message += f"群聊消息数量：{message_count}/{max_messages} ({usage_percentage:.1f}%)\n"
+        message += f"预计群聊上下文token: {context.get_context_forecast_token()}\n"
+        
+        if usage_percentage < 150:
+            status_icon = "🟢"
+            status_text = "正常"
+        elif usage_percentage < 200:
+            status_icon = "🟡" 
+            status_text = "接近上限"
+        else:
+            status_icon = "🔴"
+            status_text = "已满（将自动清理旧消息）"
+        
+        message += f"上下文状态：{status_icon} {status_text}\n"
+        message += "\n💡 使用 /chat reset 可重置上下文"
+        
+        await self.send_message.send_group_merge_text(
+            group_id = current_group_id,
+            message = message,
+            source = "聊天实例的参数"
+        )
+
+    async def _handle_context_info_user(self, group_id: int, target:str, user_id:int):
+        """处理查看上下文信息,全局上下文版本"""
+        current_group_id = group_id
+        if target:
+            self.permissions_management.has_permission(user_id, 2)
+            try:
+                user_id = int(target)
+            except Exception:
+                raise ValueError("提供qq号格式错误")
+        
+        group_context = self.context_management.get_group_context(group_id)
+        private_context = self.context_management.get_private_context(user_id)
+        context = private_context.chat_context
+        current_role = private_context.play_roles
+        
+        message_count = len(context.messages)
+        max_messages = private_context.chat_context.user_max_record
+        
+        usage_percentage = (message_count / max_messages * 100) if max_messages > 0 else 0
+        
+        message = "📊 当前群状态：\n"
+        message += f"最后消息处理时间: {time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(group_context.last_msg_at))}\n"
+        message += f"是否启用主动发言: {group_context.initiative_chat}\n"
+        message += f"turns_since_last_llm: {group_context.LLM_chat_decision_parameters.turns_since_last_llm}\n"
+        message += f"last_trigger_user_time: {group_context.LLM_chat_decision_parameters.last_trigger_user_time}\n"
+        message += f"last_msg_at: {group_context.LLM_chat_decision_parameters.last_msg_at}\n"
+        message += f"时间窗口统计时间: {group_context.time_window.window_seconds}/s\n"
+        message += f"时间窗口统计范围内消息数量: {group_context.time_window.get()}\n"
+        message += f"未总结计数: {group_context.summarize_message_count}\n\n"
+        
+        message += "✴全局上下文已启动,可为每个人配置单独的上下文\n"
+        message += f"{user_id}上下文状态:\n"
+        message += f"上下文角色：{current_role}\n"
         message += f"消息数量：{message_count}/{max_messages} ({usage_percentage:.1f}%)\n"
         message += f"预计上下文token: {context.get_context_forecast_token()}\n"
         
@@ -273,7 +453,7 @@ class AIContextCommands:
             message = message,
             source = "聊天实例的参数"
         )
-        
+
     async def _handle_get_user_info(self, group_id: str, target:str, user_id:int):
         """获取维护的user_info文档"""
 

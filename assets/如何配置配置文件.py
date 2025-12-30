@@ -98,6 +98,8 @@
     ],
     "group_initiative_chat_white_list":[#默认的启动主动聊天的名单，首先这个名单出现过的要也在group_white_list出现过，才有效
     ],
+    "group_information_extraction":[#默认的启动群消息提取，会由summarize_model配置的模型进行提取然后存入数据库
+    ],
     "database":
     {
         "host":"127.0.0.1",#数据库连接ip地址

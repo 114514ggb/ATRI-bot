@@ -14,7 +14,7 @@ import re
     
     
     
-@dataclass
+@dataclass(slots=True)
 class GenerationResponse():
     """响应后再更新状态"""
     
@@ -30,7 +30,7 @@ class GenerationResponse():
     
 
 
-@dataclass
+@dataclass(slots=True)
 class GenerationRequest():
     """请求响应"""
     
