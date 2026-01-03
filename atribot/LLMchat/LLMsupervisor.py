@@ -234,7 +234,7 @@ class large_language_model_supervisor():
                 assistant_message['tool_calls']
             )
         
-        self.logger.debug("工具调用强制结束!")
+        self.logger.debug("工具调用结束!")
         
         response.messages = increase_context.messages
         

@@ -109,30 +109,26 @@ class ChatManager:
             return group_example
         
         
-    async def store_group_chat(self, group_id: str, context: Context) -> None:
+    def store_group_chat(self, group_id: str, context: Context) -> None:
         """存储指定群的LLM聊天上下文
         
         Args:
             group_id: 群组ID
             context: 要存储的上下文对象
         """
-        group_context = self.get_group_context(group_id)
-        async with group_context.async_lock:
-                group_context.chat_context = context
+        self.get_group_context(group_id).chat_context = context
 
 
-    async def store_private_chat(self, user_id: int, context: Context) -> None:
+    def store_private_chat(self, user_id: int, context: Context) -> None:
         """存储指定用户的私聊聊天上下文
         
         Args:
             user_id: 用户ID
             context: 要存储的上下文对象
         """
-        private_context = self.get_private_context(user_id)
-        async with private_context.async_lock:
-            private_context.chat_context = context
+        self.get_private_context(user_id).chat_context = context
     
-    async def get_group_messages(self, group_id: int) -> List[str]:
+    def get_group_messages(self, group_id: int) -> List[str]:
         """返回群消息内容"""
         return list(self.get_group_context(group_id).messages)
 
@@ -140,7 +136,7 @@ class ChatManager:
         """返回LLM聊天决策参数对象"""
         return self.get_group_context(group_id).LLM_chat_decision_parameters
     
-    async def get_group_window_msg_count(self, group_id: int)->int:
+    def get_group_window_msg_count(self, group_id: int)->int:
         """返回一个群的近期消息数量统计
 
         Args:
@@ -149,7 +145,7 @@ class ChatManager:
         Returns:
             int: 消息计数
         """
-        return (await self.get_group_context(group_id)).time_window.get()
+        return self.get_group_context(group_id).time_window.get()
         
     async def add_message_record(
         self,

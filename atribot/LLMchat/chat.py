@@ -223,7 +223,7 @@ class group_chat(chat_baseics):
 
         # print(original_context)
 
-        await self.chat_manager.store_group_chat(group_id=group_id, context=original_context)
+        self.chat_manager.store_group_chat(group_id=group_id, context=original_context)
 
         self.log.debug("模型结束响应!")
         
@@ -277,7 +277,7 @@ class group_chat(chat_baseics):
                 prompt = prompt,
                 user_info = await self.user_system.get_user_info(user_id),
                 user_import = user_import,
-                chat_record = str(await self.chat_manager.get_group_messages(group_id))[:10000],
+                chat_record = str(self.chat_manager.get_group_messages(group_id))[:10000],
                 img_prompt = img_prompt
             ),
             tool_json=self.mcp_tool.get_func_desc_openai_style(),
@@ -501,7 +501,7 @@ class group_chat(chat_baseics):
         """
         prompt = ""
             
-        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>Please do not repeat the above information" #简单防止过长
+        prompt += f"\n\n<group_chat_history>{str(self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>Please do not repeat the above information" #简单防止过长
         
         if knowledge_base:
             prompt += f"\n\n<user_memory_snippet>{knowledge_base}</user_memory_snippet>"

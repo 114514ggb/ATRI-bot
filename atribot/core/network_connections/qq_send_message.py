@@ -472,14 +472,13 @@ class qq_send_message():
                 {
                     "type": type,
                     "data": {
-                    "file": "file://"+file_url if Path_type else file_url
+                        "file": "file://"+file_url if Path_type else file_url
                     }
                 }
             ],
         }
 
         return await self.async_send(url=url,payload=payload,echo=get_return)
-
 
 
     async def Send_personal_message(self,qq_id, data,type):

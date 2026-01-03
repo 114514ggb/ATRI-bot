@@ -86,3 +86,18 @@ SELECT schemaname,
        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
 FROM pg_tables
 ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+
+
+
+
+SELECT 
+    u.nickname,
+    COUNT(am.memory_id) as memory_count
+FROM atri_memory am
+JOIN users u ON am.user_id = u.user_id
+WHERE am.created_at BETWEEN '2024-01-01' AND '2026-1-1'
+GROUP BY u.user_id, u.nickname
+ORDER BY memory_count DESC
+LIMIT 50;
+
+

@@ -330,7 +330,7 @@ class TimeWindow:
         """
         return self.get() / self.window_seconds
 
-    def get_recent_avg_interval(
+    def get_padded_avg_interval(
         self, 
         sample_count: int = 5,
         default_interval: float = 1.1
@@ -352,7 +352,7 @@ class TimeWindow:
         if real_count < 2:
             return float('inf')
         
-        calc_count = min(real_count, sample_count)
+        calc_count = real_count if real_count < sample_count else sample_count
         real_duration = self.events[-1] - self.events[-calc_count]
         real_intervals = calc_count - 1
         target_intervals = sample_count - 1
@@ -362,6 +362,30 @@ class TimeWindow:
         else:
             return real_duration / real_intervals
 
+
+    def get_recent_avg_interval(self, sample_count: int = 5) -> float:
+        """获取最近几条消息的真实平均时间间隔（高效率版）
+        
+        直接计算采样范围内的时间跨度除以间隔数，不进行任何填充。
+        能够最快地反映出当前的瞬时流量密度。
+        
+        Args:
+            sample_count: 采样数量（即计算最近 N 条消息的跨度）
+            
+        Returns:
+            float: 平均间隔秒数。如果消息不足 2 条，返回 float('inf')
+        """
+        real_count = len(self.events)
+        
+        if real_count < 2:
+            return float('inf')
+        
+        calc_count = sample_count if real_count >= sample_count else real_count
+
+        return (self.events[-1] - self.events[-calc_count]) / (calc_count - 1)
+
+        
+        
 class LLMGroupChatCondition:
     """群用LLM发言的一些参数记录,用于决策的参考"""
     

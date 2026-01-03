@@ -26,10 +26,11 @@ class initiativeChat:
         group_id: int = message.group_id
         user_id: int = message.user_id
         group_context: GroupContext = self.chat_manager.get_group_context(group_id)
-        if group_context.LLM_chat_decision_parameters.time_window.get_recent_avg_interval(4) < 1:
-            #如果消息过多(超过每秒一条)不考虑
-            return False
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
+        if group_context.time_window.get_recent_avg_interval(4) < 0.7:
+            #如果消息间隔过低不考虑
+            self.logger.info(f"群{group_id}消息超过限制~")
+            return False
         
         #被@检测
         if at:
