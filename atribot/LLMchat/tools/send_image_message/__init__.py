@@ -7,7 +7,7 @@ send_message:qq_send_message = container.get("SendMessage")
 
 tool_json = {
     "name": "send_image_message",
-    "description": "发送一个url图像,画图工具应该需要这个来配合发送图片",
+    "description": "向群里发送一个url图像",
     "properties": {
         "group_id": {
             "type": "string",

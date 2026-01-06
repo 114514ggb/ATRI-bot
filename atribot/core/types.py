@@ -267,8 +267,13 @@ class TimeWindow:
             self.events.popleft()
     
     def add(self):
-        """添加一条当前时间的计数"""
+        """添加一条当前时间的计数,time.monotonic()时间"""
         now = time.monotonic()
+        self.events.append(now)
+        self._clean_expired(now)
+    
+    def add_time(self,now):
+        """添加一条时间的计数,时间单位秒级别的时间戳"""
         self.events.append(now)
         self._clean_expired(now)
     
@@ -276,7 +281,6 @@ class TimeWindow:
         """返回当前有效的消息数量"""
         self._clean_expired(time.monotonic())
         return len(self.events)
-    
     
     def clear(self):
         """清空所有计数"""
@@ -519,7 +523,6 @@ class GroupContext:
         async with self.async_lock:
             self.last_msg_at = time.time() #更新群最后处理时间
             self.messages.append(message)
-            self.time_window.add()
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
             

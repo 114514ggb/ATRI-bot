@@ -75,9 +75,9 @@ class UserActivityAnalyzer:
             user_data: 用户基础数据元组
             stats_data: 统计数据元组 (daily, weekly, monthly, earliest_time)
         """
-        number_days = str(stats_data[0][0])
-        week_daye = str(stats_data[0][1])
-        month_daye = str(stats_data[0][2]) 
+        number_days = stats_data[0][0] or 0
+        week_daye = stats_data[0][1] or 0
+        month_daye = stats_data[0][2] or 0
         earliest_time = stats_data[0][3]
         
         name = user_data[1]
@@ -86,20 +86,26 @@ class UserActivityAnalyzer:
         current_time = datetime.now()
 
         last_active_diff = self._format_timedelta(current_time - last_time)
-        earliest_date = datetime.fromtimestamp(earliest_time)
-        earliest_diff = self._format_timedelta(current_time - earliest_date)
-        days_since_earliest = (current_time - earliest_date).days
+        if earliest_time:
+            earliest_date = datetime.fromtimestamp(earliest_time)
+            earliest_diff = self._format_timedelta(current_time - earliest_date)
+            days_since_earliest = (current_time - earliest_date).days
+        else:
+            # 如果找不到最早发言时间，默认设为当前时间或做特殊处理
+            earliest_date = current_time
+            earliest_diff = "无记录"
+            days_since_earliest = 0
 
         actual_days = min(days_since_earliest, 30)
         
         activity_level = self._evaluate_activity(
-            int(number_days), int(month_daye), actual_days, days_since_earliest)
+            number_days, month_daye, actual_days, days_since_earliest)
 
         activity_score = self._calculate_activity_score(
-            int(number_days), int(week_daye), int(month_daye),
-            int(month_daye), actual_days)
+            number_days, week_daye, month_daye,
+            month_daye, actual_days)
 
-        trend = self._evaluate_trend(int(number_days), int(week_daye), int(month_daye))
+        trend = self._evaluate_trend(number_days, week_daye, month_daye)
 
         await self.send_message.send_group_message(
             group_id,
@@ -115,7 +121,7 @@ class UserActivityAnalyzer:
             f"  📆 最早距今: {earliest_diff}\n"
             f"\n"
             f"📊 活跃数据\n"
-            f"  ▫️ 平均每日消息(近30天): {int(month_daye)/max(actual_days, 1):.1f}\n"
+            f"  ▫️ 平均每日消息(近30天): {month_daye/max(actual_days, 1):.1f}\n"
             f"  ▫️ 近1天: {number_days}条\n"
             f"  ▫️ 近7天: {week_daye}条\n"
             f"  ▫️ 近30天: {month_daye}条\n"

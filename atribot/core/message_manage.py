@@ -126,6 +126,9 @@ class group_manage(message_manage):
         
         if group_id not in self.group_white_list and not (user_id == 2631018780):
             return
+        
+        group_context = self.chat_manager.get_group_context(group_id)
+        group_context.time_window.add()
 
         if data.get("message_sent_type") == "self":
             await self._process_memory_summary(data, message.text, group_id)
@@ -137,10 +140,10 @@ class group_manage(message_manage):
 
         if self._check_is_mentioned(data):
             #@处理
-            await self._handle_mentioned_message(message.pure_text, data, group_id, has_permission, message)
+            await self._handle_mentioned_message(message.pure_text, data, group_id, has_permission, message, group_context)
         elif has_permission:
             try:
-                if not await self.initiative_chat.decision(message):
+                if not await self.initiative_chat.decision(message, group_context):
                     await self.event_trigger.dispatch(data, group_id)
             except Exception as e:
                 self.error_occurred(e, "事件触发器")
@@ -154,7 +157,7 @@ class group_manage(message_manage):
                 return True
         return False
     
-    async def _handle_mentioned_message(self, pure_text:str, data, group_id, has_permission, message):
+    async def _handle_mentioned_message(self, pure_text:str, data, group_id, has_permission, message, group_context):
         """处理被 @ 的消息逻辑"""
         # 指令处理
         if pure_text.startswith("/"):
@@ -172,7 +175,7 @@ class group_manage(message_manage):
         if has_permission:
             try:
                 # await self.group_chet.step(message)
-                await self.initiative_chat.decision(message, at=True)
+                await self.initiative_chat.decision(message, group_context, at=True)
             except Exception as e:
                 self.error_occurred(e, "群聊聊天模块")
                 await self.send_message.send_group_message(

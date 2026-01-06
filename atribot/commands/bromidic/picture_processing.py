@@ -1,40 +1,34 @@
-from typing import List
+from typing import List, Optional, Union
 import urllib.parse
 import asyncio
 import aiohttp
 import random
 import base64
 
-
 class pictureProcessing:
+    
+    API_TOKEN = "sk_UqXz8BbTGFwO8YRfpfDdleZoBJxRopJp"
+    
+    HEADERS = {
+        "Authorization": f"Bearer {API_TOKEN}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "*/*"
+    }
     
     def __init__(self):
         self.step_lock = asyncio.Lock()
         
-    
-    async def step(self,message_data: dict[str,dict], prompt:str)-> str:
-        """图片处理主函数
-
-        Args:
-            message_data (dict): cq码消息体
-            prompt (str): 图片prompt
-
-        Raises:
-            aiohttp.ClientError: _description_
-            Exception: _description_
-
-        Returns:
-            base64(str): 返回图像的Base64编码
-        """
+    async def step(self, message_data: dict[str, dict], prompt: str, model:str = "nanobanana") -> str:
+        """图片处理主函数"""
         if self.step_lock.locked():
-            raise RuntimeError("系统繁忙，请稍后再试。")
+            raise RuntimeError("系统繁忙，请稍后再试")
         
-        image_url_list:List[str] = []
+        image_url_list: List[str] = []
         
         if message_data["message"][0]["type"] == "reply":
             from atribot.core.network_connections.qq_send_message import qq_send_message
             from atribot.core.service_container import container
-            send_message:qq_send_message = container.get("SendMessage")
+            send_message: qq_send_message = container.get("SendMessage")
             reply_data = (await send_message.get_msg_details(message_data["message"][0]["data"]["id"]))["data"]
             for reply_message in reply_data["message"]:
                 if reply_message.get("type") == "image":
@@ -45,54 +39,48 @@ class pictureProcessing:
                 image_url_list.append(message["data"]["url"])
         
         params = {
-            "model": "nanobanana",
+            "model": model, 
             "seed": random.randint(1, 1000),
             "nologo": "true",
-            "token": "56zs_9uGTfe19hUH"
         }
         
         if image_url_list:
             params["image"] = image_url_list[0]
-            #还没支持多图片先将就一下
         
-        for attempt in range(3):
-            try:
-                async with aiohttp.ClientSession() as session:
-                    
-                    async with session.get(
-                            url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}", 
-                            params=params, 
-                            timeout=20
-                        ) as response:
-                        
-                        #重试
-                        if response.status >= 500 and attempt < 3 - 1:
+        url = f"https://gen.pollinations.ai/image/{urllib.parse.quote(prompt)}"
+
+        async with aiohttp.ClientSession(headers=self.HEADERS) as session:
+            for attempt in range(3):
+                try:
+                    async with session.get(url, params=params, timeout=20) as response:
+                        if response.status >= 500 and attempt < 2:
                             await asyncio.sleep(1)
                             continue
                         
-                        response.raise_for_status()  # 检查状态码
-                        
+                        response.raise_for_status()
                         return base64.b64encode(await response.read()).decode('utf-8')
                         
-            except aiohttp.ClientError as e:
-                raise aiohttp.ClientError(f"网络请求错误: {e}")
-            except Exception as e:
-                raise Exception(f"图片生成失败: {e}")
+                except aiohttp.ClientError as e:
+                    if attempt == 2:
+                        raise aiohttp.ClientError(f"网络请求错误: {e}")
+                except Exception as e:
+                    if attempt == 2:
+                        raise Exception(f"图片生成失败: {e}")
 
-    
-    @staticmethod
+    @classmethod
     async def generate_image_base64(
+        cls,
         prompt: str,
         width: int = 1024,
         height: int = 1024,
-        seed: int = None,
-        model: str = "flux",
-        image_url: str|List[str] = None,
+        seed: Optional[int] = None,
+        model: str = "gptimage",
+        image_url: Union[str, List[str], None] = None,
         nologo: bool = True,
         private: bool = False,
         enhance: bool = False,
         safe: bool = False,
-        referrer: str = None,
+        referrer: Optional[str] = None,
         timeout: int = 30
     ) -> str:
         """
@@ -103,7 +91,7 @@ class pictureProcessing:
             width: 图片宽度（像素）
             height: 图片高度（像素）
             seed: 随机种子（可选）
-            model: 生成模型，默认为 'flux'
+            model: 生成模型，默认为 'gptimage'
             image_url: 输入图片URL（用于图生图）
             nologo: 是否禁用水印
             private: 是否私有模式
@@ -120,11 +108,7 @@ class pictureProcessing:
             Exception: API 返回错误
         """
         encoded_prompt = urllib.parse.quote(prompt)
-        url = f"https://image.pollinations.ai/prompt/{encoded_prompt}"
-        
-        headers = {
-            'Authorization': 'Bearer 56zs_9uGTfe19hUH'
-        }
+        url = f"https://gen.pollinations.ai/image/{encoded_prompt}"
         
         params = {
             "width": width,
@@ -134,28 +118,33 @@ class pictureProcessing:
             "private": str(private).lower(),
             "enhance": str(enhance).lower(),
             "safe": str(safe).lower(),
-            # "token": "56zs_9uGTfe19hUH"
         }
         
         if seed is not None:
+            params["seed"] = seed
+        else:
             params["seed"] = random.randint(1, 1000)
+
         if image_url:
-            params["image"] = image_url
+            img_param = image_url[0] if isinstance(image_url, list) and image_url else image_url
+            if isinstance(img_param, str):
+                params["image"] = img_param
+                
         if referrer:
             params["referrer"] = referrer
     
         last_exception = None
         
-        for _ in range(3):
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(url, params=params, timeout=timeout, headers=headers) as response:
-                        response.raise_for_status()  # 检查状态码
+        async with aiohttp.ClientSession(headers=cls.HEADERS) as session:
+            for _ in range(3):
+                try:
+                    async with session.get(url, params=params, timeout=timeout) as response:
+                        response.raise_for_status()
                         return base64.b64encode(await response.read()).decode('utf-8')
                         
-            except (aiohttp.ClientError, Exception) as e:
-                last_exception = e
-                await asyncio.sleep(0.5)
+                except (aiohttp.ClientError, Exception) as e:
+                    last_exception = e
+                    await asyncio.sleep(0.5)
 
         if isinstance(last_exception, aiohttp.ClientError):
             raise aiohttp.ClientError(f"网络请求失败: {last_exception}")

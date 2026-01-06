@@ -1,8 +1,8 @@
 from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.commands.bromidic.picture_processing import pictureProcessing
 from atribot.core.command.command_parsing import command_system
 from atribot.core.service_container import container
 from atribot.commands.bromidic.get_bilibili import BiliBiliCrawler
-from atribot.commands.bromidic.picture_processing import pictureProcessing
 from bilibili_api import video
 
 
@@ -151,7 +151,7 @@ async def bili_crawler_command(
 async def picture_processing(message_data: dict, prompt:str):
     """图片处理命令处理函数"""
     
-    img_base64 = await image_processing.step(message_data, prompt)
+    img_base64 = await image_processing.step(message_data, prompt, model = "gptimage")
     group_id = message_data["group_id"]
     
     await send_message.send_group_pictures(group_id,f"base64://{img_base64}",local_Path_type=False)

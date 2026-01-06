@@ -241,6 +241,11 @@ class group_chat(chat_baseics):
         group_id = message.group_id
         user_id = message.user_id
 
+        await self.send_message.set_msg_emoji_like(
+            message_id = data['message_id'],
+            emoji_id = 183 #表情是我最可爱
+        )
+
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
             data
         )

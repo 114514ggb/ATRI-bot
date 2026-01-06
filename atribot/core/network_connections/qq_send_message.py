@@ -354,12 +354,14 @@ class qq_send_message():
     
         await self.group_message_request(group_id,"record",url_audio,Path_type=local_Path_type)
     
+    
     async def send_group_video(self,group_id,url_video = "ATRIの珍贵录像.mp4",default = False,local_Path_type = True):
         """发送群视频"""
         if default: 
             url_video = f"{self.File_root_directory}video/{url_video}"
 
         await self.group_message_request(group_id,"video",url_video,Path_type=local_Path_type)
+
 
     async def send_group_file(self,group_id,url_file = "ATRI的文件.txt",default = False,local_Path_type = True):
         """发送群文件"""
@@ -379,6 +381,33 @@ class qq_send_message():
                 
         await self.async_send(url=url,payload=payload)
         # self.send(url,payload)
+
+    async def set_msg_emoji_like(
+        self,
+        message_id:int|str,
+        emoji_id:int,
+        set:bool = True,
+        echo:bool = False
+    ):
+        """贴表情
+
+        Args:
+            message_id (int | str): 消息id
+            emoji_id (int): 表情ID
+            set (bool): 是否贴
+            echo (bool): 是否要返回执行结果
+        Returns:
+            dict: 有echo时会返回执行结果
+        """
+        url = "set_msg_emoji_like"
+
+        payload = {
+            "message_id": message_id,
+            "emoji_id": emoji_id,
+            "set": set
+        }
+
+        return await self.async_send(url=url,payload=payload,echo= echo)
 
     async def get_img_details(self,file_id):
         """获取图片消息详情"""

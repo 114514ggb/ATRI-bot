@@ -17,7 +17,7 @@ class initiativeChat:
         self.group_chat:group_chat = container.get("GroupChat")
         self.keyword_trigger_list = ["亚托莉","哈基莉"]
     
-    async def decision(self, message: RichData, at: bool = False) -> bool:
+    async def decision(self, message: RichData, group_context:GroupContext, at: bool = False) -> bool:
         """决策是否应该发言"""
         data = message.primeval
         if not data.get("message"):
@@ -25,11 +25,10 @@ class initiativeChat:
 
         group_id: int = message.group_id
         user_id: int = message.user_id
-        group_context: GroupContext = self.chat_manager.get_group_context(group_id)
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
         if group_context.time_window.get_recent_avg_interval(4) < 0.7:
             #如果消息间隔过低不考虑
-            self.logger.info(f"群{group_id}消息超过限制~")
+            self.logger.info(f"群{group_id}消息超过限制~不考虑回复")
             return False
         
         #被@检测
