@@ -12,7 +12,7 @@ tool_json = {
     "description": "在你想发语音或是有人让你说话（发声的那种）的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
     "properties": {
         "group_id": {
-            "type": "string",
+            "type": "number",
             "description": "要发送的当前群号,必须参数",
         },
         "text": {

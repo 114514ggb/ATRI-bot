@@ -1,7 +1,9 @@
 from atribot.core.network_connections.qq_send_message import qq_send_message
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.service_container import container
+from mcp.types import CallToolResult
 from logging import Logger
+from typing import Any
 import importlib.util
 import os
 import json
@@ -23,7 +25,7 @@ class tool_calls:
         self.get_files_in_folder()
         
 
-    async def calls(self, tool_name:str, arguments_str:str):
+    async def calls(self, tool_name:str, arguments_str:str)-> CallToolResult | Any:
         """调用工具"""
         if func_tool := self.mcp_tool.get_func(tool_name):
             #MCP工具的调用

@@ -3,8 +3,9 @@ from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
 from typing import Optional
 from logging import Logger
-import json
 import aiohttp
+import json
+import os
 # import asyncio
 """
 文件支持的格式：
@@ -12,6 +13,8 @@ import aiohttp
 - 网络路径: "http://<URL>" 或 "https://<URL>", 如 "http://example.com/image.png"
 - Base64编码: "base64://<编码字符串>", 如 "base64://iVBORw0KGgo..."
 """
+
+
 
 
 class qq_send_message():
@@ -30,7 +33,8 @@ class qq_send_message():
         connection_type = "http",
         File_root_directory:str = ""
     ):
-        if not hasattr(self, "_initialized"):
+        if "_initialized" not in self.__dict__:
+            
             self.File_root_directory = File_root_directory
             self.logger:Logger = container.get("log")
             
@@ -54,7 +58,7 @@ class qq_send_message():
                 raise Exception("连接类型错误")
                 
             self.connection_type = connection_type # 连接类型
-            self.logger.info("当前连接类型为"+connection_type+"\n")
+            self.logger.info(f"当前连接类型为{connection_type}\n")
             self._initialized = True
     
     async def _send_http_strategy(self, url: str, payload: dict, echo: bool = False) -> Optional[dict]:
@@ -363,23 +367,46 @@ class qq_send_message():
         await self.group_message_request(group_id,"video",url_video,Path_type=local_Path_type)
 
 
-    async def send_group_file(self,group_id,url_file = "ATRI的文件.txt",default = False,local_Path_type = True):
+    async def send_group_file(
+        self,
+        group_id: int,
+        url_file: str = "ATRI的文件.txt",
+        name: str = None,
+        default: bool = False,
+        local_Path_type: bool = True,
+        echo:bool = False
+    ):
         """发送群文件"""
-        url = "send_group_msg"
         
+        if default:
+            raw_path = os.path.join(self.File_root_directory, "file", url_file)
+        else:
+            raw_path = url_file
+
+        file_str = f"file://{raw_path}" if local_Path_type else raw_path
+
+        data_payload = {
+            "file": file_str
+        }
+        
+        if name:
+            data_payload["name"] = name
+
         payload = {
             "group_id": group_id,
             "message": [
                 {
                     "type": "file",
-                    "data": {
-                        "file": f"{'file://' if local_Path_type else ''}{f"{self.File_root_directory}file/{url_file}" if default else url_file}"
-                    }
+                    "data": data_payload
                 }
             ],
         }
                 
-        await self.async_send(url=url,payload=payload)
+        await self.async_send(
+            url="send_group_msg", 
+            payload=payload,
+            echo = echo
+        )
         # self.send(url,payload)
 
     async def set_msg_emoji_like(
@@ -544,3 +571,19 @@ class qq_send_message():
         data = {"file": "file://"+ f"{self.File_root_directory}audio/{url_audio}" if default else url_audio}
 
         await self.Send_personal_message(qq_id,data,"record")
+
+    def __getattr__(self, item):
+        """
+        实现动态代理，将属性访问转换为API调用
+        
+        Args:
+            item: 要访问的属性名，将用作API端点
+            
+        Returns:
+            Callable[..., CoroutineType[Any, Any, dict | None]]一个可调用函数，调用时将发送异步请求
+        """
+        return lambda echo = False,**kwargs : self.async_send(
+            url=item, 
+            payload={k: v for k, v in kwargs.items() if v is not None},
+            echo=echo
+        )

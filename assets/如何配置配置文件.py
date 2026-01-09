@@ -93,6 +93,9 @@
         "group_max_record":20,#群消息缓存的消息条数量为ai上下文的
         "private_max_record":20#私聊没做所以没用的配置
     },
+    "sand_box":{#这个是沙盒的的配置参数，需要看具体使用的沙盒实例来传递参数,默认使用的是docker，可以去atribot\LLMchat\sandbox\docker_sandbox.py看看class接受的参数
+        "image":"atri-sandbox:latest"
+    },
     "group_white_list":[
         984466158#有效的群白名单
     ],

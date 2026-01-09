@@ -9,7 +9,7 @@ tool_json = {
     "description": "这是你的画板,图像生成工具，能够根据提示词自动生成对应的图片，并自动将生成的图片发送给用户。适用于需要你绘画的场景",
     "properties": {
         "group_id": {
-            "type": "string",
+            "type": "number",
             "description": "要发送的当前群号",
         },
         "prompt": {

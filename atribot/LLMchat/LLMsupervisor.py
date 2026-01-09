@@ -6,8 +6,9 @@ from atribot.core.types import (
     ToolCallsStopIteration,
     Context
 )
-from typing import Dict, List, Any
 from dataclasses import dataclass, field
+from mcp.types import CallToolResult
+from typing import Dict, List, Any
 from logging import Logger
 import re
 
@@ -192,9 +193,9 @@ class large_language_model_supervisor():
                     function = tool_call['function']
                     tool_name = function['name']
                     tool_input = function['arguments']
-                    tool_output = ""
 
-                    tool_output = str(await self.tool_management.calls(tool_name,tool_input))
+                    tool_output: CallToolResult | Any = await self.tool_management.calls(tool_name,tool_input)
+                    tool_output = self.format_mcp_result(tool_output) if isinstance(tool_output,CallToolResult) else str(tool_output)
                     
                 except ToolCallsStopIteration:
                     increase_context.add_tool_message(tool_name,tool_call['id'],tool_output)
@@ -327,6 +328,43 @@ class large_language_model_supervisor():
             
         return response
 
+    
+    @staticmethod
+    def format_mcp_result(result: CallToolResult) -> str:
+        """Formats the MCP tool execution result into a concise string.
+
+        Args:
+            result: The CallToolResult object containing execution status and content.
+
+        Returns:
+            A string containing the formatted status and content.
+        """
+        parts = [f"[{'ERROR' if result.isError else 'SUCCESS'}]"]
+
+        for block in result.content:
+            if block.type == "text":
+                parts.append(block.text)
+                
+            elif block.type in ("image", "audio"):#其实这里支持的模型应该直接传入的，但是这里支持的模型不多后面再添加
+                parts.append(f"[{block.type.capitalize()}: {block.mimeType}]")
+                
+            elif block.type == "resource":
+                res = block.resource
+                uri = getattr(res, "uri", "unknown")
+                if hasattr(res, "text") and res.text:
+                    parts.append(f"[Resource: {uri}]\n{res.text}")
+                else:
+                    mime = getattr(res, "mimeType", "application/octet-stream")
+                    parts.append(f"[Resource: {uri} - {mime}]")
+                    
+            elif block.type == "resource_link":
+                parts.append(f"[Link: {getattr(block, 'uri', 'unknown')}]")
+
+        if result.structuredContent:
+            parts.append(str(result.structuredContent))
+
+        return "\n".join(parts)
+    
 
     async def _get_assistant_message_with_retry(
         self,

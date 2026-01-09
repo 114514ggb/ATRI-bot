@@ -7,10 +7,12 @@ from atribot.LLMchat.LLMsupervisor import large_language_model_supervisor
 from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
 from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from atribot.core.cache.management_chat_example import ChatManager
+from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.core.command.command_parsing import command_system
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.core.command.command_loader import command_loader
 from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.message_manage import message_router
@@ -106,6 +108,16 @@ class BotFramework:
             }
         )
         
+        #ai使用的沙盒
+        sand_box:SandBoxBase = DockerSandbox(
+            config = self.config.sand_box
+        )
+        await sand_box.start()
+        container.register(
+            "SandBox",    
+            sand_box
+        )
+        
         #向量数据库实现的记忆系统
         container.register(
             "memirySystem",    
@@ -170,9 +182,9 @@ class BotFramework:
         """
         if server_type == "WebSocket_server":
             WSServer = WebSocketServer(
-                    host = self.config.network.host, 
-                    port = self.config.network.server_port,
-                    access_token = self.config.network.access_token, 
+                host = self.config.network.host, 
+                port = self.config.network.server_port,
+                access_token = self.config.network.access_token, 
             )
             
             container.register(

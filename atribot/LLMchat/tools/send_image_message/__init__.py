@@ -1,5 +1,6 @@
-from atribot.core.service_container import container
 from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.service_container import container
+
 
 
 
@@ -10,7 +11,7 @@ tool_json = {
     "description": "向群里发送一个url图像",
     "properties": {
         "group_id": {
-            "type": "string",
+            "type": "number",
             "description": "要发送的当前群号",
         },
         "url": {

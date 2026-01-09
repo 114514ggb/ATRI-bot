@@ -75,6 +75,9 @@
         "group_max_record":20,
         "private_max_record":20
     },
+    "sand_box":{
+        "image":"atri-sandbox:latest"
+    },
     "group_white_list":[
     ],
     "group_initiative_chat_white_list":[

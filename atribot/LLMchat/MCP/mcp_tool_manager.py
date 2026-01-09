@@ -37,7 +37,7 @@ SUPPORTED_TYPES = [
 ]  # json schema 支持的数据类型
 
 
-@dataclass
+@dataclass(slots=True)
 class FuncTool:
     """
     用于描述一个函数调用工具。

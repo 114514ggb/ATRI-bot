@@ -6,7 +6,7 @@
 >_时间流逝吧，你是多么的残酷；时间停止吧，你是多么的美丽_
 >
 > — *ATRI -My Dear Moments-*
-
+项目Logo由[吖密](https://space.bilibili.com/1196260828)绘制
 [![Python](https://img.shields.io/badge/Python-3.13-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
 [![NapCat](https://img.shields.io/badge/Backend-NapCat-green.svg)](https://github.com/NapNeko/NapCatQQ)

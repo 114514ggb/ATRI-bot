@@ -9,7 +9,7 @@ tool_json = {
     "description": "分享来源网易云的歌曲,有人让你唱歌可以调用这个工具",
     "properties": {
         "group_id": {
-            "type": "string",
+            "type": "number",
             "description": "要发送的当前群号",
         },
         "name": {

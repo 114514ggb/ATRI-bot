@@ -1,10 +1,15 @@
 from atribot.LLMchat.sandbox.sandbox_base import (
     SandBoxBase,
-    ExecutionResult
+    ExecutionResult,
+    GeneratedFile
 )
 from docker.errors import ImageNotFound, NotFound
+from tarfile import TarInfo
+from typing import List
+import mimetypes
 import tarfile
 import asyncio
+import zipfile
 import base64
 import docker
 import shlex
@@ -183,9 +188,9 @@ class DockerSandbox(SandBoxBase):
             )
 
     async def run_code(self, code: str, language: str = 'python', timeout: int = 30) -> ExecutionResult:
-        """在沙盒中执行代码。
+        """在沙盒中执行一次性代码，会执行清理
 
-        根据语言类型生成对应的文件并执行（但是目前环境只用py）
+        根据语言类型生成对应的文件并执行（但是目前环境只有py）
 
         Args:
             code: 要执行的代码字符串。
@@ -229,6 +234,143 @@ class DockerSandbox(SandBoxBase):
             if temp_dir and temp_dir.startswith("/tmp/code_"):
                 await self.run_command(f"rm -rf {temp_dir}", timeout=5)
 
+    async def run_python_code(
+        self, 
+        code: str, 
+        timeout: int = 30, 
+        max_file_size: int = 20 * 1024 * 1024,
+        max_total_size: int = 150 * 1024 * 1024
+    ) -> ExecutionResult:
+        """在沙盒中执行一次性python代码。
+        
+        逻辑变更：
+        1. 如果产生单个文件，直接返回该文件。
+        2. 如果产生多个文件，打包成 output.zip 返回。
+        3. 增加总大小限制检查。
+
+        Args:
+            code: 要执行的代码字符串
+            timeout: 执行超时时间（秒）。
+            max_file_size: 单个文件最大字节数限制（仅在单文件模式下生效）
+            max_total_size: 产生的所有文件总大小限制（压缩前）
+
+        Returns:
+            ExecutionResult: 包含执行结果的对象
+        """
+        
+        run_id = uuid.uuid4().hex
+        run_dir = f"{self.work_dir}/run_{run_id}"
+        script_name = "main.py"
+        script_path = f"{run_dir}/{script_name}"
+        
+        generated_files: List[GeneratedFile] = []
+        exec_result = None
+        warning_msg = ""
+
+        try:
+            #准备环境和代码
+            await self.run_command(f"mkdir -p {run_dir}")
+            b64_code = base64.b64encode(code.encode('utf-8')).decode('utf-8')
+            await self.run_command(f"echo {b64_code} | base64 -d > {script_path}")
+
+            #执行代码
+            run_cmd = f"cd {run_dir} && python3 -u {script_name}"
+            exec_result = await self.run_command(run_cmd, timeout=timeout)
+
+            try:
+                bits, stat = await asyncio.to_thread(self.container.get_archive, run_dir)
+                
+                file_obj = io.BytesIO()
+                for chunk in bits:
+                    file_obj.write(chunk)
+                file_obj.seek(0)
+                valid_members:List[TarInfo] = []
+                total_size = 0
+                
+                with tarfile.open(fileobj=file_obj, mode='r') as tar:
+                    for member in tar.getmembers():
+                        if not member.isfile():
+                            continue
+                        
+                        filename = os.path.basename(member.name)
+                        if filename == script_name: # 忽略脚本本身
+                            continue
+                        
+                        valid_members.append(member)
+                        total_size += member.size
+                
+                #总大小超过限制
+                if total_size > max_total_size:
+                    warning_msg = f"\n[System Warning] Generated files ignored. Total size ({total_size} bytes) exceeds limit ({max_total_size} bytes)."
+                
+                #没有产生文件
+                elif len(valid_members) == 0:
+                    pass 
+
+                #直接存储
+                elif len(valid_members) == 1:
+                    member = valid_members[0]
+                    filename = os.path.basename(member.name)
+                    
+                    if member.size > max_file_size:
+                        warning_msg = f"\n[System Warning] File '{filename}' ignored. Size ({member.size} bytes) exceeds limit ({max_file_size} bytes)."
+                    else:
+                        file_obj.seek(0) 
+                        with tarfile.open(fileobj=file_obj, mode='r') as tar:
+                            f_extracted = tar.extractfile(member)
+                            if f_extracted:
+                                content = f_extracted.read()
+                                mime_type, _ = mimetypes.guess_type(filename)
+                                generated_files.append(GeneratedFile(
+                                    path=filename,
+                                    content=content,
+                                    type=mime_type or "application/octet-stream"
+                                ))
+
+                #打包成 ZIP
+                else:
+                    zip_buffer = io.BytesIO()
+                    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+                        file_obj.seek(0) # 重置 tar 流指针
+                        with tarfile.open(fileobj=file_obj, mode='r') as tar:
+                            for member in valid_members:
+                                f_extracted = tar.extractfile(member)
+                                if f_extracted:
+                                    filename = os.path.basename(member.name)
+                                    zf.writestr(filename, f_extracted.read())
+                    
+                    generated_files.append(GeneratedFile(
+                        path="output.zip",
+                        content=zip_buffer.getvalue(),
+                        type="application/zip"
+                    ))
+
+            except Exception as e:
+                if exec_result:
+                    err_msg = f"\n[System Error] Failed to process generated files: {str(e)}"
+                    exec_result.stderr += err_msg
+                    exec_result.text += err_msg
+
+        finally:
+            # 清理环境
+            if run_dir.startswith(self.work_dir) and "run_" in run_dir:
+                await self.run_command(f"rm -rf {run_dir}", timeout=5)
+
+        if exec_result:
+            if warning_msg:
+                exec_result.stderr += warning_msg
+                exec_result.text += warning_msg
+            
+            exec_result.files = generated_files
+            return exec_result
+        else:
+            return ExecutionResult(
+                stdout="",
+                stderr="Execution failed internally.",
+                exit_code=-1,
+                text="Execution failed internally.",
+                files=[]
+            )
 
     async def upload_file(self, local_path: str, remote_path: str):
         """上传本地文件到容器。
@@ -398,3 +540,5 @@ class DockerSandbox(SandBoxBase):
             path=self.work_dir,
             data=tar_stream
         )
+
+

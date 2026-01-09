@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import List
+import base64
 import os
 
 
@@ -18,7 +19,19 @@ class GeneratedFile:
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         with open(full_path, 'wb') as f:
             f.write(self.content)
+    
+    def to_base64(self, encoding: str = 'utf-8') -> str:
+        """
+        将文件内容转换为 Base64 编码字符串
+        
+        Args:
+            encoding: 返回字符串的编码方式，默认为 'utf-8'
             
+        Returns:
+            Base64 编码的字符串
+        """
+        return base64.b64encode(self.content).decode(encoding)
+    
     @property
     def size(self) -> int:
         return len(self.content)
@@ -65,7 +78,7 @@ class SandBoxBase(ABC):
     @abstractmethod
     async def run_code(self, code: str, language: str = 'python', timeout: int = 30) -> ExecutionResult:
         """
-        在沙盒中执行代码。
+        在沙盒中执行一次性代码，会执行后清理
         
         Args:
             code: 代码字符串
@@ -76,6 +89,7 @@ class SandBoxBase(ABC):
             ExecutionResult 对象
         """
         pass
+    
 
     @abstractmethod
     async def run_command(self, command: str, timeout: int = 30) -> ExecutionResult:

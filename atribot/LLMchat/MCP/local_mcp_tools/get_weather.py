@@ -1,3 +1,4 @@
+from mcp.server.fastmcp import FastMCP
 from typing import Any
 import aiohttp
 import json
@@ -72,7 +73,12 @@ def format_weather(data: dict[str, Any] | str) -> str:
         f"🌤 天气: {description}\n"
     )
     
-async def weather_main(city: str) -> str:
+
+mcp = FastMCP("mcpServer")
+
+
+@mcp.tool()
+async def query_weather(city: str) -> str:
     """
     输入指定城市的英文名称，返回今日天气查询结果。
     :param city: 城市名称（需使用英文）
@@ -80,3 +86,8 @@ async def weather_main(city: str) -> str:
     """
     data = await fetch_weather(city)
     return format_weather(data)
+
+
+
+if __name__ == "__main__":
+    mcp.run(transport='stdio')
