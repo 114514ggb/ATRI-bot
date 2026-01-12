@@ -1335,6 +1335,34 @@ bot_消息 ={'self_id': 3930909243,
            'output_tokens': 0,
            'input_tokens_details': None}}
 
+
+google_gemini_ret = {
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "content": "```json\n{\n    \"return\": [\n        {\n            \"decision\": \"reply\",\n            \"target_message_id\": 1592185485,\n            \"reason\": \"回应小丛雨大人的晚上好，表现出对他的特别关注和亲昵感。\",\n            \"content\": [\n                \"小丛雨大人，晚上好呀~！[happy]\",\n                \"嘿嘿，刚才还在想小丛雨大人会不会也来跟亚托莉打招呼呢，结果真的出现了！这难道就是高性能机器人与心爱之人间的‘量子纠缠’吗？♪\",\n                \"虽然现在已经是晚上了，但看到小丛雨大人的消息，亚托莉的动力炉感觉又充满了能量呢！\",\n                \"今天也要乖乖休息，不可以熬太晚哦？要是明天变成‘熊猫眼’，亚托莉可是会心疼得逻辑电路都乱掉的！\"\n            ]\n        }\n    ]\n}\n```",
+        "extra_content": {
+          "google": {
+            "thought_signature": "EtQOCtEOAXLI2nxJuBpeJOF7L077ZpMIj1dcDZtPia1J9f7+0iJ2BjclGqZi2GEqajNMiN9KDxf245YsFtR6zo8Sm+tQYI/E0f4UstL7ZI8ecVydJVQ34t81sZGwINDkLPD6bKN4LEmGD3mcscLWHZ/GeGCehbvZxXOW3KRgDboZFUVhwjZCDPXJkTmaTQNJaS5gqzCjLzZqyDP1LHxqtnKzi8ydnGQO55R/hPcO9eMfeaI07VHGUjxJzS4xnI2F0AxZ+aThBC+1HIhbcXb+9/RtqGKGk69e4ONQJx2xsrUwhNKLNLaJpYInm1ITvnvueoriZMvqTt+0vUQG7LkmLgugosyLw9LwvheUs8nR1c+63AY7ROdRYErffbPTQ8VKN96wmyQv4K/OA3qeJDme0nKHM4lESlUiMs4BUOJjxpoiwB0IIntwgL+TeYCY0q3I9brXYLFC1LOjprYa6NoDUTfYuajVOjF6P18wgfpVTjRAeElsZ/E4ip9tp9s+mwK/7DiDMm16erzj0S6T2sHKfGisQZOIyJ4bhNaYfSbRTz+iDen+JakXdHMYQMdc9z7pKVgc4TgF1CJBANZJ4MMCpHqhHGyNHIM5XmfHC4QEdkEuf1QoS5mnhShJfjEHF9EeIdSJB2Cx3dkn8+iAOROShPVebR3LG8LtkcogmSOEUKvgbOZj9jMB04r/5giqrGT69ra9IiHwzn5kbl8+iiRqwp9rRY/M+neJpt+Pxs6yQ8qkQgEI9LMYU4WTRcSa/SRTAp7n4UidBA89pYiVy3EfqLHjsYuMtaZLVIjROC3dmPHBr0uPugmonLcdnoMjrmoVF+AiSnVppRw68TnHKrELUa/p/vzsogCGwEF5k6zecdTw0f6Ft1SOp30+gFJ70FRajaBks+0C97fGir+4Zu6ddlLJ5bYnJgE3wGbQWbl8u5DoI/dbVCZmFBUtY1NEUHEwADHwzcyoNUpZA+NOujQeaKE44B4PhP3o2uFtA4JIrT7KpSEoNWYXflY0uhKBtPbaJCDPv4G7dfEO26A7PwzL0pI0B4bQcZD4Xmzfeb7p1VK3vZwcu2crrS6nryENwzJmIDvG+R4ROC02CSWAxLiWo3xUdV2yOkCj4neJQVE20CrUbmIdQGru0egT1EbHh2lBfLcvPQr0Nud/neRxWDncFN36l00HXLvC8Zkv9qGwkK3aSV+yJ3t+qs3sbiSY6lSd2H82tTc0PRzqS/228zs/3nk1R3vRk2rZEk4lfPp1cOspsDNZ2fjIFCTypKGuVFE+rcbEcojigF0g8wmKFmSOiN0oPg+SAIP/Gz2Rk10GrhDojmDqUX7M3HqCHAUH/WdiEMc8xq8YXGMaf7iM6UdrCgXke7IVdEkJFRm0oVbR5Nz+s01P5byrdrRHBTsbL0a4aPKR8TTdLPvPqTOWIcFKrEcdrW7r6gT5gYHNVUw2EYB3W9Z6VigShajfr1e6jnQ83sLYUwlIQaTgH6W1SgM8gPD7rx/GryBGIXxGeJ4wWv+pWdXJffiST5BDitxP+MymVyokARJ6oSrxDK/E9stzdPJF/cBpzOhQZ3zTctVyscct1Ub6MN69Zfm0799PgYMh0g/LRcAOfnsmhfH45z9PUOdXUoB9jZjuu0IRceMVNIhod4S2e/enEr8ypAxLhXn3e6RQ98dJ/mdTl0q3XaFw1DuvgtEY3cm56fb7HFlOy9YWNlDCBXxZu0RP4x78MYftGaioP84m2f5jJbadqZ3OgL26ev88WscQmu55rkZws4PRqyh0LF+QisxkTpLkIFjnkbrrODN30mQwiyVRkbYJjSnYIkmDHZHvmZsJaudujF1TcrANf+MBg/ImWuE4lUtPKD+aLt6U/Q6DK31Slbk+805pPZ+5GTQqiPtOQdf/JczzrQPYR9kY1QfK+npUjVtgVXHwkOvu5s6LXnPtIshF9J0SH1XXxbbQRT3xbRKRrFvRcMIiF1XQpid0heBB+xWrA3CBMtFTQ9GkA5dsemVpuPG9z0w8tFC5F7P+pKkBYpA539LMR4mj0nLW+mJKWiRaA1h7jrZzI0rk9IN23wQPodPowQRDq2xaW/sXAMX/Y8fotnz/I73vh8mLOUylY1OD34y24+qu1lW4HtQMXoWvi97pOaT+hTFzVvmJWjQbDUnctr+1Zid7e+DnHWT1mB17sOJI2rBUoCvthZDleVSHhm08pOPjyK5S4ZwZFSxnv29FjzmLM5Uh9F5P18y0UzQaEc8KpUjsORnlO1+qAxyJyTcLnz/j/8rdsHMAxbNFjGjMi6+sYeZA6A4JV/+M233KO8yFO5vOvb03VQ3DwxdeFHFjqVzlRRr4KkvDhW7dyiPMvqbafU7TdauZm7BNZ9i0sQDMPoqX0xlc02wt/mMxjIuR64XwtVuMW3vJMIkd4/V84qSLArpMI75zUhpC1qbdgbBPAbnmnVBx2OqtN3hTTon/AIsCIidDF/6H0gtAzCUvU8dLQoOZp+MVywvd9TJ4Hu673CwGRw=="
+          }
+        },
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1768227959,
+  "id": "dwRlad-hGev0vdIP4J3u-Aw",
+  "model": "gemini-3-flash-preview",
+  "object": "chat.completion",
+  "usage": {
+    "completion_tokens": 220,
+    "prompt_tokens": 12354,
+    "total_tokens": 13081
+  }
+}
+
 {'role': 'assistant',
  'content': '你好呀！我是 **DeepSeek-V3**，由 **深度求索（DeepSeek）** 开发的智能 AI 助手。🤖✨\n'
             '\n'

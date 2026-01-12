@@ -36,7 +36,7 @@ class initiativeChat:
             decision =  await self._execute_reply(
                 message, group_id, params,
                 log_msg=f"Bot was @ed by user {user_id}, preparing to respond.",
-                prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或你在短时间连续发送了过多的消息，面对多次重复输入,就选择静默不回复"
+                prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或你在短时间连续发送了过多的消息或是面对多次重复类似输入,就选择静默不回复"
             )
             await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
             return decision
@@ -66,6 +66,7 @@ class initiativeChat:
                     return decision
                 
                 #"现在你的消息被引用，你需要好好想想要不要回复或是怎么回复"暂时不做
+                #还有计算话题的相似度来判断是否回复的，语言转换成向量来判断相似度,来决定是否回复
                 
                 if self.roll_trigger_probability(group_context, params):
                     return await self._execute_reply(

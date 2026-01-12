@@ -272,7 +272,6 @@ class group_chat(chat_baseics):
             group_id = group_id,
             user_id = user_id
         )
-        original_context.record_validity_check()
         
         request = replace(
             self.template_request,
@@ -342,13 +341,24 @@ class group_chat(chat_baseics):
         
         self.log.info("结束json处理!")
         
+        if total_tokens := response.metadata.get("total_tokens"):
+            original_context.total_tokens = total_tokens#更新tiken计数
+        
+        if truncated_context := original_context.record_validity_check():
+            if summarize_context := await self.memiry_system.summarize_context(str(truncated_context)):
+                original_context.messages.insert(0,{
+                    {"role": "assistant", "content":  summarize_context[:3000]}#简单做一个限制让这个不要太长
+                })
+                self.log.info(f"总结完成消息:{truncated_context}")
+            else:
+                self.log.info("模型总结为none")
+        
     
     async def reply_conduct(self, response_json:Dict, data:Dict)->None:
         
         self.log.info(f"LLM决定回复消息。理由:{response_json.get("reason")}")
         group_id = data["group_id"]
         
-
         chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
         
         since = chat_condition.get_seconds_since_llm_time()
@@ -417,7 +427,7 @@ class group_chat(chat_baseics):
         request.model_api = None
         request.parameter = { #一个绝大多数模型可用的通用配置
             "temperature":0.1,
-            "top_p":0.95,
+            "top_p":0.9,
             "max_tokens": 8192,
             "tool_choice": "auto"
         }

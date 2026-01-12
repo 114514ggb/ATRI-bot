@@ -1,4 +1,4 @@
-from atribot.LLMchat.memory.prompts import FACT_RETRIEVAL_PROMPT,PURE_GROUP_FACT_RETRIEVAL_PROMPT
+from atribot.LLMchat.memory.prompts import FACT_RETRIEVAL_PROMPT,PURE_GROUP_FACT_RETRIEVAL_PROMPT, SUMMARIZE_CONTEXT_SYSTEM_PROMPT
 from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.core.service_container import container
@@ -107,6 +107,24 @@ class memorySystem:
             return return_json.get("facts",[])
         else:
             return []
+        
+    async def summarize_context(self, context:str)->str:
+        """对一段文本进行关键性总结,为模型进行上下文压缩
+
+        Args:
+            context (str): 要进行总结的文本
+
+        Returns:
+            str: 总结后的文本
+        """
+        if return_json := await self.request_return_json_content(
+            message = context, 
+            play_role = SUMMARIZE_CONTEXT_SYSTEM_PROMPT
+        ):
+            return return_json.get("summarize","")
+        else:
+            return ""
+        
         
     async def request_return_json_content(self, message:str, play_role:str)->Dict:
         """发起请求获取json

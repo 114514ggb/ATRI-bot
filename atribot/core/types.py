@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Dict,List,Any
+from typing import Dict, List, Deque, Iterable, Any
 from collections import deque
 import asyncio
 import bisect
@@ -40,8 +40,12 @@ class Context():
     """原始的上下文"""
     user_max_record: int = 20
     """user最多消息条数限制"""
+    user_max_token: int = 40000 #一般模型的上下文是128K的token
+    """user消息token限制"""
     play_role:str = ""
     """模型人物提示词"""
+    total_tokens:int = 0
+    """上一轮api响应中给出的上下文token"""
     async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """异步锁"""
 
@@ -87,8 +91,11 @@ class Context():
         Returns:
             List[Dict[str, Any]]: 上下文list
         """
-        system_msg = [{"role": "system", "content": "\n\n".join(filter(None, [self.play_role, inject_text]))}]
-        return system_msg + self.messages if system_msg[0]["content"] else self.messages
+        if parts := [p for p in (self.play_role, inject_text) if p]:
+            return [{"role": "system", "content": "\n\n".join(parts)}, *self.messages]
+        
+        return self.messages
+        
     
     def add_message(self, role:str, content:str|list, tool_call_id:int = None)->None:
         """添加消息
@@ -156,19 +163,25 @@ class Context():
             "tool_call_id": tool_call_id,
             "content": content
         })
+
+    def clear(self)->None:
+        """清除上下文"""
+        self.messages.clear()
         
+
     def record_validity_check(self) -> list:
         """
-        针对消息条数的验证，需要显式调用。
-        如果 user 消息数超过限制，会截取到总长度为 user_max_record，
-        并确保最后一条消息是 user 消息（向下取整）。
+        针对消息条数的验证，需要显式调用
+        如果 user 消息数超过限制，会截取到总长度为 user_max_record
+        并确保最后一条消息是 user 消息（向下取整）
+        如果token到达一定值也会触发
         
         Returns:
             list: 被截取掉的消息列表,如果有的话
         """
         user_count = sum(1 for msg in self.messages if msg["role"] == "user")
         
-        if user_count > self.user_max_record:
+        if user_count > self.user_max_record or self.total_tokens > self.user_max_token:
             # 先截取到总长度为 user_max_record
             kept_messages = self.messages[-self.user_max_record:]
             
@@ -195,17 +208,206 @@ class Context():
         
         return None
         
-    def clear(self)->None:
+    def _estimate_string_tokens(self, text: str) -> float:
+        """
+        辅助方法：估算纯文本的 Token 数
+        利用 UTF-8 字节长度快速区分 ASCII (英文/数字) 和 非ASCII (中文)
+        """
+        if not text:
+            return 0
+        
+        length = len(text)
+        # ASCII占1byte，常用汉字占3bytes
+        # 通过字节差值估算非ASCII字符数量
+        
+        non_ascii_count = (len(text.encode('utf-8')) - length) // 2
+        ascii_count = length - non_ascii_count
+        
+        return (ascii_count * 0.25) + (non_ascii_count * 0.7)
+
+    def get_context_forecast_token(self) -> int:
+        """
+        获取上下文 Token 估算值 (保守估计，区分中英文)
+        """
+        total_tokens = 0
+        messages = self.get_messages() 
+        
+        for msg in messages:
+            total_tokens += 5 
+            
+            content = msg.get("content")
+            if content:
+                if isinstance(content, str):
+                    total_tokens += self._estimate_string_tokens(content)
+                elif isinstance(content, list):
+                    for item in content:
+                        item:Dict
+                        if item.get("type") == "text":
+                            total_tokens += self._estimate_string_tokens(item.get("text", ""))
+                        elif item.get("type") == "image_url":
+                            total_tokens += 1000
+            
+            if "tool_calls" in msg and msg["tool_calls"]:
+                total_tokens += self._estimate_string_tokens(str(msg["tool_calls"]))
+                
+        return int(total_tokens)
+
+
+@dataclass(slots=True)
+class ContextDeque:
+    """对话上下文 (优化版),不是很确定实战效果使用了双端队列来实现"""
+    
+    messages: Deque[Dict[str, Any]] = field(default_factory=deque)
+    """原始的上下文"""
+    
+    user_max_record: int = 20
+    """user最多消息条数限制"""
+    
+    play_role: str = ""
+    """模型人物提示词"""
+    
+    async_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
+    """异步锁"""
+
+    def __post_init__(self):
+        if self.messages is None:
+            self.messages = deque()
+        elif isinstance(self.messages, list):
+            self.messages = deque(self.messages)
+    
+    def __getitem__(self, index):
+        return self.messages[index]
+    
+    def __len__(self):
+        return len(self.messages)
+    
+    def __iter__(self):
+        return iter(self.messages)
+    
+    def __contains__(self, item):
+        return item in self.messages
+    
+    def __reversed__(self):
+        return reversed(self.messages)
+    
+    def __str__(self):
+        return str(list(self.messages))
+    
+    def __repr__(self):
+        return repr(list(self.messages))
+
+    def append(self, data: Dict[str, Any]) -> None:
+        """添加内容"""
+        self.messages.append(data)
+        
+    def extend(self, iterable: Iterable) -> None:
+        """扩展列表"""
+        self.messages.extend(iterable)
+    
+    def get_messages(self, inject_text: str = "") -> List[Dict[str, str]]:
+        """获取当前的上下文 List"""
+        system_content = "\n\n".join(filter(None, [self.play_role, inject_text]))
+        system_msg = [{"role": "system", "content": system_content}] if system_content else []
+        
+        return system_msg + list(self.messages)
+    
+    def clear(self) -> None:
         """清除上下文"""
         self.messages.clear()
 
-    def get_context_forecast_token(self)->int:
-        """获取仅供参考的当前上下文的token(默认里面都是中文)
 
-        Returns:
-            int: 大概token数,误差应该挺大的
+    def record_validity_check(self) -> List[Dict[str, Any]]:
         """
-        return int(len(str(self.get_messages()))*1.2)
+        针对消息条数的验证。
+        优化后：使用 popleft() 移除头部元素，避免了列表切片的内存拷贝和移动。
+        """
+        removed_messages = []
+
+        user_count = sum(1 for msg in self.messages if msg["role"] == "user")
+        
+        if user_count <= self.user_max_record:
+            return None
+        
+        while user_count > self.user_max_record and self.messages:
+            msg = self.messages.popleft()
+            removed_messages.append(msg)
+            if msg["role"] == "user":
+                user_count -= 1
+        
+        while self.messages and self.messages[0]["role"] != "user":
+            msg = self.messages.popleft()
+            removed_messages.append(msg)
+            
+        return removed_messages
+
+    
+    def add_message(self, role: str, content: str | list, tool_call_id: int = None) -> None:
+        if tool_call_id:
+            self.messages.append({
+                "role": role, 
+                "content": content,
+                "tool_call_id": tool_call_id
+            })
+            return
+        self.messages.append({"role": role, "content": content})
+        
+    def add_img_message(self, role: str, text: str, image_urls: list) -> None:
+        self.messages.append({
+            "role": role,
+            "content": [{"type": "image_url", "image_url": {"url": url}} for url in image_urls] + [{"type": "text", "text": text}]
+        })
+    
+    def add_user_message(self, content: str) -> None:
+        self.messages.append({"role": "user", "content": content})
+        
+    def add_assistant_message(self, content: str | None) -> None:
+        self.messages.append({"role": "assistant", "content": content})
+        
+    def add_assistant_message_flexible(self, assistant_message: Dict):
+        self.messages.append(assistant_message)
+        
+    def add_assistant_tool_message(self, content: str | None, tool_calls: List[Dict] = None) -> None:
+        msg = {"role": "assistant", "tool_calls": tool_calls}
+        if content:
+            msg["content"] = content
+        self.messages.append(msg)
+        
+    def add_system_message(self, content: str) -> None:
+        self.messages.append({"role": "system", "content": content})
+        
+    def add_tool_message(self, name: str, tool_call_id: str, content: str) -> None:
+        self.messages.append({
+            "role": "tool",
+            "name": name, 
+            "tool_call_id": tool_call_id,
+            "content": content
+        })
+
+    def _estimate_string_tokens(self, text: str) -> float:
+        if not text:
+            return 0
+        length = len(text)
+        non_ascii_count = (len(text.encode('utf-8')) - length) // 2
+        ascii_count = length - non_ascii_count
+        return (ascii_count * 0.25) + (non_ascii_count * 0.7)
+
+    def get_context_forecast_token(self) -> int:
+        total_tokens = 0
+        for msg in self.messages:
+            total_tokens += 5 
+            content = msg.get("content")
+            if content:
+                if isinstance(content, str):
+                    total_tokens += self._estimate_string_tokens(content)
+                elif isinstance(content, list):
+                    for item in content:
+                        if item.get("type") == "text":
+                            total_tokens += self._estimate_string_tokens(item.get("text", ""))
+                        elif item.get("type") == "image_url":
+                            total_tokens += 1000
+            if "tool_calls" in msg and msg["tool_calls"]:
+                total_tokens += self._estimate_string_tokens(str(msg["tool_calls"]))
+        return int(total_tokens)
     
 
 class Message:
@@ -464,7 +666,7 @@ class GroupContext:
     group_max_record:int
     """群维持的消息数量"""
     last_msg_at:float = field(default=time.time(), init=False)
-    """群最后一次消息的处理时间"""
+    """群最后一次添加消息的时间"""
     
     chat_context:Context
     """群LLM聊天上下文"""
@@ -521,7 +723,7 @@ class GroupContext:
             tuple[List[str], GroupContext]|None:  如果需要总结,返回 (消息列表, 上下文对象)
         """
         async with self.async_lock:
-            self.last_msg_at = time.time() #更新群最后处理时间
+            self.last_msg_at = time.monotonic() #更新群最后处理时间
             self.messages.append(message)
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
@@ -571,14 +773,17 @@ class PrivateContext:
     
     async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """异步锁"""
-    last_msg_at:float = field(default=time.time(), init=False)
-    """最后一次消息的处理时间"""
+    last_msg_at:float = field(default=time.monotonic(), init=False)
+    """最后一次消息的使用时间"""
     time_window: TimeWindow = field(init=False)
     """统计群近期消息数量的窗口对象"""
     
     def __post_init__(self, window_time:int = 60):
         self.time_window = TimeWindow(window_time)
 
+    def update_time(self):
+        """更新私聊类的最新使用时间"""
+        self.last_msg_at = time.monotonic()
 
 
 

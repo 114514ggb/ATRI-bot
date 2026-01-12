@@ -25,8 +25,8 @@ class GenerationResponse():
     """未合并模型回复的文本"""
     reasoning_content: List[str] = field(default_factory=list)
     """未合并的推理模型的思考过程"""
-    metadata: Dict[str, Any] = None
-    """基本信息"""
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    """可选的额外数据"""
     
     
 
@@ -117,7 +117,7 @@ class large_language_model_supervisor():
         
         
     async def step(self, request:GenerationRequest)->GenerationResponse:
-        """主处理函数
+        """主处理函数,目前没有维护了不建议使用
 
         Args:
             request (GenerationRequest): 输入
@@ -136,19 +136,21 @@ class large_language_model_supervisor():
         if request.generation_response is not None:
             return await self.resume_step(request,model_api,increase_context)
                 
-        assistant_message, content = await self._get_assistant_message_with_retry(
+        api_reply, assistant_message, content = await self._get_assistant_message_with_retry(
             request = request,
             increase_context  = increase_context,
             model_api  = model_api
         )
         
+    
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
             
             increase_context.add_assistant_message_flexible(assistant_message)
             return  self._update_response(
                 GenerationResponse(
-                    messages = increase_context.messages
+                    messages = increase_context.messages,
+                    metadata = api_reply.get("usage",{})
                 ), 
                 assistant_message
             )
@@ -183,7 +185,7 @@ class large_language_model_supervisor():
         
         response = request.generation_response or GenerationResponse()
         
-        for _ in range(20):#防止无限循环调用
+        for _ in range(10):#防止无限循环调用
             
             self._update_response(response, assistant_message)
 
@@ -217,7 +219,7 @@ class large_language_model_supervisor():
                 )
               
             try:
-                assistant_message, content = await self._get_assistant_message_with_retry(
+                api_reply,assistant_message, content = await self._get_assistant_message_with_retry(
                     request = request,
                     increase_context  = increase_context,
                     model_api  = model_api
@@ -226,6 +228,9 @@ class large_language_model_supervisor():
                 response.messages = increase_context.messages
                 raise LLMSRequestFailed(e, response)
             
+            if usage := api_reply.get("usage"):
+                response.metadata["usage"] = usage
+                
             if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
                 increase_context.add_assistant_tool_message(content)
                 break
@@ -264,7 +269,7 @@ class large_language_model_supervisor():
             if msg['role'] in ['assistant','tool']:
                 increase_context.messages.append(msg)
         
-        assistant_message, content = await self._get_assistant_message_with_retry(
+        api_reply,assistant_message, content = await self._get_assistant_message_with_retry(
             request = request,
             increase_context  = increase_context,
             model_api  = model_api
@@ -275,6 +280,8 @@ class large_language_model_supervisor():
             self._update_response(response, assistant_message)
             increase_context.add_assistant_message_flexible(assistant_message)
             response.messages = increase_context.messages
+            if usage := api_reply.get("usage"):
+                response.metadata["usage"] = usage
             return response
         
         increase_context.add_assistant_tool_message(
@@ -372,7 +379,7 @@ class large_language_model_supervisor():
         increase_context: Context,
         model_api: model_api_basics,
         max_retries: int = 3
-    ) -> tuple[Dict,str|None]:
+    ) -> tuple[Dict,Dict,str|None]:
         """获取模型回复，包含重试机制
         
         Args:
@@ -382,7 +389,7 @@ class large_language_model_supervisor():
             max_retries (int): 最大重试次数
         
         Returns:
-            tuple[Dict,str|None]: 助手消息和助手文本组成的Tuple
+            tuple[Dict,Dict,str|None]: 响应原始消息体还有整个助手消息体和助手文本(如果有的话)组成的Tuple
         
         Raises:
             ValueError: 当空回复次数超过阈值时抛出
@@ -399,9 +406,9 @@ class large_language_model_supervisor():
             assistant_message:Dict = api_reply['choices'][0]['message']
             
             if content := assistant_message.get('content'):
-                return assistant_message, content
+                return api_reply,assistant_message, content
             elif "tool_calls" in assistant_message:
-                return assistant_message, None
+                return api_reply,assistant_message, None
         
         raise ValueError(f"在{max_retries}次尝试后仍未能获取有效回复")
     

@@ -55,7 +55,7 @@ class ChatManager:
             PrivateContext: 私聊上下文实例
         """
         if private_example := self.private_dict.get(user_id):
-            return private_example
+            pass
         else:
             chat_context = Context(
                 messages = [],
@@ -73,7 +73,8 @@ class ChatManager:
                 play_roles = self.default_play_role
             )
             
-            return private_example
+        private_example.update_time()
+        return private_example
         
     def get_group_context(self, group_id: int) -> GroupContext:
         """获取指定群的GroupContext实例
