@@ -1,15 +1,14 @@
 from typing import Dict, List, Callable, Any, Optional
+from atribot.core.service_container import container
 from dataclasses import dataclass, field
 from croniter import croniter
 from datetime import datetime
-import itertools
+from logging import Logger
 import asyncio
-import logging
 import heapq
 
 
 
-logger = logging.getLogger("Scheduler")
 
 @dataclass(order=True, slots=True)
 class TimedTask:
@@ -53,6 +52,8 @@ class TimeTriggerSupervisor:
     """
 
     def __init__(self):
+        self.logger:Logger = container.get("log")
+
         self._queue: List[TimedTask] = []
         """任务最小堆：存储 TimedTask 对象，堆顶永远是最近需要执行的任务"""
 
@@ -151,7 +152,10 @@ class TimeTriggerSupervisor:
         if not croniter.is_valid(cron_expression):
             raise ValueError(f"Invalid cron expression: {cron_expression}")
 
-        delay = self._calc_cron_delay(cron_expression)
+        now_dt = datetime.now()
+        next_dt = croniter(cron_expression, now_dt).get_next(datetime)
+        delay = (next_dt - now_dt).total_seconds()
+        delay = delay if delay > 0 else 0
         
         self._add_task_internal(
             task_id, func, delay, priority, 0.0, cron_expression, kwargs, remarks
@@ -159,29 +163,30 @@ class TimeTriggerSupervisor:
     
     def _add_task_internal(
         self, 
-        task_id, 
-        func, 
-        trigger_delta, 
-        priority, 
-        interval, 
-        cron_iter, 
-        kwargs, 
-        remarks
-    ):
+        task_id: int, 
+        func: Callable, 
+        trigger_delta: float, 
+        priority: int, 
+        interval: float, 
+        cron_expression: Optional[str], 
+        kwargs: Optional[Dict[str, Any]], 
+        remarks: str
+    ) -> None:
         """内部辅助方法：统一处理任务对象的创建与入队逻辑。
 
         负责封装 TimedTask 对象，更新任务索引表，将任务推入最小堆，
         并触发唤醒事件以通知主循环重新计算休眠时间。
 
         Args:
-            task_id (int): 任务 ID。
-            func (Callable): 执行函数。
-            trigger_delta (float): 距离触发的延迟秒数。
-            priority (int): 优先级。
-            interval (float): 固定循环间隔（仅用于普通周期任务）。
-            cron_iter (croniter): croniter 对象本身（仅用于 Cron 任务）。
-            kwargs (Optional[dict]): 执行参数。
-            remarks (str): 备注信息。
+            task_id (int): 任务的唯一标识 ID。
+            func (Callable): 任务触发时执行的可调用对象（支持协程或普通函数）。
+            trigger_delta (float): 距离触发的延迟秒数（相对于当前 loop 时间）。
+            priority (int): 任务优先级，数值越小优先级越高。
+            interval (float): 固定循环执行的间隔时间（秒）。0.0 表示非周期性任务。
+            cron_expression (Optional[str]): 标准 Cron 表达式字符串（例如 "*/5 * * * *"）。
+                如果提供了此参数，任务将被视为 Cron 任务，interval 参数将被忽略。
+            kwargs (Optional[Dict[str, Any]]): 传递给 func 的关键字参数字典。
+            remarks (str): 任务备注信息，用于日志记录或调试。
         """
         if kwargs is None: 
             kwargs = {}
@@ -198,15 +203,14 @@ class TimeTriggerSupervisor:
             func=func,
             kwargs=kwargs,
             interval=interval,
-            cron_iter=cron_iter,
+            cron_expression=cron_expression,
             remarks=remarks
         )
         
         self._task_map[task_id] = task
         heapq.heappush(self._queue, task)
         
-        type_str = f"Cron({cron_iter})" if cron_iter else f"Delay({trigger_delta}s)"
-        logger.debug(f"添加任务 {task_id} [{type_str}], 将在 {trigger_delta:.2f}s 后执行")
+        self.logger.debug(f"添加任务 {task_id} [{f"Cron({cron_expression})" if cron_expression else f"Delay({trigger_delta:.2f}s)"}], 将在 {trigger_delta:.2f}s 后执行")
         
         self._wakeup_event.set()
 
@@ -225,7 +229,7 @@ class TimeTriggerSupervisor:
         if task_id in self._task_map:
             task = self._task_map.pop(task_id)
             task.cancelled = True
-            logger.debug(f"移除任务 {task_id}")
+            self.logger.debug(f"移除任务 {task_id}")
             return True
         return False
 
@@ -235,7 +239,7 @@ class TimeTriggerSupervisor:
             return
         self._running = True
         self._main_task = asyncio.create_task(self._loop())
-        logger.info("调度器启动")
+        self.logger.info("调度器启动")
 
     async def stop(self):
         """停止调度器并等待主循环结束。"""
@@ -250,44 +254,106 @@ class TimeTriggerSupervisor:
         负责监控堆顶任务、处理休眠等待、执行任务以及重新调度周期性任务。
         """
         while self._running:
+            # 1. 清除事件信号，准备进入等待
             self._wakeup_event.clear()
+            
             now = self.now()
             
+            # 2. 处理所有已到期的任务
             while self._queue:
+                # 偷看堆顶任务
                 task = self._queue[0]
+                
+                # 清理已取消的任务
                 if task.cancelled:
                     heapq.heappop(self._queue)
                     continue
                 
+                # 如果堆顶任务还没到时间，停止处理
                 if task.trigger_timestamp > now:
                     break
                 
+                # 弹出并执行任务
                 task = heapq.heappop(self._queue)
                 
+                # 再次检查取消标记（防止并发边缘情况）
                 if not task.cancelled:
                     asyncio.create_task(self._execute_safe(task))
-                    
-                    reschedule = False
-                    
-                    if task.cron_iter:
-                        current_dt = datetime.now()
-                        
-                        next_dt = task.cron_iter.get_next(datetime, start_time=current_dt)
-                        
-                        delay = (next_dt - current_dt).total_seconds()
-                        task.trigger_timestamp = self.now() + delay
-                        reschedule = True
-                        logger.debug(f"Cron[{task.task_id}] 下次: {next_dt.strftime('%H:%M:%S')} (+{delay:.1f}s)")
+                    self._reschedule_task(task)
+                else:
+                    # 如果被取消了，从 map 中彻底移除（虽然 remove_task 已经 pop 了，这里是兜底）
+                    self._task_map.pop(task.task_id, None)
 
-                    elif task.interval > 0:
-                        task.trigger_timestamp += task.interval
-                        reschedule = True
-                    
-                    if reschedule:
-                        heapq.heappush(self._queue, task)
-                    else:
-                        self._task_map.pop(task.task_id, None)
-                        
+            # 3. 计算下一次唤醒的休眠时间
+            sleep_time = None
+            
+            # 清理堆顶可能的已取消任务，确保计算准确
+            while self._queue and self._queue[0].cancelled:
+                heapq.heappop(self._queue)
+
+            if self._queue:
+                # 还有任务：计算距离最近任务的时间差
+                next_task = self._queue[0]
+                sleep_time = next_task.trigger_timestamp - self.now()
+                # 确保 sleep_time 不为负数
+                if sleep_time < 0:
+                    sleep_time = 0
+            
+            # 4. 等待：要么超时（时间到了），要么被新任务唤醒
+            try:
+                if sleep_time is None:
+                    self.logger.info("没有任务time调度器无限等待!")
+                    await self._wakeup_event.wait()
+                else:
+                    # 等待指定时间，或者被新任务打断
+                    await asyncio.wait_for(self._wakeup_event.wait(), timeout=sleep_time)
+            except asyncio.TimeoutError:
+                # 超时意味着时间到了，进入下一次循环处理任务
+                pass
+            except asyncio.CancelledError:
+                self.logger.info("调度器停止!")
+                break
+
+    def _reschedule_task(self, task: TimedTask):
+        """处理周期性任务的重新调度逻辑。
+
+        根据任务配置（Cron 表达式或固定间隔）计算下一次触发的时间戳，
+        并将任务重新推入调度队列（最小堆）。如果任务是一次性的（非周期任务），
+        则从任务索引表（_task_map）中彻底移除。
+
+        Args:
+            task (TimedTask): 刚刚被弹出并提交执行的任务对象。
+        """
+        reschedule = False
+        
+        if task.cron_expression:
+            # Cron 任务：基于当前系统时间计算下一次
+            current_dt = datetime.now()
+            try:
+                # 创建新的 croniter 对象以避免状态漂移，并基于当前时间计算
+                next_dt = croniter(task.cron_expression, current_dt).get_next(datetime)
+                delay = (next_dt - current_dt).total_seconds()
+                task.trigger_timestamp = self.now() + delay
+                reschedule = True
+                self.logger.debug(f"Cron[{task.task_id}] 下次: {next_dt} (+{delay:.1f}s)")
+            except Exception as e:
+                self.logger.error(f"Cron 计算错误 task {task.task_id}: {e}")
+                
+        elif task.interval > 0:
+            # 普通周期任务：基于上次理论触发时间累加，防止漂移
+            task.trigger_timestamp += task.interval
+            
+            # 如果落后当前时间太多（例如系统休眠后），重置为当前时间+间隔
+            if task.trigger_timestamp < self.now():
+                task.trigger_timestamp = self.now() + task.interval
+                
+            reschedule = True
+
+        if reschedule:
+            heapq.heappush(self._queue, task)
+        else:
+            # 一次性任务，执行完后从索引表移除
+            self._task_map.pop(task.task_id, None)
                         
     async def _execute_safe(self, task: TimedTask):
         """安全执行任务，捕获并记录异常。
@@ -302,5 +368,6 @@ class TimeTriggerSupervisor:
                 # 如果是同步阻塞函数，放到线程池中运行，避免阻塞事件循环
                 await asyncio.to_thread(task.func, **task.kwargs)
         except Exception as e:
-            logger.error(f"任务 {task.task_id} 执行异常: {e}", exc_info=True)
+            self.logger.error(f"任务 {task.task_id} 执行异常: {e}", exc_info=True)
             
+

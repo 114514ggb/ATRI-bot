@@ -9,14 +9,13 @@ class universal_ai_api(model_api_basics):
     """通用异步AI API"""
     
     def __init__(self, 
-            api_key = "sk-8403066c2841461491dd0b642a6c44af", 
+            api_key = "", 
             base_url = "https://api.deepseek.com/chat/completions", 
             tools = None
         ):
         super().__init__(api_key=api_key,base_url=base_url)
         
         self.headers = {
-            'Content-Type': 'application/json',
             'Accept': 'application/json',
             'Authorization': f'Bearer {api_key}'
         }
@@ -61,80 +60,94 @@ class universal_ai_api(model_api_basics):
 
     async def _client_post(self,data:dict)->dict:
         max_retries = 3
-        retry_delay = 0.2
+        retry_delay = 0.5
         for attempt in range(max_retries):
             try:
-
                 async with self.client.post(
                     self.base_url,
-                    # headers=self.headers,
-                    data=data, 
+                    json=data, 
                     # proxy='http://127.0.0.1:7890' # 代理
                 ) as response:
                     try:
-                        response_json:dict = await response.json()
-                        print(response_json)
+                        response_json: dict = await response.json()
+                        # print(response_json) # 调试用
                     except aiohttp.ContentTypeError:
-                        response_json = json.loads(await response.text())#fuck怎么会有字符串发过来?
+                        # 处理返回头不是 application/json 但内容是 json 的情况
+                        response_json = json.loads(await response.text())
 
                     if response.status != 200:
-                        print(f"API Error {response.status}: {response_json}")
+                        self.log.warning(f"API Error {response.status}: {response_json}")
                         response.raise_for_status()
                     
                     return response_json
                     
             except Exception as e:
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
                 if attempt == max_retries - 1:
-                    raise  e
-                await asyncio.sleep(retry_delay)
+                    raise e
+                await asyncio.sleep(retry_delay * attempt)
     
     async def generate_text_tools(self, model:str, messages:list,tools:list):
-        payload = json.dumps({
+        payload = {
             "model": model,
             "messages": messages,
             'tools':tools,
             # 'response_format':response_format,
         } | self.model_parameters
-        )
+    
+        max_retries = 3
+        base_delay = 0.5
         
-        for _ in range(3):
+        for attempt in range(max_retries + 1):
             try:
                 ret = await self._client_post(payload)
-                if ret["choices"]:#fuck None return
-                    return ret
-            except Exception:
-                await asyncio.sleep(0.1)
                 
-        raise ValueError("LLMapi返回值错误!")
+                if ret['choices']:#fuck None return
+                    return ret
+                    
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                self.log.warning(f"LLM请求发生异常 (第 {attempt + 1} 次重试): {e}")
+            
+            if attempt < max_retries:
+                sleep_time = base_delay * (2 ** attempt)
+                await asyncio.sleep(sleep_time)
+            else:
+                raise ValueError(f"LLM API请求失败，已重试 {max_retries} 次")
 
     async def generate_text_lightweight(self, model:str, messages:list):
         """请求生成文本,轻量参数,无工具调用,返回全部内容"""
-        payload = json.dumps({
+        payload = {
             "model": model,
             "messages": messages,
-        })
+        }
         return await self._client_post(payload)
     
     async def generate_json_ample(self, model,remainder)->dict:
-        payload = json.dumps({
-            "model": model,
-        }|remainder)
+        payload = {"model": model} | remainder
         
-        # from pprint import pp
-        # pp({
-        #     "model": model,
-        # }|remainder)
-        # while True:
-        for _ in range(3):
+        max_retries = 3
+        base_delay = 0.5
+        
+        for attempt in range(max_retries + 1):
             try:
                 ret = await self._client_post(payload)
+                
                 if ret['choices']:#fuck None return
                     return ret
+                    
+            except asyncio.CancelledError:
+                raise
             except Exception as e:
-                print(e)
-                await asyncio.sleep(0.1)
+                self.log.warning(f"LLM请求发生异常 (第 {attempt + 1} 次重试): {e}")
+            
+            if attempt < max_retries:
+                sleep_time = base_delay * (2 ** attempt)
+                await asyncio.sleep(sleep_time)
+            else:
+                raise ValueError(f"LLM API请求失败，已重试 {max_retries} 次")
         
-        raise ValueError("LLMapi返回值错误!")
     
     async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024, encoding:str = "float")->List[List[float]]:
         """异步调用指定的嵌入模型，将输入的文本转换为向量表示。
@@ -148,12 +161,12 @@ class universal_ai_api(model_api_basics):
         Returns:
             List[List[float]]: 返回的向量list,每一个字符串对应一个list
         """
-        payload = json.dumps({
+        payload = {
             "model" : model,
             "input" : input,
             "dimensions" : dimensions,
             "encoding_format" : encoding,
-        })
+        }
         # ['embeddings']
         # ['embedding']
         return (await self._client_post(payload))['embeddings']

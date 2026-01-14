@@ -1,4 +1,8 @@
+from atribot.core.service_container import container
 from abc import ABC, abstractmethod
+import logging
+
+
 
 
 class model_api_basics(ABC):
@@ -57,6 +61,12 @@ class model_api_basics(ABC):
             api_key = "", 
             base_url = ""
         ):
+        try:
+            self.log:logging = container.get("log")
+        except Exception:
+            logging.basicConfig(level=logging.INFO)
+            self.log = logging.getLogger(self.__class__.__name__)
+        
         self.base_url = base_url
         self.api_key = api_key
         

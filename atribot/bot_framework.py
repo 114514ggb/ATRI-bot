@@ -69,13 +69,13 @@ class BotFramework:
             )
         )
         
-        #时间触发器
+        # 时间触发器
         TriggerSupervisor = TimeTriggerSupervisor()
         container.register(
             "TimeTriggerSupervisor",
             TriggerSupervisor
         )
-        TriggerSupervisor.start()
+        await TriggerSupervisor.start()
         
         #模型供应商
         LLMSupplier = ai_connection_manager()

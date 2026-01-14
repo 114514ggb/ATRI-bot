@@ -27,24 +27,24 @@ class ai_api_account_pool(universal_ai_api):
     
     async def _client_post(self,data:dict)->dict:
         max_retries = 3
-        retry_delay = 0.3
+        retry_delay = 0.5
         for attempt in range(max_retries):
             try:
                 
                 async with self.client.post(
                     self.base_url,
                     headers={'Authorization': f'Bearer {next(self._headers_cycle)}'},
-                    data=data, 
+                    json=data,
                     # proxy='http://127.0.0.1:7890' # 代理
                 ) as response:
                     try:
                         res_json = await response.json()
-                        print(res_json)
+                        # print(res_json)
                     except aiohttp.ContentTypeError:
                         res_json = json.loads(await response.text())
                         
                     if response.status != 200:
-                        print(f"API Error {response.status}: {res_json}")
+                        self.log.warning(f"API Error {response.status}: {res_json}")
                         response.raise_for_status()
                         
                     return res_json
@@ -52,7 +52,7 @@ class ai_api_account_pool(universal_ai_api):
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise  e
-                await asyncio.sleep(retry_delay)
+                await asyncio.sleep(retry_delay * attempt)
                 
     async def initialize(self):
         """
@@ -69,7 +69,6 @@ class ai_api_account_pool(universal_ai_api):
                 ),
                 timeout=aiohttp.ClientTimeout(total=60, connect=10), # 细分连接超时和总超时
                 headers={
-                    'Content-Type': 'application/json',
                     'Accept': 'application/json',
                 }
             )

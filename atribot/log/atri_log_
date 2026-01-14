@@ -1,0 +1,59 @@
+01-15 01:31:06 [INFO] atri-bot | 
+_____/\\\\\\\\\____        __/\\\\\\\\\\\\\\\_        ____/\\\\\\\\\_____        __/\\\\\\\\\\\_        
+ ___/\\\\\\\\\\\\\__        _\///////\\\/////__        __/\\\///////\\\___        _\/////\\\///__       
+  __/\\\/////////\\\_        _______\/\\\_______        _\/\\\_____\/\\\___        _____\/\\\_____      
+   _\/\\\_______\/\\\_        _______\/\\\_______        _\/\\\\\\\\\\\/____        _____\/\\\_____     
+    _\/\\\\\\\\\\\\\\\_        _______\/\\\_______        _\/\\\//////\\\____        _____\/\\\_____    
+     _\/\\\/////////\\\_        _______\/\\\_______        _\/\\\____\//\\\___        _____\/\\\_____   
+      _\/\\\_______\/\\\_        _______\/\\\_______        _\/\\\_____\//\\\__        _____\/\\\_____  
+       _\/\\\_______\/\\\_        _______\/\\\_______        _\/\\\______\//\\\_        __/\\\\\\\\\\\_ 
+        _\///________\///__        _______\///________        _\///________\///__        _\///////////__
+ (main.py:22)
+01-15 02:01:53 [INFO] atri-bot | 
+_____/\\\\\\\\\____        __/\\\\\\\\\\\\\\\_        ____/\\\\\\\\\_____        __/\\\\\\\\\\\_        
+ ___/\\\\\\\\\\\\\__        _\///////\\\/////__        __/\\\///////\\\___        _\/////\\\///__       
+  __/\\\/////////\\\_        _______\/\\\_______        _\/\\\_____\/\\\___        _____\/\\\_____      
+   _\/\\\_______\/\\\_        _______\/\\\_______        _\/\\\\\\\\\\\/____        _____\/\\\_____     
+    _\/\\\\\\\\\\\\\\\_        _______\/\\\_______        _\/\\\//////\\\____        _____\/\\\_____    
+     _\/\\\/////////\\\_        _______\/\\\_______        _\/\\\____\//\\\___        _____\/\\\_____   
+      _\/\\\_______\/\\\_        _______\/\\\_______        _\/\\\_____\//\\\__        _____\/\\\_____  
+       _\/\\\_______\/\\\_        _______\/\\\_______        _\/\\\______\//\\\_        __/\\\\\\\\\\\_ 
+        _\///________\///__        _______\///________        _\///________\///__        _\///////////__
+ (main.py:22)
+01-15 02:01:54 [INFO] atri-bot | 调度器启动 (time_trigger.py:242)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: ATRI (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: ATRI_English (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: ATRI邪恶 (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: Iris (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 亚托莉 (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 反向ATRI (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 强制猫娘 (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 文艺版 (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 文言文版 (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 猫娘ATRI (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 璃酱 (management_chat_example.py:329)
+01-15 02:01:54 [DEBUG] atri-bot | 已加载角色设定: 茶叶 (management_chat_example.py:329)
+01-15 02:01:54 [INFO] atri-bot | 正在从数据库同步权限到本地... (async_permissions_management.py:180)
+01-15 02:01:54 [INFO] atri-bot | 从数据库同步权限到本地成功。 (async_permissions_management.py:196)
+01-15 02:01:54 [INFO] atri-bot | 加载权限
+ - Root: {2631018780},
+ - Admin: set(),
+ - Blacklist: set() (async_permissions_management.py:197)
+01-15 02:01:54 [INFO] atri-bot | 当前连接类型为WebSocket_server
+ (qq_send_message.py:61)
+01-15 02:01:54 [INFO] atri-bot | CommandSystem已初始化! (command_parsing.py:175)
+01-15 02:01:54 [INFO] atri-bot | 成功加载命令模块: audio (command_loader.py:54)
+01-15 02:01:54 [INFO] atri-bot | 成功加载命令模块: bromidic (command_loader.py:54)
+01-15 02:01:54 [INFO] atri-bot | 成功加载命令模块: interior (command_loader.py:54)
+01-15 02:01:54 [INFO] atri-bot | 命令加载完成，共加载 3 个模块 (command_loader.py:58)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: get_user_info (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: http_request_tool (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: memory_search (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: memory_storage (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: run_python_code (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: send_cloud_music (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: send_create_image (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: send_image_message (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: send_speech_message (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | 添加函数调用工具: web_search (mcp_tool_manager.py:237)
+01-15 02:01:54 [INFO] atri-bot | WebSocket 服务器已启动: ws://127.0.0.1:8888 (WebSocketServer.py:165)

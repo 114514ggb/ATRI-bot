@@ -24,6 +24,8 @@ from dataclasses import replace
 from logging import Logger
 import datetime
 import asyncio
+import uuid
+
 
 
 
@@ -180,7 +182,7 @@ class group_chat(chat_baseics):
         )
 
         # 获取响应
-        response = await self._try_model_request(request, img_list, group_id)
+        response = await self._try_model_request(request, img_list, group_id, uid=uuid.uuid4().hex)
 
         chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
         await chat_condition.update_trigger_user(data["user_id"])
@@ -235,11 +237,12 @@ class group_chat(chat_baseics):
     ) -> None:
         """群聊天用的json处理版"""
         
-        self.log.info("群LLM聊天json处理")
-        
         data = message.primeval
         group_id = message.group_id
         user_id = message.user_id
+        uid = uuid.uuid4().hex
+        
+        self.log.info(f"[{uid}]群LLM聊天json处理")
 
         await self.send_message.set_msg_emoji_like(
             message_id = data['message_id'],
@@ -291,10 +294,11 @@ class group_chat(chat_baseics):
         response = await self._try_model_request(
             request = request, 
             group_id = group_id, 
-            img_list= img_list 
+            img_list= img_list ,
+            uid= uid
         )
 
-        self.log.info("模型返回json_list:\n"+"".join(response.reply_text))
+        self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
             
         for response_json in (common.extract_json_from_text(s) for s in response.reply_text if s != ""):
             
@@ -310,10 +314,10 @@ class group_chat(chat_baseics):
                             await fun(response_json, data)
                             
                         else:
-                            self.log.error(f"无效decision:{response_json}")
+                            self.log.error(f"[{uid}]无效decision:{response_json}")
                         
                     else:
-                        self.log.error(f"返回json错误:{response_json}")
+                        self.log.error(f"[{uid}]返回json错误:{response_json}")
             # else:
             #     # 错误的话考虑直接发送?
             #     self.log.error(f"返回json解析错误:{response_json}")
@@ -337,9 +341,9 @@ class group_chat(chat_baseics):
         )
         
         if response.reasoning_content:
-            self.log.info("推理内容:\n"+ "".join(response.reasoning_content))
+            self.log.info(f"[{uid}]推理内容:\n{"".join(response.reasoning_content)}")
         
-        self.log.info("结束json处理!")
+        self.log.info(f"[{uid}]结束json处理!")
         
         if total_tokens := response.metadata.get("total_tokens"):
             original_context.total_tokens = total_tokens#更新tiken计数
@@ -351,11 +355,11 @@ class group_chat(chat_baseics):
                         0,
                         {"role": "assistant", "content":  summarize_context[:3000]}#简单做一个限制让这个不要太长
                     )
-                    self.log.info(f"聊天上下文总结完成{user_id}消息:{summarize_context}")
+                    self.log.info(f"[{uid}]聊天上下文总结完成{user_id}消息:{summarize_context}")
                 else:
-                    self.log.info(f"聊天上下文总结{user_id}消息为none")
+                    self.log.info(f"[{uid}]聊天上下文总结{user_id}消息为none")
             except Exception as e:
-                self.log.exception(f"聊天上下文信息总结出现了错误:{e}")
+                self.log.exception(f"[{uid}]聊天上下文信息总结出现了错误:{e}")
         
     
     async def reply_conduct(self, response_json:Dict, data:Dict)->None:
@@ -403,7 +407,8 @@ class group_chat(chat_baseics):
         self,
         request: GenerationRequest,
         img_list: List[str],
-        group_id: int
+        group_id: int,
+        uid: str
     ) -> GenerationResponse:
         """尝试模型请求,失败时自动降级到配置的备用API
 
@@ -421,11 +426,11 @@ class group_chat(chat_baseics):
             return await self.model_api_supervisor.step(request)
 
         except LLMSRequestFailed as e:
-            self.log.exception(f"群聊天调用工具中途出现了错误:{e}\n尝试备用api!")
+            self.log.exception(f"[{uid}]群聊天调用工具中途出现了错误:{e}\n尝试备用api!")
             request.generation_response = e.get_response()
             
         except Exception as e:
-            self.log.exception(f"群聊天出现了错误:{e}\n尝试备用api!")
+            self.log.exception(f"[{uid}]群聊天出现了错误:{e}\n尝试备用api!")
         
         cached_image_prompt = None
         request.model_api = None
@@ -485,10 +490,10 @@ class group_chat(chat_baseics):
             try:
                 return await self.model_api_supervisor.step(new_request)
             except Exception as e:
-                self.log.error(f"备用api{parameter}出现了错误!:{e}")
+                self.log.error(f"[{uid}]备用api{parameter}出现了错误!:{e}")
 
-        self.log.error("所有备用api出现错误!")
-        raise ValueError("所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
+        self.log.error(f"[{uid}]所有备用api出现错误!")
+        raise ValueError(f"[{uid}]所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
 
     def get_chat_context(self, group_id:int, user_id:int)->Context:
         """获取需要的聊天
