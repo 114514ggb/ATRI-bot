@@ -1,5 +1,5 @@
 from atribot.core.cache.management_chat_example import ChatManager
-from atribot.core.types import GroupContext, LLMGroupChatCondition, RichData
+from atribot.core.bot_types import GroupContext, LLMGroupChatCondition, RichData
 from atribot.core.service_container import container
 from atribot.LLMchat.chat import group_chat
 from typing import List, Literal,Optional
@@ -72,7 +72,7 @@ class initiativeChat:
                     return await self._execute_reply(
                         message, group_id, params,
                         log_msg="Random trigger activated, preparing to respond.",
-                        prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默.如果传入了图像是当前群里发送最新一条消息的所带或最新消息引用消息里的图像，这种情况下的消息都不是专门发送给你的,大多消息不是明确针对你的就不要回答了"
+                        prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默.如果传入了图像是当前群里发送最新一条消息的所带或最新消息引用消息里的图像，这种情况下的消息都不是特意发送给你的,如果没有明确提到你就不是在说你，不要特意回复"
                         "推荐在群里当卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为能完美解决的问题,不要打断或打扰到别人的聊天,不要在话中带上或问有什么需要帮忙,如果你看不懂建议就保持静默,不要频繁发言，尽量保持低调"
                     )
 
@@ -143,7 +143,6 @@ class initiativeChat:
             float: 在窗口时间内的bot消息和群总消息的大约比值
         """
         if total_msgs := group_context.time_window.get():
-            if bot_msgs := group_context.LLM_chat_decision_parameters.time_window.get():
-                return bot_msgs / (total_msgs + bayesian_smoothing_correction)
+            return group_context.LLM_chat_decision_parameters.time_window.get() / (total_msgs + bayesian_smoothing_correction)
         
         return 0.0

@@ -49,9 +49,9 @@ class universal_ai_api(model_api_basics):
                 limit_per_host=5,           # 单主机保持连接数
                 force_close=False,          # 允许keepalive
                 enable_cleanup_closed=True, # 自动清理关闭连接
-                keepalive_timeout=10        # keepalive超时
+                keepalive_timeout=20        # keepalive超时
             ),
-            timeout=aiohttp.ClientTimeout(total=120),  # 总超时设置
+            timeout=aiohttp.ClientTimeout(total=60, connect=10),  # 总超时设置
             headers=self.headers
         )
         

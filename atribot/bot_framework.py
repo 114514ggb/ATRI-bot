@@ -75,7 +75,7 @@ class BotFramework:
             "TimeTriggerSupervisor",
             TriggerSupervisor
         )
-        asyncio.create_task(TriggerSupervisor.start())
+        TriggerSupervisor.start()
         
         #模型供应商
         LLMSupplier = ai_connection_manager()

@@ -9,7 +9,7 @@ from atribot.core.service_container import container
 from atribot.core.data_manage import data_manage
 from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.chat import group_chat
-from atribot.core.types import RichData
+from atribot.core.bot_types import RichData
 from abc import ABC, abstractmethod
 from logging import Logger
 

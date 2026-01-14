@@ -3,7 +3,7 @@ from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manage
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.core.service_container import container
 from atribot.LLMchat.RAG.RAG import RAGManager
-from atribot.core.types import Context
+from atribot.core.bot_types import Context
 from typing import List,Dict,Any
 from datetime import datetime
 from logging import Logger

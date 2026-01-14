@@ -1,4 +1,4 @@
-from atribot.core.types import ToolCallsStopIteration
+from atribot.core.bot_types import ToolCallsStopIteration
 
 tool_json = {
     "name": "tool_calls_end",

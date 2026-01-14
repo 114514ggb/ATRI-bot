@@ -2,7 +2,7 @@ from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manage
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.core.service_container import container
 from atribot.LLMchat.model_tools import tool_calls
-from atribot.core.types import (
+from atribot.core.bot_types import (
     ToolCallsStopIteration,
     Context
 )

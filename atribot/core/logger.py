@@ -2,6 +2,10 @@ from logging.handlers import TimedRotatingFileHandler
 import logging
 import sys
 import os
+import re
+
+
+
 
 class ColoredFormatter(logging.Formatter):
     """自定义带颜色的日志格式化器"""
@@ -46,12 +50,13 @@ class Logger:
             
             file_handler = TimedRotatingFileHandler(
                 filename=f"{log_dir}/atri_log_",
-                when="midnight", 
-                interval=1,
-                backupCount=14, 
+                when="midnight",  # 时间单位天
+                interval=1,       # 每1天
+                backupCount=7,    # 保留的文件数量
                 encoding='utf-8'
             )
             file_handler.suffix = "%Y-%m-%d.log"
+            file_handler.extMatch = re.compile(r"^\d{4}-\d{2}-\d{2}.log$")
             file_handler.setFormatter(logging.Formatter(
                 "%(asctime)s [%(levelname)s] %(name)s | %(message)s (%(filename)s:%(lineno)d)",
                 datefmt="%m-%d %H:%M:%S"

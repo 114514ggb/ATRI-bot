@@ -1,4 +1,4 @@
-from atribot.core.types import Context, GroupContext, PrivateContext, LLMGroupChatCondition
+from atribot.core.bot_types import Context, GroupContext, PrivateContext, LLMGroupChatCondition
 from atribot.core.service_container import container
 # from collections import defaultdict
 from typing import Dict,List

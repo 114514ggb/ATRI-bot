@@ -494,12 +494,11 @@ class AIContextCommands:
         
         if target:
             group_id = int(target)
-        
-        initiative_chat = self.context_management.get_group_context(group_id).initiative_chat
-        initiative_chat = initiative_chat ^ True
+        group_context = self.context_management.get_group_context(group_id)
+        group_context.initiative_chat = group_context.initiative_chat ^ True
         
         await self.send_message.send_group_message(
             current_group_id, 
-            f"群聊{group_id},主动聊天切换为{initiative_chat}"
+            f"群聊{group_id},主动聊天切换为{group_context.initiative_chat }"
         )
     

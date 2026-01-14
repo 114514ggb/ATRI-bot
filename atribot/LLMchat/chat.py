@@ -16,8 +16,8 @@ from atribot.core.service_container import container
 from atribot.LLMchat.emoji_system import emoji_core
 from atribot.core.data_manage import data_manage
 from typing import Dict, List, Coroutine
-from atribot.core.types import RichData
-from atribot.core.types import Context
+from atribot.core.bot_types import RichData
+from atribot.core.bot_types import Context
 from abc import ABC, abstractmethod
 from atribot.common import common
 from dataclasses import replace
@@ -345,13 +345,17 @@ class group_chat(chat_baseics):
             original_context.total_tokens = total_tokens#更新tiken计数
         
         if truncated_context := original_context.record_validity_check():
-            if summarize_context := await self.memiry_system.summarize_context(str(truncated_context)):
-                original_context.messages.insert(0,{
-                    {"role": "assistant", "content":  summarize_context[:3000]}#简单做一个限制让这个不要太长
-                })
-                self.log.info(f"总结完成消息:{truncated_context}")
-            else:
-                self.log.info("模型总结为none")
+            try:
+                if summarize_context := await self.memiry_system.summarize_context(str(truncated_context)):
+                    original_context.messages.insert(
+                        0,
+                        {"role": "assistant", "content":  summarize_context[:3000]}#简单做一个限制让这个不要太长
+                    )
+                    self.log.info(f"聊天上下文总结完成{user_id}消息:{summarize_context}")
+                else:
+                    self.log.info(f"聊天上下文总结{user_id}消息为none")
+            except Exception as e:
+                self.log.exception(f"聊天上下文信息总结出现了错误:{e}")
         
     
     async def reply_conduct(self, response_json:Dict, data:Dict)->None:
