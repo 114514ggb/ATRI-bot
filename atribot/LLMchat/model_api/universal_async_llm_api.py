@@ -99,22 +99,17 @@ class universal_ai_api(model_api_basics):
         base_delay = 0.5
         
         for attempt in range(max_retries + 1):
-            try:
-                ret = await self._client_post(payload)
-                
-                if ret['choices']:#fuck None return
-                    return ret
-                    
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                self.log.warning(f"LLM请求发生异常 (第 {attempt + 1} 次重试): {e}")
+
+            ret = await self._client_post(payload)
             
-            if attempt < max_retries:
-                sleep_time = base_delay * (2 ** attempt)
-                await asyncio.sleep(sleep_time)
+            if ret.get('choices'):#fuck None return
+                return ret
             else:
-                raise ValueError(f"LLM API请求失败，已重试 {max_retries} 次")
+                if attempt < max_retries:
+                    sleep_time = base_delay * (2 ** attempt)
+                    await asyncio.sleep(sleep_time)
+                else:
+                    raise ValueError(f"LLM API请求为空，已重试 {max_retries} 次")
 
     async def generate_text_lightweight(self, model:str, messages:list):
         """请求生成文本,轻量参数,无工具调用,返回全部内容"""
@@ -131,22 +126,17 @@ class universal_ai_api(model_api_basics):
         base_delay = 0.5
         
         for attempt in range(max_retries + 1):
-            try:
-                ret = await self._client_post(payload)
+
+            ret = await self._client_post(payload)
                 
-                if ret['choices']:#fuck None return
-                    return ret
-                    
-            except asyncio.CancelledError:
-                raise
-            except Exception as e:
-                self.log.warning(f"LLM请求发生异常 (第 {attempt + 1} 次重试): {e}")
-            
-            if attempt < max_retries:
-                sleep_time = base_delay * (2 ** attempt)
-                await asyncio.sleep(sleep_time)
+            if ret.get('choices'):#fuck None return
+                return ret
             else:
-                raise ValueError(f"LLM API请求失败，已重试 {max_retries} 次")
+                if attempt < max_retries:
+                    sleep_time = base_delay * (2 ** attempt)
+                    await asyncio.sleep(sleep_time)
+                else:
+                    raise ValueError(f"LLM API请求为空，已重试 {max_retries} 次")
         
     
     async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024, encoding:str = "float")->List[List[float]]:

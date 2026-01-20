@@ -303,7 +303,7 @@ class build_prompt:
     "decision":"reply",
     "target_message_id":"想要回复的消息id,type要求int,这个字段是非必要的",
     "reason":"做出此决策的原因",
-    "content":"将解析发送给群内的文本list,里面会分条发送对应的str(要正常自然分段),内容可以有个性,可以带点情绪,需要的称呼或是其他个性化的内容推荐参考user_info"
+    "content":"将解析发送给群内的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送到群聊中,要符合聊天习惯,内容可以有个性,可以带点情绪,需要的称呼等个性化内容参考user_info"
 }
 
 参数:silence

@@ -681,7 +681,7 @@ class group_chat(chat_baseics):
         """发送群文本消息，支持表情标签
 
         Args:
-            chat_text (str): 要解析发送的文本
+            chat_text_list (List[str]): 要解析发送的文本list
             group_id (int): 群号
             message_id (int): 回复引用消息的id
             since_llm (float): 距离上一次llm发言时间
@@ -689,13 +689,15 @@ class group_chat(chat_baseics):
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
         MAX_SINGLE_MESSAGE_LENGTH = 4  # 分条发送长度阈值
         LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
+        STRING_LENGTH_LIMIT = 120 #字符串长度限制
         
         if not chat_text_list:
             return
 
         if (
-            len(chat_text_list) <= MAX_SINGLE_MESSAGE_LENGTH
-            and since_llm >= LLM_COOLDOWN_THRESHOLD
+            since_llm >= LLM_COOLDOWN_THRESHOLD 
+            and len(chat_text_list) <= MAX_SINGLE_MESSAGE_LENGTH
+            and len("".join(chat_text_list)) <= STRING_LENGTH_LIMIT
             # or MESSAGE_DELIMITER in chat_text
         ):
             # 分条发送

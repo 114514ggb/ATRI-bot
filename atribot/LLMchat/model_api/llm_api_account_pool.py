@@ -14,9 +14,9 @@ class ai_api_account_pool(universal_ai_api):
             base_url:str = "https://api.deepseek.com/chat/completions", 
             tools = None
         ):
+        super().__init__(base_url=base_url)
         
         self._headers_cycle = cycle(api_key_pool if api_key_pool else [])
-        self.base_url = base_url
         
         if tools:
             self.tools = tools
