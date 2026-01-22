@@ -19,6 +19,7 @@ dependencies = [
     "asyncpg>=0.30.0",
     "docker>=7.1.0",
     "croniter>=6.0.0",
+    "trafilatura>=2.0.0",
 ]
 
 [tool.uv.workspace]

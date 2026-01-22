@@ -8,11 +8,11 @@ import time
 
 tool_json = {
     "name": "memory_storage",
-    "description": "用于存储记忆的工具,推荐只记忆重要的事情,可以将一句话存储为可以被memory_search工具检索到的长期的记忆,还可以关联到特定的用户",
+    "description": "用于存储一条信息或记忆的工具,用于记忆要长期记忆的事情,可以将一句话存储为可以被memory_search工具检索到的长期的记忆,还可以关联到特定的用户",
     "properties": {
         "user_id": {
             "type": "number",
-            "description": "用户的唯一标识，用于关联存储的记忆,如果不提供则默认为空，代表这是一条知识库记忆",
+            "description": "用户的唯一标识，用于关联存储的记忆,如果不提供则默认为空代表这是需要记住的概念的知识库记忆",
             "default": None
         },
         "content_text": {

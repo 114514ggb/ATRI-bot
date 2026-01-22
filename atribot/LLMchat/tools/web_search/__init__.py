@@ -296,4 +296,144 @@ def format_search_results(response_data: Dict[str, Any]) -> str:
         lines.append(f"*搜索耗时: {response_time}秒*")
 
     return "\n".join(lines)
+
+
+
+async def web_extract(
+    urls: str | List[str],
+    include_images: bool = False,
+    extract_depth: str = "basic",
+    query: Optional[str] = None,
+    chunks_per_source: int = 3,
+    format: str = "markdown",
+    timeout: Optional[float] = None
+):
+    """
+    Tavily Extract API
+    https://docs.tavily.com/documentation/api-reference/endpoint/extract
+    
+    该函数用于从一个或多个指定的 URL 中提取清洗后的网页内容。
+    通常配合 web_search 工具使用：先搜索获取 URL，再用此工具读取内容。
+    它能自动去除广告、导航栏，并返回对 LLM 友好的 Markdown 格式。
+
+    Args:
+        urls (Union[str, List[str]]): 
+            需要提取内容的 URL 或 URL 列表。
+            例如："https://en.wikipedia.org/wiki/Artificial_intelligence" 
+            或 ["https://site1.com", "https://site2.com"]。
+        
+        include_images (bool, optional): 
+            是否提取网页中的图片链接。默认为 False。
+        
+        extract_depth (str, optional): 
+            提取深度。默认为 "basic"。
+            - "basic": 基础提取，速度快，成本低（1 credit / 5 URLs）。
+            - "advanced": 高级提取，处理动态加载内容、表格效果更好，但耗时稍长（2 credits / 5 URLs）。
+        
+        query (str, optional): 
+            如果提供此参数，API 将根据此查询词对提取的内容块（Chunks）进行重排序（Rerank），
+            优先返回与查询最相关的内容片段。适用于长文档的针对性提取。
+            
+        chunks_per_source (int, optional): 
+            仅当提供了 `query` 时生效。定义每个源返回的最大相关片段数量。
+            范围 1-5，默认为 3。
+            
+        format (str, optional): 
+            返回内容的格式。默认为 "markdown"。
+            - "markdown": 结构化文本，最适合 LLM 阅读。
+            - "text": 纯文本。
+            
+        timeout (float, optional): 
+            请求超时时间（秒）。范围 1.0 到 60.0。
+            如果不设置，basic 默认为 10s，advanced 默认为 30s。
+
+    Returns:
+        str: 格式化后的人类/LLM 可读字符串，包含提取的内容或错误信息。
+    """
+
+    payload = {
+        "urls": urls,
+        "include_images": include_images,
+        "extract_depth": extract_depth,
+        "format": format,
+        "include_usage": True 
+    }
+
+    if query:
+        payload["query"] = query
+        payload["chunks_per_source"] = chunks_per_source
+    
+    if timeout:
+        payload["timeout"] = timeout
+
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.post(
+                url="https://api.tavily.com/extract",
+                headers=headers,
+                json=payload
+            ) as resp:
+                # 处理非 200 错误
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    return f"❌ API 请求失败: {resp.status} - {error_text}"
+                
+                data = await resp.json()
+                # print(json.dumps(data, indent=2, ensure_ascii=False)) # 调试用
+                return format_extract_results(data)
+        except Exception as e:
+            return f"❌ 请求过程中发生异常: {str(e)}"
+
+
+def format_extract_results(response_data: Dict[str, Any]) -> str:
+    """
+    将 Tavily Extract 结果 JSON 转换为 LLM 易读的 Markdown 文本格式。
+    """
+    lines = []
+    
+    # 1. 处理成功提取的结果
+    if results := response_data.get("results", []):
+        lines.append(f"# 📄 网页提取结果 ({len(results)}个页面)\n")
+        
+        for idx, item in enumerate(results, 1):
+            url = item.get("url", "未知URL")
+            lines.append(f"## 🔗 来源 {idx}: {url}")
+            
+            # 原始内容 (Markdown)
+            raw_content = item.get("raw_content", "")
+            if raw_content:
+                lines.append("### 📝 页面内容:")
+                lines.append(raw_content)
+                lines.append("\n---\n")
+            else:
+                lines.append("> 未提取到有效内容。\n")
+
+            # 图片 (如果有)
+            if images := item.get("images"):
+                lines.append(f"**🖼️ 提取到的图片 ({len(images)}张):**")
+                # 限制显示数量以免 Context 爆炸，或者全部列出
+                for img_url in images[:5]: 
+                    lines.append(f"- ![]({img_url})")
+                if len(images) > 5:
+                    lines.append(f"- *(还有 {len(images)-5} 张图片未展示)*")
+                lines.append("")
+
+    # 2. 处理失败的结果
+    if failed_results := response_data.get("failed_results", []):
+        lines.append("## ❌ 提取失败的页面")
+        for item in failed_results:
+            lines.append(f"- **URL**: {item.get("url", "未知URL")}")
+            lines.append(f"  - 原因: {item.get("error", "未知错误")}")
+        lines.append("")
+
+    # 3. 统计信息
+    stats = []
+    if response_time := response_data.get("response_time"):
+        stats.append(f"耗时: {response_time}秒")
+    
+    if stats:
+        lines.append(f"*{' | '.join(stats)}*")
+
+    return "\n".join(lines)
+    
     

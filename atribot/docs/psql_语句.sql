@@ -87,6 +87,16 @@ SELECT schemaname,
 FROM pg_tables
 ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
 
+-- 列出数据库中所有表的大小
+SELECT 
+    schemaname as "模式",
+    tablename as "表名",
+    pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename)) as "总大小",
+    pg_size_pretty(pg_relation_size(schemaname || '.' || tablename)) as "表数据大小",
+    pg_size_pretty(pg_total_relation_size(schemaname || '.' || tablename) - pg_relation_size(schemaname || '.' || tablename)) as "索引大小"
+FROM pg_tables 
+WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
+ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC;
 
 
 
@@ -100,4 +110,12 @@ GROUP BY u.user_id, u.nickname
 ORDER BY memory_count DESC
 LIMIT 50;
 
+--删除非知识库记忆下面清除索引
+DELETE FROM atri_memory
+WHERE group_id IS NOT NULL 
+   OR user_id IS NOT NULL;
+
+VACUUM FULL atri_memory;
+-- 如果不想锁表，可以使用:
+VACUUM ANALYZE atri_memory;
 
