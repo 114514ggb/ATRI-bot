@@ -11,13 +11,13 @@ class model_api_basics(ABC):
     model_parameters = {
         'stream': False,#是否流式输出如果设置为 True，将会以 SSE（server-sent events）的形式以流式发送消息增量。消息流以 data: [DONE] 结尾。
 
-        'frequency_penalty': 1.5,#介于 -2.0 和 2.0 之间的数字。如果该值为正，那么新 token 会根据其在已有文本中的出现频率受到相应的惩罚，降低模型重复相同内容的可能性。
+        # 'frequency_penalty': 1.5,#介于 -2.0 和 2.0 之间的数字。如果该值为正，那么新 token 会根据其在已有文本中的出现频率受到相应的惩罚，降低模型重复相同内容的可能性。
 
-        'presence_penalty':0.5, #介于 -2.0 和 2.0 之间的数字。如果该值为正，那么新 token 会根据其是否已在已有文本中出现受到相应的惩罚，从而增加模型谈论新主题的可能性。
+        # 'presence_penalty':0.5, #介于 -2.0 和 2.0 之间的数字。如果该值为正，那么新 token 会根据其是否已在已有文本中出现受到相应的惩罚，从而增加模型谈论新主题的可能性。
 
         #'top_p':0.4,#作为调节采样温度的替代方案，模型会考虑前 top_p 概率的 token 的结果。所以 0.1 就意味着只有包括在最高 10% 概率中的 token 会被考虑。
         
-        'temperature': 0,#采样温度，介于 0 和 2 之间。更高的值，如 0.8，会使输出更随机，而更低的值，如 0.2，会使其更加集中和确定。
+        'temperature': 0.5,#采样温度，介于 0 和 2 之间。更高的值，如 0.8，会使输出更随机，而更低的值，如 0.2，会使其更加集中和确定。
         # #不建议同时对'top_p','temperature'进行修改 
 
         'max_tokens': 8192,#介于 1 到 8192 间的整数，限制一次请求中模型生成 completion 的最大 token 数。输入 token 和输出 token 的总长度受模型的上下文长度的限制。
@@ -59,8 +59,10 @@ class model_api_basics(ABC):
     
     def __init__(self, 
             api_key = "", 
-            base_url = ""
+            base_url = "",
+            **kwargs
         ):
+        super().__init__(**kwargs)
         try:
             self.log:logging = container.get("log")
         except Exception:
@@ -94,6 +96,18 @@ class model_api_basics(ABC):
 
         Returns:
             dict: 原消息json
+        """
+    
+    @abstractmethod
+    async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
+        """向发起请求，获取json，参数自定,但是是以流式的方法处理数据，流式接受完成后返回总数据
+
+        Args:
+            model (str): 模型名称
+            remainder (dict): 其他参数
+
+        Returns:
+            dict: 处理后兼容非流式的json数据
         """
     
     def alter_parameters(self, parameters:str, value:float|bool|dict):
@@ -137,6 +151,6 @@ class model_api_basics(ABC):
             return data['choices'][0]['message']
         except EOFError:
             raise ValueError(data)
-        
+    
     def __str__(self):
         return f"url:{self.base_url},api_key:{self.base_url}"

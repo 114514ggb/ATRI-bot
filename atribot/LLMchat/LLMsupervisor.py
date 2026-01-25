@@ -440,7 +440,13 @@ class large_language_model_supervisor():
             parameter = {
                 "messages": request.messages + messages, 
                 "tools":  request.tool_json,
-            } | request.parameter
+                **request.parameter
+            }
+            if request.parameter.get('stream'):
+                return await model_api.generate_json_ample_stream(
+                    model = request.model,
+                    remainder = parameter
+                )
             
             return await model_api.generate_json_ample(
                 model = request.model,

@@ -62,6 +62,10 @@ class memorySystem:
         for summarize in summarize_list:
             user_id = summarize["qq_id"]
             for time_text,facts in summarize["affair"].items():
+                
+                if len(facts) == 1:
+                    continue
+                
                 timestamp = int(datetime.strptime(time_text, "%Y-%m-%d %H:%M:%S").timestamp())
                 args_list += [
                     (group_id, user_id, timestamp, text, str(emb))

@@ -1,6 +1,6 @@
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from itertools import cycle
-from typing import List
+from typing import List, Dict, AsyncGenerator
 import aiohttp
 import asyncio
 import json
@@ -9,20 +9,16 @@ import json
 class ai_api_account_pool(universal_ai_api):
     """异步号池API"""
     
-    def __init__(self, 
-            api_key_pool:List[str] = None, 
-            base_url:str = "https://api.deepseek.com/chat/completions", 
-            tools = None
-        ):
-        super().__init__(base_url=base_url)
+    def __init__(
+        self, 
+        api_key_pool:List[str] = None, 
+        base_url:str = "https://api.deepseek.com/chat/completions", 
+        tools = None
+    ):
+        super().__init__(base_url=base_url, tools=tools)
         
         self._headers_cycle = cycle(api_key_pool if api_key_pool else [])
-        
-        if tools:
-            self.tools = tools
-        else:
-            self.tools = []
-        """模型可能会调用的 tool 的列表。最多支持 128 个 function。"""
+
         self.client:aiohttp.ClientSession|None = None
     
     async def _client_post(self,data:dict)->dict:
@@ -73,3 +69,68 @@ class ai_api_account_pool(universal_ai_api):
                 }
             )
         return self
+    
+    async def client_post_stream(self, data: Dict) -> AsyncGenerator[Dict, None]:
+        """
+        底层流式请求方法,返回支持的Server-Sent Events (SSE) 协议包裹的 JSON 数据
+        
+        Args:
+            data (Dict): 请求体参数
+            
+        Yields:
+            Dict: 原始的 chunk json 数据
+        """
+        max_retries = 3
+        retry_delay = 0.5
+        
+        for attempt in range(max_retries):
+            has_yielded = False
+            
+            try:
+                async with self.client.post(
+                    self.base_url,
+                    headers={'Authorization': f'Bearer {next(self._headers_cycle)}'},
+                    # proxy='http://127.0.0.1:7890', # 代理
+                    json=data
+                ) as response:
+                    
+                    if response.status != 200:
+                        error_text = await response.text()
+                        self.log.warning(f"Stream API Error (第 {attempt + 1} 次重试): {response.status} - {error_text}")
+                        response.raise_for_status()
+                        
+                    async for line in response.content:
+                        line = line.decode('utf-8').strip()
+                        
+                        if not line or line.startswith(":"):
+                            continue
+                        
+                        if line.startswith("data: "):
+                            json_str = line[6:]
+                            
+                            if json_str == "[DONE]":
+                                break
+                            
+                            try:
+                                chunk_json = json.loads(json_str)
+                                yield chunk_json
+                                has_yielded = True
+                            except json.JSONDecodeError:
+                                self.log.warning(f"JSON解析失败: {json_str}")
+                                continue          
+                    return                 
+            
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if has_yielded:
+                    self.log.error(f"流式请求在传输中途中断: {e}。由于已传输部分数据，停止重试以防数据重复。")
+                    raise e
+                
+                self.log.warning(f"流式请求连接错误 (第 {attempt + 1}/{max_retries} 次): {e}")
+                
+                if attempt == max_retries - 1:
+                    raise e
+
+                await asyncio.sleep(retry_delay * (attempt + 1))
+            except Exception as e:
+                self.log.error(f"流式请求发生未知错误: {e}")
+                raise e

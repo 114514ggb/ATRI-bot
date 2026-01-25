@@ -41,7 +41,6 @@ async def main(code:str, group_id:int):
         if filename.split('.')[-1].lower() if '.' in filename else '' in {'png', 'jpg', 'jpeg', 'gif'}:#不需要太严格的检查这样应该够了吧
             await send_message.send_group_pictures(
                 group_id = group_id,
-                name = filename,
                 url_img = "base64://"+file.to_base64(),
                 local_Path_type = False
             )

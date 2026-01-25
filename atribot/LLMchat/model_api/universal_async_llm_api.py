@@ -1,18 +1,22 @@
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
-from typing import List
+from atribot.LLMchat.model_api.stream_processor import StreamProcessor
+from typing import List, Dict ,AsyncGenerator
 import aiohttp
 import asyncio
 import json
 
 
-class universal_ai_api(model_api_basics):
+
+
+class universal_ai_api(model_api_basics,StreamProcessor):
     """通用异步AI API"""
     
-    def __init__(self, 
-            api_key = "", 
-            base_url = "https://api.deepseek.com/chat/completions", 
-            tools = None
-        ):
+    def __init__(
+        self, 
+        api_key = "", 
+        base_url = "https://api.deepseek.com/chat/completions", 
+        tools = None
+    ):
         super().__init__(api_key=api_key,base_url=base_url)
         
         self.headers = {
@@ -50,7 +54,7 @@ class universal_ai_api(model_api_basics):
                 enable_cleanup_closed=True, # 自动清理关闭连接
                 keepalive_timeout=20        # keepalive超时
             ),
-            timeout=aiohttp.ClientTimeout(total=60, connect=10),  # 总超时设置
+            timeout=aiohttp.ClientTimeout(total=300, connect=10),  # 总超时设置
             headers=self.headers
         )
         
@@ -58,7 +62,7 @@ class universal_ai_api(model_api_basics):
         """异步关闭客户端"""
         await self.client.close()
 
-    async def _client_post(self,data:dict)->dict:
+    async def _client_post(self,data:Dict)->Dict:
         max_retries = 3
         retry_delay = 0.5
         for attempt in range(max_retries):
@@ -69,7 +73,7 @@ class universal_ai_api(model_api_basics):
                     # proxy='http://127.0.0.1:7890' # 代理
                 ) as response:
                     try:
-                        response_json: dict = await response.json()
+                        response_json: Dict = await response.json()
                         # print(response_json) # 调试用
                     except aiohttp.ContentTypeError:
                         # 处理返回头不是 application/json 但内容是 json 的情况
@@ -87,13 +91,78 @@ class universal_ai_api(model_api_basics):
                     raise e
                 await asyncio.sleep(retry_delay * attempt)
     
+    async def client_post_stream(self, data: Dict) -> AsyncGenerator[Dict, None]:
+        """
+        底层流式请求方法,返回支持的Server-Sent Events (SSE) 协议包裹的 JSON 数据
+        
+        Args:
+            data (Dict): 请求体参数
+            
+        Yields:
+            Dict: 原始的 chunk json 数据
+        """
+        max_retries = 3
+        retry_delay = 0.5
+        
+        for attempt in range(max_retries):
+            has_yielded = False
+            
+            try:
+                async with self.client.post(
+                    self.base_url,
+                    # proxy='http://127.0.0.1:7890', # 代理
+                    json=data
+                ) as response:
+                    
+                    if response.status != 200:
+                        error_text = await response.text()
+                        self.log.warning(f"Stream API Error (第 {attempt + 1} 次重试): {response.status} - {error_text}")
+                        response.raise_for_status()
+                        
+                    async for line in response.content:
+                        line = line.decode('utf-8').strip()
+                        
+                        if not line or line.startswith(":"):
+                            continue
+                        
+                        if line.startswith("data: "):
+                            json_str = line[6:]
+                            
+                            if json_str == "[DONE]":
+                                break
+                            
+                            try:
+                                chunk_json = json.loads(json_str)
+                                yield chunk_json
+                                has_yielded = True
+                            except json.JSONDecodeError:
+                                self.log.warning(f"JSON解析失败: {json_str}")
+                                continue          
+                    return                 
+            
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if has_yielded:
+                    self.log.error(f"流式请求在传输中途中断: {e}。由于已传输部分数据，停止重试以防数据重复。")
+                    raise e
+                
+                self.log.warning(f"流式请求连接错误 (第 {attempt + 1}/{max_retries} 次): {e}")
+                
+                if attempt == max_retries - 1:
+                    raise e
+
+                await asyncio.sleep(retry_delay * (attempt + 1))
+            except Exception as e:
+                self.log.error(f"流式请求发生未知错误: {e}")
+                raise e
+    
     async def generate_text_tools(self, model:str, messages:list,tools:list):
         payload = {
             "model": model,
             "messages": messages,
             'tools':tools,
             # 'response_format':response_format,
-        } | self.model_parameters
+            **self.model_parameters
+        }
     
         max_retries = 3
         base_delay = 0.5
@@ -119,8 +188,8 @@ class universal_ai_api(model_api_basics):
         }
         return await self._client_post(payload)
     
-    async def generate_json_ample(self, model,remainder)->dict:
-        payload = {"model": model} | remainder
+    async def generate_json_ample(self, model,remainder)->Dict:
+        payload = {"model": model, **remainder}
         
         max_retries = 3
         base_delay = 0.5
@@ -160,4 +229,7 @@ class universal_ai_api(model_api_basics):
         # ['embeddings']
         # ['embedding']
         return (await self._client_post(payload))['embeddings']
- 
+
+    async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
+        return await self.process_stream_simple(self.client_post_stream({"model": model, **remainder}))
+
