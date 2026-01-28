@@ -110,7 +110,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
             try:
                 async with self.client.post(
                     self.base_url,
-                    # proxy='http://127.0.0.1:7890', # 代理
+                    proxy='http://127.0.0.1:7890', # 代理
                     json=data
                 ) as response:
                     

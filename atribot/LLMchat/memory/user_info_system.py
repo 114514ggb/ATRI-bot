@@ -39,7 +39,7 @@ class UserSystem:
         """
         return {
             "appellation": ["这是一个没有确认称呼的群友"],
-            "relation": "例如：朋友/助手/导师/同学等关系描述",
+            "relation": "陌生人",
             "personality": "简要描述性格特点，如：外向幽默、内敛谨慎等",
             "recent_topics": "最近几次对话的主要话题，用自然语言描述。",
             "evaluation": "对用户的观察和评价",

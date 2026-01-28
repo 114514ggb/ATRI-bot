@@ -5,12 +5,12 @@ description = "一个叫ATRI的qq机器人"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "aiohttp>=0.28.1",
-    "mcp>=1.12.2",
+    "aiohttp>=3.13.3",
+    "mcp>=1.23.0",
     "openai>=1.82.0",
     "pymilvus>=2.6.0",
     "fastapi>=0.115",
-    "aiomysql>=0.2.0",
+    "aiomysql>=0.3.0",
     "websockets>=15.0.1",
     "bs4>=0.0.2",
     "psutil>=7.0.0",

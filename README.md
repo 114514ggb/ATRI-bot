@@ -9,6 +9,7 @@
 项目Logo由[吖密](https://space.bilibili.com/1196260828)绘制
 [![Python](https://img.shields.io/badge/Python-3.13-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg)](https://www.docker.com/)
 [![NapCat](https://img.shields.io/badge/Backend-NapCat-green.svg)](https://github.com/NapNeko/NapCatQQ)
 
 </div>
@@ -104,6 +105,14 @@ ollama run Qwen3-Embedding-0.6B:F16
 ```
 
 
+#### 📦 沙盒环境 (sandbox)  - 可选
+
+为 AI 模型配备了默认的**代码沙盒环境**，使其能够安全地执行用户请求或自主生成的代码片段。当前实现基于 **Docker** 🐳沙盒，支持运行 Python 等语言的代码，可用于代码解释、数据计算等场景。
+
+- **扩展性**：如需支持其他类型的沙盒（如 Web 沙盒、系统命令沙盒），可继承 `atribot\LLMchat\sandbox\sandbox_base.py` 中的基类并实现相应接口。
+- **启用与禁用**：沙盒功能**默认启用**。若运行环境未安装或配置 Docker，项目将初始化失败。若无需此功能，可在 `atribot\bot_framework.py` 中找到标记为 `# ai使用的沙盒` 的代码段，将其注释即可。
+
+
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 文件夹：
 1.  参考 `assets\如何配置配置文件.py` 了解配置详情。
@@ -137,7 +146,7 @@ ATRI-main/
 ├─assets/                       # ⚙️ 项目配置文件及配置说明
 │
 ├─atribot/                      # 核心代码实现
-│  ├─C/                         # C语言扩展模块 (编译成链接库以提升性能)
+│  ├─C/                         # C语言扩展模块 (编译成链接库替换相关逻辑以提升性能)
 │  ├─commands/                  # 💻 命令具体实现逻辑
 │  ├─core/                      # 核心架构
 │  │  ├─cache/                  # 内存消息缓存
@@ -153,6 +162,7 @@ ATRI-main/
 │  │  ├─discard_tools/          # (已废弃的工具)
 │  │  ├─MCP/                    # MCP 协议工具与配置
 │  │  ├─memory/                 # RAG 记忆系统
+│  │  ├─sandbox/                # AI运行代码所使用的沙盒
 │  │  ├─model_api/              # LLM 供应商连接接口
 │  │  ├─RAG/                    # 检索增强生成逻辑
 │  │  └─tools/                  # 函数调用工具集

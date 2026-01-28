@@ -106,7 +106,7 @@ class StreamProcessor:
         return False
     
     
-    async def generate_json_ample_stream(self, async_generator:AsyncGenerator[Dict, None]) -> dict:
+    async def process_stream(self, async_generator:AsyncGenerator[Dict, None]) -> dict:
         """使用迭代器处理流式数据，接收完后返回兼容的格式
 
         Args:
@@ -167,10 +167,10 @@ class StreamProcessor:
         
         return result
     
-    
+
     @staticmethod
     async def process_stream_simple(async_generator: AsyncGenerator[Dict, None]) -> dict:
-        """简化的流式响应处理器
+        """简化的流式响应处理器，支持正确处理多字节字符
         
         Args:
             async_generator: 异步生成器,产出包含choices的字典
@@ -253,12 +253,12 @@ class StreamProcessor:
         
         if finish_reason:
             result["choices"][0]["finish_reason"] = finish_reason
-    
+
         if "usage" in chunk:
             result["usage"] = chunk["usage"]
         
         return result
-    
+        
     
     async def client_post_stream(self):
         """模拟流式请求"""
