@@ -131,10 +131,18 @@ class Context():
     def add_user_message(self, content: str) -> None:
         """添加用户消息"""
         self.messages.append({"role": "user", "content": content})
-        
-    def add_assistant_message(self, content: str|None) -> None:
+    
+    def add_assistant_message(self, content: str|None, reasoning_content:str|None= None) -> None:
         """添加助手消息"""
-        self.messages.append({"role": "assistant", "content": content})
+        assistant_message = {
+            "role": "assistant",
+            "content" : content
+        }
+    
+        if reasoning_content:
+            assistant_message["reasoning_content"] = reasoning_content
+        
+        self.messages.append(assistant_message)
         
     def add_assistant_message_flexible(self, assistant_message:Dict):
         """灵活的添加user消息
@@ -144,12 +152,19 @@ class Context():
         """
         self.messages.append(assistant_message)
         
-    def add_assistant_tool_message(self, content: str|None,tool_calls:List[Dict] = None) -> None:
+    def add_assistant_tool_message(self, content: str|None, tool_calls:List[Dict], reasoning_content:str|None = None, ) -> None:
         """添加助手调用工具消息"""
+        tool_message = {
+            "role": "assistant",
+            "tool_calls": tool_calls
+        }
+        
         if content:
-            self.messages.append({"role": "assistant","content": content,"tool_calls": tool_calls})
-        else:
-            self.messages.append({"role": "assistant","tool_calls": tool_calls})
+            tool_message["content"] = content
+        if reasoning_content:
+            tool_message["reasoning_content"] = reasoning_content
+        
+        self.messages.append(tool_message)
         
     def add_system_message(self, content: str) -> None:
         """添加系统消息"""

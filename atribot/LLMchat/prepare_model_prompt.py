@@ -319,7 +319,7 @@ class build_prompt:
     "decision":"update",
     "reason":"做出此决策的原因",
     "user_id":"需要更新信息的用户qq_id,没有这个参数默认是当前消息的用户",
-    "update_field":"这个必须是一个json对象,里面的key是需要更新的字段名,value是对应更新后的值, 参考原有的user_info给出你觉得需要更新的字段,记得不要太长,要简洁精炼不过200字"
+    "update_field":"这个必须是一个json对象,里面的key是需要更新的字段名,value是对应更新后的值, 参考原有的user_info给出要更新的字段,记得不要太长,要简洁精炼不过200字"
 }
 
 规则:

@@ -223,7 +223,7 @@ async def handle_status_command(message_data: dict, components: list):
 
 @cmd_system.register_command(
     name="query",
-    description="查询记忆库中的相关信息，会把输入转换成向量然后进行余弦距离搜索",
+    description="查询记忆库中的相关信息，会把输入转换成向量然后进行余弦距离搜索,不提供文本会按照时间降序排序",
     aliases=["search", "记忆"],
     authority_level=1,
     examples=[
@@ -238,7 +238,7 @@ async def handle_status_command(message_data: dict, components: list):
 @cmd_system.argument(
     name="query_text",
     description="要查询的文本内容",
-    required=True,
+    required=False,
     multiple=True,
     metavar="TEXT"
 )
@@ -309,7 +309,6 @@ async def handle_status_command(message_data: dict, components: list):
     metavar="FLOAT"
 )
 async def cmd_query_memories(
-    query_text: list[str],
     limit: int,
     group: int,
     user: int,
@@ -320,10 +319,14 @@ async def cmd_query_memories(
     kb_only: bool,
     threshold: float,
     message_data: dict,
+    query_text: list[str] = None,
 ):
     """查询记忆命令处理函数"""
-    query_string = " ".join(query_text)
-    
+    if query_text:
+        query_string = " ".join(query_text)
+    else:
+        query_string = None
+        
     if days is not None:
         import time
         end_time = int(time.time())

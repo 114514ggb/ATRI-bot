@@ -196,7 +196,7 @@ class WebSocketClient:
                     task.add_done_callback(running_tasks.discard)
                     
             except Exception as e:
-                self.log.error(f"处理消息时发生错误: {e}")
+                self.log.exception(f"处理消息时发生错误: {e}")
         
         if running_tasks:
             await gather(*running_tasks, return_exceptions=True)

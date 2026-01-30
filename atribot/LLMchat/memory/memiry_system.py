@@ -305,7 +305,7 @@ class memorySystem:
     
     async def query_memories(
         self,
-        query_text: List[float],
+        query_text: List[float] = None,
         limit: int = 5,
         group_id: int|str = None,
         user_id: int|str = None,
@@ -316,10 +316,10 @@ class memorySystem:
         distance_threshold: float = 0.5
     ) -> List[Dict[str, Any]]:
         """
-        记忆查询接口
+        通用向量查询接口
         
         Args:
-            query_text: 查询文本，会自然转换向量
+            query_text: 要查询的文本,会转换成向量。如果其值为假则按创建时间倒序返回。
             limit: 返回结果数量限制
             group_id: 群组ID筛选 (None表示不筛选)
             user_id: 用户ID筛选 (None表示不筛选)
@@ -330,11 +330,14 @@ class memorySystem:
             distance_threshold: 向量距离阈值,只返回距离小于等于此值的结果,默认小于0.5
         
         Returns:
-            记忆记录列表,按向量相似度排序
+            记忆记录列表,有提供的话按向量相似度排序
+            格式:[
+                (memory_id, group_id,user_id,event_time,event,created_at,distance)
+            ]
         """
         
         return await self.vector_store.query_memories(
-            str((await self.rag.calculate_embedding(query_text))[0]) ,
+            (await self.rag.calculate_embedding(query_text))[0] if query_text else None,
             limit,
             group_id,
             user_id,

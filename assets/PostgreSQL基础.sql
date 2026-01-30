@@ -113,13 +113,13 @@ CREATE TABLE IF NOT EXISTS message (
 
 -- 记忆表 (支持向量检索)
 CREATE TABLE IF NOT EXISTS atri_memory (
-    memory_id BIGSERIAL PRIMARY KEY,
-    group_id BIGINT DEFAULT 0,  -- 0=私聊, NULL=知识库, 其他=群聊
-    user_id BIGINT,             -- NULL=知识库
-    event_time BIGINT NOT NULL,
-    event TEXT,
-    event_vector VECTOR(1024),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    memory_id BIGSERIAL PRIMARY KEY,    -- 唯一id
+    group_id BIGINT DEFAULT 0,          -- 0=私聊, NULL=知识库, 其他=群聊
+    user_id BIGINT,                     -- NULL=知识库
+    event_time BIGINT NOT NULL,         -- 记忆的时间
+    event TEXT,                         -- 记忆的文本
+    event_vector VECTOR(1024),          -- 向量
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- 存入的时间
     CONSTRAINT uq_user_event UNIQUE (user_id, event)
 );
 

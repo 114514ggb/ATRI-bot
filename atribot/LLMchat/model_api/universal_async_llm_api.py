@@ -142,7 +142,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
             
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                 if has_yielded:
-                    self.log.error(f"流式请求在传输中途中断: {e}。由于已传输部分数据，停止重试以防数据重复。")
+                    self.log.exception(f"流式请求在传输中途中断: {e}。由于已传输部分数据，停止重试以防数据重复。")
                     raise e
                 
                 self.log.warning(f"流式请求连接错误 (第 {attempt + 1}/{max_retries} 次): {e}")
@@ -152,7 +152,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
 
                 await asyncio.sleep(retry_delay * (attempt + 1))
             except Exception as e:
-                self.log.error(f"流式请求发生未知错误: {e}")
+                self.log.exception(f"流式请求发生未知错误: {e}")
                 raise e
     
     async def generate_text_tools(self, model:str, messages:list,tools:list):
@@ -226,9 +226,19 @@ class universal_ai_api(model_api_basics,StreamProcessor):
             "dimensions" : dimensions,
             "encoding_format" : encoding,
         }
-        # ['embeddings']
-        # ['embedding']
-        return (await self._client_post(payload))['embeddings']
+        
+        ret = await self._client_post(payload)
+        
+        try:
+            if embeddings := ret.get('embeddings'):
+                return embeddings
+            else:
+                return [
+                    embedding["embedding"]
+                    for embedding in ret["data"]
+                ]
+        except Exception as e:
+            self.log.exception(f"不兼容的嵌入返回值错误:{e}")
 
     async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
         return await self.process_stream_simple(self.client_post_stream({"model": model, **remainder}))

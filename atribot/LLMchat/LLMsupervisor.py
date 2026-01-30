@@ -146,7 +146,7 @@ class large_language_model_supervisor():
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             #没有tool调用提前返回
             
-            increase_context.add_assistant_message_flexible(assistant_message)
+            increase_context.messages.append(assistant_message)
             return  self._update_response(
                 GenerationResponse(
                     messages = increase_context.messages,
@@ -155,10 +155,10 @@ class large_language_model_supervisor():
                 assistant_message
             )
         
-        
         increase_context.add_assistant_tool_message(
             content,
-            assistant_message['tool_calls']
+            tool_calls = assistant_message['tool_calls'],
+            reasoning_content = assistant_message.get("reasoning_content")
         )
         
         return await self.tool_calls_while(
@@ -232,12 +232,16 @@ class large_language_model_supervisor():
                 response.metadata["usage"] = usage
                 
             if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
-                increase_context.add_assistant_tool_message(content)
+                increase_context.add_assistant_message(
+                    content = content,
+                    reasoning_content = assistant_message.get("reasoning_content")
+                )
                 break
             
             increase_context.add_assistant_tool_message(
                 content,
-                assistant_message['tool_calls']
+                assistant_message['tool_calls'],
+                reasoning_content = assistant_message.get("reasoning_content")
             )
         
         self.logger.debug("工具调用结束!")
@@ -278,7 +282,7 @@ class large_language_model_supervisor():
         if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
             
             self._update_response(response, assistant_message)
-            increase_context.add_assistant_message_flexible(assistant_message)
+            increase_context.messages.append(assistant_message)
             response.messages = increase_context.messages
             if usage := api_reply.get("usage"):
                 response.metadata["usage"] = usage
@@ -286,7 +290,8 @@ class large_language_model_supervisor():
         
         increase_context.add_assistant_tool_message(
             content,
-            assistant_message['tool_calls']
+            tool_calls = assistant_message['tool_calls'],
+            reasoning_content = assistant_message.get("reasoning_content")
         )
         
         return await self.tool_calls_while(

@@ -223,7 +223,7 @@ class VectorStore(VectorStoreBasics):
     
     async def query_memories(
         self,
-        query_vector: List[float],
+        query_vector: List[float] = None,
         limit: int = 5,
         group_id: int|str = None,
         user_id: int|str = None,
@@ -237,7 +237,7 @@ class VectorStore(VectorStoreBasics):
         通用向量查询接口
         
         Args:
-            query_vector: 查询向量 (1024维)
+            query_vector: 查询向量 (1024维)。如果为None，则按创建时间倒序返回。
             limit: 返回结果数量限制
             group_id: 群组ID筛选 (None表示不筛选)
             user_id: 用户ID筛选 (None表示不筛选)
@@ -248,9 +248,12 @@ class VectorStore(VectorStoreBasics):
             distance_threshold: 向量距离阈值,只返回距离小于等于此值的结果,默认小于0.5
         
         Returns:
-            记忆记录列表,按向量相似度排序
+            记忆记录列表,有提供的话按向量相似度排序
+            格式:[
+                (memory_id, group_id,user_id,event_time,event,created_at,distance)
+            ]
         """
-        # 构建WHERE子句
+
         where_clauses = []
         params = []
         param_index = 1
@@ -287,12 +290,33 @@ class VectorStore(VectorStoreBasics):
         # 构建基础SQL
         where_sql = " AND ".join(where_clauses) if where_clauses else "TRUE"
         
-        # 向量查询子句
-        vector_param = f"${param_index}"
-        params.append(query_vector)
-        param_index += 1
-        
-        # 构建完整SQL
+        select_distance_sql = ""
+        distance_filter_sql = ""
+        order_by_sql = ""
+
+        if query_vector is not None:
+            vector_param = f"${param_index}"
+            params.append(str(query_vector))
+            param_index += 1
+            
+            select_distance_sql = f"event_vector <=> {vector_param}::vector(1024)"
+            
+            if distance_threshold is not None:
+                distance_filter_sql = f" AND event_vector <=> {vector_param}::vector(1024) <= ${param_index}"
+                params.append(distance_threshold)
+                param_index += 1
+            
+            order_by_sql = "distance ASC"
+            
+        else:
+            select_distance_sql = "0.0" 
+            
+            # 不进行距离筛选
+            distance_filter_sql = ""
+            
+            # 按创建时间倒序排序
+            order_by_sql = "created_at DESC"
+
         sql = f"""
             SELECT 
                 memory_id,
@@ -301,31 +325,21 @@ class VectorStore(VectorStoreBasics):
                 event_time,
                 event,
                 created_at,
-                event_vector <=> {vector_param}::vector(1024) AS distance
+                {select_distance_sql} AS distance
             FROM atri_memory
             WHERE {where_sql}
-        """
-        
-        # 添加距离阈值筛选
-        if distance_threshold is not None:
-            sql += f" AND event_vector <=> {vector_param}::vector(1024) <= ${param_index}"
-            params.append(distance_threshold)
-            param_index += 1
-        
-        # 排序和限制
-        sql += f"""
-            ORDER BY distance ASC
+            {distance_filter_sql}
+            ORDER BY {order_by_sql}
             LIMIT ${param_index}
         """
+        
         params.append(limit)
         
-        # 执行查询
-        results = await self.vector_database.execute_SQL(
+        return await self.vector_database.execute_SQL(
             sql=sql,
             argument=tuple(params)
         )
         
-        return results
     
     async def query_private_chat(
         self,

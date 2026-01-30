@@ -190,7 +190,7 @@ class StreamProcessor:
                 
             delta = choices[0].get("delta", {})
             
-            if "reasoning_content" in delta:
+            if delta.get("reasoning_content"):
                 reasoning_content += delta["reasoning_content"]
             
             if delta.get("content"):

@@ -27,8 +27,8 @@
         {
             "supplier":"deepseek",#配置的聊天模型来自的供应商
             "model_name":"deepseek-chat",#配置的聊天模型名称
-            "visual_sense":False,#模型是否有视觉，能接收图片吗
-            "system_review":False,#决定统提示词的嵌入方式一般不用动
+            "visual_sense":False,#模型是否有视觉，是否能接收图片
+            "system_review":False,#决定统提示词的嵌入方式，一般不用动
             "user_global_context":True #决定了上下文的纯在形式
         },
         "chat_parameter":{#聊天模型会使用的参数配置
@@ -73,7 +73,7 @@
         ],
         "RAG":{#对模型提供记忆搜索支持的嵌入式模型
             "enable":True,
-            "dimensions":1024,#嵌入模型的维度
+            "dimensions":1024,#嵌入模型的维度,这个目前配置了也没用，有些地方硬编码了没改
             "use_embedding_model":{#一般配置这个就行了
                 "supplier":"ollama_embed",
                 "model_name":"dengcao/Qwen3-Embedding-0.6B:F16"
@@ -118,11 +118,16 @@
     "api":[
         {
             "name":"deepseek",#作为上面supplier参考的名称
-            "base_url":"https://api.deepseek.com/chat/completions",#要是有openai兼容的地址
+            "base_url":"https://api.deepseek.com/chat/completions",#只接受有openai兼容的地址
+            #一般要在地址后面加上 v1/chat/completions
+            #比如谷歌的openai兼容地址https://generativelanguage.googleapis.com/v1beta/openai
+            #要加后才能用https://generativelanguage.googleapis.com/v1beta/openai/v1/chat/completions
+            #对于嵌入模型就一般不需要了比如这个https://api.siliconflow.cn/v1/embeddings
+            #如果有的api文档里有写的话使用curl里面的url地址
             "api_key":"sk-????",#你的密匙这个可以是一个list类型，那样的话就可以输入多个密匙成为一个号池
             "models":{
                 "deepseek-chat": {#模型名称(对应上面使用的"model_name")和对应的模型参数，参数目前就一个有没有视觉
-                    "visual_sense": False
+                    "visual_sense": False #模型是否有视觉，是否能接收图片
                 },
                 "deepseek-reasoner": {
                     "visual_sense": False

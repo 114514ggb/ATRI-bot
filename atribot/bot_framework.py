@@ -109,14 +109,17 @@ class BotFramework:
         )
         
         #ai使用的沙盒
-        sand_box:SandBoxBase = DockerSandbox(
-            config = self.config.sand_box
-        )
-        await sand_box.start()
-        container.register(
-            "SandBox",    
-            sand_box
-        )
+        try:
+            sand_box:SandBoxBase = DockerSandbox(
+                config = self.config.sand_box
+            )
+            await sand_box.start()
+            container.register(
+                "SandBox",    
+                sand_box
+            )
+        except Exception as e:
+            self.logger.exception(f"LLM使用的使用的沙盒初始化失败{e}")
         
         #向量数据库实现的记忆系统
         container.register(
