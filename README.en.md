@@ -1,21 +1,28 @@
 <img src="./assets/ATRI-bot.png" width="400" height="400" alt="ATRI-bot" align="right" />
 <div align="center">
 
+<p align="right">
+  <a href="./README.md">
+    <img src="https://img.shields.io/badge/lang-简体中文-red" alt="简体中文">
+  </a>
+  <a href="./README.en.md">
+    <img src="https://img.shields.io/badge/lang-English-blue" alt="English">
+  </a>
+</p>
+
 # ATRI-bot
 
-> _時よ止まれ、おまえは美しい_  
+>_時よ止まれ、おまえは美しい_
 >
 > — *ATRI -My Dear Moments-*
-
-Project logo drawn by [吖密](https://space.bilibili.com/1196260828)
-
+>
+项目Logo由[吖密](https://space.bilibili.com/1196260828)绘制  
 [![Python](https://img.shields.io/badge/Python-3.13-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg)](https://www.docker.com/)
 [![NapCat](https://img.shields.io/badge/Backend-NapCat-green.svg)](https://github.com/NapNeko/NapCatQQ)
 
 </div>
-
 ## 📖 Introduction
 
 A personal hobby project created by a beginner learning (or rather, "combining the strengths of many" ✨) from various sources.  
@@ -188,12 +195,10 @@ Let's make ATRI smarter and cuter together!
 
 ---
 <div align="center">
-_私は、高性能ですから!_
-
+  
+_私は、高性能ですから!_  
+  
 <img src="https://files.astrbot.app/watashiwa-koseino-desukara.gif" width="100"/>
 
 ❤️ ATRI-bot ❤️
-</div>
-<div align="right">
-[English Version](README_ENG.md) | [中文版本](README.md)
 </div>
