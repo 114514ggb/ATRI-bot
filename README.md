@@ -15,7 +15,8 @@
 >_时间流逝吧，你是多么的残酷；时间停止吧，你是多么的美丽_
 >
 > — *ATRI -My Dear Moments-*
-项目Logo由[吖密](https://space.bilibili.com/1196260828)绘制
+>
+项目Logo由[吖密](https://space.bilibili.com/1196260828)绘制  
 [![Python](https://img.shields.io/badge/Python-3.13-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg)](https://www.docker.com/)
@@ -96,8 +97,8 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 #### 🗣️ 语音合成 (TTS) - 可选
 支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)
-实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速情感等常用参数,当然你还要有自己的语音模型
-使用前需要修改`atribot\commands\audio\TTS.py`文件里的参考音频路径,还有GPT-SoVITS接口的端口地址
+实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速情感等常用参数,当然你还要有自己的语音模型  
+使用前需要修改`atribot\commands\audio\TTS.py`文件里的参考音频路径,还有GPT-SoVITS接口的端口地址  
 ```json
 {
     "这里是对应的情感": {
@@ -197,23 +198,18 @@ ATRI-main/
 ## 🤝 参与贡献
 
 非常欢迎你参与到这个项目中来！无论是提交 Bug、修补代码还是提出新功能建议。
-让我们一起把 ATRI 变得更聪明、更可爱！
+让我们一起把 ATRI-bot 变得更聪明、更可爱！
 虽然这个目前其实很烂
 
 ---
-<div align="center">
-_私は、高性能ですから!_
-
-<img src="https://files.astrbot.app/watashiwa-koseino-desukara.gif" width="100"/>
 
 <div align="center">
-_私は、高性能ですから!_
-
+  
+_私は、高性能ですから!_  
+  
 <img src="https://files.astrbot.app/watashiwa-koseino-desukara.gif" width="100"/>
 
 ❤️ ATRI-bot ❤️
 </div>
-<div align="right">
-[English Version](README_ENG.md) | [中文版本](README.md)
-</div>
+
 
