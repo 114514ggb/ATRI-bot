@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS message (
     message_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     group_id BIGINT,
-    time BIGINT, -- 推荐存储 Unix 时间戳
+    time BIGINT, -- Unix 时间戳
     message_content TEXT,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
@@ -111,10 +111,10 @@ CREATE TABLE IF NOT EXISTS message (
 -- 数据导入后可能需要重置序列：
 -- SELECT setval('message_sole_id_seq', (SELECT COALESCE(MAX(sole_id), 0) FROM message));
 
--- 记忆表 (支持向量检索)
+-- 记忆表 (支持向量)
 CREATE TABLE IF NOT EXISTS atri_memory (
     memory_id BIGSERIAL PRIMARY KEY,    -- 唯一id
-    group_id BIGINT DEFAULT 0,          -- 0=私聊, NULL=知识库, 其他=群聊
+    group_id BIGINT DEFAULT 0,          -- 0或NULL私聊, 和user_id一起为NULL=知识库
     user_id BIGINT,                     -- NULL=知识库
     event_time BIGINT NOT NULL,         -- 记忆的时间
     event TEXT,                         -- 记忆的文本

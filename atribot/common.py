@@ -48,7 +48,8 @@ class common():
         headers = {
             'User-Agent': 'Mozilla/5.0',
             'Referer': 'https://music.163.com/',
-            'Accept': 'application/json, text/plain, */*'
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Encoding': 'gzip, deflate'
         }
         
         async with aiohttp.ClientSession() as session:

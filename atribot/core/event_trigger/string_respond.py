@@ -263,7 +263,7 @@ class string_response:
         "哼哼": [["img",["ATRI_恶臭1145.jpg"]]],
         "粽子": [["img",["ATRI_粽子.gif"]]],
         "异议": [["img",["ATRI_我有异议.jpg"]]],
-        "qwq": [["img",["ATRI_qwq.jpg"]],["text",["QWQ"]]],
+        # "qwq": [["img",["ATRI_qwq.jpg"]],["text",["QWQ"]]],
         # "galgame": [["img",["ATRI_玩galgame.jpeg"]]],
         # "ATRI": [["img",["ATRI_探头.png","ATRI_左右摆头.gif","ATRI_看你.gif","ATRI_小虎牙咬面包.jpg","ATRI_闪亮登场.jpg","ATRI_乱跳.gif"]]],
         "离谱": [["text",["离谱","离谱了","确实离谱"]]],

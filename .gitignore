@@ -8,6 +8,7 @@ wheels/
 *.egg-info
 privacy/
 .vscode/
+atri_log_
 test.py
 *.log
 assets/config.json

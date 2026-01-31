@@ -14,7 +14,7 @@
         "name":"ATRI-bot" #bot的账号名称
     },
     "file_path":{
-        "item_path":"E:/程序文件/python/ATRI-main/",#项目的根路径
+        "item_path":"E:/程序文件/python/ATRI-main/",#项目的根路径，如果你用默认的话后面要加上/如果前面用的是\\建议统一用\\就不要用/了
         "document":"E:/程序文件/python/ATRI-main/document/",#项目的资源文件夹如bot要发送的表情包音频等
         "procedure_root":"E:/程序文件/python/ATRI-main/",#给tts使用的缓存音频前路径
         "emoji":"document/img/emojis",#会和项目的根路径拼接在一起的路径,会拼接作为发送表情文件的路径
