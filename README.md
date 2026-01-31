@@ -1,6 +1,15 @@
 <img src=".\assets\ATRI-bot.png" width = "400" height = "400" alt="ATRI-bot" align=right />
 <div align="center">
 
+<p align="right">
+  <a href="./README.md">
+    <img src="https://img.shields.io/badge/lang-简体中文-red" alt="简体中文">
+  </a>
+  <a href="./README.en.md">
+    <img src="https://img.shields.io/badge/lang-English-blue" alt="English">
+  </a>
+</p>
+
 # ATRI-bot
 
 >_时间流逝吧，你是多么的残酷；时间停止吧，你是多么的美丽_
@@ -193,5 +202,9 @@ ATRI-main/
 
 ---
 <div align="center">
+_私は、高性能ですから!_
+
+<img src="https://files.astrbot.app/watashiwa-koseino-desukara.gif" width="100"/>
+
 ❤️ ATRI-bot ❤️
 </div>
