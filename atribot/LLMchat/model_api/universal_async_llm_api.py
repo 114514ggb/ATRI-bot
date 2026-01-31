@@ -54,7 +54,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                 enable_cleanup_closed=True, # 自动清理关闭连接
                 keepalive_timeout=20        # keepalive超时
             ),
-            timeout=aiohttp.ClientTimeout(total=300, connect=10),  # 总超时设置
+            timeout=aiohttp.ClientTimeout(total=360, connect=20),  # 总超时设置
             headers=self.headers
         )
         

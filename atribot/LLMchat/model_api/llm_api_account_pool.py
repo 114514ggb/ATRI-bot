@@ -65,7 +65,7 @@ class ai_api_account_pool(universal_ai_api):
                     enable_cleanup_closed=True, # 自动清理关闭连接
                     keepalive_timeout=20        # keepalive超时
                 ),
-                timeout=aiohttp.ClientTimeout(total=180, connect=15), # 细分连接超时和总超时
+                timeout=aiohttp.ClientTimeout(total=180, connect=20), # 细分连接超时和总超时
                 headers={
                     'Accept': 'application/json',
                 }

@@ -11,7 +11,7 @@ class emoji_core:
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
         self.file = f"file://{item_path}{folder_path}"
-        self.emoji_prompt = None
+        self.emoji_prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
     
@@ -29,12 +29,13 @@ class emoji_core:
                          if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))]
                 if files:
                     self.emoji_file_dict[item] = files
-                    
-        self.emoji_prompt = build_prompt.append_tag_hint(
-            tag_prompt = "可以在输出中加入被[]包裹的标签,这个格式的标签会解析成对应分类的表情包,在对话中自然加入且不要超过一个,绝对不要加入没有的标签",
-            tag_list = list(self.emoji_file_dict.keys())
-        )
-    
+
+        if self.emoji_file_dict:
+            self.emoji_prompt = build_prompt.append_tag_hint(
+                tag_prompt = "可以在输出中加入被[]包裹的标签,这个格式的标签会解析成对应分类的表情包,在对话中自然加入且不要超过一个,绝对不要加入没有的标签",
+                tag_list = list(self.emoji_file_dict.keys())
+            )
+        
     def extract_emotion_tags(self, text: str) -> list:
         """从文本中提取标签"""
         tags = []
