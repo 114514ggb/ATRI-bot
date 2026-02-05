@@ -9,6 +9,7 @@ from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.core.command.command_parsing import command_system
+from atribot.LLMchat.skills.skills_manager import SkillsManager
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.core.command.command_loader import command_loader
 from atribot.LLMchat.memory.memiry_system import memorySystem
@@ -76,6 +77,12 @@ class BotFramework:
             TriggerSupervisor
         )
         await TriggerSupervisor.start()
+        
+        #Skills的管理
+        container.register(
+            "SkillsManager",
+            SkillsManager()
+        )
         
         #模型供应商
         LLMSupplier = ai_connection_manager()

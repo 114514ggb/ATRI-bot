@@ -171,6 +171,7 @@ dependencies = [
     { name = "psutil" },
     { name = "pyahocorasick" },
     { name = "pymilvus" },
+    { name = "strictyaml" },
     { name = "trafilatura" },
     { name = "websockets" },
 ]
@@ -190,6 +191,7 @@ requires-dist = [
     { name = "psutil", specifier = ">=7.0.0" },
     { name = "pyahocorasick", specifier = ">=2.2.0" },
     { name = "pymilvus", specifier = ">=2.6.0" },
+    { name = "strictyaml", specifier = ">=1.7.3" },
     { name = "trafilatura", specifier = ">=2.0.0" },
     { name = "websockets", specifier = ">=15.0.1" },
 ]
@@ -1527,6 +1529,18 @@ dependencies = [
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/04/57/d062573f391d062710d4088fa1369428c38d51460ab6fedff920efef932e/starlette-0.47.2.tar.gz", hash = "sha256:6ae9aa5db235e4846decc1e7b79c4f346adf41e9777aebeb49dfd09bbd7023d8" }
 wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/f7/1f/b876b1f83aef204198a42dc101613fefccb32258e5428b5f9259677864b4/starlette-0.47.2-py3-none-any.whl", hash = "sha256:c5847e96134e5c5371ee9fac6fdf1a67336d5815e09eb2a01fdb57a351ef915b" },
+]
+
+[[package]]
+name = "strictyaml"
+version = "1.7.3"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/b3/08/efd28d49162ce89c2ad61a88bd80e11fb77bc9f6c145402589112d38f8af/strictyaml-1.7.3.tar.gz", hash = "sha256:22f854a5fcab42b5ddba8030a0e4be51ca89af0267961c8d6cfa86395586c407" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/96/7c/a81ef5ef10978dd073a854e0fa93b5d8021d0594b639cc8f6453c3c78a1d/strictyaml-1.7.3-py3-none-any.whl", hash = "sha256:fb5c8a4edb43bebb765959e420f9b3978d7f1af88c80606c03fb420888f5d1c7" },
 ]
 
 [[package]]

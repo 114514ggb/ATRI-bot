@@ -20,6 +20,7 @@ dependencies = [
     "docker>=7.1.0",
     "croniter>=6.0.0",
     "trafilatura>=2.0.0",
+    "strictyaml>=1.7.3",
 ]
 
 [tool.uv.workspace]

@@ -163,7 +163,7 @@ class memorySystem:
                 self.logger.error(f"第{i}次总结请求出错:{e}")
                 await asyncio.sleep(1)
         
-        if assistant_content := assistant_message.get('content',"").strip():
+        if assistant_content := assistant_message.get('content',""):
             return json.loads(assistant_content)
         else:
             return {}
