@@ -15,7 +15,7 @@ class initiativeChat:
         self.logger:Logger = container.get("log")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.group_chat:group_chat = container.get("GroupChat")
-        self.keyword_trigger_list = ["亚托莉","哈基莉"]
+        self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
     
     async def decision(self, message: RichData, group_context:GroupContext, at: bool = False) -> bool:
         """决策是否应该发言"""

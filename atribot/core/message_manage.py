@@ -127,7 +127,7 @@ class group_manage(message_manage):
         if group_id not in self.group_white_list and not (user_id == 2631018780):
             return
         
-        group_context = self.chat_manager.get_group_context(group_id)
+        group_context = await self.chat_manager.get_group_context(group_id)
         group_context.time_window.add()
 
         if data.get("message_sent_type") == "self":

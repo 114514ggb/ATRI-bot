@@ -26,16 +26,10 @@ memiry_system:memorySystem = container.get("memirySystem")
 
 async def main(content_text:str,user_id:str|int=None):
     if user_id:
-        args_list = [
-            (0, user_id, int(time.time()), 
-             content_text, str((await memiry_system.rag.calculate_embedding(content_text))[0]))
-        ]
+        args_list = (0, user_id, int(time.time()), content_text, str((await memiry_system.rag.calculate_embedding(content_text))[0]))
     else:
-        args_list = [
-            (None, None, int(time.time()), 
-             content_text, str((await memiry_system.rag.calculate_embedding(content_text))[0]))
-        ]
+        args_list = (None, None, int(time.time()), content_text, str((await memiry_system.rag.calculate_embedding(content_text))[0]))
 
-    await memiry_system.vector_store.batch_add_memories(args_list)
+    await memiry_system.vector_store.add_memory(args_list)
     
     return "存储记忆成功"

@@ -36,16 +36,17 @@ class ai_api_account_pool(universal_ai_api):
                     # proxy='http://127.0.0.1:7890' # 代理
                 ) as response:
                     try:
-                        res_json = await response.json()
-                        # print(res_json)
+                        # self.log.debug(await response.text()) # 调试用
+                        response_json = await response.json()
                     except aiohttp.ContentTypeError:
-                        res_json = json.loads(await response.text())
+                        response_json = json.loads(await response.text())
+
                         
                     if response.status != 200:
-                        self.log.warning(f"API Error {response.status}: {res_json}")
+                        self.log.warning(f"API Error {response.status}: {response_json}")
                         response.raise_for_status()
                         
-                    return res_json
+                    return response_json
                 
             except Exception as e:
                 if attempt == max_retries - 1:

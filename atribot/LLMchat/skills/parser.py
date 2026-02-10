@@ -86,7 +86,7 @@ def read_properties(skill_dir: Path) -> SkillProperties:
     if skill_md is None:
         raise ParseError(f"未在 {skill_dir} 中找到 SKILL.md")
 
-    metadata, _ = parse_frontmatter(skill_md.read_text())
+    metadata, _ = parse_frontmatter(skill_md.read_text(encoding='utf-8'))
 
     if "name" not in metadata:
         raise ValidationError("frontmatter 中缺少必填字段: name")

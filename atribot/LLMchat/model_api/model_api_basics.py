@@ -137,6 +137,7 @@ class model_api_basics(ABC):
                 'tools': tools,
                 'temperature' : temperature,
                 'tool_choice': "auto", #有的模型要开启这个才能调用工具
+                'stream': False
                 # "reasoning_effort": "high",
                 # "extra_body": {
                 #     "google": {

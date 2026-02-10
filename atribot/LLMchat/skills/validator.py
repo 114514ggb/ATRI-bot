@@ -169,7 +169,7 @@ def validate(skill_dir: Path) -> list[str]:
         return ["缺少必需文件：SKILL.md"]
 
     try:
-        metadata, _ = parse_frontmatter(skill_md.read_text())
+        metadata, _ = parse_frontmatter(skill_md.read_text(encoding='utf-8'))
     except ParseError as e:
         return [str(e)]
 

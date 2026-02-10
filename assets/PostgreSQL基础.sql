@@ -42,16 +42,6 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- 通用触发器函数：自动更新 last_updated 时间戳
-CREATE OR REPLACE FUNCTION update_timestamp_func()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.last_updated = CURRENT_TIMESTAMP;
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-
 /* ==========================================================================
    2. 基础表结构 (Users, Groups)
    ========================================================================== */
@@ -71,7 +61,7 @@ CREATE TABLE IF NOT EXISTS user_group (
 
 
 /* ==========================================================================
-   3. 依赖表结构 (Info, Permissions, Message, Memory)
+   3. 依赖表结构 (Info, Permissions, Message, Memory, Context)
    ========================================================================== */
 
 -- 用户信息 JSON 表
@@ -124,6 +114,26 @@ CREATE TABLE IF NOT EXISTS atri_memory (
 );
 
 
+-- 上下文缓存表：存储每个用户的AI对话上下文
+CREATE TABLE IF NOT EXISTS chat_context (
+    context_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT,                                     -- 私聊上下文
+    group_id BIGINT,                                    -- 群聊上下文
+    context_data JSONB NOT NULL DEFAULT '[]',           -- 消息数组 [{role, content, timestamp}, ...]
+    total_tokens INT DEFAULT 0,                         -- 预估token数
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,   -- 最后更新时间
+    CONSTRAINT chk_owner_exclusive CHECK (
+        (user_id IS NOT NULL AND group_id IS NULL) OR   --只能有一个
+        (user_id IS NULL AND group_id IS NOT NULL)
+    ),
+    CONSTRAINT uq_chat_context_user UNIQUE (user_id),
+    CONSTRAINT uq_chat_context_group UNIQUE (group_id), -- 要唯一
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES user_group(group_id)
+        ON DELETE CASCADE ON UPDATE CASCADE  
+);
+
 /* ==========================================================================
    4. 索引定义 (Indexes)
    ========================================================================== */
@@ -143,10 +153,28 @@ ON atri_memory
 USING hnsw (event_vector vector_cosine_ops) 
 WITH (m = 16, ef_construction = 64);
 
+-- 快速查询指定用户的上下文
+CREATE INDEX IF NOT EXISTS idx_chat_context_user_id 
+    ON chat_context(user_id) 
+    WHERE user_id IS NOT NULL;
 
+-- 快速查询指定群组的上下文  
+CREATE INDEX IF NOT EXISTS idx_chat_context_group_id 
+    ON chat_context(group_id) 
+    WHERE group_id IS NOT NULL;
+    
 /* ==========================================================================
    5. 触发器定义 (Triggers)
    ========================================================================== */
+
+-- 通用触发器函数：自动更新 last_updated 时间戳
+CREATE OR REPLACE FUNCTION update_timestamp_func()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.last_updated = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Users 表自动更新
 CREATE TRIGGER trg_users_update_timestamp
@@ -166,6 +194,11 @@ CREATE TRIGGER trg_permissions_update_timestamp
     FOR EACH ROW
     EXECUTE FUNCTION update_timestamp_func();
 
+-- chat_context 表自动更新
+CREATE TRIGGER trg_chat_context_update_timestamp
+    BEFORE UPDATE ON chat_context
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp_func();
 
 /* ==========================================================================
    6. 注释 (Comments)

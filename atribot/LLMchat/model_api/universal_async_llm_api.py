@@ -73,8 +73,8 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     # proxy='http://127.0.0.1:7890' # 代理
                 ) as response:
                     try:
+                        # self.log.debug(await response.text()) # 调试用
                         response_json: Dict = await response.json()
-                        # print(response_json) # 调试用
                     except aiohttp.ContentTypeError:
                         # 处理返回头不是 application/json 但内容是 json 的情况
                         response_json = json.loads(await response.text())
@@ -202,8 +202,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                 return ret
             else:
                 if attempt < max_retries:
-                    sleep_time = base_delay * (2 ** attempt)
-                    await asyncio.sleep(sleep_time)
+                    await asyncio.sleep(base_delay * (2 ** attempt))
                 else:
                     raise ValueError(f"LLM API请求为空，已重试 {max_retries} 次")
         
@@ -238,7 +237,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     for embedding in ret["data"]
                 ]
         except Exception as e:
-            self.log.exception(f"不兼容的嵌入返回值错误:{e}")
+            self.log.exception(f"不兼容的嵌入返回值错误:{e},原始data:{ret}")
 
     async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
         return await self.process_stream_simple(self.client_post_stream({"model": model, **remainder}))

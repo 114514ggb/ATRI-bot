@@ -716,6 +716,10 @@ class GroupContext:
     def __iter__(self):
         return iter(self.messages)
     
+    def update_time(self):
+        """更新私聊类的最新使用时间"""
+        self.last_msg_at = time.time()
+
     def _record_validity_check(self)->List[str]|None:
         """针对群聊天消息条数的验证
 
@@ -738,7 +742,7 @@ class GroupContext:
             tuple[List[str], GroupContext]|None:  如果需要总结,返回 (消息列表, 上下文对象)
         """
         async with self.async_lock:
-            self.last_msg_at = time.monotonic() #更新群最后处理时间
+            self.last_msg_at = time.time() #更新群最后处理时间
             self.messages.append(message)
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
@@ -779,16 +783,16 @@ class GroupContext:
 @dataclass(slots=True)
 class PrivateContext:
     
-    user_id:int
+    user_id: int
     """user的qq号"""
-    chat_context:Context
+    chat_context: Context
     """群LLM聊天上下文"""
-    play_roles:str
+    play_roles: str
     """当前LLM聊天人设名称"""
     
-    async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
+    async_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """异步锁"""
-    last_msg_at:float = field(default=time.monotonic(), init=False)
+    last_msg_at: float = field(default=time.monotonic(), init=False)
     """最后一次消息的使用时间"""
     time_window: TimeWindow = field(init=False)
     """统计群近期消息数量的窗口对象"""
@@ -798,7 +802,7 @@ class PrivateContext:
 
     def update_time(self):
         """更新私聊类的最新使用时间"""
-        self.last_msg_at = time.monotonic()
+        self.last_msg_at = time.time()
 
 
 

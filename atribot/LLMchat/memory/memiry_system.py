@@ -10,6 +10,7 @@ from logging import Logger
 import asyncio
 import json
 import time
+import re
 
 
 
@@ -35,8 +36,7 @@ class memorySystem:
             messages (List[Dict[str,str]]): 上下文消息
             user_id (int | str): 用户ID
         """
-        summarize_list = await self.extract_and_summarize_facts(str(messages))
-        if summarize_list:
+        if summarize_list :=  await self.extract_and_summarize_facts(str(messages)):
             
             event_time = int(time.time())
             await self.vector_store.batch_add_memories([
@@ -71,8 +71,8 @@ class memorySystem:
                     (group_id, user_id, timestamp, text, str(emb))
                     for text, emb in zip(facts, await self.rag.calculate_embedding(facts))
                 ]
-    
-        await self.vector_store.batch_add_memories(args_list)
+        if args_list:
+            await self.vector_store.batch_add_memories(args_list)
                      
         
     async def extract_and_summarize_facts(self, message:str)->List[str|None]:
@@ -147,26 +147,46 @@ class memorySystem:
         
         parameters = {
             "messages":private_context.get_messages(),
-            "temperature":0.0,
+            "temperature":0,
             # "max_tokens": 65536,
             # "reasoning_effort": "high",
-            "response_format":{ "type": "json_object" }
+            "response_format":{ "type": "json_object" },
+            "stream":False
         }
         
-        assistant_message = {}
+        assistant_content = None
         
-        for i in range(3):
+        for i in range(5):
             try:
-                assistant_message:Dict[str, Any] = (await self.supplier.generate_json_ample(self.model, parameters))['choices'][0]['message']
-                break
+                assistant_content:str = (await self.supplier.generate_json_ample(self.model, parameters))['choices'][0]['message'].get('content')
             except Exception as e:
                 self.logger.error(f"第{i}次总结请求出错:{e}")
                 await asyncio.sleep(1)
-        
-        if assistant_content := assistant_message.get('content',""):
-            return json.loads(assistant_content)
-        else:
-            return {}
+                
+            if assistant_content and assistant_content != "[响应为空，请重新尝试]":
+                try:
+                    return json.loads(assistant_content)
+                except json.JSONDecodeError: 
+                    extracted_str:str = None #兼容一些奇怪的情况
+            
+                    if match := re.search(r"```(?:json)?\s*(\{.*?\})\s*```", assistant_content, re.DOTALL):
+                        extracted_str = match.group(1)
+                    
+                    elif match := re.search(r"\{.*\}", assistant_content, re.DOTALL):
+                        extracted_str = match.group(0)
+                    
+                    if extracted_str:
+                        try:
+                            return json.loads(extracted_str)
+                        except json.JSONDecodeError:
+                            self.logger.error(f"总结的提取解析json问题,data:{assistant_content}")
+                    
+                except Exception:
+                    self.logger.error(f"总结的提取解析json问题,data:{assistant_content}")
+
+            await asyncio.sleep(1)
+
+        return {}
     
     async def query_user_recently_memory(self, text:str, limit:int = 5)->List[tuple[dict[str,str]]]:
         """简单根据文本向量和user_id查询数据库最相似消息,返回余弦距离<0.5,和最近30天内的消息

@@ -53,19 +53,14 @@ class TimeTriggerSupervisor:
 
     def __init__(self):
         self.logger:Logger = container.get("log")
-
         self._queue: List[TimedTask] = []
         """任务最小堆：存储 TimedTask 对象，堆顶永远是最近需要执行的任务"""
-
         self._task_map: Dict[int, TimedTask] = {}
         """任务索引表：用于通过 task_id 快速查找任务（O(1)），主要用于取消任务"""
-
         self._wakeup_event = asyncio.Event()
         """唤醒事件：当有新任务插入且比堆顶任务更早执行时，用于唤醒主循环"""
-
         self._running = False
         """调度器运行状态标记"""
-
         self._main_task: Optional[asyncio.Task] = None
         """调度器的主循环协程任务对象"""
 

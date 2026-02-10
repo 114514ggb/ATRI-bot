@@ -50,6 +50,13 @@ class BotFramework:
         self.config = atri_config()
         container.register("config",self.config)
         
+        # 时间触发器,后面服务会依赖就只能放最前面了
+        TriggerSupervisor = TimeTriggerSupervisor()
+        container.register(
+            "TimeTriggerSupervisor",
+            TriggerSupervisor
+        )
+        
         #MCP
         mcp_server = FuncCall("atribot/LLMchat/MCP/")
         asyncio.create_task(mcp_server.mcp_service_selector())#放到后台不等待
@@ -69,14 +76,6 @@ class BotFramework:
                 password = self.config.database.password
             )
         )
-        
-        # 时间触发器
-        TriggerSupervisor = TimeTriggerSupervisor()
-        container.register(
-            "TimeTriggerSupervisor",
-            TriggerSupervisor
-        )
-        await TriggerSupervisor.start()
         
         #Skills的管理
         container.register(
@@ -173,6 +172,9 @@ class BotFramework:
             "PermissionsManagement",
             await permissions_management.create()
         )
+        
+        #启动时间触发器的主循环
+        await TriggerSupervisor.start()
 
         #连接配置
         server_type:str = self.config.network.connection_type

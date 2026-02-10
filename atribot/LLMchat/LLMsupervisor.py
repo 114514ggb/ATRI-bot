@@ -383,7 +383,7 @@ class large_language_model_supervisor():
         request: GenerationRequest,
         increase_context: Context,
         model_api: model_api_basics,
-        max_retries: int = 3
+        max_retries: int = 5
     ) -> tuple[Dict,Dict,str|None]:
         """获取模型回复，包含重试机制
         
@@ -409,8 +409,9 @@ class large_language_model_supervisor():
             self.logger.debug(f"模型返回:{api_reply}")
             
             assistant_message:Dict = api_reply['choices'][0]['message']
+            content = assistant_message.get('content')
             
-            if content := assistant_message.get('content'):
+            if content and content != "[响应为空，请重新尝试]":
                 return api_reply,assistant_message, content
             elif "tool_calls" in assistant_message:
                 return api_reply,assistant_message, None

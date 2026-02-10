@@ -114,7 +114,7 @@ class RAGManager:
         
         
     async def store_memory(self, document:str):
-        """对文本进行处理然后存储到数据库作为知识库记忆供查询
+        """对一段文本进行处理然后存储到数据库作为知识库记忆供查询
 
         Args:
             document (str): 要存储在向量数据库的记忆

@@ -47,7 +47,7 @@ class string_response:
             elif send_type is ResponseType.MIXTURE:
                 await self.send_message.send_group_message(group_id, common.construction_message_dict(document,self.url_prefi))
         
-        if time.time() - self.context_management.get_group_context(group_id).last_msg_at < 2:
+        if time.time() - (await self.context_management.get_group_context(group_id)).last_msg_at < 2:
             #如果间隔太短不处理
             return 
         

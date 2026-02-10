@@ -126,9 +126,9 @@ class group_chat(chat_baseics):
         }
         
         if self.config.model.connect.user_global_context:
-            self.get_context = lambda group_id,user_id : self.chat_manager.get_private_context(user_id).chat_context
+            self.get_context = lambda group_id,user_id : self.chat_manager.get_private_context(user_id)
         else:
-            self.get_context = lambda group_id,user_id : self.chat_manager.get_group_context(group_id).chat_context
+            self.get_context = lambda group_id,user_id : self.chat_manager.get_group_context(group_id)
 
     async def step(self, message: RichData) -> None:
         """群聊主处理函数"""
@@ -141,7 +141,7 @@ class group_chat(chat_baseics):
 
         self.log.debug(f"群LLM聊天处理:{readable_text}")
 
-        original_context = self.chat_manager.get_group_context(group_id).chat_context
+        original_context =await self.chat_manager.get_group_context(group_id).chat_context
         original_context.record_validity_check()
         group_context = await self.get_group_context(
             group_id = group_id,
@@ -184,7 +184,7 @@ class group_chat(chat_baseics):
         # 获取响应
         response = await self._try_model_request(request, img_list, group_id, uid=uuid.uuid4().hex)
 
-        chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
+        chat_condition =await self.chat_manager.get_group_LLM_decision_parameters(group_id)
         await chat_condition.update_trigger_user(data["user_id"])
         
         since = chat_condition.get_seconds_since_llm_time()
@@ -225,7 +225,7 @@ class group_chat(chat_baseics):
 
         # print(original_context)
 
-        self.chat_manager.store_group_chat(group_id=group_id, context=original_context)
+        await self.chat_manager.store_group_chat(group_id=group_id, context=original_context)
 
         self.log.debug("模型结束响应!")
         
@@ -246,7 +246,7 @@ class group_chat(chat_baseics):
 
         await self.send_message.set_msg_emoji_like(
             message_id = data['message_id'],
-            emoji_id = 183 #表情是我最可爱
+            emoji_id = 183 #表情:我最可爱
         )
 
         readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
@@ -268,10 +268,10 @@ class group_chat(chat_baseics):
                     text = message.pure_text,
                     limit = 10
                 )
-            ]
+            ] if message.pure_text else None
         )
         
-        original_context:Context = self.get_chat_context(
+        original_context:Context = await self.get_chat_context(
             group_id = group_id,
             user_id = user_id
         )
@@ -284,7 +284,7 @@ class group_chat(chat_baseics):
                 prompt = prompt,
                 user_info = await self.user_system.get_user_info(user_id),
                 user_import = user_import,
-                chat_record = str(self.chat_manager.get_group_messages(group_id))[:10000],
+                chat_record = str(await self.chat_manager.get_group_messages(group_id))[:10000],
                 img_prompt = img_prompt
             ),
             tool_json=self.mcp_tool.get_func_desc_openai_style(),
@@ -334,7 +334,7 @@ class group_chat(chat_baseics):
             #     )
             #     continue
         
-        #存储更新等,因为直接返回的是那个对象所以可以直接改变,不是很清楚是否有竞态条件
+        #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
         original_context.add_user_message(prompt+user_import)
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
@@ -367,7 +367,7 @@ class group_chat(chat_baseics):
         self.log.info(f"LLM决定回复消息。理由:{response_json.get("reason")}")
         group_id = data["group_id"]
         
-        chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
+        chat_condition =await self.chat_manager.get_group_LLM_decision_parameters(group_id)
         
         since = chat_condition.get_seconds_since_llm_time()
         await chat_condition.update_last_time()
@@ -445,6 +445,7 @@ class group_chat(chat_baseics):
             
             supplier = parameter["supplier"]
             model_name = parameter["model_name"]
+            self.log.info(f"正在使用备用api,来自{parameter}")
             if img_list:
                 visual_sense:bool = self.supplier.get_model_information(
                     supplier, model_name
@@ -495,7 +496,7 @@ class group_chat(chat_baseics):
         self.log.error(f"[{uid}]所有备用api出现错误!")
         raise ValueError(f"[{uid}]所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
 
-    def get_chat_context(self, group_id:int, user_id:int)->Context:
+    async def get_chat_context(self, group_id:int, user_id:int)->Context:
         """获取需要的聊天
 
         Args:
@@ -505,7 +506,7 @@ class group_chat(chat_baseics):
         Returns:
             Context: 上下文
         """
-        return self.get_context(group_id,user_id)
+        return (await self.get_context(group_id,user_id)).chat_context
 
     async def get_group_context(
         self, 
@@ -525,7 +526,7 @@ class group_chat(chat_baseics):
         """
         prompt = ""
             
-        prompt += f"\n\n<group_chat_history>{str(self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>Please do not repeat the above information" #简单防止过长
+        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>Please do not repeat the above information" #简单防止过长
         
         if knowledge_base:
             prompt += f"\n\n<user_memory_snippet>{knowledge_base}</user_memory_snippet>"

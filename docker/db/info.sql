@@ -60,6 +60,26 @@ CREATE TABLE message (
         ON DELETE SET NULL ON UPDATE CASCADE
 );
 
+-- 上下文缓存表
+CREATE TABLE IF NOT EXISTS chat_context (
+    context_id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT,                                     -- 私聊上下文
+    group_id BIGINT,                                    -- 群聊上下文
+    context_data JSONB NOT NULL DEFAULT '[]',           -- 消息数组 [{role, content, timestamp}, ...]
+    total_tokens INT DEFAULT 0,                         -- 预估token数
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,   -- 最后更新时间
+    CONSTRAINT chk_owner_exclusive CHECK (
+        (user_id IS NOT NULL AND group_id IS NULL) OR  --只能有一个
+        (user_id IS NULL AND group_id IS NOT NULL)
+    ),
+    CONSTRAINT uq_chat_context_user UNIQUE (user_id),
+    CONSTRAINT uq_chat_context_group UNIQUE (group_id), -- 要唯一
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES user_group(group_id)
+        ON DELETE CASCADE ON UPDATE CASCADE  
+);
+
 --记忆表
 CREATE TABLE atri_memory (
     memory_id BIGSERIAL PRIMARY KEY,
@@ -80,6 +100,12 @@ CREATE INDEX idx_user_info_info_gin ON user_info USING GIN (info);
 
 -- 记忆表常规索引
 CREATE INDEX idx_atri_memory_user_time ON atri_memory (user_id, event_time);
+
+-- 快速查询用户的上下文
+CREATE INDEX IF NOT EXISTS idx_chat_context_user_id ON chat_context(user_id) WHERE user_id IS NOT NULL;
+
+-- 快速查询指定群组的上下文  
+CREATE INDEX IF NOT EXISTS idx_chat_context_group_id ON chat_context(group_id) WHERE group_id IS NOT NULL;
 
 -- 记忆表 HNSW 向量索引
 CREATE INDEX idx_atri_memory_vector
@@ -114,6 +140,12 @@ CREATE TRIGGER trigger_update_permissions_last_updated
     FOR EACH ROW
     EXECUTE FUNCTION update_last_updated();
 
+-- 上下文表触发器
+CREATE TRIGGER trg_chat_context_update_timestamp
+    BEFORE UPDATE ON chat_context
+    FOR EACH ROW
+    EXECUTE FUNCTION update_timestamp_func();
+
 ALTER DATABASE atri SET hnsw.ef_search = 100;
 
 COMMENT ON TABLE user_group IS '群组表';
@@ -134,3 +166,4 @@ ALTER TABLE user_info OWNER TO atri;
 ALTER TABLE permissions OWNER TO atri;
 ALTER TABLE message OWNER TO atri;
 ALTER TABLE atri_memory OWNER TO atri;
+ALTER TABLE chat_context OWNER TO atri;

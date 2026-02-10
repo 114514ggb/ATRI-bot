@@ -236,13 +236,15 @@ class StreamProcessor:
         if tool_calls:
             message["tool_calls"] = tool_calls
         
+        
         if chunk and chunk.get("choices"):
             last_delta = chunk["choices"][0].get("delta", {})
             if "extra_content" in last_delta:
                 message["extra_content"] = last_delta["extra_content"]
                 
-            if finish_reason := chunk["choices"][0].get("finish_reason"):
-                pass
+            finish_reason = chunk["choices"][0].get("finish_reason")
+        else:
+            finish_reason = None
         
         result = {
             "choices": [{

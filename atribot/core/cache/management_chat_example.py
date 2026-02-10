@@ -1,9 +1,12 @@
 from atribot.core.bot_types import Context, GroupContext, PrivateContext, LLMGroupChatCondition
+from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
+from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.core.service_container import container
 # from collections import defaultdict
 from typing import Dict,List
 from logging import Logger
 import datetime
+import time
 
 
 
@@ -20,32 +23,52 @@ class ChatManager:
         character_folder: str = "atribot/LLMchat/character_setting",
         initiative_white_list: List = None,
         information_extraction: List = None,
+        archival_after: float = 1800.0
     ):
         self.logger: Logger = container.get("log")
+        self.time_trigger: TimeTriggerSupervisor = container.get("TimeTriggerSupervisor")
         self.group_dict: Dict[int, GroupContext] = {}
         """存储群组上下文实例"""
         self.private_dict:Dict[int, PrivateContext] = {}
         """存储私聊上下文实例"""
-        self.default_play_role = default_play_role
+        self.default_play_role: str = default_play_role
         """默认扮演角色"""
-        self.group_max_record = group_messages_max_limit
+        self.group_max_record: int = group_messages_max_limit
         """群消息最大记录数"""
-        self.private_max_record = private_messages_max_limit
+        self.private_max_record: int = private_messages_max_limit
         """私聊最大记录数"""
-        self.LLM_max_record = group_LLM_max_limit
+        self.LLM_max_record: int = group_LLM_max_limit
         """LLM聊天的轮数"""
-        self.character_folder = character_folder
+        self.character_folder: str = character_folder
         """角色设定文件夹路径"""
         self.play_role_list: Dict[str, str] = {"none": ""}
         """角色预设字典"""
         self.initiative_white_list:list = initiative_white_list if initiative_white_list else []
         """配置文件里的群主动聊天白名单(非动态)"""
         self.information_extraction:list = information_extraction if information_extraction else []
-        """配置文件里的是否启用群信息提取白名单"""
+        """配置文件里的是否启用群信息提取白名单(非动态)"""
+        self.lifecycle_manager = ContextLifecycleManager(archival_after = archival_after)
+        """用于持久化上下文的,生命周期管理器"""
+        self.time_trigger.add_task(
+            task_id = 1001,
+            func = self.groom_context_storage,
+            trigger_delta = archival_after,
+            interval = archival_after
+        )
         
         self._load_character_settings()
     
-    def get_private_context(self, user_id: int) -> PrivateContext:
+    async def groom_context_storage(self):
+        """整理上下文存储：归档不活跃项目"""
+        await self.lifecycle_manager.conduct_data_persistence(
+            management_context_dict = self.group_dict,
+            is_user_context = False
+        )
+        await self.lifecycle_manager.conduct_data_persistence(
+            management_context_dict = self.private_dict
+        )
+
+    async def get_private_context(self, user_id: int) -> PrivateContext:
         """获取指定user的PrivateContext实例
         
         Args:
@@ -55,10 +78,16 @@ class ChatManager:
             PrivateContext: 私聊上下文实例
         """
         if private_example := self.private_dict.get(user_id):
-            pass
+            private_example.update_time()
+            return private_example
         else:
+            
+            messages = await self.lifecycle_manager.get_user_context(
+                user_id
+            )
+            
             chat_context = Context(
-                messages = [],
+                messages = messages if messages else [],
                 user_max_record = self.private_max_record,
                 play_role = self.play_role_list.get(
                     self.default_play_role, 
@@ -72,11 +101,11 @@ class ChatManager:
                 chat_context = chat_context,
                 play_roles = self.default_play_role
             )
+            return private_example
             
-        private_example.update_time()
-        return private_example
+
         
-    def get_group_context(self, group_id: int) -> GroupContext:
+    async def get_group_context(self, group_id: int) -> GroupContext:
         """获取指定群的GroupContext实例
         
         Args:
@@ -86,10 +115,15 @@ class ChatManager:
             GroupContext: 群组上下文实例
         """
         if group_example := self.group_dict.get(group_id):
-            return group_example
+            pass
         else:
+            
+            messages = await self.lifecycle_manager.get_group_context(
+                group_id
+            )
+                        
             chat_context = Context(
-                messages = [],
+                messages = messages if messages else [],
                 user_max_record = self.LLM_max_record,
                 play_role = self.play_role_list.get(
                     self.default_play_role, 
@@ -106,38 +140,38 @@ class ChatManager:
                 initiative_chat = group_id in self.initiative_white_list,
                 information_extraction = group_id in self.information_extraction
             )
-            
-            return group_example
+        #因为这个群聊接收消息时会刷新时间，需要获取的时候更新时间了
+        return group_example
         
         
-    def store_group_chat(self, group_id: str, context: Context) -> None:
+    async def store_group_chat(self, group_id: str, context: Context) -> None:
         """存储指定群的LLM聊天上下文
         
         Args:
             group_id: 群组ID
             context: 要存储的上下文对象
         """
-        self.get_group_context(group_id).chat_context = context
+        (await self.get_group_context(group_id)).chat_context = context
 
 
-    def store_private_chat(self, user_id: int, context: Context) -> None:
+    async def store_private_chat(self, user_id: int, context: Context) -> None:
         """存储指定用户的私聊聊天上下文
         
         Args:
             user_id: 用户ID
             context: 要存储的上下文对象
         """
-        self.get_private_context(user_id).chat_context = context
+        (await self.get_private_context(user_id)).chat_context = context
     
-    def get_group_messages(self, group_id: int) -> List[str]:
+    async def get_group_messages(self, group_id: int) -> List[str]:
         """返回群消息内容"""
-        return list(self.get_group_context(group_id).messages)
+        return list((await self.get_group_context(group_id)).messages)
 
-    def get_group_LLM_decision_parameters(self, group_id:int)->LLMGroupChatCondition:
+    async def get_group_LLM_decision_parameters(self, group_id:int)->LLMGroupChatCondition:
         """返回LLM聊天决策参数对象"""
-        return self.get_group_context(group_id).LLM_chat_decision_parameters
+        return (await self.get_group_context(group_id)).LLM_chat_decision_parameters
     
-    def get_group_window_msg_count(self, group_id: int)->int:
+    async def get_group_window_msg_count(self, group_id: int)->int:
         """返回一个群的近期消息数量统计
 
         Args:
@@ -146,7 +180,7 @@ class ChatManager:
         Returns:
             int: 消息计数
         """
-        return self.get_group_context(group_id).time_window.get()
+        return (await self.get_group_context(group_id)).time_window.get()
         
     async def add_message_record(
         self,
@@ -165,7 +199,7 @@ class ChatManager:
         
             if message_type == 'group':
                 
-                group_context: GroupContext = self.get_group_context(data["group_id"])
+                group_context: GroupContext = await self.get_group_context(data["group_id"])
                 
                 if data.get("message_sent_type") == "self":
                     group_context.LLM_chat_decision_parameters.time_window.add()
@@ -205,7 +239,7 @@ class ChatManager:
         Args:
             group_id: 群组ID
         """
-        context = self.get_group_context(group_id)
+        context =await self.get_group_context(group_id)
         async with context.async_lock:
             context.chat_context.clear()
             self.logger.info(f"已重置群{group_id}的聊天上下文")
@@ -217,7 +251,7 @@ class ChatManager:
         Args:
             user_id: 用户id及qq号
         """
-        context = self.get_private_context(user_id)
+        context =await self.get_private_context(user_id)
         async with context.async_lock:
             context.chat_context.clear()
             self.logger.info(f"已重置user:{user_id}的聊天上下文")
@@ -232,7 +266,7 @@ class ChatManager:
         Returns:
             bool: 是否设置成功
         """
-        group_context = self.get_group_context(group_id)
+        group_context =await self.get_group_context(group_id)
         
         async with group_context.async_lock:
             if role_key in self.play_role_list:
@@ -255,7 +289,7 @@ class ChatManager:
         Returns:
             bool: 是否设置成功
         """
-        group_context = self.get_private_context(user_id)
+        group_context =await self.get_private_context(user_id)
         
         async with group_context.async_lock:
             if role_key in self.play_role_list:
@@ -277,7 +311,7 @@ class ChatManager:
         Returns:
             str: 人设文本
         """
-        return self.get_group_context(group_id).chat_context.play_role
+        return (await self.get_group_context(group_id)).chat_context.play_role
     
     async def clear_group_role(self, group_id: int) -> None:
         """清除指定群的自定义角色，恢复为默认角色
@@ -285,7 +319,7 @@ class ChatManager:
         Args:
             group_id: 群组ID
         """
-        group_context = self.get_group_context(group_id)
+        group_context =await self.get_group_context(group_id)
         async with group_context.async_lock:
             
             group_context.play_roles = self.default_play_role

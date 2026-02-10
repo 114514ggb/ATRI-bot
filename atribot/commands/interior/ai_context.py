@@ -206,7 +206,7 @@ class AIContextCommands:
     async def _handle_current_role(self, group_id: int):
         """处理查看当前角色"""
         
-        current_role = self.context_management.get_group_context(group_id).play_roles
+        current_role = await self.context_management.get_group_context(group_id).play_roles
         
         role_content = self.context_management.play_role_list.get(current_role, "")
         role_preview = role_content[:100] + "..." if len(role_content) > 100 else role_content
@@ -229,7 +229,7 @@ class AIContextCommands:
             except Exception:
                 raise ValueError("提供账号错误")
         
-        current_role = self.context_management.get_private_context(user_id).play_roles
+        current_role =(await self.context_management.get_private_context(user_id)).play_roles
         
         role_content = self.context_management.play_role_list.get(current_role, "")
         role_preview = role_content[:100] + "..." if len(role_content) > 100 else role_content
@@ -246,7 +246,7 @@ class AIContextCommands:
     async def _handle_list_roles(self, group_id: str, detail: bool = False):
         """处理列出角色"""
         roles = self.context_management.play_role_list
-        current_role = self.context_management.get_group_context(group_id).play_roles
+        current_role = (await self.context_management.get_group_context(group_id)).play_roles
         
         if not detail:
             role_names = []
@@ -357,7 +357,7 @@ class AIContextCommands:
             except Exception:
                 raise ValueError("提供群号错误")
         
-        group_context = self.context_management.get_group_context(group_id)
+        group_context =await self.context_management.get_group_context(group_id)
         context = group_context.chat_context
         current_role = group_context.play_roles
         
@@ -410,8 +410,8 @@ class AIContextCommands:
             except Exception:
                 raise ValueError("提供qq号格式错误")
         
-        group_context = self.context_management.get_group_context(group_id)
-        private_context = self.context_management.get_private_context(user_id)
+        group_context =await self.context_management.get_group_context(group_id)
+        private_context = await self.context_management.get_private_context(user_id)
         context = private_context.chat_context
         current_role = private_context.play_roles
         
@@ -494,7 +494,7 @@ class AIContextCommands:
         
         if target:
             group_id = int(target)
-        group_context = self.context_management.get_group_context(group_id)
+        group_context =await self.context_management.get_group_context(group_id)
         group_context.initiative_chat = group_context.initiative_chat ^ True
         
         await self.send_message.send_group_message(

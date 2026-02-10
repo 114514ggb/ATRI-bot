@@ -110,6 +110,9 @@ GROUP BY u.user_id, u.nickname
 ORDER BY memory_count DESC
 LIMIT 50;
 
+-- 查看当前数据库中的所有触发器
+SELECT * FROM pg_trigger WHERE NOT tgisinternal;
+
 --删除非知识库记忆下面清除索引
 DELETE FROM atri_memory
 WHERE group_id IS NOT NULL 

@@ -220,6 +220,18 @@ class VectorStore(VectorStoreBasics):
         async with self.vector_database as db:
             await db.executemany_with_pool(sql, args_list)
 
+    async def add_memory(self, args: tuple):
+        """插入单条user消息
+
+        Args:
+            args (tuple): 插入的tuple，格式为 (group_id, user_id, event_time, event, event_vector)
+        """
+        sql = """
+            INSERT INTO atri_memory (group_id, user_id, event_time, event, event_vector)
+            VALUES ($1, $2, $3, $4, $5)
+        """
+        async with self.vector_database as db:
+            await db.execute_with_pool(sql, args)
     
     async def query_memories(
         self,

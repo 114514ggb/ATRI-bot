@@ -19,8 +19,8 @@ class SkillsManager:
     """skills的缓存字典, key: skill_name, value: SkillProperties对象"""
     
     def __init__(self, skill_dir=Path(__file__).parent / "agent_skills"):
-        self.log.info("正在初始化SkillsManager!")
         self.log:Logger = container.get("log")
+        self.log.info("正在初始化SkillsManager!")
         self.skills_dict = {}
         self.prompt = ""
         self.initialize(skill_dir)
@@ -110,7 +110,7 @@ class SkillsManager:
         
         if skill_path := find_skill_md(skill_dir=skill.path):
             try:
-                return skill_path.read_text().split("---", 2)[2].strip()
+                return skill_path.read_text(encoding='utf-8').split("---", 2)[2].strip()
             except Exception:
                 raise ValueError(f"读取{skill_name}的skill.md时候文件内容不符合格式要求")
         else:
