@@ -1,26 +1,26 @@
-from atribot.core.command.async_permissions_management import permissions_management
-from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
+from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
-from atribot.core.network_connections.qq_send_message import qq_send_message
-from atribot.LLMchat.LLMsupervisor import large_language_model_supervisor
-from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
-from atribot.core.command.command_parsing import command_system
 from atribot.LLMchat.skills.skills_manager import SkillsManager
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.core.command.command_loader import command_loader
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
+from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.core.message_manage import message_router
 from atribot.core.service_container import container
-from atribot.LLMchat.emoji_system import emoji_core
-from atribot.core.atri_config import atri_config
-from atribot.LLMchat.chat import group_chat
+from atribot.LLMchat.emoji_system import EmojiCore
+from atribot.core.atri_config import atriConfig
+from atribot.LLMchat.chat import GroupChat
 # from atribot.common import common
 from typing import Dict, Any
 from fastapi import FastAPI
@@ -47,7 +47,7 @@ class BotFramework:
     async def initialize(self):
         """初始化"""
         #配置参数
-        self.config = atri_config()
+        self.config = atriConfig()
         container.register("config",self.config)
         
         # 时间触发器,后面服务会依赖就只能放最前面了
@@ -77,20 +77,14 @@ class BotFramework:
             )
         )
         
-        #Skills的管理
-        container.register(
-            "SkillsManager",
-            SkillsManager()
-        )
-        
         #模型供应商
-        LLMSupplier = ai_connection_manager()
+        LLMSupplier = AiConnectionManager()
         await LLMSupplier.initialize_connections(self.config.file_path.supplier_config_path)
         container.register(
             "LLMSupplier",
             LLMSupplier
         )
-        bigModel = async_bigModel_api()
+        bigModel = AsyncBigModelApi()
         await bigModel.initialize()
         LLMSupplier.add_connection(
             name = "bigModel",
@@ -112,6 +106,12 @@ class BotFramework:
                     "visual_sense": False
                 }
             }
+        )
+        
+        #Skills的管理
+        container.register(
+            "SkillsManager",
+            SkillsManager()
         )
         
         #ai使用的沙盒
@@ -161,7 +161,7 @@ class BotFramework:
         
         container.register(
             "EmojiCore",
-            emoji_core(
+            EmojiCore(
                 folder_path = self.config.file_path.emoji,
                 item_path = self.config.file_path.item_path
             )
@@ -170,7 +170,7 @@ class BotFramework:
         #权限
         container.register(
             "PermissionsManagement",
-            await permissions_management.create()
+            await PermissionsManagement.create()
         )
         
         #启动时间触发器的主循环
@@ -255,7 +255,7 @@ class BotFramework:
     
     def creation_send_message(self)->None:
         """初始化发送消息class,还有环节最后的加载"""
-        send_message = qq_send_message(
+        send_message = QQAPIClient(
             token = self.config.network.access_token, 
             http_base_url = self.config.network.url, 
             connection_type = self.config.network.connection_type,
@@ -267,7 +267,7 @@ class BotFramework:
         #指令
         container.register(
             "CommandSystem",
-            command_system()
+            CommandSystem()
         )
         CommandLoader = command_loader()
         CommandLoader.load_commands_from_directory(self.config.file_path.commands)
@@ -276,11 +276,11 @@ class BotFramework:
         #处理模型响应
         container.register(
             "LLMsupervisor",
-            large_language_model_supervisor()
+            LLMCoordinator()
         )
         
         #AIchat
         container.register(
             "GroupChat",
-            group_chat()
+            GroupChat()
         )

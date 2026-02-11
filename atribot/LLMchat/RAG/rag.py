@@ -1,4 +1,4 @@
-from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
+from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.LLMchat.RAG.text_chunker import RecursiveCharacterTextSplitter
 from atribot.LLMchat.RAG.vector_store import VectorStore
@@ -12,7 +12,7 @@ class RAGManager:
     
     def __init__(self):
         self.config = container.get("config")
-        self.supplier: ai_connection_manager = container.get("LLMSupplier")
+        self.supplier: AiConnectionManager = container.get("LLMSupplier")
         self.embedding_model = self.config.model.RAG.use_embedding_model.model_name
         self.embedding_api:universal_ai_api = self.supplier.get_filtration_connection(
             supplier_name = self.config.model.RAG.use_embedding_model.supplier

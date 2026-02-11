@@ -1,7 +1,7 @@
 from datetime import datetime,timedelta
 from atribot.core.service_container import container
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.common import common
 
 
@@ -16,7 +16,7 @@ class UserActivityAnalyzer:
     
     def __init__(self):
         self.db:AsyncDatabaseBase = container.get("database")
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.send_message:QQAPIClient = container.get("SendMessage")
     
     async def query_mysql(self, message_data: dict, user_id:int = 0)->None:
         """查询MySQL数据库并生成用户活跃度报告

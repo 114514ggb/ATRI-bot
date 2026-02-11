@@ -1,4 +1,4 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.event_trigger.string_respond import string_response
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
@@ -26,7 +26,7 @@ class EventTrigger:
     
     def __init__(self):        
         self.log:Logger = container.get("log")
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.send_message:QQAPIClient = container.get("SendMessage")
         self.str_response = string_response()
         
         self.message_processors = [

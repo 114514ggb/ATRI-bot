@@ -1,4 +1,4 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.service_container import container
 from mcp.types import CallToolResult
@@ -17,7 +17,7 @@ class tool_calls:
 
     def __init__(self):
         self.logger:Logger = container.get("log")
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.send_message:QQAPIClient = container.get("SendMessage")
         self.mcp_tool:FuncCall = container.get("MCP")
         """掌管MCP的""" 
         

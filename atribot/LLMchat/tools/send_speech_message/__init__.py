@@ -1,10 +1,10 @@
 from atribot.commands.audio.TTS import TTSService
 from atribot.core.service_container import container
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 
 
 
-send_message:qq_send_message = container.get("SendMessage")
+send_message:QQAPIClient = container.get("SendMessage")
 tts_main = TTSService()
 
 tool_json = {

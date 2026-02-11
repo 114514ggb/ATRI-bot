@@ -112,7 +112,7 @@ import base64
 
 
 
-class async_bigModel_api():
+class AsyncBigModelApi():
     # chat_model = "GLM-4.5-Flash"
     # chat_model = "GLM-4.1V-Thinking-Flash"
     

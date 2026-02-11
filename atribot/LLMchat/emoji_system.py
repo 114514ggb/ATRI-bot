@@ -4,7 +4,7 @@ import random
 import os
 import re
 
-class emoji_core:
+class EmojiCore:
     """管理表情包"""
     
     def __init__(self,item_path:str ,folder_path:str = ""):

@@ -6,7 +6,6 @@ from atribot.core.service_container import container
 from typing import Dict,List
 from logging import Logger
 import datetime
-import time
 
 
 
@@ -55,6 +54,12 @@ class ChatManager:
             trigger_delta = archival_after,
             interval = archival_after
         )
+        self.time_trigger.add_task(
+            task_id = 1002,
+            func = self.context_storage,
+            trigger_delta = 480,
+            interval = 480
+        )
         
         self._load_character_settings()
     
@@ -67,6 +72,17 @@ class ChatManager:
         await self.lifecycle_manager.conduct_data_persistence(
             management_context_dict = self.private_dict
         )
+
+    async def context_storage(self):
+        """整理上下文存储：全部存储"""
+        await self.lifecycle_manager.backup_data(
+            management_context_dict = self.group_dict,
+            is_user_context = False
+        )
+        await self.lifecycle_manager.backup_data(
+            management_context_dict = self.private_dict
+        )
+
 
     async def get_private_context(self, user_id: int) -> PrivateContext:
         """获取指定user的PrivateContext实例

@@ -1,14 +1,14 @@
-from atribot.core.command.async_permissions_management import permissions_management
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.event_trigger.event_trigger import EventTrigger
-from atribot.core.command.command_parsing import command_system
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.core.service_container import container
 from atribot.core.data_manage import data_manage
 from atribot.LLMchat.initiative_chat import initiativeChat
-from atribot.LLMchat.chat import group_chat
+from atribot.LLMchat.chat import GroupChat
 from atribot.core.bot_types import RichData
 from abc import ABC, abstractmethod
 from logging import Logger
@@ -22,7 +22,7 @@ class message_router():
     def __init__(self):
         self.logger:Logger = container.get("log")
         self.db:AsyncDatabaseBase = container.get("database")
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.send_message:QQAPIClient = container.get("SendMessage")
         self.group_manage = group_manage()
         self.group_set = set()
     
@@ -86,9 +86,9 @@ class message_router():
 class message_manage(ABC):
     """消息处理基类"""
     def __init__(self):
-        self.permissions_management:permissions_management = container.get("PermissionsManagement")
-        self.command_system:command_system = container.get("CommandSystem")
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
+        self.command_system:CommandSystem = container.get("CommandSystem")
+        self.send_message:QQAPIClient = container.get("SendMessage")
         self.memiry_system:memorySystem = container.get("memirySystem")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.logger:Logger = container.get("log")
@@ -117,7 +117,7 @@ class group_manage(message_manage):
         super().__init__()
         self.group_white_list:list = container.get("config").group_white_list
         self.self_qq = str(container.get("config").account.id)
-        self.group_chet:group_chat = container.get("GroupChat")
+        self.group_chet:GroupChat = container.get("GroupChat")
         self.event_trigger = EventTrigger()
         
     async def handle_message(self, message: RichData, group_id: int) -> None:

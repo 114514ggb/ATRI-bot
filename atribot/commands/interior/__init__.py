@@ -1,9 +1,9 @@
-from atribot.core.command.async_permissions_management import permissions_management
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.commands.interior.query_statistics import UserActivityAnalyzer
 from atribot.commands.interior.ai_context import AIContextCommands
 from atribot.commands.interior.system_monitor import SystemMonitor
-from atribot.core.command.command_parsing import command_system
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.core.service_container import container
 from typing import Optional
@@ -12,9 +12,9 @@ import time
 
 
 
-cmd_system:command_system = container.get("CommandSystem")
-send_message:qq_send_message = container.get("SendMessage")
-perm_manager:permissions_management = container.get("PermissionsManagement")
+cmd_system:CommandSystem = container.get("CommandSystem")
+send_message:QQAPIClient = container.get("SendMessage")
+perm_manager:PermissionsManagement = container.get("PermissionsManagement")
 memiry_system:memorySystem = container.get("memirySystem") 
 AIContextCommands()
 

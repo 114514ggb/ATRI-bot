@@ -1,4 +1,4 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from typing import List, Optional, Union
 import urllib.parse
@@ -31,7 +31,7 @@ class pictureProcessing:
         image_url_list: List[str] = []
         
         if message_data["message"][0]["type"] == "reply":
-            send_message: qq_send_message = container.get("SendMessage")
+            send_message: QQAPIClient = container.get("SendMessage")
             reply_data = (await send_message.get_msg_details(message_data["message"][0]["data"]["id"]))["data"]
             for reply_message in reply_data["message"]:
                 if reply_message.get("type") == "image":

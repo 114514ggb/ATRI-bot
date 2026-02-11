@@ -1,7 +1,7 @@
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.bot_types import GroupContext, LLMGroupChatCondition, RichData
 from atribot.core.service_container import container
-from atribot.LLMchat.chat import group_chat
+from atribot.LLMchat.chat import GroupChat
 from typing import List, Literal,Optional
 from logging import Logger
 
@@ -14,7 +14,7 @@ class initiativeChat:
     def __init__(self):
         self.logger:Logger = container.get("log")
         self.chat_manager:ChatManager = container.get("ChatManager")
-        self.group_chat:group_chat = container.get("GroupChat")
+        self.group_chat:GroupChat = container.get("GroupChat")
         self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
     
     async def decision(self, message: RichData, group_context:GroupContext, at: bool = False) -> bool:

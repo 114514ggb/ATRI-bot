@@ -1,4 +1,4 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.bot_types import RichData
 from typing import Dict, Tuple, List
@@ -10,7 +10,7 @@ class data_manage():
     """处理或格式化一些数据的类"""
     
     def __init__(self):
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.send_message:QQAPIClient = container.get("SendMessage")
 
     @staticmethod
     def data_processing_text(data:Dict[str, int|str|Dict])->str:

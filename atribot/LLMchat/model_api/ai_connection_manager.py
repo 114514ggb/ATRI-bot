@@ -38,7 +38,7 @@ class ai_api_connection:
         if self.model_parameter is not None:
             self.connection_object.update_parameters(self.model_parameter)
     
-class ai_connection_manager:
+class AiConnectionManager:
     """ai供应商的api连接管理类"""
     
     def __init__(self):

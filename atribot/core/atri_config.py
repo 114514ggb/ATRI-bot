@@ -50,13 +50,13 @@ class ConfigLoader:
         """获取整个配置对象"""
         return self._config
     
-class atri_config(ConfigLoader):
+class atriConfig(ConfigLoader):
     """提供项目的配置参数"""
     def __init__(self):
         super().__init__("assets/config.json")
         
         
 if __name__ == "__main__":
-    Config = atri_config()
+    Config = atriConfig()
     print(Config.all_config)
     print(type(Config.group_white_list))

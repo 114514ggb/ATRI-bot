@@ -1,7 +1,7 @@
-from atribot.core.command.async_permissions_management import permissions_management
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.cache.management_chat_example import ChatManager
-from atribot.core.command.command_parsing import command_system
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.core.service_container import container
 from logging import Logger
@@ -14,10 +14,10 @@ class AIContextCommands:
     """AI上下文管理命令处理器"""
     
     def __init__(self):
-        self.permissions_management:permissions_management = container.get("PermissionsManagement")
-        self.command_system: command_system = container.get("CommandSystem")
+        self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
+        self.command_system: CommandSystem = container.get("CommandSystem")
         self.context_management: ChatManager = container.get("ChatManager")
-        self.send_message: qq_send_message = container.get("SendMessage")
+        self.send_message: QQAPIClient = container.get("SendMessage")
         self.user_system: UserSystem = container.get("UserSystem")
         self.log: Logger = container.get("log")
         

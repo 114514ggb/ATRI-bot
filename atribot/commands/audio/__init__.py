@@ -1,12 +1,12 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
-from atribot.core.command.command_parsing import command_system
+from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.service_container import container
 from atribot.commands.audio.TTS import TTSService
 from atribot.commands.audio.song import song
 
 
-cmd_system:command_system = container.get("CommandSystem")
-send_message:qq_send_message = container.get("SendMessage")
+cmd_system:CommandSystem = container.get("CommandSystem")
+send_message:QQAPIClient = container.get("SendMessage")
 config = container.get("config")
 song_manager:song = song()
 

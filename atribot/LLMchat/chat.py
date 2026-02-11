@@ -1,19 +1,20 @@
-from atribot.LLMchat.LLMsupervisor import (
-    large_language_model_supervisor,
+from atribot.LLMchat.LLM_supervisor import (
+    LLMCoordinator,
     GenerationRequest,
     GenerationResponse,
     LLMSRequestFailed
 )
-from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
-from atribot.core.network_connections.qq_send_message import qq_send_message
-from atribot.LLMchat.model_api.bigModel_api import async_bigModel_api
+from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
+from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
 from atribot.core.cache.management_chat_example import ChatManager
+from atribot.LLMchat.skills.skills_manager import SkillsManager
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.core.service_container import container
-from atribot.LLMchat.emoji_system import emoji_core
+from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.core.data_manage import data_manage
 from typing import Dict, List, Coroutine
 from atribot.core.bot_types import RichData
@@ -33,18 +34,19 @@ class chat_baseics(ABC):
     """聊天基类"""
 
     def __init__(self):
-        self.model_api_supervisor: large_language_model_supervisor = container.get("LLMsupervisor")
-        self.supplier: ai_connection_manager = container.get("LLMSupplier")
-        self.send_message: qq_send_message = container.get("SendMessage")
+        self.model_api_supervisor: LLMCoordinator = container.get("LLMsupervisor")
+        self.supplier: AiConnectionManager = container.get("LLMSupplier")
         self.memiry_system: memorySystem = container.get("memirySystem")       
+        self.send_message: QQAPIClient = container.get("SendMessage")
         self.chat_manager: ChatManager = container.get("ChatManager")
+        self.skills:SkillsManager = container.get("SkillsManager")
         self.user_system: UserSystem = container.get("UserSystem")
-        self.emoji_core: emoji_core = container.get("EmojiCore")
+        self.emoji_core: EmojiCore = container.get("EmojiCore")
         self.mcp_tool: FuncCall = container.get("MCP")
-        self.log: Logger = container.get("log")
         self.config = container.get("config")
+        self.log: Logger = container.get("log")
         self.build_prompt = build_prompt()
-        self.bigModel: async_bigModel_api = self.supplier.connections[
+        self.bigModel: AsyncBigModelApi = self.supplier.connections[
             "bigModel"
         ].connection_object
 
@@ -95,7 +97,7 @@ class chat_baseics(ABC):
         )
 
 
-class group_chat(chat_baseics):
+class GroupChat(chat_baseics):
     """处理群聊天"""
 
     def __init__(self):
@@ -141,7 +143,7 @@ class group_chat(chat_baseics):
 
         self.log.debug(f"群LLM聊天处理:{readable_text}")
 
-        original_context =await self.chat_manager.get_group_context(group_id).chat_context
+        original_context =(await self.chat_manager.get_group_context(group_id)).chat_context
         original_context.record_validity_check()
         group_context = await self.get_group_context(
             group_id = group_id,
@@ -335,7 +337,7 @@ class group_chat(chat_baseics):
             #     continue
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
-        original_context.add_user_message(prompt+user_import)
+        original_context.add_user_message(f"{prompt}<user_id>{user_id}<user_id><time>{datetime.datetime.fromtimestamp(data['time']).strftime("%Y-%m-%d %H:%M:%S")}<time><user_message>{readable_text}<user_message>")
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )

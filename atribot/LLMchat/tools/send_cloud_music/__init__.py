@@ -1,4 +1,4 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.common import common
 
@@ -20,7 +20,7 @@ tool_json = {
 }
 
 
-send_message:qq_send_message = container.get("SendMessage")
+send_message:QQAPIClient = container.get("SendMessage")
 
 async def main(group_id:int|str, name:str,):
     """分享网易云歌曲

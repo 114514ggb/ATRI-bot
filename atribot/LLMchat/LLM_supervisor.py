@@ -1,4 +1,4 @@
-from atribot.LLMchat.model_api.ai_connection_manager import ai_connection_manager
+from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.core.service_container import container
 from atribot.LLMchat.model_tools import tool_calls
@@ -106,11 +106,11 @@ class LLMSRequestFailed(Exception):
         return self.response
 
 
-class large_language_model_supervisor():
+class LLMCoordinator():
     """LLM响应的主类"""
     
     def __init__(self):
-        self.supplier:ai_connection_manager = container.get("LLMSupplier")
+        self.supplier:AiConnectionManager = container.get("LLMSupplier")
         self.logger:Logger = container.get("log")
         self.config = container.get("config")
         self.tool_management = tool_calls()

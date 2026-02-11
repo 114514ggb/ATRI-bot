@@ -1,4 +1,4 @@
-from atribot.core.command.command_parsing import command_system
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.service_container import container
 from pathlib import Path
 import importlib
@@ -12,7 +12,7 @@ class command_loader:
     """命令加载器 - 用于动态加载指定目录下的命令模块"""
     
     def __init__(self):
-        self.command_system:command_system = container.get("CommandSystem")
+        self.command_system:CommandSystem = container.get("CommandSystem")
         self.logger:logging = container.get("log")
         self.loaded_modules = []
     

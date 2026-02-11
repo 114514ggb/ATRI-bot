@@ -17,13 +17,13 @@ import os
 
 
 
-class qq_send_message():
+class QQAPIClient():
     """qq接口有关的请求发送器"""
     _instance = None
     
     def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            cls._instance = super(qq_send_message, cls).__new__(cls)
+            cls._instance = super(QQAPIClient, cls).__new__(cls)
         return cls._instance
 
     def __init__(

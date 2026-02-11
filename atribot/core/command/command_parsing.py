@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Callable, Type, Dict, Any, List, Optional
-from atribot.core.command.async_permissions_management import permissions_management
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.common import common
 import logging
@@ -163,13 +163,13 @@ class Command:
 
 
 
-class command_system:
+class CommandSystem:
     """命令系统主类"""
     
     def __init__(self):
         self.log:logging = container.get("log")
-        self.permissions_management:permissions_management = container.get("PermissionsManagement")
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
+        self.send_message:QQAPIClient = container.get("SendMessage")
         self.command_registry: Dict[str, Command] = {}
         self.alias_registry: Dict[str, str] = {}  # 别名映射
         self.log.info("CommandSystem已初始化!")

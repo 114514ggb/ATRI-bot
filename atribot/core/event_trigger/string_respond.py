@@ -1,4 +1,4 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
 from typing import Dict, List, Union, Tuple, Any
@@ -21,7 +21,7 @@ class ResponseType(Enum):
 class string_response:
     
     def __init__(self):
-        self.send_message:qq_send_message = container.get("SendMessage")
+        self.send_message:QQAPIClient = container.get("SendMessage")
         self.url_prefi:str = "file://" + container.get("config").file_path.document + "img/"
         self.context_management: ChatManager = container.get("ChatManager")
         self._build_automaton()

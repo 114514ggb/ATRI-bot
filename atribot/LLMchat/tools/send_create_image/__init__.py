@@ -1,4 +1,4 @@
-from atribot.core.network_connections.qq_send_message import qq_send_message
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.commands.bromidic.picture_processing import pictureProcessing
 from atribot.core.service_container import container
 
@@ -29,7 +29,7 @@ tool_json = {
     }
 }
 
-send_message:qq_send_message = container.get("SendMessage")
+send_message:QQAPIClient = container.get("SendMessage")
 
 async def main(group_id, prompt, width="1024", height="1024"):
     """生成发送图片消息"""

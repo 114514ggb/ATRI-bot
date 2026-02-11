@@ -7,7 +7,7 @@ import logging
 
 
 
-class permissions_management:
+class PermissionsManagement:
     """
     异步权限管理类
     """

@@ -69,7 +69,32 @@ class ContextLifecycleManager:
 
         for k in keys_to_remove:
             management_context_dict.pop(k, None)
+    
+    async def backup_data(self, management_context_dict: dict[int, ContextContainer], is_user_context: bool = True) -> dict[int, bool]:
+        """对现有的上下文进行批量存储（只保存，不删除）
+
+        Args:
+            management_context_dict (dict[int,ContextContainer]): 管理上下文的字典
+            is_user_context (bool): 是否是user上下文
+
+        Returns:
+            dict[int, bool]: 每个 ID 对应的保存结果，True 表示成功，False 表示失败
+        """
+        contexts_to_save: list[tuple[int, list[dict[str, Any]], int]] = [
+            (
+                container_data.user_id if is_user_context else container_data.group_id,
+                getattr(container_data.chat_context, "messages", []),
+                getattr(container_data.chat_context, "total_tokens", 0)
+            )
+            for container_data in management_context_dict.values()
+        ]
         
+        if is_user_context:
+            return await self.batch_save_user_contexts(contexts_to_save)
+        else:
+            return await self.batch_save_group_contexts(contexts_to_save)
+        
+    
     async def save_user_context(
         self,
         user_id: int,
@@ -133,7 +158,7 @@ class ContextLifecycleManager:
                     params=(int(user_id),),
                     fetch_type="one"
                 ):
-                    return data[0]
+                    return json.loads(data[0])
                 return None
         except Exception as e:
             self.logger.error(f"获取用户 {user_id} 上下文失败: {e}")
@@ -202,8 +227,108 @@ class ContextLifecycleManager:
                     params=(int(group_id),),
                     fetch_type="one"
                 ):
-                    return data[0]
+                    return json.loads(data[0])
                 return None
         except Exception as e:
             self.logger.error(f"获取群组 {group_id} 上下文失败: {e}")
             return None
+
+    async def batch_save_user_contexts(
+        self,
+        user_contexts: list[tuple[int, list[dict[str, Any]], int]]
+    ) -> dict[int, bool]:
+        """批量保存多个用户的私聊上下文到数据库。
+        
+        利用 executemany 高效批量插入/更新，单条失败不影响其他。
+        
+        Args:
+            user_contexts: 用户上下文列表，每个元素为 (user_id, context_data, total_tokens) 的元组
+        
+        Returns:
+            dict[int, bool]: 每个 user_id 对应的保存结果，True 表示成功，False 表示失败
+        """
+        if not user_contexts:
+            return {}
+        
+        sql = """
+        INSERT INTO chat_context (user_id, group_id, context_data, total_tokens, last_updated)
+        VALUES ($1, NULL, $2::jsonb, $3, CURRENT_TIMESTAMP)
+        ON CONFLICT (user_id) 
+        DO UPDATE SET 
+            context_data = EXCLUDED.context_data,
+            total_tokens = EXCLUDED.total_tokens
+        """
+        
+        args_list = [
+            (int(user_id), json.dumps(context_data), total_tokens)
+            for user_id, context_data, total_tokens in user_contexts
+        ]
+        
+        results = {}
+        try:
+            async with self.database as db:
+                await db.executemany_with_pool(sql, args_list)
+            for user_id, _, _ in user_contexts:
+                results[user_id] = True
+                self.logger.debug(f"批量保存用户 {user_id} 上下文成功")
+        except Exception as e:
+            self.logger.error(f"批量保存用户上下文失败: {e}")
+            for user_id, context_data, total_tokens in user_contexts:
+                try:
+                    success = await self.save_user_context(user_id, context_data, total_tokens)
+                    results[user_id] = success
+                except Exception as inner_e:
+                    self.logger.error(f"单条保存用户 {user_id} 上下文失败: {inner_e}")
+                    results[user_id] = False
+        
+        return results
+
+    async def batch_save_group_contexts(
+        self,
+        group_contexts: list[tuple[int, list[dict[str, Any]], int]]
+    ) -> dict[int, bool]:
+        """批量保存多个群组的聊天上下文到数据库。
+        
+        利用 executemany 高效批量插入/更新，单条失败不影响其他。
+        
+        Args:
+            group_contexts: 群组上下文列表，每个元素为 (group_id, context_data, total_tokens) 的元组
+        
+        Returns:
+            dict[int, bool]: 每个 group_id 对应的保存结果，True 表示成功，False 表示失败
+        """
+        if not group_contexts:
+            return {}
+        
+        sql = """
+        INSERT INTO chat_context (user_id, group_id, context_data, total_tokens, last_updated)
+        VALUES (NULL, $1, $2::jsonb, $3, CURRENT_TIMESTAMP)
+        ON CONFLICT (group_id) 
+        DO UPDATE SET 
+            context_data = EXCLUDED.context_data,
+            total_tokens = EXCLUDED.total_tokens
+        """
+
+        args_list = [
+            (int(group_id), json.dumps(context_data), total_tokens)
+            for group_id, context_data, total_tokens in group_contexts
+        ]
+        
+        results = {}
+        try:
+            async with self.database as db:
+                await db.executemany_with_pool(sql, args_list)
+            for group_id, _, _ in group_contexts:
+                results[group_id] = True
+                self.logger.debug(f"批量保存群组 {group_id} 上下文成功")
+        except Exception as e:
+            self.logger.error(f"批量保存群组上下文失败: {e}")
+            for group_id, context_data, total_tokens in group_contexts:
+                try:
+                    success = await self.save_group_context(group_id, context_data, total_tokens)
+                    results[group_id] = success
+                except Exception as inner_e:
+                    self.logger.error(f"单条保存群组 {group_id} 上下文失败: {inner_e}")
+                    results[group_id] = False
+        
+        return results
