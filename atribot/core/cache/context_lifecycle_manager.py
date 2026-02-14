@@ -116,7 +116,7 @@ class ContextLifecycleManager:
         """
         sql = """
         INSERT INTO chat_context (user_id, group_id, context_data, total_tokens, last_updated)
-        VALUES ($1, NULL, $2::jsonb, $3, CURRENT_TIMESTAMP)
+        VALUES ($1, NULL, $2, $3, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id) 
         DO UPDATE SET 
             context_data = EXCLUDED.context_data,
@@ -185,7 +185,7 @@ class ContextLifecycleManager:
         """
         sql = """
         INSERT INTO chat_context (user_id, group_id, context_data, total_tokens, last_updated)
-        VALUES (NULL, $1, $2::jsonb, $3, CURRENT_TIMESTAMP)
+        VALUES (NULL, $1, $2, $3, CURRENT_TIMESTAMP)
         ON CONFLICT (group_id) 
         DO UPDATE SET 
             context_data = EXCLUDED.context_data,
@@ -252,7 +252,7 @@ class ContextLifecycleManager:
         
         sql = """
         INSERT INTO chat_context (user_id, group_id, context_data, total_tokens, last_updated)
-        VALUES ($1, NULL, $2::jsonb, $3, CURRENT_TIMESTAMP)
+        VALUES ($1, NULL, $2, $3, CURRENT_TIMESTAMP)
         ON CONFLICT (user_id) 
         DO UPDATE SET 
             context_data = EXCLUDED.context_data,
@@ -302,7 +302,7 @@ class ContextLifecycleManager:
         
         sql = """
         INSERT INTO chat_context (user_id, group_id, context_data, total_tokens, last_updated)
-        VALUES (NULL, $1, $2::jsonb, $3, CURRENT_TIMESTAMP)
+        VALUES (NULL, $1, $2, $3, CURRENT_TIMESTAMP)
         ON CONFLICT (group_id) 
         DO UPDATE SET 
             context_data = EXCLUDED.context_data,

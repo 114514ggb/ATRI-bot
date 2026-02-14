@@ -277,7 +277,7 @@ class CommandSystem:
         
         Args:
             name (str): 标志名称
-            short (Optional[str]): 短选项前缀，如"-v"，默认为None
+            short (Optional[str]): 短选项前缀，如"v"，默认为None
             long (Optional[str]): 长选项前缀，如"--verbose"，默认为None
             description (str): 标志描述，默认为空字符串
         """

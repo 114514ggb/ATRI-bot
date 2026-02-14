@@ -25,7 +25,7 @@ tool_json = {
         },
         "start_date": {
             "type": "string",
-            "description": "筛选记忆的开始日期，格式必须为 'YYYY-MM-DD' (例如 '2023-01-01')。如果不填则不限制开始时间。",
+            "description": "筛选记忆的开始日期，格式必须为 'YYYY-MM-DD' (例如 '2026-01-01')。如果不填则不限制开始时间。",
         },
         "end_date": {
             "type": "string",
