@@ -1,14 +1,14 @@
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.cache.management_chat_example import ChatManager
-from atribot.core.service_container import container
-from typing import Dict, List, Union, Tuple, Any
-from atribot.common import common
-from enum import Enum
-import ahocorasick
 import random
 import time
+from enum import Enum
+from typing import Any, Dict, List, Tuple, Union
 
+import ahocorasick
 
+from atribot.common import common
+from atribot.core.cache.management_chat_example import ChatManager
+from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.service_container import container
 
 
 class ResponseType(Enum):

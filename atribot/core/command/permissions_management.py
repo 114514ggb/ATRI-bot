@@ -1,8 +1,10 @@
-from atribot.core.service_container import container
-from atribot.core.db.async_db_basics import AsyncDatabaseBase
 import logging
-import sqlite3
 import re
+import sqlite3
+
+from atribot.core.db.async_db_basics import AsyncDatabaseBase
+from atribot.core.service_container import container
+
 
 class permissions_management:
 

@@ -1,13 +1,16 @@
-from asyncio import Queue, Event, create_task, gather, CancelledError, Task
-from websockets.legacy.server import WebSocketServer as WSSercer, WebSocketServerProtocol, Serve
-from typing import Optional, Dict, List, Callable, Any
-from atribot.core.service_container import container
-from websockets.datastructures import Headers
-from urllib.parse import urlparse, parse_qs
-from logging import Logger
 import asyncio
-import uuid
 import json
+import uuid
+from asyncio import CancelledError, Event, Queue, Task, create_task, gather
+from logging import Logger
+from typing import Any, Callable, Dict, List, Optional
+from urllib.parse import parse_qs, urlparse
+
+from websockets.datastructures import Headers
+from websockets.legacy.server import Serve, WebSocketServerProtocol
+from websockets.legacy.server import WebSocketServer as WSSercer
+
+from atribot.core.service_container import container
 
 
 class WebSocketServer:

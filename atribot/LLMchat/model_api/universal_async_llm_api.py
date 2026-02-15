@@ -1,11 +1,11 @@
-from atribot.LLMchat.model_api.model_api_basics import model_api_basics
-from atribot.LLMchat.model_api.stream_processor import StreamProcessor
-from typing import List, Dict ,AsyncGenerator
-import aiohttp
 import asyncio
 import json
+from typing import AsyncGenerator, Dict, List
 
+import aiohttp
 
+from atribot.LLMchat.model_api.model_api_basics import model_api_basics
+from atribot.LLMchat.model_api.stream_processor import StreamProcessor
 
 
 class universal_ai_api(model_api_basics,StreamProcessor):

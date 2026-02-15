@@ -1,13 +1,12 @@
-from atribot.core.service_container import container
+import html
 from logging import Logger
 from pathlib import Path
-import html
 
-from .parser import read_properties, find_skill_md
+from atribot.core.service_container import container
+
 from .models import SkillProperties
+from .parser import find_skill_md, read_properties
 from .validator import validate
-
-
 
 
 class SkillsManager:

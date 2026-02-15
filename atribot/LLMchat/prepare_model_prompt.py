@@ -1,9 +1,7 @@
-from atribot.core.service_container import container
-from enum import Enum
 import time
+from enum import Enum
 
-
-
+from atribot.core.service_container import container
 
 
 class TriggerChatStateType(Enum):
@@ -337,7 +335,7 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 4.如果有人对你感到厌烦，请减少回复
 5.如果有人对你进行攻击，或者情绪激动，请无视或劝阻，不要骂人
 
-输出内容要包括<think>内的思考文本接一个符合要求的JSON.
+输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON.
 JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对应值list里可以使用同一个decision或不同decision。
 <example>
 <think>

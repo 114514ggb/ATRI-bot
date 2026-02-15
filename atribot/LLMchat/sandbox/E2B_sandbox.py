@@ -1,13 +1,10 @@
-from atribot.LLMchat.sandbox.sandbox_base import (
-    SandBoxBase,
-    ExecutionResult,
-    GeneratedFile
-)
 import base64
-import uuid
 import os
 import sys
+import uuid
 from typing import Optional
+
+from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile, SandBoxBase
 
 try:
     from e2b_code_interpreter import AsyncSandbox

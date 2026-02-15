@@ -1,18 +1,21 @@
-from atribot.LLMchat.memory.prompts import FACT_RETRIEVAL_PROMPT,PURE_GROUP_FACT_RETRIEVAL_PROMPT, SUMMARIZE_CONTEXT_SYSTEM_PROMPT
-from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
-from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
-from atribot.core.service_container import container
-from atribot.LLMchat.RAG.RAG import RAGManager
-from atribot.core.bot_types import Context
-from typing import List,Dict,Any
-from datetime import datetime
-from logging import Logger
 import asyncio
 import json
-import time
 import re
+import time
+from datetime import datetime
+from logging import Logger
+from typing import Any, Dict, List
 
-
+from atribot.core.bot_types import Context
+from atribot.core.service_container import container
+from atribot.LLMchat.memory.prompts import (
+    FACT_RETRIEVAL_PROMPT,
+    PURE_GROUP_FACT_RETRIEVAL_PROMPT,
+    SUMMARIZE_CONTEXT_SYSTEM_PROMPT,
+)
+from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
+from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
+from atribot.LLMchat.RAG.RAG import RAGManager
 
 
 class memorySystem:

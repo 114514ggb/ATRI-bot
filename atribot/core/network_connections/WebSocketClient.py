@@ -1,16 +1,16 @@
-from asyncio import Queue, Event, create_task, sleep, gather, CancelledError, Task
-from websockets.legacy.client import WebSocketClientProtocol
-from typing import Optional, Dict, List, Callable, Any
-from atribot.core.service_container import container
-from contextlib import asynccontextmanager
-from logging import Logger
-import websockets
 import asyncio
-import uuid
 import json
 import sys
+import uuid
+from asyncio import CancelledError, Event, Queue, Task, create_task, gather, sleep
+from contextlib import asynccontextmanager
+from logging import Logger
+from typing import Any, Callable, Dict, List, Optional
 
+import websockets
+from websockets.legacy.client import WebSocketClientProtocol
 
+from atribot.core.service_container import container
 
 
 class WebSocketClient:

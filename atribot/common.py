@@ -1,12 +1,13 @@
-from typing import List, Dict, Any
-import numpy as np
-import functools
 import asyncio
-import aiohttp
 import base64
+import functools
 import json
-import time
 import re
+import time
+from typing import Any, Dict, List
+
+import aiohttp
+import numpy as np
 
 """
 一些自己常用的方法,不要问我为什么要放在一个类里面

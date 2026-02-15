@@ -1,10 +1,8 @@
 """Agent Skill 的数据模型。"""
 
 from dataclasses import dataclass, field
-from typing import Optional
 from pathlib import Path
-
-
+from typing import Optional
 
 
 @dataclass(slots=True)

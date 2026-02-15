@@ -1,8 +1,10 @@
-from atribot.LLMchat.prepare_model_prompt import build_prompt
-from typing import Match
-import random
 import os
+import random
 import re
+from typing import Match
+
+from atribot.LLMchat.prepare_model_prompt import build_prompt
+
 
 class EmojiCore:
     """管理表情包"""

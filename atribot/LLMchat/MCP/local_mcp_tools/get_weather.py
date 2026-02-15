@@ -1,7 +1,8 @@
-from mcp.server.fastmcp import FastMCP
-from typing import Any
-import aiohttp
 import json
+from typing import Any
+
+import aiohttp
+from mcp.server.fastmcp import FastMCP
 
 OPENWEATHER_API_BASE = "https://api.openweathermap.org/data/2.5/weather"
 API_KEY = "e32ece71180b8f54ab7ec20746186cdf"  

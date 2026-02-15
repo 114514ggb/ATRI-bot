@@ -1,8 +1,7 @@
-from atribot.core.service_container import container
-from abc import ABC, abstractmethod
 import logging
+from abc import ABC, abstractmethod
 
-
+from atribot.core.service_container import container
 
 
 class model_api_basics(ABC):

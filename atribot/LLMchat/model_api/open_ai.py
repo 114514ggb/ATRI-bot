@@ -1,5 +1,6 @@
 from openai import OpenAI
 
+
 class OpenAI_api:
     """OpenAI API"""
     model_parameters = {

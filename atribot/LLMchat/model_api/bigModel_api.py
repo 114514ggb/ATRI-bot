@@ -1,6 +1,8 @@
-from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
-from atribot.core.service_container import container
 import base64
+
+from atribot.core.service_container import container
+from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
+
 # try:
 #     from zhipuai import ZhipuAI
 # except (ModuleNotFoundError, ImportError):

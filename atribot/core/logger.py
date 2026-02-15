@@ -1,10 +1,8 @@
-from logging.handlers import TimedRotatingFileHandler
 import logging
-import sys
 import os
 import re
-
-
+import sys
+from logging.handlers import TimedRotatingFileHandler
 
 
 class ColoredFormatter(logging.Formatter):

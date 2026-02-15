@@ -1,10 +1,9 @@
+import json
+from logging import Logger
+from typing import Any, Dict
+
 from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from atribot.core.service_container import container
-from typing import Dict, Any
-from logging import Logger
-import json
-
-
 
 
 class UserSystem:

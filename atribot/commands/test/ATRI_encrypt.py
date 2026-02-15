@@ -1,6 +1,7 @@
 
-from typing import Union
 from math import floor
+from typing import Union
+
 
 class Encrypt:
     """

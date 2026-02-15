@@ -1,33 +1,26 @@
-from atribot.LLMchat.LLM_supervisor import (
-    LLMCoordinator,
-    GenerationRequest,
-    GenerationResponse,
-    LLMSRequestFailed
-)
-from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
-from atribot.core.cache.management_chat_example import ChatManager
-from atribot.LLMchat.skills.skills_manager import SkillsManager
-from atribot.LLMchat.memory.user_info_system import UserSystem
-from atribot.LLMchat.prepare_model_prompt import build_prompt
-from atribot.LLMchat.memory.memiry_system import memorySystem
-from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
-from atribot.core.service_container import container
-from atribot.LLMchat.emoji_system import EmojiCore
-from atribot.core.data_manage import data_manage
-from typing import Dict, List, Coroutine
-from atribot.core.bot_types import RichData
-from atribot.core.bot_types import Context
+import asyncio
+import datetime
+import uuid
 from abc import ABC, abstractmethod
-from atribot.common import common
 from dataclasses import replace
 from logging import Logger
-import datetime
-import asyncio
-import uuid
+from typing import Coroutine, Dict, List
 
-
+from atribot.common import common
+from atribot.core.bot_types import Context, RichData
+from atribot.core.cache.management_chat_example import ChatManager
+from atribot.core.data_manage import data_manage
+from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.service_container import container
+from atribot.LLMchat.emoji_system import EmojiCore
+from atribot.LLMchat.LLM_supervisor import GenerationRequest, GenerationResponse, LLMCoordinator, LLMSRequestFailed
+from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
+from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.memory.user_info_system import UserSystem
+from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
+from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
+from atribot.LLMchat.prepare_model_prompt import build_prompt
+from atribot.LLMchat.skills.skills_manager import SkillsManager
 
 
 class chat_baseics(ABC):
@@ -301,7 +294,7 @@ class GroupChat(chat_baseics):
         )
 
         self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
-            
+        
         for response_json in (common.extract_json_from_text(s) for s in response.reply_text if s != ""):
             
             if isinstance(response_json, dict):
@@ -320,9 +313,9 @@ class GroupChat(chat_baseics):
                         
                     else:
                         self.log.error(f"[{uid}]返回json错误:{response_json}")
-            # else:
-            #     # 错误的话考虑直接发送?
-            #     self.log.error(f"返回json解析错误:{response_json}")
+            else:
+                self.log.error(f"返回json解析不正确:{type(response_json)}")
+                # 错误的话考虑直接发送?
             #     chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
                 
             #     since = chat_condition.get_seconds_since_llm_time()

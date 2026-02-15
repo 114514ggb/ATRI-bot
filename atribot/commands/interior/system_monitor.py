@@ -1,7 +1,9 @@
-from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
-from atribot.core.service_container import container
 from datetime import datetime
+
 import psutil
+
+from atribot.core.service_container import container
+from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 
 mcp:FuncCall = container.get("MCP")
 config = container.get("config")

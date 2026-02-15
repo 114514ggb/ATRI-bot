@@ -1,6 +1,8 @@
-from bilibili_api import video, Credential
 import asyncio
 import re
+
+from bilibili_api import Credential, video
+
 
 class BiliBiliCrawler:
     """爬取b站视频信息"""

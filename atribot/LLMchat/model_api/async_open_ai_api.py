@@ -1,5 +1,6 @@
 from openai import AsyncOpenAI
 
+
 class async_openAI:
     """async OpenAI API"""
     model_parameters = {

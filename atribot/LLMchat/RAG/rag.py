@@ -1,11 +1,11 @@
+# from atribot.common import common
+from typing import List
+
+from atribot.core.service_container import container
 from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.LLMchat.RAG.text_chunker import RecursiveCharacterTextSplitter
 from atribot.LLMchat.RAG.vector_store import VectorStore
-from atribot.core.service_container import container
-# from atribot.common import common
-from typing import List
-
 
 
 class RAGManager:

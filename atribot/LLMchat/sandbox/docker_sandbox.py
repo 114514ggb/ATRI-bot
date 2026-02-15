@@ -1,24 +1,20 @@
-from atribot.LLMchat.sandbox.sandbox_base import (
-    SandBoxBase,
-    ExecutionResult,
-    GeneratedFile
-)
-from docker.errors import ImageNotFound, NotFound
+import asyncio
+import base64
+import io
+import mimetypes
+import os
+import shlex
+import tarfile
+import time
+import uuid
+import zipfile
 from tarfile import TarInfo
 from typing import List
-import mimetypes
-import tarfile
-import asyncio
-import zipfile
-import base64
+
+from docker.errors import ImageNotFound, NotFound
+
 import docker
-import shlex
-import uuid
-import time
-import io
-import os
-
-
+from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile, SandBoxBase
 
 
 class DockerSandbox(SandBoxBase):

@@ -1,11 +1,10 @@
-from atribot.core.cache.management_chat_example import ChatManager
+from logging import Logger
+from typing import List, Literal, Optional
+
 from atribot.core.bot_types import GroupContext, LLMGroupChatCondition, RichData
+from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
 from atribot.LLMchat.chat import GroupChat
-from typing import List, Literal,Optional
-from logging import Logger
-
-
 
 
 class initiativeChat:
@@ -19,8 +18,7 @@ class initiativeChat:
     
     async def decision(self, message: RichData, group_context:GroupContext, at: bool = False) -> bool:
         """决策是否应该发言"""
-        data = message.primeval
-        if not data.get("message"):
+        if message.text == "":
             return False
 
         group_id: int = message.group_id

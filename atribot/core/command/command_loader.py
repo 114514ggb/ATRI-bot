@@ -1,11 +1,11 @@
-from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.service_container import container
-from pathlib import Path
 import importlib
 import importlib.util
 import logging
 import sys
+from pathlib import Path
 
+from atribot.core.command.command_parsing import CommandSystem
+from atribot.core.service_container import container
 
 
 class command_loader:

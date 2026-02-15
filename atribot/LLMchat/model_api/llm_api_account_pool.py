@@ -1,11 +1,11 @@
-from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
-from itertools import cycle
-from typing import List, Dict, AsyncGenerator
-import aiohttp
 import asyncio
 import json
+from itertools import cycle
+from typing import AsyncGenerator, Dict, List
 
+import aiohttp
 
+from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 
 
 class ai_api_account_pool(universal_ai_api):

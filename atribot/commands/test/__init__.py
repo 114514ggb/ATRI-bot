@@ -1,9 +1,8 @@
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.command.command_parsing import CommandSystem
+from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+
 from .ATRI_encrypt import Encrypt
-
-
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
@@ -30,7 +29,7 @@ send_message:QQAPIClient = container.get("SendMessage")
 )
 @cmd_system.flag(
     name="decode",
-    short="d",
+    short="-d",
     long="--decode",
     description="解码模式：将ATRI编码的Unicode字符还原为原始文本",
 )

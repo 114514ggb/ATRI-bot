@@ -1,6 +1,4 @@
-from typing import Callable, AsyncGenerator, Dict
-
-
+from typing import AsyncGenerator, Callable, Dict
 
 
 class StreamProcessor:

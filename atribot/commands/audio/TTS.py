@@ -1,5 +1,7 @@
+from typing import Any, Dict
+
 import aiohttp
-from typing import Dict, Any
+
 from atribot.core.service_container import container
 
 

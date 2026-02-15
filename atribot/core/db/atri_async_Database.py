@@ -1,10 +1,12 @@
+import asyncio
+from contextvars import ContextVar
+from logging import Logger
+from typing import Optional, Tuple
+
 import aiomysql
 from aiomysql import IntegrityError, Pool
+
 from atribot.core.service_container import container
-from contextvars import ContextVar
-from typing import Optional, Tuple
-from logging import Logger
-import asyncio
 
 
 class AtriDB_Async:

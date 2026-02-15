@@ -1,5 +1,6 @@
 import json
 
+
 class ConfigObject(dict):
     """
     将字典转换为点运算符访问的对象

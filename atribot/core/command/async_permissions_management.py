@@ -1,10 +1,9 @@
+import logging
+from typing import Set
+
+from atribot.common import common
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
-from atribot.common import common
-
-from typing import Set
-import logging
-
 
 
 class PermissionsManagement:

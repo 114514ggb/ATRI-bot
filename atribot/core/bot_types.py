@@ -1,12 +1,10 @@
-from contextlib import asynccontextmanager
-from dataclasses import dataclass, field
-from typing import Dict, List, Deque, Iterable, Any
-from collections import deque
 import asyncio
 import bisect
 import time
-
-
+from collections import deque
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import Any, Deque, Dict, Iterable, List
 
 
 class ToolCallsStopIteration(Exception):

@@ -1,20 +1,17 @@
+import re
+from dataclasses import dataclass, field
+from logging import Logger
+from typing import Any, Dict, List
+
+from mcp.types import CallToolResult
+
+from atribot.core.bot_types import Context, ToolCallsStopIteration
+from atribot.core.service_container import container
 from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
-from atribot.core.service_container import container
 from atribot.LLMchat.model_tools import tool_calls
-from atribot.core.bot_types import (
-    ToolCallsStopIteration,
-    Context
-)
-from dataclasses import dataclass, field
-from mcp.types import CallToolResult
-from typing import Dict, List, Any
-from logging import Logger
-import re
 
-    
-    
-    
+
 @dataclass(slots=True)
 class GenerationResponse():
     """响应后再更新状态"""

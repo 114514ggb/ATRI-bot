@@ -1,8 +1,8 @@
-from atribot.core.service_container import container
-from atribot.bot_framework import BotFramework
-from atribot.core.logger import Logger
 import asyncio
 
+from atribot.bot_framework import BotFramework
+from atribot.core.logger import Logger
+from atribot.core.service_container import container
 
 logo_tmpl = r"""
 _____/\\\\\\\\\____        __/\\\\\\\\\\\\\\\_        ____/\\\\\\\\\_____        __/\\\\\\\\\\\_        

@@ -1,9 +1,9 @@
-from typing import Dict, List, Optional, Tuple, TypedDict, Callable
+import copy
+import re
 from dataclasses import dataclass, field
-import yaml
-import copy 
-import re 
+from typing import Callable, Dict, List, Optional, Tuple, TypedDict
 
+import yaml
 
 
 class TextChunker:
