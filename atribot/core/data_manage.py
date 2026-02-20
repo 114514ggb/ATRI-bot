@@ -1,9 +1,9 @@
 import json
 from typing import Dict, List, Tuple
 
-from atribot.core.bot_types import RichData
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import RichData
 
 
 class data_manage():

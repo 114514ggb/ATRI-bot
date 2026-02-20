@@ -1,9 +1,9 @@
 from logging import Logger
 from typing import List, Literal, Optional
 
-from atribot.core.bot_types import GroupContext, LLMGroupChatCondition, RichData
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import GroupContext, LLMGroupChatCondition, RichData
 from atribot.LLMchat.chat import GroupChat
 
 

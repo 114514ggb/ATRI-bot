@@ -242,12 +242,12 @@ class QQAPIClient():
         
         await self.async_send(api_url,payload)
     
-    async def send_group_json(self,group_id: int, json: json):
+    async def send_group_json(self,group_id: int, json_dict: dict):
         """发送群JSON"""
         payload =[
             {
                 "type": "json",
-                "data": json
+                "data": json_dict
             }
         ]
         

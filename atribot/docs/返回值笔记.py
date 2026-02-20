@@ -15,7 +15,7 @@ Received_event={
       'card': '',  # 发送者群名片
       'role': 'owner' # 发送者角色
     },
-'raw_message': '?', # 消息内容
+'raw_message': '?', # 消息内容原始cq码
 'font': 14,  # 字体
 'sub_type': 'normal', # 消息子类型
 'message': [{
@@ -2664,3 +2664,55 @@ google_gemini_ret = {
   'model': 'gemini-3-flash-preview',
   'nonce': '9ccd50b0',
   'object': 'chat.completion.chunk'},
+
+
+
+新版的qq小程序分享={'self_id': 168238719,
+ 'user_id': 2631018780,
+ 'time': 1771421534,
+ 'message_id': 319841499,
+ 'message_seq': 319841499,
+ 'real_id': 319841499,
+ 'real_seq': '21916',
+ 'message_type': 'group',
+ 'sender': {'user_id': 2631018780,
+            'nickname': '除了摸鱼什么都做不到',
+            'card': '',
+            'role': 'owner'},
+ 'raw_message': '[CQ:json,data={"ver":"1.0.0.19"&#44;"prompt":"&#91;QQ小程序&#93;（填词\\/翻唱\\/描改）我的悲伤是海做的"&#44;"config":{"type":"normal"&#44;"width":0&#44;"height":0&#44;"forward":1&#44;"autoSize":0&#44;"ctime":1771421391&#44;"token":"7c377870913094851a79cdcab3b7c3d3"}&#44;"needShareCallBack":false&#44;"app":"com.tencent.miniapp_01"&#44;"view":"view_8C8E89B49BE609866298ADDFF2DBABA4"&#44;"meta":{"detail_1":{"appid":"1109937557"&#44;"appType":0&#44;"title":"哔哩哔哩"&#44;"desc":"（填词\\/翻唱\\/描改）我的悲伤是海做的"&#44;"icon":"http:\\/\\/miniapp.gtimg.cn\\/public\\/appicon\\/432b76be3a548fc128acaa6c1ec90131_200.jpg"&#44;"preview":"https:\\/\\/qq.ugcimg.cn\\/v1\\/br4c7p2aqns7ostgadqcov8f7m3e1aipmsmlolie94vh7vga9mj653ns0sv2v65b0spcqroitmtm8mk47u0h8nrse8c22msohgip2vp05i37ccub7qhttll5uod9v0h0jet2mle62oo3p9upi44al95sa0\\/e9vf2tsqr6j29hl2kodb3vahlc"&#44;"url":"m.q.qq.com\\/a\\/s\\/a49953c07ae302432cc759380c96dd2e"&#44;"scene":1036&#44;"host":{"uin":2631018780&#44;"nick":"除了摸鱼什么都做不到"}&#44;"shareTemplateId":"8C8E89B49BE609866298ADDFF2DBABA4"&#44;"shareTemplateData":{}&#44;"qqdocurl":"https:\\/\\/b23.tv\\/0zelLU5?share_medium=android&amp;share_source=qq&amp;bbid=XU01C8F063EEC9EC918F03EEF83CA2CE7E695&amp;ts=1771421390490"&#44;"showLittleTail":""&#44;"gamePoints":""&#44;"gamePointsUrl":""&#44;"shareOrigin":0}}}]',
+ 'font': 14,
+ 'sub_type': 'normal',
+ 'message': [{'type': 'json',
+              'data': {'data': '{"ver":"1.0.0.19","prompt":"[QQ小程序]（填词\\/翻唱\\/描改）我的悲伤是海做的","config":{"type":"normal","width":0,"height":0,"forward":1,"autoSize":0,"ctime":1771421391,"token":"7c377870913094851a79cdcab3b7c3d3"},"needShareCallBack":false,"app":"com.tencent.miniapp_01","view":"view_8C8E89B49BE609866298ADDFF2DBABA4","meta":{"detail_1":{"appid":"1109937557","appType":0,"title":"哔哩哔哩","desc":"（填词\\/翻唱\\/描改）我的悲伤是海做的","icon":"http:\\/\\/miniapp.gtimg.cn\\/public\\/appicon\\/432b76be3a548fc128acaa6c1ec90131_200.jpg","preview":"https:\\/\\/qq.ugcimg.cn\\/v1\\/br4c7p2aqns7ostgadqcov8f7m3e1aipmsmlolie94vh7vga9mj653ns0sv2v65b0spcqroitmtm8mk47u0h8nrse8c22msohgip2vp05i37ccub7qhttll5uod9v0h0jet2mle62oo3p9upi44al95sa0\\/e9vf2tsqr6j29hl2kodb3vahlc","url":"m.q.qq.com\\/a\\/s\\/a49953c07ae302432cc759380c96dd2e","scene":1036,"host":{"uin":2631018780,"nick":"除了摸鱼什么都做不到"},"shareTemplateId":"8C8E89B49BE609866298ADDFF2DBABA4","shareTemplateData":{},"qqdocurl":"https:\\/\\/b23.tv\\/0zelLU5?share_medium=android&share_source=qq&bbid=XU01C8F063EEC9EC918F03EEF83CA2CE7E695&ts=1771421390490","showLittleTail":"","gamePoints":"","gamePointsUrl":"","shareOrigin":0}}}'}}],
+ 'message_format': 'array',
+ 'post_type': 'message',
+ 'group_id': 984466158,
+ 'group_name': '个人の群'}
+
+分享中间的data={'ver': '1.0.0.19',
+ 'prompt': '[QQ小程序]（填词/翻唱/描改）我的悲伤是海做的',
+ 'config': {'type': 'normal',
+            'width': 0,
+            'height': 0,
+            'forward': 1,
+            'autoSize': 0,
+            'ctime': 1771421391,
+            'token': '7c377870913094851a79cdcab3b7c3d3'},
+ 'needShareCallBack': False,
+ 'app': 'com.tencent.miniapp_01',
+ 'view': 'view_8C8E89B49BE609866298ADDFF2DBABA4',
+ 'meta': {'detail_1': {'appid': '1109937557',
+                       'appType': 0,
+                       'title': '哔哩哔哩',
+                       'desc': '（填词/翻唱/描改）我的悲伤是海做的',
+                       'icon': 'http://miniapp.gtimg.cn/public/appicon/432b76be3a548fc128acaa6c1ec90131_200.jpg',
+                       'preview': 'https://qq.ugcimg.cn/v1/br4c7p2aqns7ostgadqcov8f7m3e1aipmsmlolie94vh7vga9mj653ns0sv2v65b0spcqroitmtm8mk47u0h8nrse8c22msohgip2vp05i37ccub7qhttll5uod9v0h0jet2mle62oo3p9upi44al95sa0/e9vf2tsqr6j29hl2kodb3vahlc',
+                       'scene': 1036,
+                       'host': {'uin': 2631018780, 'nick': '除了摸鱼什么都做不到'},
+                       'shareTemplateId': '8C8E89B49BE609866298ADDFF2DBABA4',
+                       'shareTemplateData': {},
+                       'qqdocurl': 'https://b23.tv/0zelLU5?share_medium=android&share_source=qq&bbid=XU01C8F063EEC9EC918F03EEF83CA2CE7E695&ts=1771421390490',      
+                       'showLittleTail': '',
+                       'gamePoints': '',
+                       'gamePointsUrl': '',
+                       'shareOrigin': 0}}}

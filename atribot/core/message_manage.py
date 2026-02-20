@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from logging import Logger
 
-from atribot.core.bot_types import RichData
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_parsing import CommandSystem
@@ -10,6 +9,7 @@ from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import RichData
 from atribot.LLMchat.chat import GroupChat
 from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.memory.memiry_system import memorySystem

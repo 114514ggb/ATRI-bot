@@ -6,8 +6,8 @@ from datetime import datetime
 from logging import Logger
 from typing import Any, Dict, List
 
-from atribot.core.bot_types import Context
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import Context
 from atribot.LLMchat.memory.prompts import (
     FACT_RETRIEVAL_PROMPT,
     PURE_GROUP_FACT_RETRIEVAL_PROMPT,
@@ -110,7 +110,7 @@ class memorySystem:
                 }
             ]}
         """
-        if return_json := await self.request_return_json_content(message, PURE_GROUP_FACT_RETRIEVAL_PROMPT+f"排除<qq_id>{bot_id}</qq_id>的bot发送的消息"):
+        if return_json := await self.request_return_json_content(message, PURE_GROUP_FACT_RETRIEVAL_PROMPT+f"详细记录bot账号<qq_id>{bot_id}</qq_id>相关qq信息"):
             return return_json.get("facts",[])
         else:
             return []

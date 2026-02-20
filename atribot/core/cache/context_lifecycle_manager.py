@@ -3,9 +3,9 @@ import time
 from logging import Logger
 from typing import Any, Optional
 
-from atribot.core.bot_types import Context
 from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import Context
 
 
 class ContextContainer:

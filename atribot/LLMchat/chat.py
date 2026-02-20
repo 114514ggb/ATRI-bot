@@ -7,11 +7,11 @@ from logging import Logger
 from typing import Coroutine, Dict, List
 
 from atribot.common import common
-from atribot.core.bot_types import Context, RichData
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.data_manage import data_manage
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import Context, RichData
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import GenerationRequest, GenerationResponse, LLMCoordinator, LLMSRequestFailed
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
@@ -521,7 +521,7 @@ class GroupChat(chat_baseics):
         """
         prompt = ""
             
-        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>Please do not repeat the above information" #简单防止过长
+        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>" #简单防止过长
         
         if knowledge_base:
             prompt += f"\n\n<user_memory_snippet>{knowledge_base}</user_memory_snippet>"
