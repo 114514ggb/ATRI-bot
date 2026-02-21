@@ -1,4 +1,3 @@
-import json
 import os
 from logging import Logger
 from typing import Optional
@@ -8,6 +7,7 @@ import aiohttp
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_type import GroupMessage, PrivateMessage, SendMessage
 
 # import asyncio
 """
@@ -99,6 +99,45 @@ class QQAPIClient():
     async def async_send(self, url, payload, echo = False)->dict|None:
         """通用的发送异步请求,返回json"""
         return await self._send_impl(url, payload, echo)
+
+    async def send(self, message: SendMessage) -> dict | None:
+            """
+            发送已构建好的消息对象 (支持 GroupMessage 和 PrivateMessage或)
+            
+            Args:
+                message (SendMessage): 消息对象实例
+                
+            Returns:
+                dict | None: 发送结果的响应
+            """
+                
+            if isinstance(message, GroupMessage):
+                url = "send_group_msg"
+            elif isinstance(message, PrivateMessage):
+                url = "send_private_msg"
+            else:
+                self.logger.error(f"不支持的发送消息类型: {type(message)}")
+                return None
+                
+            return await self.async_send(url, payload=message.to_dict())
+
+    async def send_group(self, message: GroupMessage) -> dict | None:
+        """
+        专门发送群聊消息对象
+        """
+        return await self.async_send(
+            url="send_group_msg", 
+            payload=message.to_dict()
+        )
+
+    async def send_private(self, message: PrivateMessage) -> dict | None:
+        """
+        专门发送私聊消息对象
+        """ 
+        return await self.async_send(
+            url="send_private_msg", 
+            payload=message.to_dict()
+        )
 
     async def send_group_message(self,group_id: int, message:str|list):
         """

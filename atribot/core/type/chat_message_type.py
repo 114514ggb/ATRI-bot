@@ -70,59 +70,47 @@ class MessageSegment(ABC):
 
 class TextSegment(MessageSegment):
     """文本"""
-    __slots__ = ['_text']
+    __slots__ = ['text']
     
     def __init__(self, text: str):
-        self._text = text
+        self.text = text
         super().__init__(MessageSegmentType.TEXT.value)
     
     @property
-    def text(self) -> str:
-        return self._text
-    
-    @property
     def data(self) -> Dict[str, Any]:
-        return {"text": self._text}
+        return {"text": self.text}
     
     def __str__(self) -> str:
-        return self._text
+        return self.text
 
 
 class AtSegment(MessageSegment):
     """@"""
-    __slots__ = ['_user_id']
+    __slots__ = ['user_id']
     
     def __init__(self, user_id: int):
-        self._user_id = user_id
+        self.user_id = user_id
         super().__init__(MessageSegmentType.AT.value)
     
     @property
-    def user_id(self) -> str:
-        return self._user_id
-    
-    @property
     def data(self) -> Dict[str, Any]:
-        return {"qq": self._user_id}
+        return {"qq": self.user_id}
     
     def __str__(self) -> str:
-        return f"[CQ:at,qq={self._user_id}]"
+        return f"[CQ:at,qq={self.user_id}]"
 
 
 class FaceSegment(MessageSegment):
     """QQ 表情"""
-    __slots__ = ['_face_id']
+    __slots__ = ['face_id']
     
     def __init__(self, face_id: str):
-        self._face_id = face_id
+        self.face_id = face_id
         super().__init__(MessageSegmentType.FACE.value)
     
     @property
-    def face_id(self) -> str:
-        return self._face_id
-    
-    @property
     def data(self) -> Dict[str, Any]:
-        return {"id": self._face_id}
+        return {"id": self.face_id}
     
     def __str__(self) -> str:
         return "[CQ:face]"
@@ -130,28 +118,27 @@ class FaceSegment(MessageSegment):
 
 class ReplySegment(MessageSegment):
     """回复"""
-    __slots__ = ['_message_id']
+    __slots__ = ['message_id']
     
     def __init__(self, message_id: str):
-        self._message_id = message_id
+        self.message_id = message_id
         super().__init__(MessageSegmentType.REPLY.value)
     
     @property
-    def message_id(self) -> str:
-        return self._message_id
-    
-    @property
     def data(self) -> Dict[str, Any]:
-        return {"id": self._message_id}
+        return {"id": self.message_id}
     
     def __str__(self) -> str:
-        return f"[CQ:reply,id={self._message_id}]"
+        return f"[CQ:reply,id={self.message_id}]"
 
 
 class JsonSegment(MessageSegment):
+    """json"""
     __slots__ = ['json_data']
     
     def __init__(self, json_data: dict|str):
+        if isinstance(json_data, dict):
+            json_data = json.dumps(json_data, ensure_ascii=False)
         self.json_data = json_data
         super().__init__(MessageSegmentType.JSON.value)
     
@@ -163,9 +150,118 @@ class JsonSegment(MessageSegment):
         try:
             data = json.loads(self.json_data)
             detail_1 = data["meta"]["detail_1"]
-            return f"[CQ:json,prompt={data.get("prompt")},title={detail_1.get("title", "")},desc={detail_1.get("desc", "")},url={detail_1.get("qqdocurl", "")}]"
+            return f"[CQ:json,prompt={data.get('prompt')},title={detail_1.get('title')},desc={detail_1.get('desc')},url={detail_1.get('qqdocurl')}]"
         except Exception:
             return f"[CQ:json,data={str(self.json_data)[:1500]}]"
+
+
+class ForwardSegment(MessageSegment):
+    """合并转发消息"""
+    __slots__ = ["id","content"]
+    
+    def __init__(self, id: str, content:list[dict]|None = None):
+        self.id = id
+        """合并转发ID"""
+        self.content = content
+        """消息内容 (OB11Message[])"""
+        super().__init__(MessageSegmentType.FORWARD.value)
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        data_dict= {"id": self.id}
+        if self.content:
+            data_dict["content"] = self.content
+        
+        return data_dict
+    
+    def __str__(self) -> str:
+        if self.content:
+            content_str = "".join(ChatMessage.from_event(m).llm_formatted_message for m in self.content)
+            return f"[CQ:转发消息,id={self.id},content={content_str[:5000]}]"
+        return f"[CQ:forward,id={self.id}]"
+    
+    
+class NodeSegment(MessageSegment):
+    """合并转发消息节点"""
+    
+    __slots__ = ['id', 'user_id', 'uin', 'nickname', 'name', 'content', 'source', 'news', 'summary', 'prompt', 'time']
+    
+    def __init__(
+        self,
+        nickname: str,
+        content: Any,
+        id: str | None = None,
+        user_id: str | None = None,
+        uin: str | None = None,
+        name: str | None = None,
+        source: str | None = "高性能秘籍",
+        news: list[dict] | None = None,
+        summary: str | None = "点击即看",
+        prompt: str | None = "果然是群聊天记录",
+        time: str | None = None
+    ):
+        """初始化合并转发消息节点。
+        
+        Args:
+            nickname: 发送者的昵称（必填）。
+            content: 消息的具体内容，遵循OB11MessageMixType协议（必填）。
+            id: 转发消息的唯一标识ID（可选）。
+            user_id: 发送者的QQ号（可选）。
+            uin: 发送者的QQ号，兼容go-cqhttp协议格式（可选）。
+            name: 发送者的昵称，兼容go-cqhttp协议格式（可选）。
+            source: 标题文本（可选）。
+            news: 预览文本（可选）格式list[dict][{"text" : "文本"}]
+            summary: 底下文本（可选）。
+            prompt: 消息的提示信息（可选）。
+            time: 消息发送的时间（可选）。
+        """
+        self.id = id
+        self.user_id = user_id
+        self.uin = uin
+        self.nickname = nickname
+        self.name = name
+        self.content = content
+        self.source = source
+        self.summary = summary
+        self.prompt = prompt
+        self.time = time
+        if news is None:
+            self.news = [{"text" : "ATRI:晚上一个人偷偷看[图片]"}]
+        super().__init__(MessageSegmentType.NODE.value)
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        """返回消息段的用于发送的字典。"""
+        data_dict: Dict[str, Any] = {
+            "nickname": self.nickname,
+            "content": self.content
+        }
+        
+        if self.id is not None:
+            data_dict["id"] = self.id
+        if self.user_id is not None:
+            data_dict["user_id"] = self.user_id
+        if self.uin is not None:
+            data_dict["uin"] = self.uin
+        if self.name is not None:
+            data_dict["name"] = self.name
+        if self.source is not None:
+            data_dict["source"] = self.source
+        if self.news is not None:
+            data_dict["news"] = self.news
+        if self.summary is not None:
+            data_dict["summary"] = self.summary
+        if self.prompt is not None:
+            data_dict["prompt"] = self.prompt
+        if self.time is not None:
+            data_dict["time"] = self.time
+        
+        return data_dict
+    
+    def __str__(self) -> str:
+        """返回简化的CQ码格式的字符串表示。"""
+        return f"[CQ:node,content={str(self.content)[:4000]}]"
+
 
 @dataclass(slots=True)
 class File:
@@ -237,7 +333,7 @@ class FileMessageSegment(MessageSegment, ABC):
 
     def __init__(
         self,
-        type: MessageSegmentType,
+        type: str, #MessageSegmentType
         file: File,
         file_name: str | None = None,
         url: str | None = None,         # 接收时带过来的网络地址
@@ -257,14 +353,14 @@ class FileMessageSegment(MessageSegment, ABC):
         super().__init__(type)
 
     @classmethod
-    def from_local_path(cls, path: str, **kwargs) -> "FileMessageSegment":
+    def from_local_path(cls, file_path: str, **kwargs) -> "FileMessageSegment":
         """从本地路径构造"""
-        return cls(file=File.from_local_path(path), **kwargs)
+        return cls(file=File.from_local_path(file_path), **kwargs)
 
     @classmethod
-    def from_url(cls, url: str, **kwargs) -> "FileMessageSegment":
+    def from_url(cls, file_url: str, **kwargs) -> "FileMessageSegment":
         """从网络 URL 构造"""
-        return cls(file=File.from_url(url), **kwargs)
+        return cls(file=File.from_url(file_url), **kwargs)
 
     @classmethod
     def from_base64(cls, data: str, **kwargs) -> "FileMessageSegment":
@@ -281,6 +377,7 @@ class FileMessageSegment(MessageSegment, ABC):
 
 
 class ImageSegment(FileMessageSegment):
+    """图片"""
     __slots__ = ["summary"]
     
     def __init__(
@@ -306,11 +403,14 @@ class ImageSegment(FileMessageSegment):
         return data_dict
     
     def __str__(self) -> str:
-        return f"[CQ:image,{f"summary={self.summary }," if self.summary else ""}file={self.file_name},url={self.url}]"
+        summary_part = f"summary={self.summary}," if self.summary else ""
+        return f"[CQ:image,{summary_part}file={self.file_name},url={self.url}]"
 
 
 class RecordSegment(FileMessageSegment):
     """语音"""
+    __slots__ = []
+    
     def __init__(
         self,
         file: File,
@@ -355,6 +455,8 @@ class VideoSegment(FileMessageSegment):
 
 class FileSegment(FileMessageSegment):
     """文件"""
+    __slots__ = []
+    
     def __init__(
         self,
         file: File,
@@ -391,7 +493,7 @@ class UnknownSegment(MessageSegment):
         return self._raw_data
     
     def __str__(self) -> str:
-        return f"[CQ:{self._raw_type}]"
+        return f"[CQ:{self._raw_type},data:{str(self.data)[:1000]}]"
 
 
 @dataclass(slots=True)
@@ -410,6 +512,8 @@ class ChatMessage:
     """时间戳秒级"""
     raw_message: str 
     """原始cq码文本消息"""
+    primeval:dict
+    """原始接收的data的dict"""
     llm_formatted_message: str = ""
     """重新处理过的短文本LLM友好的文本"""
     pure_text: str = ""
@@ -461,9 +565,31 @@ class ChatMessage:
                     summary=d.get('summary')
                 ))
             
+            elif t == MessageSegmentType.REPLY.value:
+                parsed_segments.append(ReplySegment(str(d.get('id', ''))))
+            
+            elif t == MessageSegmentType.AT.value:
+                parsed_segments.append(AtSegment(int(d.get('qq', 0))))
+            
+            elif t == MessageSegmentType.FACE.value:
+                parsed_segments.append(FaceSegment(str(d.get('id', ''))))
+            
             elif t == MessageSegmentType.RECORD.value:
                 file_str = d.get('url') or d.get('path')
                 parsed_segments.append(RecordSegment(
+                    file=File(file_str),
+                    file_name=d.get('file'),
+                    url=d.get('url'),
+                    path=d.get('path'),
+                    file_size=d.get('file_size', 0)
+                ))
+            
+            elif t == MessageSegmentType.FORWARD.value:
+                parsed_segments.append(ForwardSegment(id=d.get('id', ""), content=d.get('content')))
+            
+            elif t == MessageSegmentType.FILE.value:
+                file_str = d.get('url') or d.get('path') or d.get('file', '')
+                parsed_segments.append(FileSegment(
                     file=File(file_str),
                     file_name=d.get('file'),
                     url=d.get('url'),
@@ -482,28 +608,6 @@ class ChatMessage:
                     thumb=d.get('thumb')
                 ))
             
-            elif t == MessageSegmentType.FILE.value:
-                file_str = d.get('url') or d.get('path') or d.get('file', '')
-                parsed_segments.append(FileSegment(
-                    file=File(file_str),
-                    file_name=d.get('file'),
-                    url=d.get('url'),
-                    path=d.get('path'),
-                    file_size=d.get('file_size', 0)
-                ))
-            
-            elif t == MessageSegmentType.AT.value:
-                parsed_segments.append(AtSegment(int(d.get('qq', 0))))
-            
-            elif t == MessageSegmentType.REPLY.value:
-                parsed_segments.append(ReplySegment(str(d.get('id', ''))))
-            
-            elif t == MessageSegmentType.FACE.value:
-                parsed_segments.append(FaceSegment(str(d.get('id', ''))))
-            
-            elif t == MessageSegmentType.JSON.value:
-                parsed_segments.append(JsonSegment(d.get('data', "")))
-            
             else:
                 parsed_segments.append(UnknownSegment(t, d))
         
@@ -513,6 +617,7 @@ class ChatMessage:
             group_id=event.get('group_id'),
             message_id=event.get('message_id', 0),
             time=message_time,
+            primeval=event,
             raw_message=event.get('raw_message', ''),
             llm_formatted_message="",
             pure_text="".join(pure_text_parts),
@@ -577,8 +682,6 @@ class SendMessage:
                 file_obj = File(file)
             elif file.startswith("/") or (len(file) > 1 and file[1] == ":"):
                 file_obj = File.from_local_path(file)
-            elif file.startswith("http"):
-                file_obj = File.from_url(file.replace("https://", "").replace("http://", ""))
             else:
                 file_obj = File.from_local_path(file)
         else:
@@ -673,6 +776,69 @@ class SendMessage:
         self.segments.append(JsonSegment(json_data))
         return self
     
+    def add_forward(self, id: str, content: Optional[List[Dict]] = None) -> "SendMessage":
+        """
+        添加合并转发消息段
+        
+        Args:
+            id: 合并转发ID
+            content: 消息内容列表，每个元素为符合 OneBot 标准的消息段字典（可选）
+        
+        Returns:
+            Self, 用于链式调用
+        """
+        self.segments.append(ForwardSegment(id=id, content=content))
+        return self
+    
+    def add_node(
+        self,
+        nickname: str,
+        content: Any,
+        id: Optional[str] = None,
+        user_id: Optional[str] = None,
+        uin: Optional[str] = None,
+        name: Optional[str] = None,
+        source: Optional[str] = None,
+        news: Optional[List[Dict]] = None,
+        summary: Optional[str] = None,
+        prompt: Optional[str] = None,
+        time: Optional[str] = None
+    ) -> "SendMessage":
+        """
+        添加合并转发消息节点
+        
+        Args:
+            nickname: 发送者的昵称（必填）
+            content: 消息的具体内容，遵循 OneBot 消息段格式（必填）
+            id: 转发消息的唯一标识ID（可选）
+            user_id: 发送者的QQ号（可选）
+            uin: 发送者的QQ号，兼容go-cqhttp协议格式（可选）
+            name: 发送者的昵称，兼容go-cqhttp协议格式（可选）
+            source: 标题文本（可选）
+            news: 预览文本，格式为 [{"text": "文本"}]（可选）
+            summary: 底部文本（可选）
+            prompt: 消息的提示信息（可选）
+            time: 消息发送的时间（可选）
+        
+        Returns:
+            Self, 用于链式调用
+        """
+        node = NodeSegment(
+            nickname=nickname,
+            content=content,
+            id=id,
+            user_id=user_id,
+            uin=uin,
+            name=name,
+            source=source,
+            news=news,
+            summary=summary,
+            prompt=prompt,
+            time=time
+        )
+        self.segments.append(node)
+        return self
+    
     def add_segment(self, segment: MessageSegment) -> "SendMessage":
         """直接添加自定义消息段"""
         self.segments.append(segment)
@@ -691,7 +857,6 @@ class SendMessage:
     def data(self) -> List[Dict[str, Any]]:
         """
         序列化为OneBot标准格式的消息列表
-        与 ChatMessage.to_list() 格式一致
         """
         return [seg.to_dict() for seg in self.segments]
     
@@ -751,4 +916,5 @@ class PrivateMessage(SendMessage):
         """转换为发送私聊消息的JSON字符串"""
         import json
         return json.dumps(self.to_dict(), ensure_ascii=False)
+
 
