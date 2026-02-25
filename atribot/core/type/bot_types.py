@@ -4,7 +4,6 @@ import time
 from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Any, Deque, Dict, Iterable, List
 
 from atribot.core.type.chat_message_type import ChatMessage
@@ -836,7 +835,7 @@ class GroupContext:
 
     def build_context(self) -> str:
         """返回构建的LLM文本上下文"""
-        return "\n".join(msg.llm_formatted_message for msg in self.messages)
+        return "".join(msg.llm_formatted_message for msg in self.messages)
 
     async def add_group_chat_message(self, message:ChatMessage)->tuple[List[str], "GroupContext"]|None:
         """添加群消息,然后做有效性验证
@@ -850,7 +849,7 @@ class GroupContext:
         
         async with self.async_lock:
             self.last_msg_at = time.time() #更新群最后处理时间
-            self.messages.append(message.llm_formatted_message)
+            self.messages.append(message)
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
             
