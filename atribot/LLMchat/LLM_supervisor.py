@@ -7,9 +7,9 @@ from mcp.types import CallToolResult
 
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import Context, ToolCallsStopIteration
+from atribot.LLMchat.MCP.model_tools import tool_calls
 from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
-from atribot.LLMchat.model_tools import tool_calls
 
 
 @dataclass(slots=True)
@@ -26,8 +26,6 @@ class GenerationResponse():
     """可选的额外数据"""
     
     
-
-
 @dataclass(slots=True)
 class GenerationRequest():
     """请求响应"""
@@ -48,6 +46,31 @@ class GenerationRequest():
     """如果有有的话会加入响应"""
     system_review:bool = False
     """prompt嵌入时是否单独使用system而不是采用直接拼接"""
+    tool_json: List[Dict] = None
+    """可供模型调用工具json"""
+    parameter: Dict = None
+    """模型参数"""
+    generation_response: GenerationResponse|None = None
+    """
+    从上次错误继承来未完成返回值\n
+    如果是调用工具时出现api响应错误时重试的时候这个会有值\n
+    如果是初始请求则为None
+    """
+
+@dataclass(slots=True)
+class GenerationRequestSimplify():
+    """请求响应"""
+    
+    model: str
+    """模型名称"""
+    messages: List[Dict[str, Any]]
+    """模型聊天的历史上下文"""
+    supplier_name:str = ""
+    """供应商"""
+    increment_messages:List[Dict[str, Any]]|None = None
+    """增量上下文""" 
+    model_api:model_api_basics|None = None
+    """模型的api实例"""
     tool_json: List[Dict] = None
     """可供模型调用工具json"""
     parameter: Dict = None
@@ -114,7 +137,7 @@ class LLMCoordinator():
         
         
     async def step(self, request:GenerationRequest)->GenerationResponse:
-        """主处理函数,目前没有维护了不建议使用
+        """对于GenerationRequest的主处理函数
 
         Args:
             request (GenerationRequest): 输入
@@ -164,7 +187,60 @@ class LLMCoordinator():
             increase_context = increase_context,
             model_api = model_api
         )
+    
+    async def run(self, request:GenerationRequestSimplify)->GenerationResponse:
+        """对于GenerationRequest的主处理函数,运行后产生结果,中间会处理工具掉用
+
+        Args:
+            request (GenerationRequest): 输入
+
+        Returns:
+            GenerationResponse: 输出
+        """ 
+        increase_context = Context(
+            messages = request.messages + request.increment_messages
+        )
         
+        model_api = request.model_api or (self.supplier.get_filtration_connection(
+            supplier_name=request.supplier_name,
+            model_name=request.model,
+        )[0]).connection_object
+
+        #中断继续
+        if request.generation_response is not None:
+            return await self.resume_step(request,model_api,increase_context)
+        
+        api_reply, assistant_message, content = await self._get_assistant_message_with_retry(
+            request = request,
+            increase_context  = increase_context,
+            model_api  = model_api
+        )
+        
+    
+        if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
+            #没有tool调用提前返回
+            
+            increase_context.messages.append(assistant_message)
+            return  self._update_response(
+                GenerationResponse(
+                    messages = increase_context.messages,
+                    metadata = api_reply.get("usage",{})
+                ), 
+                assistant_message
+            )
+        
+        increase_context.add_assistant_tool_message(
+            content,
+            tool_calls = assistant_message['tool_calls'],
+            reasoning_content = assistant_message.get("reasoning_content")
+        )
+        
+        return await self.tool_calls_while(
+            request = request,
+            assistant_message = assistant_message,
+            increase_context = increase_context,
+            model_api = model_api
+        )
         
     async def tool_calls_while(self, request:GenerationRequest, assistant_message:dict, increase_context:Context, model_api:model_api_basics)->GenerationResponse:
         """处理模型有工具调用的情况

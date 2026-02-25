@@ -1,6 +1,6 @@
-from atribot.LLMchat.tools.web_search import web_extract
 from typing import List, Optional
 
+from atribot.LLMchat.tools.web_search import web_extract
 
 tool_json = {
     "name": "web_extract",

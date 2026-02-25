@@ -1,8 +1,7 @@
 from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.service_container import container
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
-from atribot.core.service_container import container
-
 
 sand_box:DockerSandbox = container.get("SandBox")
 send_message:QQAPIClient = container.get("SendMessage")

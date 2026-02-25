@@ -147,7 +147,7 @@ class SystemMonitor:
 
             parameters = "\n参数:\n" + "\n".join(params_info) if params_info else "\n参数: 无"
             
-            tool_info = f"""🔧 工具名称: {func.name} {status}{origin_info}📝 描述: {func.description}{parameters}""".strip()
+            tool_info = f"""🔧 工具名称: {func.name} {status}{origin_info}\n📝 描述: {func.description}{parameters}""".strip()
             
             tools_info.append(tool_info)
         

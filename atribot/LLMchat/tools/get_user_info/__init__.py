@@ -1,10 +1,6 @@
 from atribot.core.service_container import container
 from atribot.LLMchat.memory.user_info_system import UserSystem
 
-
-
-
-
 tool_json = {
     "name": "get_user_info",
     "description": "用于获取用户的user_info文档,里面包含一些基本信息,如果没有记录的话会返回默认文档",

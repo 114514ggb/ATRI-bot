@@ -4,12 +4,11 @@ from logging import Logger
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.data_manage import data_manage
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import RichData
+from atribot.core.type.chat_message_type import ChatMessage
 from atribot.LLMchat.chat import GroupChat
 from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.memory.memiry_system import memorySystem
@@ -29,27 +28,28 @@ class message_router():
         """主消息处理逻辑"""
         
         group_id = data.get("group_id")
+        chat_message:ChatMessage = None
         
         if data.get('post_type') in ["message","message_sent"]:
-            _rich_data = data_manage.rich_data_processing_rich_data(data)
+            chat_message = ChatMessage.from_chat_event(data)
         else:
             if data.get("meta_event_type") !=  'heartbeat':
                 self.logger.debug(f"原始消息:\n{data}")
-            _rich_data = RichData(data)
+            chat_message = ChatMessage.from_not_chat_event(data)
         
         if group_id:            
-            await self.group_manage.handle_message(_rich_data, group_id)
+            await self.group_manage.handle_message(chat_message, group_id)
         else:
             #私聊处理
             return
 
-        if _rich_data.text:
-            await self.store_data(_rich_data,group_id) #存储群消息
+        if chat_message.segments:
+            await self.store_data(chat_message,group_id) #存储群消息
             
 
-    async def store_data(self, rich_data:RichData, group_id:int)->None:
+    async def store_data(self, chat_message:ChatMessage, group_id:int)->None:
         """存储消息"""
-        data = rich_data.primeval
+        data = chat_message.primeval
         
         if group_id not in self.group_set:
             group_name = (await self.send_message.get_group_info(group_id))["data"]["group_name"]
@@ -62,8 +62,8 @@ class message_router():
                 self.logger.warning(f"群信息存储失败:{e}")
         
         try:
-            users = {"user_id":rich_data.user_id,"nickname":data['sender']['nickname']}
-            message ={"message_id":data["message_id"],"content":rich_data.text,"timestamp":data["time"],"group_id":group_id,"user_id":rich_data.user_id}
+            users = {"user_id":chat_message.user_id,"nickname":data['sender']['nickname']}
+            message ={"message_id":data["message_id"],"content":chat_message.llm_formatted_message,"timestamp":data["time"],"group_id":group_id,"user_id":chat_message.user_id}
         except Exception as e:
             self.logger.warning(f"获取db存储参数失败:{e}")
             return
@@ -94,7 +94,7 @@ class message_manage(ABC):
         self.initiative_chat = initiativeChat()
     
     @abstractmethod
-    async def handle_message(self, message: RichData) -> None:
+    async def handle_message(self, message: ChatMessage) -> None:
         """处理接收到的消息"""
         pass
     
@@ -119,9 +119,9 @@ class group_manage(message_manage):
         self.group_chet:GroupChat = container.get("GroupChat")
         self.event_trigger = EventTrigger()
         
-    async def handle_message(self, message: RichData, group_id: int) -> None:
-        data = message.primeval
-        user_id = message.user_id
+    async def handle_message(self, chat_message:ChatMessage, group_id: int) -> None:
+        data = chat_message.primeval
+        user_id = chat_message.user_id
         
         if group_id not in self.group_white_list and not (user_id == 2631018780):
             return
@@ -130,7 +130,7 @@ class group_manage(message_manage):
         group_context.time_window.add()
 
         if data.get("message_sent_type") == "self":
-            await self._process_memory_summary(data, message.text, group_id)
+            await self._process_memory_summary(chat_message, group_id)
             return
 
         self.logger.debug(f"Received group message: {data}")
@@ -139,15 +139,15 @@ class group_manage(message_manage):
 
         if self._check_is_mentioned(data):
             #@处理
-            await self._handle_mentioned_message(message.pure_text, data, group_id, has_permission, message, group_context)
+            await self._handle_mentioned_message(chat_message.pure_text, data, group_id, has_permission, chat_message, group_context)
         elif has_permission:
             try:
-                if not await self.initiative_chat.decision(message, group_context):
+                if not await self.initiative_chat.decision(chat_message, group_context):
                     await self.event_trigger.dispatch(data, group_id)
             except Exception as e:
                 self.error_occurred(e, "事件触发器")
         
-        await self._process_memory_summary(data, message.text, group_id)
+        await self._process_memory_summary(chat_message, group_id)
 
     def _check_is_mentioned(self, data: dict) -> bool:
         """辅助函数：检查是否被 @"""
@@ -156,7 +156,7 @@ class group_manage(message_manage):
                 return True
         return False
     
-    async def _handle_mentioned_message(self, pure_text:str, data, group_id, has_permission, message, group_context):
+    async def _handle_mentioned_message(self, pure_text:str, data, group_id, has_permission, chat_message:ChatManager, group_context):
         """处理被 @ 的消息逻辑"""
         # 指令处理
         if pure_text.startswith("/"):
@@ -174,7 +174,7 @@ class group_manage(message_manage):
         if has_permission:
             try:
                 # await self.group_chet.step(message)
-                await self.initiative_chat.decision(message, group_context, at=True)
+                await self.initiative_chat.decision(chat_message, group_context, at=True)
             except Exception as e:
                 self.error_occurred(e, "群聊聊天模块")
                 await self.send_message.send_group_message(
@@ -185,17 +185,17 @@ class group_manage(message_manage):
             self.logger.info(f"黑名单人员被拒绝聊天{data["user_id"]}!") 
 
 
-    async def _process_memory_summary(self, data, text, group_id):
+    async def _process_memory_summary(self, chat_message:ChatMessage, group_id):
         """处理记忆存储与总结"""
         try:
-            if summary_needed := await self.chat_manager.add_message_record(data, text):
+            if summary_needed := await self.chat_manager.add_message_record(chat_message):
                 messages, group_context = summary_needed
                 async with group_context.summarizing() as ctx:
                     if ctx is not None:
                         self.logger.info(f"开始总结 {group_id} 群消息!")
                         await self.memiry_system.extract_stored_group_message(
                             messages=messages,
-                            bot_id=data['self_id'],
+                            bot_id=chat_message.self_id,
                             group_id=group_id
                         )
         except Exception as e:

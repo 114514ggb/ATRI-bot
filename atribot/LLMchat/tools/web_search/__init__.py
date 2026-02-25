@@ -1,7 +1,8 @@
-import aiohttp
-from typing import List, Dict, Optional, Any
-from atribot.core.service_container import container
+from typing import Any, Dict, List, Optional
 
+import aiohttp
+
+from atribot.core.service_container import container
 
 headers = {
     "Authorization": f"Bearer {container.get("config").model.tavily_search_API_key}",

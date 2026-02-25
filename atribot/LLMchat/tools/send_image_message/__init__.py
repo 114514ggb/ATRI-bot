@@ -1,9 +1,6 @@
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 
-
-
-
 send_message:QQAPIClient = container.get("SendMessage")
 
 tool_json = {

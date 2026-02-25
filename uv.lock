@@ -220,6 +220,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "mcp" },
     { name = "openai" },
+    { name = "pillow" },
     { name = "psutil" },
     { name = "pyahocorasick" },
     { name = "pymilvus" },
@@ -240,6 +241,7 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "mcp", specifier = ">=1.23.0" },
     { name = "openai", specifier = ">=1.82.0" },
+    { name = "pillow", specifier = ">=12.1.0" },
     { name = "psutil", specifier = ">=7.0.0" },
     { name = "pyahocorasick", specifier = ">=2.2.0" },
     { name = "pymilvus", specifier = ">=2.6.0" },
@@ -2101,8 +2103,8 @@ name = "uvicorn"
 version = "0.40.0"
 source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
 dependencies = [
-    { name = "click" },
-    { name = "h11" },
+    { name = "click", marker = "sys_platform != 'emscripten'" },
+    { name = "h11", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://mirrors.aliyun.com/pypi/packages/c3/d1/8f3c683c9561a4e6689dd3b1d345c815f10f86acd044ee1fb9a4dcd0b8c5/uvicorn-0.40.0.tar.gz", hash = "sha256:839676675e87e73694518b5574fd0f24c9d97b46bea16df7b8c05ea1a51071ea" }
 wheels = [

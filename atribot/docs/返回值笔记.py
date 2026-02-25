@@ -2883,3 +2883,7 @@ google_gemini_ret = {
  'post_type': 'message',
  'group_id': 984466158,
  'group_name': '个人の群'}
+
+
+
+{'time': 1772040806, 'self_id': 3930909243, 'post_type': 'notice', 'notice_type': 'notify', 'sub_type': 'poke', 'target_id': 215176364, 'user_id': 168238719, 'group_id': 2169027872, 'raw_info': [{'col': '1', 'nm': '', 'type': 'qq', 'uid': 'u_K0ahGoXMecVMLrnO92_orw'}, {'jp': 'https://zb.vip.qq.com/v2/pages/nudgeMall?_wv=2&actionId=0', 'src': 'http://tianquan.gtimg.cn/nudgeaction/item/0/expression.jpg', 'type': 'img'}, {'txt': '戳了戳', 'type': 'nor'}, {'col': '1', 'nm': '', 'tp': '0', 'type': 'qq', 'uid': 'u_s3kekkFE0yeSUL1Mr4KEhQ'}, {'txt': '的身体，对方变成了泡沫', 'type': 'nor'}]}

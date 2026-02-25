@@ -117,8 +117,8 @@ class data_manage():
         )
     
     
-    async def data_processing_ai_chat_text(self,data:Dict[str, int|str|Dict])->Tuple[str,List[str]]:
-        """用来解析成ai读的文本"
+    async def data_processing_llm_chat_text(self,data:Dict[str, int|str|Dict])->Tuple[str,List[str]]:
+        """用来解析成ai读的文本
 
         Args:
             data (Dict[str, int | str | Dict]): 原始消息json
@@ -199,5 +199,5 @@ class data_manage():
                 
             else:
                 text_parts.append(f"[CQ:{my_type}]")
-        
+         
         return "".join(text_parts),image_urls

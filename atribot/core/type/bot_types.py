@@ -4,7 +4,10 @@ import time
 from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Deque, Dict, Iterable, List
+
+from atribot.core.type.chat_message_type import ChatMessage
 
 
 class ToolCallsStopIteration(Exception):
@@ -29,6 +32,105 @@ class RichData():
     """发送者id"""
     group_id:int|None = None
     """群号"""
+    
+    
+class MessageBuilder:
+    """链式消息构建器，支持多模态内容自动合并相邻文本块"""
+    __slots__ = ['_role', '_parts']
+
+    def __init__(self, role: str = "user"):
+        self._role = role
+        self._parts: list = []
+    
+    def _last_is_text(self) -> bool:
+        return bool(self._parts) and self._parts[-1]["type"] == "text"
+    
+    def add_text(self, text: str) -> "MessageBuilder":
+        """添加文本，与前一个文本块自动合并"""
+        if self._last_is_text():
+            self._parts[-1]["text"] += text
+        else:
+            self._parts.append({"type": "text", "text": text})
+        return self
+    
+    def add_image(self, url: str, detail: str = "auto") -> "MessageBuilder":
+        """添加图片 URL"""
+        self._parts.append({
+            "type": "image_url",
+            "image_url": {"url": url, "detail": detail}
+        })
+        return self
+    
+    def add_image_base64(self, data: str, mime: str = "image/png") -> "MessageBuilder":
+        """添加 base64 图片"""
+        self._parts.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime};base64,{data}"}
+        })
+        return self
+    
+    def add_audio(self, data: str, fmt: str = "wav") -> "MessageBuilder":
+        """添加 base64 音频"""
+        self._parts.append({
+            "type": "input_audio",
+            "input_audio": {"data": data, "format": fmt}
+        })
+        return self
+    
+    def add_video(self, url: str) -> "MessageBuilder":
+        """添加视频 URL（部分模型支持）"""
+        self._parts.append({
+            "type": "video_url",
+            "video_url": {"url": url}
+        })
+        return self
+    
+    def add_file(self, url: str, mime: str = "") -> "MessageBuilder":
+        """添加文件（如 PDF 等，部分模型支持）"""
+        self._parts.append({
+            "type": "file",
+            "file": {"url": url, **({"mime_type": mime} if mime else {})}
+        })
+        return self
+    
+    def merge(self, other: "MessageBuilder") -> "MessageBuilder":
+        """和另一个构建合并"""
+        if not other._parts:
+            return self
+        
+        first = other._parts[0]
+        
+        start = 0
+        if first["type"] == "text":
+            self.add_text(first["text"])
+            start = 1
+        
+        self._parts.extend(other._parts[start:])
+        return self
+    
+    def build(self) -> Dict[str, Any]:
+        """构建消息 dict"""
+        # if not self._parts:
+        #     raise ValueError("MessageBuilder: 内容为空")
+        if len(self._parts) == 1 and self._parts[0]["type"] == "text":
+            return {"role": self._role, "content": self._parts[0]["text"]}
+        return {"role": self._role, "content": list(self._parts)}
+    
+    def build_and_add(self, ctx: "Context") -> None:
+        """构建并直接追加到 Context"""
+        ctx.append(self.build())
+
+    @classmethod
+    def user(cls) -> "MessageBuilder":
+        return cls("user")
+    
+    @classmethod
+    def assistant(cls) -> "MessageBuilder":
+        return cls("assistant")
+    
+    @classmethod
+    def system(cls) -> "MessageBuilder":
+        return cls("system")
     
     
 @dataclass(slots=True)
@@ -79,6 +181,12 @@ class Context():
     def extend(self, Iterable:List)->None:
         """用可迭代对象来扩展列表"""
         self.messages.extend(Iterable)
+    
+    # def builder(self, role: str = "user") -> "MessageBuilder":
+    #     """返回一个绑定到本 Context 的 MessageBuilder"""
+    #     b = MessageBuilder(role)
+    #     b.build_and_add = lambda: MessageBuilder.build_and_add(b, self)
+    #     return b
     
     def get_messages(self, inject_text:str = "")->List[Dict[str, str]]:
         """获取当前的上下文List
@@ -674,7 +782,7 @@ class GroupContext:
     
     group_id:int
     """群号"""
-    messages:deque = field(init=False)
+    messages:deque[ChatMessage] = field(init=False)
     """消息列表"""
     group_max_record:int
     """群维持的消息数量"""
@@ -683,14 +791,10 @@ class GroupContext:
     
     chat_context:Context
     """群LLM聊天上下文"""
-    # chat_img_url_cache:deque
-    # """图像url缓存"""
     play_roles:str
     """当前LLM聊天人设名称"""
     IS_SUMMARIZING:bool = field(default=False, init=False)
     """是否在总结"""
-    # group_chat_summary:str = field(default="", init=False)
-    # """群聊天的总结"""
     summarize_message_count:int = field(default=0, init=False)
     """未总结的计数"""
     time_window: TimeWindow = field(init=False)
@@ -726,11 +830,15 @@ class GroupContext:
         """
         if self.summarize_message_count >= self.group_max_record:
             self.summarize_message_count = 0
-            return list(self.messages)
+            return self.build_context()
         
         return None
 
-    async def add_group_chat_message(self,message:str)->tuple[List[str], "GroupContext"]|None:
+    def build_context(self) -> str:
+        """返回构建的LLM文本上下文"""
+        return "\n".join(msg.llm_formatted_message for msg in self.messages)
+
+    async def add_group_chat_message(self, message:ChatMessage)->tuple[List[str], "GroupContext"]|None:
         """添加群消息,然后做有效性验证
 
         Args:
@@ -739,9 +847,10 @@ class GroupContext:
         Returns:
             tuple[List[str], GroupContext]|None:  如果需要总结,返回 (消息列表, 上下文对象)
         """
+        
         async with self.async_lock:
             self.last_msg_at = time.time() #更新群最后处理时间
-            self.messages.append(message)
+            self.messages.append(message.llm_formatted_message)
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
             
@@ -749,10 +858,6 @@ class GroupContext:
                 return (messages_to_summarize, self)
         
         return None
-    
-    # def data_extract_img_url(self, data:Dict)->None:
-    #     (message["data"]["url"] for message in data["message"] if message["type"] == "image")
-
     
     @asynccontextmanager
     async def summarizing(self):

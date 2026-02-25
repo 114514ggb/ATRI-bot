@@ -1,8 +1,6 @@
+from atribot.common import common
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.common import common
-
-
 
 tool_json = {
     "name": "send_cloud_music",

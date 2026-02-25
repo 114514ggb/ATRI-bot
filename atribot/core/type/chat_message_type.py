@@ -1,7 +1,9 @@
 import datetime
 import json
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+from pathlib import Path
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -176,7 +178,7 @@ class ForwardSegment(MessageSegment):
     
     def __str__(self) -> str:
         if self.content:
-            content_str = "".join(ChatMessage.from_event(m).llm_formatted_message for m in self.content)
+            content_str = "".join(ChatMessage.from_chat_event(m).llm_formatted_message for m in self.content)
             return f"[CQ:转发消息,id={self.id},content={content_str[:5000]}]"
         return f"[CQ:forward,id={self.id}]"
     
@@ -347,10 +349,14 @@ class FileMessageSegment(MessageSegment, ABC):
         self.url = url
         """文件的网络路径"""
         self.path = path
-        """文件的本地路径"""
+        """文件的本地绝对路径"""
         self.file_size = file_size
         """文件大小字节"""
         super().__init__(type)
+
+    def get_path(self)->Path:
+        """获取文件的路径,不会进行是否存在检测"""
+        return Path(self.path)
 
     @classmethod
     def from_local_path(cls, file_path: str, **kwargs) -> "FileMessageSegment":
@@ -529,18 +535,14 @@ class ChatMessage:
         'role': 'owner' # 群角色
     }
     """
-    
-    def __post_init__(self):
-        self.llm_formatted_message = self.format_for_llm()
 
     @classmethod
-    def from_event(cls, event: Dict[str, Any]) -> "ChatMessage":
+    def from_chat_event(cls, event: Dict[str, Any]) -> "ChatMessage":
         """
         工厂方法：从接收到的 JSON 事件中实例化 ChatMessage
         """
         self_id = event.get('self_id', 0)
         user_id = event.get('user_id', 0)
-        message_time = event.get('time', 0)
 
         parsed_segments: List[MessageSegment] = []
         pure_text_parts: List[str] = []
@@ -611,17 +613,38 @@ class ChatMessage:
             else:
                 parsed_segments.append(UnknownSegment(t, d))
         
-        return cls(
+        chat_message = cls(
             self_id=self_id,
             user_id=user_id,
             group_id=event.get('group_id'),
             message_id=event.get('message_id', 0),
-            time=message_time,
+            time=event.get('time', int(time.time())),
             primeval=event,
             raw_message=event.get('raw_message', ''),
             llm_formatted_message="",
             pure_text="".join(pure_text_parts),
             segments=parsed_segments,
+            sender_info=event.get('sender', {})
+        )
+        
+        chat_message.llm_formatted_message = chat_message.format_for_llm()
+        
+        return chat_message
+        
+    @classmethod
+    def from_not_chat_event(cls, event: Dict[str, Any]) -> "ChatMessage":
+        """用于非聊天消息的初始化"""
+        return cls(
+            self_id=event.get('self_id', 0),
+            user_id=event.get('user_id', 0),
+            group_id=event.get('group_id'),
+            message_id=event.get('message_id', 0),
+            time=event.get('time', int(time.time())),
+            primeval=event,
+            raw_message=event.get('raw_message', ''),
+            llm_formatted_message="",
+            pure_text="",
+            segments=[],
             sender_info=event.get('sender', {})
         )
 
@@ -640,12 +663,13 @@ class ChatMessage:
         return (
             "<MESSAGE>"
             f"<qq_id>{self.user_id}</qq_id>"
-            f"<nick_name>{self.sender_info['nickname']}</nick_name>"
+            f"<nick_name>{self.sender_info.get('nickname')}</nick_name>"
             f"<time>{datetime.datetime.fromtimestamp(self.time).strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
             f"<user_message>{self.get_cq_code()[:2000]}</user_message>"
             f"<message_id>{self.message_id}</message_id>"
             "</MESSAGE>"
         )
+
     
     def __str__(self):
         return self.llm_formatted_message

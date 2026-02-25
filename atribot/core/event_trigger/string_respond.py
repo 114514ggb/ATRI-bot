@@ -47,7 +47,7 @@ class string_response:
             elif send_type is ResponseType.MIXTURE:
                 await self.send_message.send_group_message(group_id, common.construction_message_dict(document,self.url_prefi))
         
-        if time.time() - (await self.context_management.get_group_context(group_id)).last_msg_at < 2:
+        if time.time() - (await self.context_management.get_group_context(group_id)).last_msg_at < 5:
             #如果间隔太短不处理
             return 
         
@@ -139,8 +139,8 @@ class string_response:
             
     monitoring_alike_list = {
         "?": [["img",["ATRI_问号1.jpg","ATRI_问号2.jpg","ATRI_问号3.jpg","ATRI_问号4.png","ATRI_问号5.jpg","ATRI_问号6.jpg","ATRI_问号7.jpg","ATRI_问号8.jpg","ATRI_问号9.jpg","ATRI_问号10.png","ATRI_问号11.jpg"]],["text",["?"]]],
-        "草": [["text",["草"]]],
-        "艹": [["text",["艹"]]],
+        # "草": [["text",["草"]]],
+        # "艹": [["text",["艹"]]],
         "怪了": [["text",["怪了"]]],
         "贴贴": [["text",["贴贴～","贴贴！","不给你贴","亚达哟,不给","我贴～～","贴贴,好啊！","要贴创口贴吗？那我帮你贴一个吧"]]],
         "😰": [["text",["😰"]]],

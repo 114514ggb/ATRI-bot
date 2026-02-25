@@ -1,5 +1,6 @@
 import asyncio
 import datetime
+import time
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import replace
@@ -11,9 +12,16 @@ from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.data_manage import data_manage
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import Context, RichData
+from atribot.core.type.bot_types import Context, MessageBuilder, RichData
+from atribot.core.type.chat_message_type import ChatMessage, FileMessageSegment, FileSegment, ImageSegment, ReplySegment
 from atribot.LLMchat.emoji_system import EmojiCore
-from atribot.LLMchat.LLM_supervisor import GenerationRequest, GenerationResponse, LLMCoordinator, LLMSRequestFailed
+from atribot.LLMchat.LLM_supervisor import (
+    GenerationRequest,
+    GenerationRequestSimplify,
+    GenerationResponse,
+    LLMCoordinator,
+    LLMSRequestFailed,
+)
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
@@ -63,7 +71,7 @@ class chat_baseics(ABC):
         """为不支持图片的model提供图片解析服务，支持多图片最大解析数量为5,
 
         Args:
-            image_urls:包含链接的图像
+            image_urls:包含链接的图像列表
 
         Returns:
             图片描述文本，如果没有图片则没有返回
@@ -113,6 +121,13 @@ class GroupChat(chat_baseics):
             parameter=self.config.model.chat_parameter,
         )
         
+        self.template_request_simplify = GenerationRequestSimplify(
+            model_api=self.model_api,
+            model=self.config.model.connect.model_name,
+            parameter=self.config.model.chat_parameter,
+            messages=[]
+        )
+        
         self.decision_function:Dict[str,Coroutine[Dict]] = {
             "reply" : self.reply_conduct,
             "update" : self.update_conduct,
@@ -130,7 +145,7 @@ class GroupChat(chat_baseics):
         data = message.primeval
         group_id = message.group_id
         increase_context = Context()
-        readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
+        readable_text, img_list = await self.data_manage.data_processing_llm_chat_text(
             data
         )
 
@@ -159,7 +174,7 @@ class GroupChat(chat_baseics):
             if not self.visual_sense:
                 img_prompt = await self.image_processing(img_list)
             else:
-                img_list = await common.urls_to_base64(img_list)
+                img_list = await common.urls_list_to_base64(img_list)
 
         prompt = await self.prompt_structure(
             group_id, 
@@ -226,14 +241,13 @@ class GroupChat(chat_baseics):
         
     async def step_json(
         self, 
-        message: RichData, 
+        message: ChatMessage, 
         prompt:str,
         group_id: int,
     ) -> None:
         """群聊天用的json处理版"""
         
         data = message.primeval
-        group_id = message.group_id
         user_id = message.user_id
         uid = uuid.uuid4().hex
         
@@ -244,16 +258,14 @@ class GroupChat(chat_baseics):
             emoji_id = 183 #表情:我最可爱
         )
 
-        readable_text, img_list = await self.data_manage.data_processing_ai_chat_text(
-            data
-        )
+        readable_text, img_list = await self.data_manage.data_processing_llm_chat_text(data)
         
         img_prompt = None
         if img_list:
             if not self.visual_sense:
                 img_prompt = await self.image_processing(img_list)
             else:
-                img_list = await common.urls_to_base64(img_list)
+                img_list = await common.urls_list_to_base64(img_list)
         
         user_import = self.build_prompt.build_user_Information(
             data = data, 
@@ -279,7 +291,7 @@ class GroupChat(chat_baseics):
                 prompt = prompt,
                 user_info = await self.user_system.get_user_info(user_id),
                 user_import = user_import,
-                chat_record = str(await self.chat_manager.get_group_messages(group_id))[:10000],
+                chat_record = (await self.chat_manager.get_group_messages_str(group_id))[:10000],
                 img_prompt = img_prompt
             ),
             tool_json=self.mcp_tool.get_func_desc_openai_style(),
@@ -356,6 +368,203 @@ class GroupChat(chat_baseics):
             except Exception as e:
                 self.log.exception(f"[{uid}]聊天上下文信息总结出现了错误:{e}")
         
+        
+    async def step_json_enrichment(
+        self,
+        message: ChatMessage, 
+        prompt: str,
+        group_id: int,
+    ) -> None:
+        """群聊天用的json处理版的加强版本,会携带消息中图片的位置信息"""
+        
+        data = message.primeval
+        user_id = message.user_id
+        uid: str = uuid.uuid4().hex
+        message_builder = MessageBuilder()
+        """最新一条消息的构造,包含系统提示词和群历史"""
+        
+        self.log.info(f"[{uid}]群LLM聊天json处理")
+
+        await self.send_message.set_msg_emoji_like(
+            message_id = data['message_id'],
+            emoji_id = 183 #表情:我最可爱
+        )
+
+        message_builder.add_text(f"<group_history>{(await self.chat_manager.get_group_messages_str(group_id))[:10000]}</group_history>")
+        #群聊内容
+
+        await self.chat_message_processing_llm_chat_message(
+            message,
+            message_builder,
+            self.visual_sense
+        )#添加user的部分
+
+        message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>")
+        #user信息
+        
+        message_builder.add_text(self.build_prompt.decision_whether_responses_prompt(
+            group_id = group_id,
+            prompt = prompt,
+            else_prompt = self.emoji_core.emoji_prompt
+        ))#主提示词
+        
+        original_context:Context = await self.get_chat_context(
+            group_id = group_id,
+            user_id = user_id
+        )#以前决策的上下文
+        
+        request: GenerationRequestSimplify = replace(
+            self.template_request_simplify,
+            increment_messages=[message_builder.build()],
+            messages=original_context.get_messages(),
+            tool_json=self.mcp_tool.get_func_desc_openai_style()
+        )
+        
+        response = await self._request_model_with_fallback_(
+            request = request, 
+            message = message,
+            prompt = prompt, 
+            uid = uid
+        )
+
+        self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
+        
+        for response_json in (common.extract_json_from_text(s) for s in response.reply_text if s != ""):
+            
+            if isinstance(response_json, dict):
+                
+                for response_json in response_json.get("return",[]):
+                    
+                    response_json:dict[str: str|int]
+                    if decision := response_json.get("decision"):
+                        
+                        if fun := self.decision_function.get(decision):
+                            
+                            await fun(response_json, data)
+                            
+                        else:
+                            self.log.error(f"[{uid}]无效decision:{response_json}")
+                        
+                    else:
+                        self.log.error(f"[{uid}]返回json错误:{response_json}")
+            else:
+                self.log.error(f"返回json解析不正确:{type(response_json)}")
+    
+        original_context.add_user_message(f"{prompt}{message.llm_formatted_message}")
+        original_context.extend(
+            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+        )
+        
+        if response.reasoning_content:
+            self.log.info(f"[{uid}]推理内容:\n{"".join(response.reasoning_content)}")
+        
+        self.log.info(f"[{uid}]结束json处理!")
+        
+        if total_tokens := response.metadata.get("total_tokens"):
+            original_context.total_tokens = total_tokens#更新tiken计数
+        
+        if truncated_context := original_context.record_validity_check():
+            try:
+                if summarize_context := await self.memiry_system.summarize_context(str(truncated_context)):
+                    original_context.messages.insert(
+                        0,
+                        {"role": "assistant", "content":  summarize_context[:3000]}#简单做一个限制让这个不要太长
+                    )
+                    self.log.info(f"[{uid}]聊天上下文总结完成{user_id}消息:{summarize_context}")
+                else:
+                    self.log.info(f"[{uid}]聊天上下文总结{user_id}消息为none")
+            except Exception as e:
+                self.log.exception(f"[{uid}]聊天上下文信息总结出现了错误:{e}")
+    
+    
+    async def chat_message_processing_llm_chat_message(
+        self, 
+        chat_message:ChatMessage,
+        message_builder:MessageBuilder,
+        Including_pictures:bool
+    ):
+        """用来解析最新的输入格式化ai读的上下文,对ChatMessage的解析,会包含图片等信息"""
+        
+        Segment = chat_message.segments[0]
+        quote_message = None
+        data = chat_message.primeval
+        message_builder.add_text(
+            f"最新用户消息:\n<MESSAGE>"
+            f"<user_id>{data['user_id']}</user_id>"
+            f"<nick_name>{data['sender']['nickname']}</nick_name>"
+            f"<group_role>{data['sender']['role']}</group_role>"
+            f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
+            f"<message_id>{data['message_id']}</message_id>"
+            "<user_message>"
+        )
+        
+        if Including_pictures:
+            async def dispose_img(message:ImageSegment, message_builder:MessageBuilder):
+                """交给其他模型识别图像转换文字"""
+                if img := await common.url_to_base64([message.url],""):
+                    message_builder.add_image_base64(img,"image/jpeg")
+                else:
+                    message_builder.add_text("[CQ:image,summary=图片出现问题]")
+        else:
+            async def dispose_img(message:ImageSegment, message_builder:MessageBuilder):
+                """交给其他模型识别图像转换文字"""
+                message_builder.add_text(await self.image_processing([message.url]))
+        
+        if isinstance(Segment,ReplySegment):
+            if reply_data := await self.send_message.get_msg_details(Segment.message_id):
+                quote_message = ChatMessage.from_chat_event(reply_data)
+                message_builder.add_text("<引用了消息段>")
+        
+        if quote_message:
+            for message in quote_message.segments:
+                if isinstance(message,FileMessageSegment):
+                    if isinstance(message,ImageSegment):
+                        await dispose_img(message,message_builder)
+                        continue
+                    if isinstance(message,FileSegment):
+                        if message.file_name.split('.')[-1].lower() in {'png', 'jpg', 'jpeg', 'gif'}:
+                            await dispose_img(message,message_builder)
+                            continue
+
+                message_builder.add_text(message.__str__())
+            
+            message_builder.add_text("</引用了消息段>")
+            
+            for message in chat_message.segments[1:]:
+                if isinstance(message,FileMessageSegment):
+                    if isinstance(message,ImageSegment):
+                        await dispose_img(message,message_builder)
+                        continue
+                    if isinstance(message,FileSegment):
+                        if message.file_name.split('.')[-1].lower() in {'png', 'jpg', 'jpeg', 'gif'}:
+                            await dispose_img(message,message_builder)
+                            continue
+
+                message_builder.add_text(message.__str__())
+
+        else:
+            
+            for message in chat_message.segments:
+                if isinstance(message,FileMessageSegment):
+                    if isinstance(message,ImageSegment):
+                        await dispose_img(message,message_builder)
+                        continue
+                    if isinstance(message,FileSegment):
+                        if message.file_name.split('.')[-1].lower() in {'png', 'jpg', 'jpeg', 'gif'}:
+                            await dispose_img(message,message_builder)
+                            continue
+
+                message_builder.add_text(message.__str__())
+        
+        if memory := [
+            (f"user_id:{r[0]}",datetime.datetime.fromtimestamp(r[1]).strftime("%Y-%m-%d %H:%M:%S"),r[2]) for r in await self.memiry_system.query_user_recently_memory(
+                text = chat_message.pure_text,
+                limit = 10
+            )
+        ] if chat_message.pure_text else None:
+            message_builder.add_text(f"</user_message></MESSAGE>以下是用户可能相关的最近记忆片段：<recent_memory_snippet>{memory}</recent_memory_snippet>")
+        else:
+            message_builder.add_text("</user_message></MESSAGE>")
     
     async def reply_conduct(self, response_json:Dict, data:Dict)->None:
         
@@ -411,7 +620,7 @@ class GroupChat(chat_baseics):
             request (GenerationRequest): 请求体
             img_list (list[str]): 图像url list
             group_id (int): 群号
-            reminiscence (list): 数据库查询的记忆
+            uid (str): 唯一响应的标识
 
         Returns:
             GenerationResponse: 回复
@@ -491,6 +700,99 @@ class GroupChat(chat_baseics):
         self.log.error(f"[{uid}]所有备用api出现错误!")
         raise ValueError(f"[{uid}]所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
 
+    async def _request_model_with_fallback_(
+        self,
+        request: GenerationRequestSimplify,
+        message: ChatMessage,
+        prompt: str,
+        uid: str
+    ) -> GenerationResponse:
+        """尝试模型请求,失败时自动降级到配置的备用API
+
+        Args:
+            request (GenerationRequestSimplify): 请求体
+            message (ChatMessage): 原始消息体
+            prompt (str): 响应提示词
+            uid (str): 唯一响应的标识
+
+        Returns:
+            GenerationResponse: 回复
+        """
+        try:
+            return await self.model_api_supervisor.run(request)
+
+        except LLMSRequestFailed as e:
+            self.log.exception(f"[{uid}]群聊天调用工具中途出现了错误:{e}\n尝试备用api!")
+            request.generation_response = e.get_response()
+            
+        except Exception as e:
+            self.log.exception(f"[{uid}]群聊天出现了错误:{e}\n尝试备用api!")
+            
+        opposite_structure_increment_messages = None
+        request.model_api = None
+        request.parameter = { #一个绝大多数模型可用的通用配置
+            "temperature":0.1,
+            "top_p":0.9,
+            "max_tokens": 8192,
+            "tool_choice": "auto"
+        }
+        
+        for parameter in self.api_order:
+            
+            supplier = parameter["supplier"]
+            model_name = parameter["model_name"]
+            self.log.info(f"正在使用备用api,来自{parameter}")
+
+            visual_sense:bool = self.supplier.get_model_information(
+                supplier, model_name
+            ).get("visual_sense",False)
+
+            if visual_sense == self.visual_sense:
+                new_request = replace(
+                    request,
+                    model=model_name,
+                    supplier_name=supplier,
+                )
+            else:
+                if not opposite_structure_increment_messages:
+                    
+                    message_builder = MessageBuilder()
+
+                    message_builder.add_text(f"<group_history>{(await self.chat_manager.get_group_messages_str(message.group_id))[:10000]}</group_history>")#其实这个历史记录会不和前面一致
+
+                    await self.chat_message_processing_llm_chat_message(
+                        message,
+                        message_builder,
+                        self.visual_sense
+                    )
+
+                    message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(message.user_id)}</current_user_info>")
+                    
+                    message_builder.add_text(self.build_prompt.decision_whether_responses_prompt(
+                        group_id = message.group_id,
+                        prompt = prompt,
+                        else_prompt = self.emoji_core.emoji_prompt
+                    ))
+                    
+                    message_builder.build_and_add()
+                    
+                    opposite_structure_increment_messages = [message_builder.build()]
+
+                new_request = replace(
+                    request,
+                    model=model_name,
+                    supplier_name=supplier,
+                    increment_messages = opposite_structure_increment_messages
+                )
+
+            try:
+                return await self.model_api_supervisor.run(new_request)
+            except Exception as e:
+                self.log.error(f"[{uid}]备用api{parameter}出现了错误!:{e}")
+
+        self.log.error(f"[{uid}]所有备用api出现错误!")
+        raise ValueError(f"[{uid}]所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
+
     async def get_chat_context(self, group_id:int, user_id:int)->Context:
         """获取需要的聊天
 
@@ -521,7 +823,7 @@ class GroupChat(chat_baseics):
         """
         prompt = ""
             
-        prompt += f"\n\n<group_chat_history>{str(await self.chat_manager.get_group_messages(group_id))[:5000]}</group_chat_history>" #简单防止过长
+        prompt += f"\n\n<group_chat_history>{(await self.chat_manager.get_group_messages_str(group_id))[:5000]}</group_chat_history>" #简单防止过长
         
         if knowledge_base:
             prompt += f"\n\n<user_memory_snippet>{knowledge_base}</user_memory_snippet>"

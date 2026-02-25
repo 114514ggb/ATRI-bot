@@ -1,9 +1,7 @@
-from atribot.core.service_container import container
-from atribot.LLMchat.memory.memiry_system import memorySystem
 import datetime
 
-
-
+from atribot.core.service_container import container
+from atribot.LLMchat.memory.memiry_system import memorySystem
 
 tool_json = {
     "name": "memory_search",
@@ -20,7 +18,7 @@ tool_json = {
                 "user_only",
                 "knowledge_base_only"
             ],
-            "description": "搜索的数据范围。\n- 'all': 搜索所有内容（默认）。\n- 'user_only': 仅搜索用户和群组的聊天记忆，排除通用知识库。\n- 'knowledge_base_only': 仅搜索预设的知识库/设定集，排除用户聊天记录。",
+            "description": "搜索的数据范围。- 'all': 搜索所有内容（默认）。- 'user_only': 仅搜索用户和群组的聊天记忆，排除通用知识库。- 'knowledge_base_only': 仅搜索预设的知识库/设定集，排除用户聊天记录。",
             "default": "all"
         },
         "start_date": {

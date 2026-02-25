@@ -15,7 +15,7 @@ from atribot.LLMchat.memory.prompts import (
 )
 from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
-from atribot.LLMchat.RAG.RAG import RAGManager
+from atribot.LLMchat.RAG.rag import RAGManager
 
 
 class memorySystem:
@@ -48,15 +48,15 @@ class memorySystem:
             ])
 
 
-    async def extract_stored_group_message(self, messages:List[Dict[str,str]], bot_id:int|str, group_id:int|str)->None:
+    async def extract_stored_group_message(self, messages_str:str, bot_id:int|str, group_id:int|str)->None:
         """对于群聊，从提取总结到存入向量数据库全流程
 
         Args:
-            messages (List[Dict[str,str]]): 上下文消息
+            messages_str (str): 上下文消息,的字符串
             group_id (int | str): 群号
             bot_id (int|str): 总结排除在外的bot的qq号
         """
-        summarize_list:List[Dict[str,str]|Dict[str,Dict]] = await self.extract_and_summarize_group_facts(str(messages),bot_id)
+        summarize_list:List[Dict[str,str]|Dict[str,Dict]] = await self.extract_and_summarize_group_facts(messages_str,bot_id)
         
         self.logger.info(f"群消息总结信息:{summarize_list}")
         

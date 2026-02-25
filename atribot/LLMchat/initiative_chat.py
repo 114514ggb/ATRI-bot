@@ -3,7 +3,8 @@ from typing import List, Literal, Optional
 
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import GroupContext, LLMGroupChatCondition, RichData
+from atribot.core.type.bot_types import GroupContext, LLMGroupChatCondition
+from atribot.core.type.chat_message_type import ChatMessage
 from atribot.LLMchat.chat import GroupChat
 
 
@@ -16,9 +17,9 @@ class initiativeChat:
         self.group_chat:GroupChat = container.get("GroupChat")
         self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
     
-    async def decision(self, message: RichData, group_context:GroupContext, at: bool = False) -> bool:
+    async def decision(self, message: ChatMessage, group_context:GroupContext, at: bool = False) -> bool:
         """决策是否应该发言"""
-        if message.text == "":
+        if message.pure_text == "":
             return False
 
         group_id: int = message.group_id
@@ -80,7 +81,7 @@ class initiativeChat:
     
     async def _execute_reply(
         self, 
-        message: RichData, 
+        message: ChatMessage, 
         group_id:int,  
         decision_params:LLMGroupChatCondition,
         log_msg:str, 
@@ -90,7 +91,7 @@ class initiativeChat:
             self.logger.info(f"Group {group_id} {log_msg}")
             await decision_params.reset_turns_since_last_llm() 
             
-            await self.group_chat.step_json(
+            await self.group_chat.step_json_enrichment(
                 message=message,
                 group_id=group_id,
                 prompt=prompt

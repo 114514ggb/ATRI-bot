@@ -21,6 +21,7 @@ dependencies = [
     "croniter>=6.0.0",
     "trafilatura>=2.0.0",
     "strictyaml>=1.7.3",
+    "pillow>=12.1.0",
 ]
 
 [tool.ruff]

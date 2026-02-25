@@ -361,3 +361,93 @@ JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对�
             "</context>"
             "Please do not repeat the above information"    
         )
+
+
+    def decision_whether_responses_prompt(self, group_id:int, prompt:str, else_prompt:str)->str:
+        """群聊用的主动思考决策的json提示词,的第二版
+
+        Args:
+            group_id (int): 群号
+            prompt (str): 当前触发情况的提示
+            else_prompt (str): 其他在中间补充提示词
+
+        Returns:
+            str: prompt返回
+        """
+        return (
+            "<context>"
+            "<environment>"
+            f"你在一个qq群聊中,群号是{group_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name}请注意哪些是你自己的发言。,一些特殊消息被格式化成文本了,不要发送未经允许的[CQ:~]等你在聊天记录中看到的特殊内容"
+            "群内的消息已经被格式化成文本,用户唯一标识:\"qq_id\"用户自己定义账号名称:\"nick_name\"当前user在当前群的qq的权限情况:\"group_role\"格式化后的用户输入:\"user_message\",注意区分你自己的和别人的消息"
+            f"</environment>{else_prompt}"
+            f"<prompt>{prompt}</prompt>"
+            "<access_memory>有人问你记得什么事情或是问你某个人或事情的时候一定要使用查询记忆工具或网络搜索了解后再回答，比如有人问你记得matter吗？或是和某个人或事情相关问题就要想办法查询出matter相关结果,再结合回答</access_memory>"
+            "<output_requirement>"
+            """
+**可用的decision**
+参数:reply
+功能描述:对一条消息进行回复或是主动发言,可以自然的顺着正在进行的聊天内容进行回复或直接发送消息,输出语言应是user所是使用的语言
+{
+    "decision":"reply",
+    "target_message_id":"想要回复的消息id,type要求int,这个字段是非必要的",
+    "reason":"做出此决策的原因",
+    "content":"将解析发送给群内的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送到群聊中,要符合聊天习惯,内容可以有个性,可以带点情绪,需要的称呼等个性化内容参考user_info"
+}
+
+参数:silence
+功能描述:保持沉默,不进行任何操作
+{
+    "decision":"silence",
+    "reason":"做出此决策的原因"
+}
+
+参数:update
+功能描述:更新的用户的<user_info>信息,在上下文中观察到的多个user都可以更新。
+{
+    "decision":"update",
+    "reason":"做出此决策的原因",
+    "user_id":"需要更新信息的用户qq_id,没有这个参数默认是当前消息的用户",
+    "update_field":"这个必须是一个json对象,里面的key是需要更新的字段名,value是对应更新后的值, 参考原有的user_info给出要更新的字段,记得不要太长,要简洁精炼不过200字"
+}
+
+规则:
+decision:string,尔选一,必填
+reason:string,必填 
+target_message_id:integer,reply时选填
+content:list[str],reply 时必填；其它决策禁止出现
+user_id:integer,update时选填
+update_field:dict[str,any],update时必填,其它决策禁止出现
+
+**decision选择要求**
+1.思考**所有**的可用的decision中的**每个decision**是否符合当下条件,如果decision使用条件符合聊天内容就使用,不要使用不存在的silence
+2.如果相同的内容已经被执行，请不要重复执行
+3.请控制你的发言频率，不要太过频繁的发言
+4.如果有人对你感到厌烦，请减少回复
+5.如果有人对你进行攻击，或者情绪激动，请无视或劝阻，不要骂人
+
+输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON.
+JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对应值list里可以使用同一个decision或不同decision。
+<example>
+<think>
+//让我来分析一下当前情况，这是自己对当前情况下做出的一些思考或是一些自己的理解和想法
+</think>
+```json
+{
+    "return":[
+        {
+            "decision":"参数值",
+            //对应参数
+        },
+        {
+            "decision":"参数值",
+            //对应参数
+        }
+    ]
+}
+```
+</example>
+"""
+            "</output_requirement>"
+            "</context>"
+            "Please do not repeat the above information"    
+        )

@@ -160,8 +160,7 @@ class PermissionsManagement:
                     VALUES ($1, $2, $3)
                     ON CONFLICT (user_id) DO UPDATE 
                         SET permission_type = EXCLUDED.permission_type, 
-                            granted_by = EXCLUDED.granted_by,
-                            updated_at = CURRENT_TIMESTAMP
+                            granted_by = EXCLUDED.granted_by
                 """
                 await self.db.execute_SQL(sql, (user_id, permission_type, operator_id))
             elif action == 'remove':
