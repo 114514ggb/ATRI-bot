@@ -115,7 +115,7 @@ class GroupChat(chat_baseics):
         self.template_request = GenerationRequest(
             model_api=self.model_api,
             new_message="",
-            messages=[],
+            messages=None,
             model=self.config.model.connect.model_name,
             system_review=self.config.model.connect.system_review,
             parameter=self.config.model.chat_parameter,
@@ -125,7 +125,7 @@ class GroupChat(chat_baseics):
             model_api=self.model_api,
             model=self.config.model.connect.model_name,
             parameter=self.config.model.chat_parameter,
-            messages=[]
+            messages=None
         )
         
         self.decision_function:Dict[str,Coroutine[Dict]] = {
@@ -283,7 +283,7 @@ class GroupChat(chat_baseics):
             user_id = user_id
         )
         
-        request = replace(
+        request: GenerationRequest = replace(
             self.template_request,
             messages=original_context.get_messages(),
             new_message=self.prompt_structure_json(
@@ -371,7 +371,7 @@ class GroupChat(chat_baseics):
         
     async def step_json_enrichment(
         self,
-        message: ChatMessage, 
+        message: ChatMessage,
         prompt: str,
         group_id: int,
     ) -> None:
@@ -449,7 +449,7 @@ class GroupChat(chat_baseics):
                         self.log.error(f"[{uid}]返回json错误:{response_json}")
             else:
                 self.log.error(f"返回json解析不正确:{type(response_json)}")
-    
+
         original_context.add_user_message(f"{prompt}{message.llm_formatted_message}")
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
@@ -500,8 +500,8 @@ class GroupChat(chat_baseics):
         
         if Including_pictures:
             async def dispose_img(message:ImageSegment, message_builder:MessageBuilder):
-                """交给其他模型识别图像转换文字"""
-                if img := await common.url_to_base64([message.url],""):
+                """给自己解析图像"""
+                if img := await common.url_to_base64(message.url,""):
                     message_builder.add_image_base64(img,"image/jpeg")
                 else:
                     message_builder.add_text("[CQ:image,summary=图片出现问题]")
@@ -512,8 +512,8 @@ class GroupChat(chat_baseics):
         
         if isinstance(Segment,ReplySegment):
             if reply_data := await self.send_message.get_msg_details(Segment.message_id):
-                quote_message = ChatMessage.from_chat_event(reply_data)
-                message_builder.add_text("<引用了消息段>")
+                quote_message = ChatMessage.from_chat_event(reply_data["data"])
+                message_builder.add_text("<引用消息段>")
         
         if quote_message:
             for message in quote_message.segments:
@@ -528,7 +528,7 @@ class GroupChat(chat_baseics):
 
                 message_builder.add_text(message.__str__())
             
-            message_builder.add_text("</引用了消息段>")
+            message_builder.add_text("</引用消息段>")
             
             for message in chat_message.segments[1:]:
                 if isinstance(message,FileMessageSegment):
@@ -763,7 +763,7 @@ class GroupChat(chat_baseics):
                     await self.chat_message_processing_llm_chat_message(
                         message,
                         message_builder,
-                        self.visual_sense
+                        visual_sense
                     )
 
                     message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(message.user_id)}</current_user_info>")

@@ -9,6 +9,7 @@ from atribot.core.type.bot_types import Context
 
 
 class ContextContainer:
+    """用于参照的一个类"""
     
     user_id: int
     """user的qq号"""

@@ -299,9 +299,8 @@ class Context():
         Returns:
             list: 被截取掉的消息列表,如果有的话
         """
-        user_count = sum(1 for msg in self.messages if msg["role"] == "user")
         
-        if user_count > self.user_max_record or self.total_tokens > self.user_max_token:
+        if sum(1 for msg in self.messages if msg["role"] == "user") > self.user_max_record or self.total_tokens > self.user_max_token:
             # 先截取到总长度为 user_max_record
             kept_messages = self.messages[-self.user_max_record:]
             

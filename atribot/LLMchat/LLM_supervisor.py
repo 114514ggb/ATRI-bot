@@ -197,9 +197,7 @@ class LLMCoordinator():
         Returns:
             GenerationResponse: 输出
         """ 
-        increase_context = Context(
-            messages = request.messages + request.increment_messages
-        )
+        increase_context = Context(messages = request.increment_messages)
         
         model_api = request.model_api or (self.supplier.get_filtration_connection(
             supplier_name=request.supplier_name,

@@ -19,12 +19,13 @@ class initiativeChat:
     
     async def decision(self, message: ChatMessage, group_context:GroupContext, at: bool = False) -> bool:
         """决策是否应该发言"""
-        if message.pure_text == "":
+        if not message.segments:
             return False
 
         group_id: int = message.group_id
         user_id: int = message.user_id
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
+        
         if group_context.time_window.get_recent_avg_interval(4) < 0.7:
             #如果消息间隔过低不考虑
             self.logger.info(f"群{group_id}消息超过限制~不考虑回复")

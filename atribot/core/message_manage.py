@@ -8,7 +8,7 @@ from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_type import AtSegment, ChatMessage
 from atribot.LLMchat.chat import GroupChat
 from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.memory.memiry_system import memorySystem
@@ -27,24 +27,23 @@ class message_router():
     async def main(self, data:dict):
         """主消息处理逻辑"""
         
-        group_id = data.get("group_id")
-        chat_message:ChatMessage = None
-        
         if data.get('post_type') in ["message","message_sent"]:
             chat_message = ChatMessage.from_chat_event(data)
         else:
-            if data.get("meta_event_type") !=  'heartbeat':
+            if data.get("meta_event_type") ==  'heartbeat':
+                return #目前心跳的话就跳过吧
+            else:
                 self.logger.debug(f"原始消息:\n{data}")
             chat_message = ChatMessage.from_not_chat_event(data)
         
-        if group_id:            
-            await self.group_manage.handle_message(chat_message, group_id)
+        if chat_message.group_id:            
+            await self.group_manage.handle_message(chat_message, chat_message.group_id)
         else:
             #私聊处理
             return
 
         if chat_message.segments:
-            await self.store_data(chat_message,group_id) #存储群消息
+            await self.store_data(chat_message,chat_message.group_id) #存储群消息
             
 
     async def store_data(self, chat_message:ChatMessage, group_id:int)->None:
@@ -137,7 +136,7 @@ class group_manage(message_manage):
 
         has_permission = self.permissions_management.check_access(user_id)
 
-        if self._check_is_mentioned(data):
+        if self._check_is_mentioned(chat_message):
             #@处理
             await self._handle_mentioned_message(chat_message.pure_text, data, group_id, has_permission, chat_message, group_context)
         elif has_permission:
@@ -149,10 +148,10 @@ class group_manage(message_manage):
         
         await self._process_memory_summary(chat_message, group_id)
 
-    def _check_is_mentioned(self, data: dict) -> bool:
-        """辅助函数：检查是否被 @"""
-        for msg in data.get("message", []):
-            if msg.get("type") == "at" and str(msg.get("data", {}).get("qq")) == self.self_qq:
+    def _check_is_mentioned(self, chat_message:ChatMessage) -> bool:
+        """辅助函数：检查bot是否被 @"""
+        for segment in chat_message.segments:
+            if isinstance(segment,AtSegment) and segment.user_id == chat_message.self_id:
                 return True
         return False
     
@@ -194,7 +193,7 @@ class group_manage(message_manage):
                     if ctx is not None:
                         self.logger.info(f"开始总结 {group_id} 群消息!")
                         await self.memiry_system.extract_stored_group_message(
-                            messages=messages,
+                            messages_str=messages,
                             bot_id=chat_message.self_id,
                             group_id=group_id
                         )

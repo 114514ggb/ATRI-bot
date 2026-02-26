@@ -3,8 +3,8 @@ import json
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
@@ -622,7 +622,7 @@ class ChatMessage:
             primeval=event,
             raw_message=event.get('raw_message', ''),
             llm_formatted_message="",
-            pure_text="".join(pure_text_parts),
+            pure_text="".join(pure_text_parts).strip(),
             segments=parsed_segments,
             sender_info=event.get('sender', {})
         )
@@ -637,7 +637,7 @@ class ChatMessage:
         return cls(
             self_id=event.get('self_id', 0),
             user_id=event.get('user_id', 0),
-            group_id=event.get('group_id'),
+            group_id=event.get('group_id', 0),
             message_id=event.get('message_id', 0),
             time=event.get('time', int(time.time())),
             primeval=event,

@@ -8,7 +8,6 @@ dependencies = [
     "aiohttp[speedups]>=3.13.3",
     "mcp>=1.23.0",
     "openai>=1.82.0",
-    "pymilvus>=2.6.0",
     "fastapi>=0.115",
     "aiomysql>=0.3.0",
     "websockets>=15.0.1",
@@ -22,6 +21,7 @@ dependencies = [
     "trafilatura>=2.0.0",
     "strictyaml>=1.7.3",
     "pillow>=12.1.0",
+    "numpy>=2.4.2",
 ]
 
 [tool.ruff]
