@@ -45,6 +45,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
         """
         异步初始化方法
         """
+        # from aiohttp.resolver import AsyncResolver
         if self.client is None:
             self.client = aiohttp.ClientSession(
             connector=aiohttp.TCPConnector(
@@ -52,7 +53,10 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                 limit_per_host=5,           # 单主机保持连接数
                 force_close=False,          # 允许keepalive
                 enable_cleanup_closed=True, # 自动清理关闭连接
-                keepalive_timeout=20        # keepalive超时
+                keepalive_timeout=20,       # keepalive超时
+                # resolver=AsyncResolver(
+                #     nameservers=['8.8.8.8', '8.8.4.4', '114.114.114.114'] #DNS相关
+                # )
             ),
             timeout=aiohttp.ClientTimeout(total=360, connect=20),  # 总超时设置
             headers=self.headers

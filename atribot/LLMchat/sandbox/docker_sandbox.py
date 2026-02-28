@@ -79,7 +79,7 @@ class DockerSandbox(SandBoxBase):
                 cpu_quota=self.cpu_quota,
                 pids_limit=self.pids_limit,
                 network_mode=self.network_mode,
-                # cap_drop=['ALL'] # 进阶安全：丢弃所有 Linux 能力
+                # cap_drop=['ALL'] # 丢弃所有 Linux 能力
             )
 
             self.is_running = True
@@ -239,7 +239,6 @@ class DockerSandbox(SandBoxBase):
     ) -> ExecutionResult:
         """在沙盒中执行一次性python代码。
         
-        逻辑变更：
         1. 如果产生单个文件，直接返回该文件。
         2. 如果产生多个文件，打包成 output.zip 返回。
         3. 增加总大小限制检查。

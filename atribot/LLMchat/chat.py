@@ -577,7 +577,7 @@ class GroupChat(chat_baseics):
         await chat_condition.update_last_time()
         
         await self.send_reply_message(
-            chat_text_list = response_json["content"],
+            chat_text_list = response_json.get("content",[]),
             message_id = response_json.get("target_message_id"),
             group_id = group_id,
             since_llm = since
