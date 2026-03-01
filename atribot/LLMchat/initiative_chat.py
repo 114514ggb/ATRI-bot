@@ -92,7 +92,7 @@ class initiativeChat:
             self.logger.info(f"Group {group_id} {log_msg}")
             await decision_params.reset_turns_since_last_llm() 
             
-            await self.group_chat.step_json_enrichment(
+            await self.group_chat.step(
                 message=message,
                 group_id=group_id,
                 prompt=prompt

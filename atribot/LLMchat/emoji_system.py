@@ -3,6 +3,7 @@ import random
 import re
 from typing import Match
 
+from atribot.core.type.chat_message_type import File, GroupMessage
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 
 
@@ -12,7 +13,7 @@ class EmojiCore:
     def __init__(self,item_path:str ,folder_path:str = ""):
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
-        self.file = f"file://{item_path}{folder_path}"
+        self.file = f"{item_path}{folder_path}"
         self.emoji_prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
@@ -72,54 +73,15 @@ class EmojiCore:
         return random.choice(self.emoji_file_dict[tag]) if tag in self.emoji_file_dict else None
     
     def get_complete_file_path(self, tag_content:str)->str:
-        """返回一个标签的完整路径
+        """返回一个标签的绝对路径
 
         Args:
             tag_content (str): 标签
 
         Returns:
-            str: 完整路径
+            str: 完整路径,不包含file://
         """
         return f"{self.file}/{tag_content}/{self.get_random_emoji_name(tag_content)}"
-    
-    def process_text_and_emotion_tags(text: str, emoji_dict: dict) -> tuple[str, list[str]]:
-        """
-        过滤字符串标签并且提取标签
-        
-        Args:
-            text: 要处理的字符串
-            emoji_dict: 指定的标签字典
-
-        Returns:
-            tuple[str, list[str]]: 处理过的字符串和标签组成的元组
-        """
-        tags_list = []
-        result_chars = []
-        emoji_set = set(emoji_dict)
-        i = 0
-        number = len(text)
-        
-        while i < number:
-            char = text[i]
-            if char == '[':
-                start = i + 1  # 记录标签开始位置
-                i += 1
-
-                while i < number and text[i] != ']':
-                    i += 1
-                if i < number:
-                    tag_content = text[start:i]
-                    if tag_content in emoji_set:
-                        tags_list.append(tag_content)
-                        i += 1
-                        continue  # 跳过添加标签内容到结果
-
-                    i = start - 1
-
-            result_chars.append(char)
-            i += 1
-        
-        return (''.join(result_chars), tags_list)
     
     def parse_text_with_emotion_tags(self, text: str, emoji_dict: dict) -> list:
         """
@@ -183,7 +145,7 @@ class EmojiCore:
                 # 添加表情图片
                 segments.append({
                     "type": "image",
-                    "data": {"file": self.get_complete_file_path(tag_content)}
+                    "data": {"file": "file://"+self.get_complete_file_path(tag_content)}
                 })
                 
                 # 更新位置
@@ -202,6 +164,69 @@ class EmojiCore:
                     start_pos = bracket_start + 1
             
         return segments
+
+    def parse_text_with_emotion_tags_return_construction(
+        self, 
+        text: str, 
+        emoji_dict: dict,
+        send_mesage: GroupMessage
+        ):
+        """
+        解析文本并提取表情标签，保留原始位置信息，在原有的GroupMessage后构造完成消息
+        
+        Args:
+            text: 要处理的字符串
+            emoji_dict: 表情标签字典
+            send_mesage: 要构造的消息对象
+        """        
+        if '[' not in text:
+            send_mesage.add_text(text)
+        
+        emoji_set = set(emoji_dict)
+        text_len = len(text)
+        start_pos = 0
+        add_start = 0
+        
+        while start_pos < text_len:
+            bracket_start = text.find('[', start_pos)
+            
+            if bracket_start == -1:
+                # 添加剩余文本
+                if remaining_text := text[add_start:]:
+                    send_mesage.add_text(remaining_text)
+                break
+            
+            # 查找对应的 ']'
+            bracket_end = text.find(']', bracket_start + 1)
+            
+            if bracket_end == -1:
+                # 没有 ']'，剩余部分作为文本
+                if remaining_text := text[add_start:]:
+                    send_mesage.add_text(remaining_text)
+                break
+            
+            # 提取标签内容
+            tag_content = text[bracket_start + 1:bracket_end]
+            
+            if tag_content in emoji_set:
+                
+                if before_text := text[add_start:bracket_start]:
+                    send_mesage.add_text(before_text)
+                
+                # 添加表情图片
+                send_mesage.add_image(File.from_local_path(self.get_complete_file_path(tag_content)))
+                
+                # 更新位置
+                add_start = start_pos = bracket_end + 1
+            else:
+                # 无效标签
+                if tag_content.startswith("CQ:at,qq=" ):
+                    if before_text := text[add_start:bracket_start]:
+                        send_mesage.add_text(before_text)
+                    send_mesage.add_at(tag_content[9:])
+                    add_start = start_pos = bracket_end + 1
+                else:
+                    start_pos = bracket_start + 1
 
     def parse_text_with_emotion_tags_separator(self, text: str, emoji_dict: dict, separator:str) -> list:
         """
@@ -265,7 +290,7 @@ class EmojiCore:
                 
                 segments.append({
                     "type": "image",
-                    "data": {"file": self.get_complete_file_path(tag_content)}
+                    "data": {"file": "file://"+self.get_complete_file_path(tag_content)}
                 })
                 
                 # 更新位置

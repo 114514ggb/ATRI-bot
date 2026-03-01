@@ -70,7 +70,7 @@
         }
     },
     "ai_chat":{
-        "playRole":"ATRI",
+        "playRole":"ATRI_simplify",
         "ai_max_record":20,
         "group_max_record":20,
         "private_max_record":20

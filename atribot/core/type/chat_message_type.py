@@ -289,15 +289,15 @@ class File:
 
     @classmethod
     def from_url(cls, url: str) -> "File":
-        """从网络 URL 创建 File 对象，自动添加 https:// 前缀
+        """从网络 URL 创建 File 对象
 
         Args:
-            url: URL 字符串，不包含 http:// 或 https://
+            url: URL 字符串
 
         Returns:
             File: 包含正确前缀的 File 实例。
         """
-        return cls(file="https://" + url)
+        return cls(file=url)
 
     @classmethod
     def from_base64(cls, data: str) -> "File":

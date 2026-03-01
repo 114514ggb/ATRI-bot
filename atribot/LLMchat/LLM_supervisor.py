@@ -162,31 +162,31 @@ class LLMCoordinator():
             model_api  = model_api
         )
         
-    
-        if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
-            #没有tool调用提前返回
-            
-            increase_context.messages.append(assistant_message)
-            return  self._update_response(
-                GenerationResponse(
-                    messages = increase_context.messages,
-                    metadata = api_reply.get("usage",{})
-                ), 
-                assistant_message
+        if tool_calls := assistant_message.get('tool_calls'):
+            #有工具处理
+            increase_context.add_assistant_tool_message(
+                content,
+                tool_calls = tool_calls,
+                reasoning_content = assistant_message.get("reasoning_content")
             )
-        
-        increase_context.add_assistant_tool_message(
-            content,
-            tool_calls = assistant_message['tool_calls'],
-            reasoning_content = assistant_message.get("reasoning_content")
+            
+            return await self.tool_calls_while(
+                request = request,
+                assistant_message = assistant_message,
+                increase_context = increase_context,
+                model_api = model_api
+            )
+            
+        increase_context.messages.append(assistant_message)
+        return  self._update_response(
+            GenerationResponse(
+                messages = increase_context.messages,
+                metadata = api_reply.get("usage",{})
+            ), 
+            assistant_message
         )
         
-        return await self.tool_calls_while(
-            request = request,
-            assistant_message = assistant_message,
-            increase_context = increase_context,
-            model_api = model_api
-        )
+
     
     async def run(self, request:GenerationRequestSimplify)->GenerationResponse:
         """对于GenerationRequest的主处理函数,运行后产生结果,中间会处理工具掉用
@@ -213,38 +213,48 @@ class LLMCoordinator():
             increase_context  = increase_context,
             model_api  = model_api
         )
-        
     
-        if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
-            #没有tool调用提前返回
-            
-            increase_context.messages.append(assistant_message)
-            return  self._update_response(
-                GenerationResponse(
-                    messages = increase_context.messages,
-                    metadata = api_reply.get("usage",{})
-                ), 
-                assistant_message
+        if tool_calls := assistant_message.get('tool_calls'):
+            #有tool处理
+            increase_context.add_assistant_tool_message(
+                content,
+                tool_calls = tool_calls,
+                reasoning_content = assistant_message.get("reasoning_content")
             )
-        
-        increase_context.add_assistant_tool_message(
-            content,
-            tool_calls = assistant_message['tool_calls'],
-            reasoning_content = assistant_message.get("reasoning_content")
+            
+            return await self.tool_calls_while(
+                request = request,
+                tool_calls = tool_calls,
+                assistant_message = assistant_message,
+                increase_context = increase_context,
+                model_api = model_api
+            )
+                
+            
+        increase_context.messages.append(assistant_message)
+        return  self._update_response(
+            GenerationResponse(
+                messages = increase_context.messages,
+                metadata = api_reply.get("usage",{})
+            ), 
+            assistant_message
         )
         
-        return await self.tool_calls_while(
-            request = request,
-            assistant_message = assistant_message,
-            increase_context = increase_context,
-            model_api = model_api
-        )
+
         
-    async def tool_calls_while(self, request:GenerationRequest, assistant_message:dict, increase_context:Context, model_api:model_api_basics)->GenerationResponse:
+    async def tool_calls_while(
+        self, 
+        request:GenerationRequest, 
+        tool_calls: list,
+        assistant_message:dict, 
+        increase_context:Context, 
+        model_api:model_api_basics
+    )->GenerationResponse:
         """处理模型有工具调用的情况
 
         Args:
             request (GenerationRequest): 输入
+            tool_calls (list): 调用的工具list
             assistant_message (dict): 模型上一次返回
             increase_context (Context): 新增的上下文部分
             model_api (model_api_basics): api响应实例
@@ -260,7 +270,7 @@ class LLMCoordinator():
             
             self._update_response(response, assistant_message)
 
-            for tool_call in assistant_message['tool_calls']:#可能一次里面调用多少工具 
+            for tool_call in tool_calls:#可能一次里面调用多少工具 
                 
                 try:
                     function = tool_call['function']
@@ -302,18 +312,18 @@ class LLMCoordinator():
             if usage := api_reply.get("usage"):
                 response.metadata["usage"] = usage
                 
-            if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
+            if tool_calls := assistant_message.get('tool_calls'):
+                increase_context.add_assistant_tool_message(
+                    content,
+                    tool_calls,
+                    reasoning_content = assistant_message.get("reasoning_content")
+                )
+            else:
                 increase_context.add_assistant_message(
                     content = content,
                     reasoning_content = assistant_message.get("reasoning_content")
                 )
                 break
-            
-            increase_context.add_assistant_tool_message(
-                content,
-                assistant_message['tool_calls'],
-                reasoning_content = assistant_message.get("reasoning_content")
-            )
         
         self.logger.debug("工具调用结束!")
         

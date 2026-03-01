@@ -11,7 +11,7 @@ headers = {
 
 tool_json = {
     "name": "web_search",
-    "description": "强大的网络搜索工具，提供全面、实时的搜索结果。支持自定义结果数量、内容类型与域名筛选，是获取实时信息、新闻与进行网络内容分析的理想方案",
+    "description": "网络搜索工具，提供全面、实时的搜索结果。支持自定义结果数量、内容类型与域名筛选，是获取实时信息、新闻与进行网络内容分析的理想方案",
     "properties": {
         "query": {
             "type": "string",
@@ -133,7 +133,7 @@ async def web_search(
     days: int = 3,
     time_range: Optional[str] = None,
     max_results: int = 10,
-    include_answer: Optional[str] = None,
+    include_answer: Optional[str] = "advanced",
     include_images: bool = False,
     include_image_descriptions: bool = False,
     include_raw_content: bool = False,
