@@ -36,6 +36,22 @@ from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.skills.skills_manager import SkillsManager
 
+TEXT_EXTENSIONS = {
+    # 纯文本
+    'txt', 'text', 'log', 'md', 'markdown', 'rst',
+    # 配置文件
+    'json', 'xml', 'yaml', 'yml', 'toml', 'ini', 'cfg', 'conf', 'properties',
+    # 数据文件
+    'csv', 'tsv', 'jsonl',
+    # 文档
+    'html', 'htm', 'css',
+    # 编程语言
+    'py', 'js', 'java', 'c', 'cpp', 'php', 'rb', 'kt', 'sh', 'bash', 'bat', 'cmd', 'ps1', 'sql',
+}
+IMAGE_EXTENSIONS = {
+    'jpg', 'jpeg''png','gif','psd',
+}
+
 
 class chat_baseics(ABC):
     """聊天基类"""
@@ -170,7 +186,7 @@ class GroupChat(chat_baseics):
         message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>")
         #user信息
         
-        message_builder.add_text(self.build_prompt.decision_whether_responses_prompt(
+        message_builder.add_text(self.build_prompt.decision_whether_responses(
             group_id = group_id,
             prompt = prompt,
             else_prompt = self.emoji_core.emoji_prompt
@@ -258,7 +274,6 @@ class GroupChat(chat_baseics):
             except Exception as e:
                 self.log.exception(f"[{uid}]聊天上下文信息总结出现了错误:{e}")
     
-    
     async def prompt_structure(
         self, 
         chat_message:ChatMessage,
@@ -281,16 +296,34 @@ class GroupChat(chat_baseics):
         )
         
         if Including_pictures:
-            async def dispose_img(message:ImageSegment, message_builder:MessageBuilder):
+            async def dispose_img(message:ImageSegment):
                 """给自己解析图像"""
                 if img := await common.url_to_base64(message.url,""):
                     message_builder.add_image_base64(img,"image/jpeg")
                 else:
                     message_builder.add_text("[CQ:image,summary=图片出现问题]")
         else:
-            async def dispose_img(message:ImageSegment, message_builder:MessageBuilder):
+            async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""
                 message_builder.add_text(await self.image_processing([message.url]))
+
+        async def append_segments(segments) -> None:
+            """用来统一处理对各种不同类型的消息段的加入"""
+            for segment in segments:
+                if isinstance(segment, FileMessageSegment):
+                    if isinstance(segment, ImageSegment):
+                        await dispose_img(segment, message_builder)
+                        continue
+                    if isinstance(segment, FileSegment):
+                        if file_extension := segment.file_name.split('.')[-1].lower():
+                            if file_extension in IMAGE_EXTENSIONS:
+                                await dispose_img(segment, message_builder)
+                                continue
+                            elif file_extension in TEXT_EXTENSIONS:
+                                message_builder.add_text(f"[CQ:file,file={segment.file_name},content={await common.download_text(segment.url)}]")
+                                continue
+                
+                message_builder.add_text(segment.__str__())
         
         if isinstance(Segment,ReplySegment):
             if reply_data := await self.send_message.get_msg_details(Segment.message_id):
@@ -298,45 +331,16 @@ class GroupChat(chat_baseics):
                 message_builder.add_text("<引用消息段>")
         
         if quote_message:
-            for message in quote_message.segments:
-                if isinstance(message,FileMessageSegment):
-                    if isinstance(message,ImageSegment):
-                        await dispose_img(message,message_builder)
-                        continue
-                    if isinstance(message,FileSegment):
-                        if message.file_name.split('.')[-1].lower() in {'png', 'jpg', 'jpeg', 'gif'}:
-                            await dispose_img(message,message_builder)
-                            continue
-
-                message_builder.add_text(message.__str__())
+            await append_segments(quote_message.segments)
             
             message_builder.add_text("</引用消息段>")
             
-            for message in chat_message.segments[1:]:
-                if isinstance(message,FileMessageSegment):
-                    if isinstance(message,ImageSegment):
-                        await dispose_img(message,message_builder)
-                        continue
-                    if isinstance(message,FileSegment):
-                        if message.file_name.split('.')[-1].lower() in {'png', 'jpg', 'jpeg', 'gif'}:
-                            await dispose_img(message,message_builder)
-                            continue
-
-                message_builder.add_text(message.__str__())
+            await append_segments(chat_message.segments[1:])
 
         else:
-            
-            for message in chat_message.segments:
-                if isinstance(message,FileMessageSegment):
-                    if isinstance(message,ImageSegment):
-                        await dispose_img(message,message_builder)
-                        continue
-                    if isinstance(message,FileSegment):
-                        if message.file_name.split('.')[-1].lower() in {'png', 'jpg', 'jpeg', 'gif'}:
-                            await dispose_img(message,message_builder)
-                            continue
-
-                message_builder.add_text(message.__str__())
+            await append_segments(chat_message.segments)
+        
+        message_builder.add_text("</user_message></MESSAGE>")
         
         if memory := [
             (f"user_id:{r[0]}",datetime.datetime.fromtimestamp(r[1]).strftime("%Y-%m-%d %H:%M:%S"),r[2]) for r in await self.memiry_system.query_user_recently_memory(
@@ -344,9 +348,7 @@ class GroupChat(chat_baseics):
                 limit = 10
             )
         ] if chat_message.pure_text else None:
-            message_builder.add_text(f"</user_message></MESSAGE>以下是用户可能相关的最近记忆片段：<recent_memory_snippet>{memory}</recent_memory_snippet>")
-        else:
-            message_builder.add_text("</user_message></MESSAGE>")
+            message_builder.add_text(f"以下是可能相关的最近记忆片段：<recent_memory_snippet>{memory}</recent_memory_snippet>")
     
     async def reply_conduct(self, response_json:Dict, data:Dict)->None:
         
@@ -459,7 +461,7 @@ class GroupChat(chat_baseics):
 
                     message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(message.user_id)}</current_user_info>")
                     
-                    message_builder.add_text(self.build_prompt.decision_whether_responses_prompt(
+                    message_builder.add_text(self.build_prompt.decision_whether_responses(
                         group_id = message.group_id,
                         prompt = prompt,
                         else_prompt = self.emoji_core.emoji_prompt
@@ -496,90 +498,6 @@ class GroupChat(chat_baseics):
             Context: 上下文
         """
         return (await self.get_context(group_id,user_id)).chat_context
-    
-
-    # async def send_reply_message_separator(
-    #     self,
-    #     chat_text_list: List[str],
-    #     group_id: int,
-    #     since_llm: float,
-    #     message_id: int = None,
-    # ) -> None:
-    #     """发送群文本消息，支持表情标签
-
-    #     Args:
-    #         chat_text_list (List[str]): 要解析发送的文本list
-    #         group_id (int): 群号
-    #         message_id (int): 回复引用消息的id
-    #         since_llm (float): 距离上一次llm发言时间
-    #     """
-    #     MESSAGE_DELAY = 1.5  # 多条消息间隔时间
-    #     MAX_SINGLE_MESSAGE_LENGTH = 4  # 分条发送长度阈值
-    #     LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
-    #     STRING_LENGTH_LIMIT = 120 #字符串长度限制
-        
-    #     if not chat_text_list:
-    #         return
-
-    #     if (
-    #         since_llm >= LLM_COOLDOWN_THRESHOLD 
-    #         and len(chat_text_list) <= MAX_SINGLE_MESSAGE_LENGTH
-    #         and len("".join(chat_text_list)) <= STRING_LENGTH_LIMIT
-    #         # or MESSAGE_DELIMITER in chat_text
-    #     ):
-    #         # 分条发送
-    #         messages_list = self.emoji_core.parse_list_with_emotion_tags(
-    #             chat_text_list,
-    #             self.emoji_file_dict
-    #         )
-            
-    #         if message_id:
-    #             message = messages_list[0]
-    #             if message['type'] == 'text':
-    #                 await self.send_message.send_group_message(group_id, f"[CQ:reply,id={message_id}]{message['data']['text']}")
-    #             else:
-    #                 await self.send_message.send_group_message(
-    #                     group_id, [{"type": "reply", "data": {"id": message_id}}, message]
-    #                 )
-
-    #             if len(messages_list) == 1:
-    #                 return
-
-    #             await asyncio.sleep(MESSAGE_DELAY)
-
-    #             for message in messages_list[1:]:
-    #                 await self.send_message.send_group_message(
-    #                     group_id,
-    #                     [message],
-    #                 )
-    #                 await asyncio.sleep(MESSAGE_DELAY)
-    #             return
-    #         else:
-    #             for message in messages_list:
-    #                 await self.send_message.send_group_message(
-    #                     group_id,
-    #                     [message],
-    #                 )
-    #                 await asyncio.sleep(MESSAGE_DELAY)
-    #             return
-    #     else:
-    #         chat_text = "\n".join(chat_text_list)
-    #         # 合并发送完
-    #         messages_list = self.emoji_core.parse_text_with_emotion_tags(
-    #             chat_text, self.emoji_file_dict
-    #         )
-    #         if message_id:
-    #             await self.send_message.send_group_message(
-    #                 group_id,
-    #                 [{"type": "reply", "data": {"id": message_id}}, *messages_list],
-    #             )
-    #         else:
-    #             await self.send_message.send_group_message(
-    #                 group_id,
-    #                 messages_list,
-    #             )
-    #         return
-    
     
     async def send_reply_message_separator(
         self,
@@ -647,6 +565,22 @@ class GroupChat(chat_baseics):
                 return
         else:
             # 合并发送完
+            
+            # chat_text = "\n".join(chat_text_list)
+            # messages_list = self.emoji_core.parse_text_with_emotion_tags(
+            #     chat_text, self.emoji_file_dict
+            # )
+            # if message_id:
+            #     await self.send_message.send_group_message(
+            #         group_id,
+            #         [{"type": "reply", "data": {"id": message_id}}, *messages_list],
+            #     )
+            # else:
+            #     await self.send_message.send_group_message(
+            #         group_id,
+            #         messages_list,
+            #     )
+            
             send_mesage_structure = GroupMessage(group_id=group_id)
             
             if message_id:

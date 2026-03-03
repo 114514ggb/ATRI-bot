@@ -88,14 +88,14 @@ class TextSegment(MessageSegment):
 
 class AtSegment(MessageSegment):
     """@"""
-    __slots__ = ['user_id']
+    __slots__ = ['user_id']#一个qq号或是'all'全体
     
-    def __init__(self, user_id: int):
+    def __init__(self, user_id: str|int):
         self.user_id = user_id
         super().__init__(MessageSegmentType.AT.value)
     
     @property
-    def data(self) -> Dict[str, Any]:
+    def data(self) -> Dict[str, str|int]:
         return {"qq": self.user_id}
     
     def __str__(self) -> str:
@@ -571,7 +571,7 @@ class ChatMessage:
                 parsed_segments.append(ReplySegment(str(d.get('id', ''))))
             
             elif t == MessageSegmentType.AT.value:
-                parsed_segments.append(AtSegment(int(d.get('qq', 0))))
+                parsed_segments.append(AtSegment(d.get('qq', 0)))
             
             elif t == MessageSegmentType.FACE.value:
                 parsed_segments.append(FaceSegment(str(d.get('id', ''))))

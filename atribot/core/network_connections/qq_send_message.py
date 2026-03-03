@@ -384,6 +384,21 @@ class QQAPIClient():
 
         return await self.async_send(api_url,payload,echo = True)
    
+    async def delete_msg(self,message_id:int|str,get_return:bool=False)->dict:
+        """撤回消息
+
+        Args:
+            message_id (int | str): 消息ID
+            get_return (bool, optional): 是否返回执行结果. Defaults to False.
+
+        Returns:
+            dict: 返回结果详情
+        """
+        return await self.async_send(
+            "delete_msg",
+            {"message_id": message_id},
+            echo = get_return
+        )
 
     async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True, get_return = False)->dict|None:
         """发送群图片,默认图片为img_ATRI.png还有可开启默认路径"""

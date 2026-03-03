@@ -22,6 +22,9 @@ class initiativeChat:
         if not message.segments:
             return False
 
+        # if not message.pure_text:#你不输入文本内容在那里@什么呢
+        #     return False
+
         group_id: int = message.group_id
         user_id: int = message.user_id
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
@@ -36,7 +39,7 @@ class initiativeChat:
             decision =  await self._execute_reply(
                 message, group_id, params,
                 log_msg=f"Bot was @ed by user {user_id}, preparing to respond.",
-                prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或你在短时间连续发送了过多的消息或是面对多次重复类似输入,就选择静默不回复"
+                prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或你在短时间连续发送了过多的消息或是面对多次重复或类似没有意义的输入,就选择静默不回复"
             )
             await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
             return decision
@@ -49,7 +52,7 @@ class initiativeChat:
                 return await self._execute_reply(
                     message, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",
-                    prompt="尝试考虑用户在你回复后，是否下一句是想接着聊天的情况,你应观察是否应该进行回复,如果有人在追问你，或者话题没有说完，请你继续回复"
+                    prompt="尝试考虑用户在你回复后，是否下一句是想接着聊天的情况,你应观察是否应该进行回复,如果有人在追问你，或者话题没有说完，请你继续回复，不然就建议静默"
                 )
 
             #活跃度限制

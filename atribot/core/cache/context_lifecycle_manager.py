@@ -270,7 +270,7 @@ class ContextLifecycleManager:
                 await db.executemany_with_pool(sql, args_list)
             for user_id, _, _ in user_contexts:
                 results[user_id] = True
-                self.logger.debug(f"批量保存用户 {user_id} 上下文成功")
+                # self.logger.debug(f"批量保存用户 {user_id} 上下文成功")
         except Exception as e:
             self.logger.error(f"批量保存用户上下文失败: {e}")
             for user_id, context_data, total_tokens in user_contexts:
@@ -320,7 +320,7 @@ class ContextLifecycleManager:
                 await db.executemany_with_pool(sql, args_list)
             for group_id, _, _ in group_contexts:
                 results[group_id] = True
-                self.logger.debug(f"批量保存群组 {group_id} 上下文成功")
+                # self.logger.debug(f"批量保存群组 {group_id} 上下文成功")
         except Exception as e:
             self.logger.error(f"批量保存群组上下文失败: {e}")
             for group_id, context_data, total_tokens in group_contexts:

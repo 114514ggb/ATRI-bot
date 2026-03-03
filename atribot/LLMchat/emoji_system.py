@@ -56,7 +56,6 @@ class EmojiCore:
             start = end + 1
         return tags
     
-    
     def remove_emotion_tags(self, text: str)-> str:
         """把字符串除去记录在内的表情标签"""
         
@@ -65,7 +64,6 @@ class EmojiCore:
             return '' if tag in self.emoji_file_dict else match.group(0)
         
         return re.sub(r'\[(.*?)\]', replace_if_valid, text)
-
 
     def get_random_emoji_name(self, tag:str)->str:
         """根据所属标签随机返回一个文件名"""
@@ -181,6 +179,7 @@ class EmojiCore:
         """        
         if '[' not in text:
             send_mesage.add_text(text)
+            return
         
         emoji_set = set(emoji_dict)
         text_len = len(text)

@@ -151,7 +151,7 @@ class group_manage(message_manage):
     def _check_is_mentioned(self, chat_message:ChatMessage) -> bool:
         """辅助函数：检查bot是否被 @"""
         for segment in chat_message.segments:
-            if isinstance(segment,AtSegment) and segment.user_id == chat_message.self_id:
+            if isinstance(segment,AtSegment) and int(segment.user_id) == chat_message.self_id:
                 return True
         return False
     

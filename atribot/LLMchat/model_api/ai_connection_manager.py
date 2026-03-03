@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict
 
 from atribot.LLMchat.model_api.llm_api_account_pool import ai_api_account_pool
@@ -7,27 +7,31 @@ from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 
 
-@dataclass
+@dataclass(slots=True)
 class ai_api_connection:
     """
     用于描述对一个供应商的连接
     """
     name:str
     """连接供应商的名称"""
-    model_dict:Dict[str,Dict[str,str|bool]] = None
-    """支持的模型信息list,里面的格式应该是{models_name:{parameter}}"""
+    
     base_url:str = ""
     """供应商api地址"""
+    
     api_key:str = ""
     """验证token"""
-    connection_object:model_api_basics|object = None
-    """用于连接的实例"""
-    model_parameter:dict = None
-    """模型设置默认的参数"""
+    
+    model_dict: Dict[str, Dict[str, str | bool]] = field(default_factory=dict)
+    """支持的模型信息，格式: {model_name: {parameter: value}}"""
+    
+    model_parameter: Dict[str, any] = field(default_factory=dict)
+    """模型默认参数"""
+    
+    connection_object: model_api_basics|None = field(default=None)
+    """用于连接的实例（延迟初始化）"""
+    
 
     def __post_init__(self):
-        if self.model_dict is None:
-            self.model_dict = []
         if self.connection_object is None:
             if self.base_url and self.api_key:
                 self.connection_object = universal_ai_api(
@@ -35,7 +39,7 @@ class ai_api_connection:
                     api_key=self.api_key
                 )
             else:
-                raise ValueError("api缺少初始化的值!")
+                raise ValueError("初始化供应商api缺少初始化的值!")
         if self.model_parameter is not None:
             self.connection_object.update_parameters(self.model_parameter)
     
@@ -171,11 +175,7 @@ class AiConnectionManager:
                 continue
                 
             if model_name:
-                model_exists = any(
-                    model["name"] == model_name 
-                    for model in conn.model_list
-                )
-                if not model_exists:
+                if not any(model == model_name for model in conn.model_dict):
                     continue
                     
             if conn.connection_object:

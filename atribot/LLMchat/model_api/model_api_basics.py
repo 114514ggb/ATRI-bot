@@ -70,7 +70,10 @@ class model_api_basics(ABC):
         
         self.base_url = base_url
         self.api_key = api_key
-        
+    
+    @abstractmethod
+    async def aclose(self):
+        """异步关闭客户端"""
         
     @abstractmethod
     async def generate_text_tools(self, model:str, messages:list, tools:list)->dict:
