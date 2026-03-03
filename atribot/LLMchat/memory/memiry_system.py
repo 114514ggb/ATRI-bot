@@ -110,7 +110,7 @@ class memorySystem:
                 }
             ]}
         """
-        if return_json := await self.request_return_json_content(message, PURE_GROUP_FACT_RETRIEVAL_PROMPT+f"详细记录bot账号<qq_id>{bot_id}</qq_id>相关qq信息"):
+        if return_json := await self.request_return_json_content(message, PURE_GROUP_FACT_RETRIEVAL_PROMPT+f"详细记录bot账号<qq_id>{bot_id}</qq_id>相关的,但是不要记录bot的"):
             return return_json.get("facts",[])
         else:
             return []

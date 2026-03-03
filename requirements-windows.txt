@@ -109,6 +109,8 @@ idna==3.11
     #   yarl
 jiter==0.13.0
     # via openai
+json-repair==0.58.3
+    # via atri-bot (pyproject.toml)
 jsonschema==4.26.0
     # via mcp
 jsonschema-specifications==2025.9.1

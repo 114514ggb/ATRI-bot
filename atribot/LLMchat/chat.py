@@ -312,12 +312,12 @@ class GroupChat(chat_baseics):
             for segment in segments:
                 if isinstance(segment, FileMessageSegment):
                     if isinstance(segment, ImageSegment):
-                        await dispose_img(segment, message_builder)
+                        await dispose_img(segment)
                         continue
                     if isinstance(segment, FileSegment):
                         if file_extension := segment.file_name.split('.')[-1].lower():
                             if file_extension in IMAGE_EXTENSIONS:
-                                await dispose_img(segment, message_builder)
+                                await dispose_img(segment)
                                 continue
                             elif file_extension in TEXT_EXTENSIONS:
                                 message_builder.add_text(f"[CQ:file,file={segment.file_name},content={await common.download_text(segment.url)}]")
@@ -466,8 +466,6 @@ class GroupChat(chat_baseics):
                         prompt = prompt,
                         else_prompt = self.emoji_core.emoji_prompt
                     ))
-                    
-                    message_builder.build_and_add()
                     
                     opposite_structure_increment_messages = [message_builder.build()]
 

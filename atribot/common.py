@@ -8,6 +8,7 @@ import time
 from typing import Any, Dict, List
 
 import aiohttp
+import json_repair
 import numpy as np
 from PIL import Image
 
@@ -589,14 +590,14 @@ class common():
         
         elif match := re.search(r"\{.*\}", text, re.DOTALL):
             extracted_str = match.group(0)
+            
+        if not extracted_str:
+            return text
 
-        if extracted_str:
-            try:
-                return json.loads(extracted_str)
-            except json.JSONDecodeError:
-                pass
-
-        return text
+        try:
+            return json.loads(extracted_str)
+        except json.JSONDecodeError:
+            return json_repair.loads(extracted_str)
 
 
 
@@ -619,3 +620,4 @@ async def function():
 #     pp(asyncio.run(common().urls_to_base64([
 #         "https://multimedia.nt.qq.com.cn/download?appid=1407&fileid=EhRl36i0Ixf49SDmjaxVmdMR8yjTbxiy7gkg_wooi-CA6LqAkAMyBHByb2RQgL2jAVoQLpqJOxD9AwyKKIfSiRqTbnoCqTSCAQJneg&rkey=CAMSMBxmyRdldyYvmTxVpyDAQfvIrP8IrUvbXvIyLFWRP6UZ4-mTM3FdgweFUupCGBBeRg"
 #     ])))
+

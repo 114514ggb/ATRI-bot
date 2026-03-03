@@ -1,5 +1,5 @@
 version = 1
-revision = 1
+revision = 3
 requires-python = ">=3.13"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'win32'",
@@ -218,6 +218,7 @@ dependencies = [
     { name = "croniter" },
     { name = "docker" },
     { name = "fastapi" },
+    { name = "json-repair" },
     { name = "mcp" },
     { name = "numpy" },
     { name = "openai" },
@@ -239,6 +240,7 @@ requires-dist = [
     { name = "croniter", specifier = ">=6.0.0" },
     { name = "docker", specifier = ">=7.1.0" },
     { name = "fastapi", specifier = ">=0.115" },
+    { name = "json-repair", specifier = ">=0.58.3" },
     { name = "mcp", specifier = ">=1.23.0" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "openai", specifier = ">=1.82.0" },
@@ -845,6 +847,15 @@ wheels = [
     { url = "https://mirrors.aliyun.com/pypi/packages/47/66/eea81dfff765ed66c68fd2ed8c96245109e13c896c2a5015c7839c92367e/jiter-0.13.0-cp314-cp314t-win32.whl", hash = "sha256:24dc96eca9f84da4131cdf87a95e6ce36765c3b156fc9ae33280873b1c32d5f6" },
     { url = "https://mirrors.aliyun.com/pypi/packages/ff/32/4ac9c7a76402f8f00d00842a7f6b83b284d0cf7c1e9d4227bc95aa6d17fa/jiter-0.13.0-cp314-cp314t-win_amd64.whl", hash = "sha256:0a8d76c7524087272c8ae913f5d9d608bd839154b62c4322ef65723d2e5bb0b8" },
     { url = "https://mirrors.aliyun.com/pypi/packages/f9/8e/7def204fea9f9be8b3c21a6f2dd6c020cf56c7d5ff753e0e23ed7f9ea57e/jiter-0.13.0-cp314-cp314t-win_arm64.whl", hash = "sha256:2c26cf47e2cad140fa23b6d58d435a7c0161f5c514284802f25e87fddfe11024" },
+]
+
+[[package]]
+name = "json-repair"
+version = "0.58.3"
+source = { registry = "https://mirrors.aliyun.com/pypi/simple" }
+sdist = { url = "https://mirrors.aliyun.com/pypi/packages/f5/e4/1a1925b4c1740bc8753f4bdfcec4528e85d89fb253af4cc8132d2f5d0f87/json_repair-0.58.3.tar.gz", hash = "sha256:bc1fad983e12b38cef066f73315765537b60b7e0544106b5c410de83aa2e1f4b" }
+wheels = [
+    { url = "https://mirrors.aliyun.com/pypi/packages/96/16/c7cf6658004cf6b7e2df3848743bb9707bd805b309802362ac0c2dedd9ff/json_repair-0.58.3-py3-none-any.whl", hash = "sha256:0194cb1eb5c2126a47dbcc2dfcc2f27ffd55366b00fb1a21b7d5a5bc50f74ce5" },
 ]
 
 [[package]]
