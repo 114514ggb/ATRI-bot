@@ -10,21 +10,13 @@ from datetime import timedelta
 from logging import Logger
 from typing import Any, Awaitable, Dict, List, Literal, Optional
 
+import httpx
+import mcp
+from mcp.client.sse import sse_client
+from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
+
 from atribot.core.service_container import container
-
-try:
-    import mcp
-    from mcp.client.sse import sse_client
-except (ModuleNotFoundError, ImportError):
-    print("警告: 缺少依赖库 'mcp'，将无法使用 MCP 服务。")
-
-try:
-    from mcp.client.streamable_http import streamablehttp_client
-except (ModuleNotFoundError, ImportError):
-    print(
-        "警告: 缺少依赖库 'mcp' 或者 mcp 库版本过低，无法使用 Streamable HTTP 连接方式。"
-    )
-
 
 DEFAULT_MCP_CONFIG = {"mcpServers": {}}
 
@@ -143,14 +135,24 @@ class MCPClient:
                 sse_read_timeout = timedelta(
                     seconds=cfg.get("sse_read_timeout", 60 * 5)
                 )
-                self._streams_context = streamablehttp_client(
+                http_client = await self.exit_stack.enter_async_context(
+                    create_mcp_http_client(
+                        headers=cfg.get("headers", {}),
+                        timeout=httpx.Timeout(
+                            timeout.total_seconds(),
+                            read=sse_read_timeout.total_seconds(),
+                        ),
+                    )
+                )
+
+                self._streams_context = streamable_http_client(
                     url=cfg["url"],
-                    headers=cfg.get("headers", {}),
-                    timeout=timeout,
-                    sse_read_timeout=sse_read_timeout,
+                    http_client=http_client,
                     terminate_on_close=cfg.get("terminate_on_close", True),
                 )
-                read_s, write_s, _ = await self._streams_context.__aenter__()
+                read_s, write_s, _ = await self.exit_stack.enter_async_context(
+                    self._streams_context
+                )
 
                 self.session = await self.exit_stack.enter_async_context(
                     mcp.ClientSession(read_stream=read_s, write_stream=write_s)

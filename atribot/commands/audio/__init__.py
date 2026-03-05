@@ -1,9 +1,9 @@
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.service_container import container
-from atribot.commands.audio.TTS import TTSService
 from atribot.commands.audio.song import song
-
+from atribot.commands.audio.TTS import TTSService
+from atribot.core.command.command_parsing import CommandSystem
+from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.service_container import container
+from atribot.core.type.chat_message_type import ChatMessage
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
@@ -47,7 +47,7 @@ song_manager:song = song()
     type=float,
     metavar="SPEED"
 )
-async def tts_synthesis(message_data: dict, target_text:list[str], emotion:str = "高兴", speed:float = 1.0):
+async def tts_synthesis(message_data: ChatMessage, target_text:list[str], emotion:str = "高兴", speed:float = 1.0):
     """TTS文本合成语音
         
     Args:
@@ -63,7 +63,7 @@ async def tts_synthesis(message_data: dict, target_text:list[str], emotion:str =
         speed= speed
     )
     await send_message.send_group_audio(
-        group_id = message_data["group_id"],
+        group_id = message_data.group_id,
         url_audio = audio_path,
         default = True
     )
@@ -96,7 +96,7 @@ async def tts_synthesis(message_data: dict, target_text:list[str], emotion:str =
     metavar='SONG_NAME'
 )
 async def handle_song_command(
-    message_data: dict,
+    message_data: ChatMessage,
     list: bool,
     refresh: bool,
     file: bool,
@@ -105,7 +105,7 @@ async def handle_song_command(
     """
     处理所有与'song'命令相关的逻辑
     """
-    group_id = message_data.get('group_id')
+    group_id = message_data.group_id
 
     if refresh:
         song_manager.refresh()

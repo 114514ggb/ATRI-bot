@@ -273,7 +273,7 @@ class DockerSandbox(SandBoxBase):
             exec_result = await self.run_command(run_cmd, timeout=timeout)
 
             try:
-                bits, stat = await asyncio.to_thread(self.container.get_archive, run_dir)
+                bits, _ = await asyncio.to_thread(self.container.get_archive, run_dir)
                 
                 file_obj = io.BytesIO()
                 for chunk in bits:

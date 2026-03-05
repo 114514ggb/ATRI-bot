@@ -1,6 +1,7 @@
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_type import ChatMessage
 
 from .ATRI_encrypt import Encrypt
 
@@ -45,7 +46,7 @@ send_message:QQAPIClient = container.get("SendMessage")
     type=str
 )
 async def atri_encrypt_command(
-    message_data: dict,
+    message_data: ChatMessage,
     text: list = None,
     decode: bool = False,
     encoding: str = "utf-8",
@@ -55,7 +56,7 @@ async def atri_encrypt_command(
     """
     
     encryptor = Encrypt()
-    group_id = message_data.get("group_id")
+    group_id = message_data.group_id
 
     input_text = " ".join(text) if isinstance(text, list) else str(text)
     

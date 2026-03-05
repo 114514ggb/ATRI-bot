@@ -333,7 +333,7 @@ class LLMCoordinator():
     
     async def resume_step(
         self, 
-        request :GenerationRequest, 
+        request :GenerationRequest|GenerationRequestSimplify, 
         model_api :model_api_basics, 
         increase_context: Context
     )->GenerationResponse:
@@ -348,9 +348,8 @@ class LLMCoordinator():
             GenerationResponse: 返回
         """
         self.logger.debug("从中断继续请求!")
-        response = request.generation_response
         
-        for msg in response.messages: 
+        for msg in request.generation_response.messages: 
             if msg['role'] in ['assistant','tool']:
                 increase_context.messages.append(msg)
         
@@ -360,27 +359,32 @@ class LLMCoordinator():
             model_api  = model_api
         )
         
-        if 'tool_calls' not in assistant_message or assistant_message['tool_calls'] is None:
+        if tool_calls := assistant_message.get('tool_calls'):
+            #有tool处理
+            increase_context.add_assistant_tool_message(
+                content,
+                tool_calls = tool_calls,
+                reasoning_content = assistant_message.get("reasoning_content")
+            )
             
-            self._update_response(response, assistant_message)
-            increase_context.messages.append(assistant_message)
-            response.messages = increase_context.messages
-            if usage := api_reply.get("usage"):
-                response.metadata["usage"] = usage
-            return response
-        
-        increase_context.add_assistant_tool_message(
-            content,
-            tool_calls = assistant_message['tool_calls'],
-            reasoning_content = assistant_message.get("reasoning_content")
+            return await self.tool_calls_while(
+                request = request,
+                tool_calls = tool_calls,
+                assistant_message = assistant_message,
+                increase_context = increase_context,
+                model_api = model_api
+            )
+                
+            
+        increase_context.messages.append(assistant_message)
+        return  self._update_response(
+            GenerationResponse(
+                messages = increase_context.messages,
+                metadata = api_reply.get("usage",{})
+            ), 
+            assistant_message
         )
         
-        return await self.tool_calls_while(
-            request = request,
-            assistant_message = assistant_message,
-            increase_context = increase_context,
-            model_api = model_api
-        )
     
     @staticmethod
     def get_init_context(request:GenerationRequest)->Context:
@@ -461,7 +465,7 @@ class LLMCoordinator():
 
     async def _get_assistant_message_with_retry(
         self,
-        request: GenerationRequest,
+        request: GenerationRequest|GenerationRequestSimplify,
         increase_context: Context,
         model_api: model_api_basics,
         max_retries: int = 5
@@ -521,7 +525,7 @@ class LLMCoordinator():
             return "", text
     
     @staticmethod
-    async def get_chat_json(request:GenerationRequest, messages:List[Dict[str, Any]], model_api:model_api_basics)->Dict:
+    async def get_chat_json(request:GenerationRequest|GenerationRequestSimplify, messages:List[Dict[str, Any]], model_api:model_api_basics)->Dict:
         """发起向api的请求"""
         if request.parameter:
             parameter = {

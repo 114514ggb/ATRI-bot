@@ -5,6 +5,7 @@ from atribot.commands.bromidic.picture_processing import pictureProcessing
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_type import ChatMessage, ImageSegment, ReplySegment
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
@@ -61,7 +62,7 @@ image_processing = pictureProcessing()
     metavar="URL/BV"
 )
 async def bili_crawler_command(
-        message_data: dict, 
+        message_data: ChatMessage, 
         url_or_bv: str, 
         info: bool = False, 
         stats: bool = False, 
@@ -74,7 +75,7 @@ async def bili_crawler_command(
     
     crawler = BiliBiliCrawler()
     
-    group_id = message_data["group_id"]
+    group_id = message_data.group_id
     try:
 
         bvid = crawler.get_bv_id(url_or_bv)
@@ -148,11 +149,23 @@ async def bili_crawler_command(
     required=True,
     metavar="PROMPT"
 )
-async def picture_processing(message_data: dict, prompt:str):
+async def picture_processing(message_data: ChatMessage, prompt:str):
     """图片处理命令处理函数"""
     
-    img_base64 = await image_processing.step(message_data, prompt, model = "gptimage")
-    group_id = message_data["group_id"]
+    image_url_list = []
     
-    await send_message.send_group_pictures(group_id,f"base64://{img_base64}",local_Path_type=False)
+    def add_img(message:ChatMessage):
+        for segment in message.segments:
+            if isinstance(segment, ImageSegment):
+                image_url_list.append(segment.url)
+    
+    if isinstance(message_data.segments[0],ReplySegment):
+        reply_data = (await send_message.get_msg_details(message_data.segments[0].message_id))["data"]
+        add_img(ChatMessage.from_chat_event(reply_data))
+        
+    add_img(message_data)
+    
+    img_base64 = await image_processing.step(image_url_list, prompt, model = "gptimage")
+    
+    await send_message.send_group_pictures(message_data.group_id,f"base64://{img_base64}",local_Path_type=False)
 

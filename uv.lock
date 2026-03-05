@@ -241,7 +241,7 @@ requires-dist = [
     { name = "docker", specifier = ">=7.1.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "json-repair", specifier = ">=0.58.3" },
-    { name = "mcp", specifier = ">=1.23.0" },
+    { name = "mcp", specifier = ">=1.26.0" },
     { name = "numpy", specifier = ">=2.4.2" },
     { name = "openai", specifier = ">=1.82.0" },
     { name = "pillow", specifier = ">=12.1.0" },

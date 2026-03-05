@@ -578,6 +578,7 @@ class GroupChat(chat_baseics):
             #         group_id,
             #         messages_list,
             #     )
+            #原来的实现说不定快些留着
             
             send_mesage_structure = GroupMessage(group_id=group_id)
             

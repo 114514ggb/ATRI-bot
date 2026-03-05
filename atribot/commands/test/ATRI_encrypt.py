@@ -3,6 +3,7 @@ from math import floor
 from typing import Union
 
 
+#不知道从什么地方复制过来的
 class Encrypt:
     """
     修复版 - 基于Unicode特殊字符的编码器

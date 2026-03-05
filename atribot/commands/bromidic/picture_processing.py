@@ -6,9 +6,6 @@ from typing import List, Optional, Union
 
 import aiohttp
 
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.service_container import container
-
 
 class pictureProcessing:
     
@@ -23,23 +20,10 @@ class pictureProcessing:
     def __init__(self):
         self.step_lock = asyncio.Lock()
         
-    async def step(self, message_data: dict[str, dict], prompt: str, model:str = "nanobanana") -> str:
+    async def step(self, image_url_list: List[str], prompt: str, model:str = "nanobanana") -> str:
         """图片处理主函数"""
         if self.step_lock.locked():
             raise RuntimeError("系统繁忙，请稍后再试")
-        
-        image_url_list: List[str] = []
-        
-        if message_data["message"][0]["type"] == "reply":
-            send_message: QQAPIClient = container.get("SendMessage")
-            reply_data = (await send_message.get_msg_details(message_data["message"][0]["data"]["id"]))["data"]
-            for reply_message in reply_data["message"]:
-                if reply_message.get("type") == "image":
-                    image_url_list.append(reply_message["data"]["url"])
-        
-        for message in message_data["message"]:
-            if message.get("type") == "image":
-                image_url_list.append(message["data"]["url"])
         
         params = {
             "model": model, 
@@ -48,7 +32,7 @@ class pictureProcessing:
         }
         
         if image_url_list:
-            params["image"] = image_url_list[0]
+            params["image"] = image_url_list[0]#先只处理一张图
         
         url = f"https://gen.pollinations.ai/image/{urllib.parse.quote(prompt)}"
 

@@ -8,6 +8,7 @@ from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import GroupContext
 from atribot.core.type.chat_message_type import AtSegment, ChatMessage
 from atribot.LLMchat.chat import GroupChat
 from atribot.LLMchat.initiative_chat import initiativeChat
@@ -114,7 +115,6 @@ class group_manage(message_manage):
     def __init__(self):
         super().__init__()
         self.group_white_list:list = container.get("config").group_white_list
-        self.self_qq = str(container.get("config").account.id)
         self.group_chet:GroupChat = container.get("GroupChat")
         self.event_trigger = EventTrigger()
         
@@ -125,7 +125,7 @@ class group_manage(message_manage):
         if group_id not in self.group_white_list and not (user_id == 2631018780):
             return
         
-        group_context = await self.chat_manager.get_group_context(group_id)
+        group_context: GroupContext = await self.chat_manager.get_group_context(group_id)
         group_context.time_window.add()
 
         if data.get("message_sent_type") == "self":
@@ -138,7 +138,7 @@ class group_manage(message_manage):
 
         if self._check_is_mentioned(chat_message):
             #@处理
-            await self._handle_mentioned_message(chat_message.pure_text, data, group_id, has_permission, chat_message, group_context)
+            await self._handle_mentioned_message(has_permission, chat_message, group_context)
         elif has_permission:
             try:
                 if not await self.initiative_chat.decision(chat_message, group_context):
@@ -151,20 +151,20 @@ class group_manage(message_manage):
     def _check_is_mentioned(self, chat_message:ChatMessage) -> bool:
         """辅助函数：检查bot是否被 @"""
         for segment in chat_message.segments:
-            if isinstance(segment,AtSegment) and int(segment.user_id) == chat_message.self_id:
+            if isinstance(segment,AtSegment) and segment.user_id == str(chat_message.self_id):
                 return True
         return False
     
-    async def _handle_mentioned_message(self, pure_text:str, data, group_id, has_permission, chat_message:ChatManager, group_context):
+    async def _handle_mentioned_message(self,has_permission, chat_message:ChatMessage, group_context):
         """处理被 @ 的消息逻辑"""
         # 指令处理
-        if pure_text.startswith("/"):
+        if chat_message.pure_text.startswith("/"):
             try:
-                await self.command_system.dispatch_command(pure_text, data)
+                await self.command_system.dispatch_command(chat_message)
             except Exception as e:
                 self.error_occurred(e, "命令处理模块")
                 await self.send_message.send_group_message(
-                    group_id, 
+                    chat_message.group_id, 
                     f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"
                 )
             return 
@@ -177,11 +177,11 @@ class group_manage(message_manage):
             except Exception as e:
                 self.error_occurred(e, "群聊聊天模块")
                 await self.send_message.send_group_message(
-                    group_id, 
+                    chat_message.group_id, 
                     f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}"
                 )
         else:
-            self.logger.info(f"黑名单人员被拒绝聊天{data["user_id"]}!") 
+            self.logger.info(f"黑名单人员被拒绝聊天{chat_message.user_id}!") 
 
 
     async def _process_memory_summary(self, chat_message:ChatMessage, group_id):

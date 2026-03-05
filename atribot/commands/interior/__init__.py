@@ -8,6 +8,7 @@ from atribot.core.command.async_permissions_management import PermissionsManagem
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_type import ChatMessage
 from atribot.LLMchat.memory.memiry_system import memorySystem
 
 cmd_system:CommandSystem = container.get("CommandSystem")
@@ -61,7 +62,7 @@ async def query_database_command(message_data: dict, user_id: int = 0):
     long="--list",
     description="显示支持的所有命令"
 )
-async def help_command(message_data: dict, list: bool = False):
+async def help_command(message_data: ChatMessage, list: bool = False):
     """
     显示帮助信息
     
@@ -72,7 +73,7 @@ async def help_command(message_data: dict, list: bool = False):
     if list:
         help_text = cmd_system.get_help_text()
         await send_message.send_group_merge_text(
-            group_id = message_data["group_id"],
+            group_id = message_data.group_id,
             message = help_text,
             source = "命令list"
         )
@@ -89,7 +90,7 @@ async def help_command(message_data: dict, list: bool = False):
             "3.会对群出现的一些词进行反应。\n"
             "4.会对交互数据进行存储，可能会对其用于分析，服务质量优化和功能迭代。\n"
         )
-        await send_message.send_group_message(message_data["group_id"],basic_help)
+        await send_message.send_group_message(message_data.group_id,basic_help)
 
 
 
@@ -127,7 +128,7 @@ async def help_command(message_data: dict, list: bool = False):
     type=int
 )
 async def permission_command_handler(
-    message_data: dict, 
+    message_data: ChatMessage, 
     subcommand: str, 
     role: Optional[str] = None, 
     user_id: Optional[int] = None
@@ -135,8 +136,8 @@ async def permission_command_handler(
     """
     权限管理命令分发器
     """
-    group_id = message_data["group_id"]
-    operator_id = message_data["user_id"]
+    group_id = message_data.group_id
+    operator_id = message_data.user_id
     async def reply_func(msg):
         await send_message.send_group_message(group_id, msg)
         
@@ -199,11 +200,11 @@ async def permission_command_handler(
     multiple=True,
     choices=['all', 'sys', 'cpu', 'mem', 'disk', 'mcp', 'model']
 )
-async def handle_status_command(message_data: dict, components: list):
+async def handle_status_command(message_data: ChatMessage, components: list):
     """
     处理状态查询命令，并将结果以合并转发的形式发送。
     """
-    group_id = message_data['group_id']
+    group_id = message_data.group_id
 
     info_str = await SystemMonitor().view_list(components)
 
@@ -316,7 +317,7 @@ async def cmd_query_memories(
     exclude_kb: bool,
     kb_only: bool,
     threshold: float,
-    message_data: dict,
+    message_data: ChatMessage,
     query_text: list[str] = None,
 ):
     """查询记忆命令处理函数"""
@@ -347,7 +348,7 @@ async def cmd_query_memories(
 
     if not results:
         await send_message.send_group_merge_text(
-            message_data["group_id"], 
+            message_data.group_id, 
             message = f"🔍 未找到与「{query_string}」相关的记忆",
             source = "记忆查询结果"
         )
@@ -390,7 +391,7 @@ async def cmd_query_memories(
     result_lines.append("=" * 10)
     
     await send_message.send_group_merge_text(
-        group_id=message_data["group_id"],
+        group_id=message_data.group_id,
         message="\n".join(result_lines),
         source="记忆查询结果"
     )
@@ -412,9 +413,9 @@ async def cmd_query_memories(
     metavar="qq_id",
     type=int
 )
-async def get_qq_profile(message_data: dict, qq_id: int = None):
+async def get_qq_profile(message_data: ChatMessage, qq_id: int = None):
 
-    target_id = qq_id or message_data["user_id"]
+    target_id = qq_id or message_data.user_id
 
     resp: dict = await send_message.get_stranger_info(target_id)
     
@@ -466,7 +467,7 @@ async def get_qq_profile(message_data: dict, qq_id: int = None):
     )
 
     await send_message.send_group_merge_text(
-        group_id=message_data["group_id"],
+        group_id=message_data.group_id,
         message=card,
         source="QQ账号信息"
     )
