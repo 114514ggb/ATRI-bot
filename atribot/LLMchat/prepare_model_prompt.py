@@ -352,9 +352,9 @@ JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对�
     ]
 }
 ```
+请根据情况完成任务并且给出你的decision
 </example>
 """
             "</output_requirement>"
-            "</context>"
-            "给出你的decision的json:"    
+            "</context>"  
         )

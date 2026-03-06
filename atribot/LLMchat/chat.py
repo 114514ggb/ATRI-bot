@@ -7,9 +7,8 @@ from dataclasses import replace
 from logging import Logger
 from typing import Coroutine, Dict, List
 
-from atribot.common import common
+from atribot.common_utils import download_text, extract_json_from_text, url_to_base64
 from atribot.core.cache.management_chat_example import ChatManager
-from atribot.core.data_manage import data_manage
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import Context, MessageBuilder
@@ -125,7 +124,6 @@ class GroupChat(chat_baseics):
 
     def __init__(self):
         super().__init__()
-        self.data_manage = data_manage()
         self.model_api = self.supplier.connections[
             self.config.model.connect.supplier
         ].connection_object
@@ -213,7 +211,7 @@ class GroupChat(chat_baseics):
 
         self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
         
-        for response_json in (common.extract_json_from_text(s) for s in response.reply_text if s != ""):
+        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
             
             if isinstance(response_json, dict):
                 
@@ -298,7 +296,7 @@ class GroupChat(chat_baseics):
         if Including_pictures:
             async def dispose_img(message:ImageSegment):
                 """给自己解析图像"""
-                if img := await common.url_to_base64(message.url,""):
+                if img := await url_to_base64(message.url,""):
                     message_builder.add_image_base64(img,"image/jpeg")
                 else:
                     message_builder.add_text("[CQ:image,summary=图片出现问题]")
@@ -320,7 +318,7 @@ class GroupChat(chat_baseics):
                                 await dispose_img(segment)
                                 continue
                             elif file_extension in TEXT_EXTENSIONS:
-                                message_builder.add_text(f"[CQ:file,file={segment.file_name},content={await common.download_text(segment.url)}]")
+                                message_builder.add_text(f"[CQ:file,file={segment.file_name},content={await download_text(segment.url)}]")
                                 continue
                 
                 message_builder.add_text(segment.__str__())
@@ -448,7 +446,7 @@ class GroupChat(chat_baseics):
             else:
                 if not opposite_structure_increment_messages:
                     
-                    #重新构建一次,再缓存后面有用
+                    #重新构建一次,再缓存后面可能还要用
                     message_builder = MessageBuilder()
 
                     message_builder.add_text(f"<group_history>{(await self.chat_manager.get_group_messages_str(message.group_id))[:10000]}</group_history>")#其实这个历史记录会不和前面一致

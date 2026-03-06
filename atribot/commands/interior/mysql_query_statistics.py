@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from atribot.common import common
+from atribot.common_utils import is_qq
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -30,7 +30,7 @@ class UserActivityAnalyzer:
         user_id = user_id if user_id else message_data['user_id']
         group_id = message_data["group_id"]
         
-        if not common.is_qq(user_id):
+        if not is_qq(user_id):
             raise ValueError("请输入正确的QQ号")
             
         if not await self._process_user_data(user_id, group_id):

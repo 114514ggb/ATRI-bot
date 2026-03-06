@@ -16,21 +16,6 @@ class ToolCallsStopIteration(Exception):
             super().__init__(f"'tool_calls_end': {message}")
         else:
             super().__init__("end tool call")
-
-
-@dataclass(slots=True)
-class RichData():
-    """一般处理消息"""
-    primeval:dict
-    """原始消息"""
-    text:str = ""
-    """解析过的qq的文本"""
-    pure_text:str = ""
-    """消息的文本部分"""
-    user_id:int|None = None
-    """发送者id"""
-    group_id:int|None = None
-    """群号"""
     
     
 class MessageBuilder:
@@ -543,13 +528,13 @@ class Message:
     """消息处理器首次接收到这次消息的时间"""
     process_time:float
     """到达当前处理节点的时间"""
-    rich_data:"RichData"
+    rich_data:ChatMessage
     """具体的处理数据"""  
     
-    def __init__(self, rich_data:RichData):
-        self.create_time = rich_data.primeval['time']
+    def __init__(self, rich_data:ChatMessage):
+        self.create_time = rich_data.time
         self.receive_time = self.process_time = time.time()
-        self.rich_data:RichData = rich_data
+        self.rich_data:ChatMessage = rich_data
         
     def update_process_time(self) -> None:
         """更新当前处理节点时间为当前时间戳"""
@@ -906,60 +891,3 @@ class PrivateContext:
         self.last_msg_at = time.time()
 
 
-
-@dataclass(slots=True)
-class MessageBase():
-    """基础消息类"""
-    
-    message_id:int
-    """消息id"""
-    user_id:int
-    """发送者id"""
-    nickname:str
-    """发送者账户名"""
-    user_message:str
-    """消息有效的文本内容"""
-    # message:Dict = field(default_factory=dict)
-    # """原始格式化消息内容"""
-    message_time:str = field(default_factory=lambda: time.strftime('%Y-%m-%d %H:%M:%S'))
-    """创建的时间"""
-
-    # def __post_init__(self):
-    #     """在 dataclass 初始化后调用"""
-    #     self.user_message = self.get_user_message_str()
-    
-    def to_dict(self,extend_dict:dict = {}) -> dict:
-        """获取自己属性的字典"""
-        return {
-            "message_id": self.message_id,
-            "time": self.message_time,
-            "user_id": self.user_id,
-            "nickname": self.nickname,
-            "user_message": self.user_message
-        } | extend_dict
-    
-    # @abstractmethod
-    # def get_user_message_str() -> str:
-    #     """获取纯文本的user消息"""
-    #     pass
-    
-    def __str__(self):
-        return str(self.to_dict())
-    
-    def __repr__(self):
-        return str(self.to_dict())
-    
-    def __getitem__(self, item):
-        return getattr(self, item)
-    
-    def get(self, item, default=None):
-        return getattr(self, item, default)
-
-
-@dataclass(slots=True)
-class GroupMessage(MessageBase):
-    """群消息"""
-
-@dataclass(slots=True)  
-class PrivateMessage(MessageBase):
-    """私聊消息"""

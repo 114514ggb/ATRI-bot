@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Type
 
-from atribot.common import common
+from atribot.common_utils import jaro_winkler_similarity
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -528,7 +528,7 @@ class CommandSystem:
         
         matches = []
         for cmd in all_commands:
-            similarity = common.jaro_winkler_similarity(command_name.lower(), cmd.lower())
+            similarity = jaro_winkler_similarity(command_name.lower(), cmd.lower())
             
             if similarity >= 0.8:
                 matches.append((cmd, similarity))

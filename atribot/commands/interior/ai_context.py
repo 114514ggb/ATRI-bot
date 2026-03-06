@@ -4,6 +4,7 @@ from logging import Logger
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_parsing import CommandSystem
+from atribot.core.type.chat_message_type import ChatMessage
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.LLMchat.memory.user_info_system import UserSystem
@@ -63,25 +64,25 @@ class AIContextCommands:
                 long="--detail", 
                 description="显示详细信息（适用于list操作）"
             )
-            async def ai_context_handler(message_data:dict, action: str, target: str = None, detail: bool = False):
-                group_id = message_data.get('group_id', '')
+            async def ai_context_handler(message_data:ChatMessage, action: str, target: str = None, detail: bool = False):
+                group_id = message_data.group_id
                 
                 if action == "role":
-                    await self._handle_set_role_user(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_set_role_user(group_id, target, user_id=message_data.user_id)
                 elif action == "current":
-                    await self._handle_current_role_user_(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_current_role_user_(group_id, target, user_id=message_data.user_id)
                 elif action == "list":
                     await self._handle_list_roles(group_id, detail)
                 elif action == "reload":
-                    await self._handle_reload_roles(group_id, user_id=message_data['user_id'])
+                    await self._handle_reload_roles(group_id, user_id=message_data.user_id)
                 elif action == "reset":
-                    await self._handle_reset_context_user_(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_reset_context_user_(group_id, target, user_id=message_data.user_id)
                 elif action == "info":
-                    await self._handle_context_info_user(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_context_info_user(group_id, target, user_id=message_data.user_id)
                 elif action == "user":
-                    await self._handle_get_user_info(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_get_user_info(group_id, target, user_id=message_data.user_id)
                 elif action == "active":
-                    await self._handle_group_active_chat(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_group_active_chat(group_id, target, user_id=message_data.user_id)
         else:
             @self.command_system.register_command(
                 name="chat",
@@ -119,25 +120,25 @@ class AIContextCommands:
                 long="--detail", 
                 description="显示详细信息（适用于list操作）"
             )
-            async def ai_context_handler(message_data:dict, action: str, target: str = None, detail: bool = False):
-                group_id = message_data.get('group_id', '')
+            async def ai_context_handler(message_data:ChatMessage, action: str, target: str = None, detail: bool = False):
+                group_id = message_data.group_id
                 
                 if action == "role":
-                    await self._handle_set_role(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_set_role(group_id, target, user_id=message_data.user_id)
                 elif action == "current":
                     await self._handle_current_role(group_id)
                 elif action == "list":
                     await self._handle_list_roles(group_id, detail)
                 elif action == "reload":
-                    await self._handle_reload_roles(group_id, user_id=message_data['user_id'])
+                    await self._handle_reload_roles(group_id, user_id=message_data.user_id)
                 elif action == "reset":
-                    await self._handle_reset_context(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_reset_context(group_id, target, user_id=message_data.user_id)
                 elif action == "info":
-                    await self._handle_context_info(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_context_info(group_id, target, user_id=message_data.user_id)
                 elif action == "user":
-                    await self._handle_get_user_info(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_get_user_info(group_id, target, user_id=message_data.user_id)
                 elif action == "active":
-                    await self._handle_group_active_chat(group_id, target, user_id=message_data['user_id'])
+                    await self._handle_group_active_chat(group_id, target, user_id=message_data.user_id)
 
 
     async def _handle_set_role(self, group_id: str, role_name: str, user_id:int):

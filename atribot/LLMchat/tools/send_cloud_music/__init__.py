@@ -1,4 +1,4 @@
-from atribot.common import common
+from atribot.common_utils import search_music
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 
@@ -28,7 +28,7 @@ async def main(group_id:int|str, name:str,):
         group_id (int | str): 群号
     """
     
-    if music_lsit := await common.search_music(name):
+    if music_lsit := await search_music(name):
         await send_message.send_group_music(
             group_id,
             "163",

@@ -1,7 +1,7 @@
 import os
 from typing import List
 
-from atribot.common import common
+from atribot.common_utils import jaro_winkler_similarity
 
 
 class song:
@@ -76,7 +76,7 @@ class song:
         similarities = []
         for song in self.song_list:
             song_without_ext = self._remove_extension(song)
-            similarity = common.jaro_winkler_similarity(song_name, song_without_ext)
+            similarity = jaro_winkler_similarity(song_name, song_without_ext)
             similarities.append((song, similarity))
         similarities.sort(key=lambda x: x[1], reverse=True)
         

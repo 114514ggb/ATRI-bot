@@ -327,6 +327,10 @@ class File:
         if file_str.startswith("base64://"): return "base64"
         return "unknown"
 
+    @property
+    def type(self) -> str:   
+        return self.detect_type(self.file)
+
 
 class FileMessageSegment(MessageSegment, ABC):
     """文件类消息基类，强制要求 file 字段，其余为可选元信息"""

@@ -1,7 +1,7 @@
 import logging
 from typing import Set
 
-from atribot.common import common
+from atribot.common_utils import is_qq
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 
@@ -84,7 +84,7 @@ class PermissionsManagement:
         if operator_level < required_level:
             raise PermissionError("操作失败：您的权限不足。")
 
-        if not common.is_qq(target_user_id):
+        if not is_qq(target_user_id):
             raise ValueError(f"无法操作：{target_user_id} 不是一个合法的QQ号。")
             
         target_role_name = self._get_user_role(target_user_id)

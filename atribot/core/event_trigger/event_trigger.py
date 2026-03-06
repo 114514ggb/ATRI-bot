@@ -92,7 +92,7 @@ class EventTrigger:
             
         elif sub_type == 'leave':
             
-            await self.send_message.send_group_message(group_id,f"qq:{user_id}已离开！")
+            await self.send_message.send_group_message(group_id,f"qq:{user_id}永久的离开了我们！希望以后安好~")
             
     async def manage_add_group(self,group_id, data):
         """管理加群的请求"""

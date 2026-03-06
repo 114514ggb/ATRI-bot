@@ -1,10 +1,25 @@
 import json
+from dataclasses import dataclass
 from typing import Dict, List, Tuple
 
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import RichData
 
+#以前使用的废弃类
+
+@dataclass(slots=True)
+class RichData():
+    """处理消息,已弃用"""
+    primeval:dict
+    """原始消息"""
+    text:str = ""
+    """解析过的qq的文本"""
+    pure_text:str = ""
+    """消息的文本部分"""
+    user_id:int|None = None
+    """发送者id"""
+    group_id:int|None = None
+    """群号"""
 
 class data_manage():
     """处理或格式化一些数据的类"""

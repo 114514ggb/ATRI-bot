@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Tuple, Union
 
 import ahocorasick
 
-from atribot.common import common
+from atribot.common_utils import construction_message_dict
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -45,7 +45,7 @@ class string_response:
             elif send_type is ResponseType.AUDIO:
                 await self.send_message.send_group_audio(group_id, document, True)
             elif send_type is ResponseType.MIXTURE:
-                await self.send_message.send_group_message(group_id, common.construction_message_dict(document,self.url_prefi))
+                await self.send_message.send_group_message(group_id, construction_message_dict(document,self.url_prefi))
         
         if time.time() - (await self.context_management.get_group_context(group_id)).last_msg_at < 5:
             #如果间隔太短不处理

@@ -161,33 +161,16 @@ class LLMCoordinator():
             increase_context  = increase_context,
             model_api  = model_api
         )
-        
-        if tool_calls := assistant_message.get('tool_calls'):
-            #有工具处理
-            increase_context.add_assistant_tool_message(
-                content,
-                tool_calls = tool_calls,
-                reasoning_content = assistant_message.get("reasoning_content")
-            )
-            
-            return await self.tool_calls_while(
-                request = request,
-                assistant_message = assistant_message,
-                increase_context = increase_context,
-                model_api = model_api
-            )
-            
-        increase_context.messages.append(assistant_message)
-        return  self._update_response(
-            GenerationResponse(
-                messages = increase_context.messages,
-                metadata = api_reply.get("usage",{})
-            ), 
-            assistant_message
+        return await self._handle_assistant_message(
+            request = request,
+            api_reply = api_reply,
+            assistant_message = assistant_message,
+            content = content,
+            increase_context = increase_context,
+            model_api = model_api
         )
         
 
-    
     async def run(self, request:GenerationRequestSimplify)->GenerationResponse:
         """对于GenerationRequest的主处理函数,运行后产生结果,中间会处理工具掉用
 
@@ -197,7 +180,7 @@ class LLMCoordinator():
         Returns:
             GenerationResponse: 输出
         """ 
-        increase_context = Context(messages = request.increment_messages)
+        increase_context = Context(messages = request.increment_messages[:])#浅拷贝一个应该够用了
         
         model_api = request.model_api or (self.supplier.get_filtration_connection(
             supplier_name=request.supplier_name,
@@ -213,15 +196,70 @@ class LLMCoordinator():
             increase_context  = increase_context,
             model_api  = model_api
         )
+        return await self._handle_assistant_message(
+            request = request,
+            api_reply = api_reply,
+            assistant_message = assistant_message,
+            content = content,
+            increase_context = increase_context,
+            model_api = model_api
+        )
+
     
+    async def resume_step(
+        self, 
+        request :GenerationRequest|GenerationRequestSimplify, 
+        model_api :model_api_basics, 
+        increase_context: Context
+    )->GenerationResponse:
+        """从中断继续请求
+
+        Args:
+            request (GenerationRequest): 输入
+            model_api (model_api_basics): 模型api实例
+            increase_context (Context): 新增上下文
+
+        Returns:
+            GenerationResponse: 返回
+        """
+        self.logger.debug("从中断继续请求!")
+        
+        for msg in request.generation_response.messages: 
+            if msg['role'] in ['assistant','tool']:
+                increase_context.messages.append(msg)
+        
+        api_reply,assistant_message, content = await self._get_assistant_message_with_retry(
+            request = request,
+            increase_context  = increase_context,
+            model_api  = model_api
+        )
+        return await self._handle_assistant_message(
+            request = request,
+            api_reply = api_reply,
+            assistant_message = assistant_message,
+            content = content,
+            increase_context = increase_context,
+            model_api = model_api
+        )
+
+
+    async def _handle_assistant_message(
+        self,
+        request: GenerationRequest|GenerationRequestSimplify,
+        api_reply: Dict[str, Any],
+        assistant_message: Dict[str, Any],
+        content: str|None,
+        increase_context: Context,
+        model_api: model_api_basics
+    ) -> GenerationResponse:
+        """统一处理助手消息中的工具调用与普通回复分支"""
         if tool_calls := assistant_message.get('tool_calls'):
-            #有tool处理
             increase_context.add_assistant_tool_message(
                 content,
                 tool_calls = tool_calls,
                 reasoning_content = assistant_message.get("reasoning_content")
             )
-            
+
             return await self.tool_calls_while(
                 request = request,
                 tool_calls = tool_calls,
@@ -229,22 +267,20 @@ class LLMCoordinator():
                 increase_context = increase_context,
                 model_api = model_api
             )
-                
-            
+
         increase_context.messages.append(assistant_message)
-        return  self._update_response(
+        return self._update_response(
             GenerationResponse(
                 messages = increase_context.messages,
-                metadata = api_reply.get("usage",{})
-            ), 
+                metadata = api_reply.get("usage", {})
+            ),
             assistant_message
         )
         
-
-        
+       
     async def tool_calls_while(
         self, 
-        request:GenerationRequest, 
+        request:GenerationRequest|GenerationRequestSimplify, 
         tool_calls: list,
         assistant_message:dict, 
         increase_context:Context, 
@@ -330,61 +366,6 @@ class LLMCoordinator():
         response.messages = increase_context.messages
         
         return self._update_response(response, assistant_message)
-    
-    async def resume_step(
-        self, 
-        request :GenerationRequest|GenerationRequestSimplify, 
-        model_api :model_api_basics, 
-        increase_context: Context
-    )->GenerationResponse:
-        """从中断继续请求
-
-        Args:
-            request (GenerationRequest): 输入
-            model_api (model_api_basics): 模型api实例
-            increase_context (Context): 新增上下文
-
-        Returns:
-            GenerationResponse: 返回
-        """
-        self.logger.debug("从中断继续请求!")
-        
-        for msg in request.generation_response.messages: 
-            if msg['role'] in ['assistant','tool']:
-                increase_context.messages.append(msg)
-        
-        api_reply,assistant_message, content = await self._get_assistant_message_with_retry(
-            request = request,
-            increase_context  = increase_context,
-            model_api  = model_api
-        )
-        
-        if tool_calls := assistant_message.get('tool_calls'):
-            #有tool处理
-            increase_context.add_assistant_tool_message(
-                content,
-                tool_calls = tool_calls,
-                reasoning_content = assistant_message.get("reasoning_content")
-            )
-            
-            return await self.tool_calls_while(
-                request = request,
-                tool_calls = tool_calls,
-                assistant_message = assistant_message,
-                increase_context = increase_context,
-                model_api = model_api
-            )
-                
-            
-        increase_context.messages.append(assistant_message)
-        return  self._update_response(
-            GenerationResponse(
-                messages = increase_context.messages,
-                metadata = api_reply.get("usage",{})
-            ), 
-            assistant_message
-        )
-        
     
     @staticmethod
     def get_init_context(request:GenerationRequest)->Context:
@@ -525,8 +506,21 @@ class LLMCoordinator():
             return "", text
     
     @staticmethod
-    async def get_chat_json(request:GenerationRequest|GenerationRequestSimplify, messages:List[Dict[str, Any]], model_api:model_api_basics)->Dict:
-        """发起向api的请求"""
+    async def get_chat_json(
+        request:GenerationRequest|GenerationRequestSimplify, 
+        messages:List[Dict[str, Any]], 
+        model_api:model_api_basics
+    )->Dict:
+        """发起向api的请求
+
+        Args:
+            request (GenerationRequest | GenerationRequestSimplify): _description_
+            messages (List[Dict[str, Any]]): 消息的新增部分
+            model_api (model_api_basics): _description_
+
+        Returns:
+            Dict: 请求回的json
+        """
         if request.parameter:
             parameter = {
                 "messages": request.messages + messages, 
