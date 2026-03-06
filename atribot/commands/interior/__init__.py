@@ -33,7 +33,7 @@ AIContextCommands()
     required=False,
     type=int
 )
-async def query_database_command(message_data: dict, user_id: int = 0):
+async def query_database_command(message_data: ChatMessage, user_id: int = 0):
     """
     查询数据库并生成用户活跃度报告
     

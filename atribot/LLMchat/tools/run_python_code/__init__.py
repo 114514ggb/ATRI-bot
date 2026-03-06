@@ -75,7 +75,10 @@ async def main(code:str, group_id:int, files:list[str] | None = None):
             )
         else:
             await send_message.send_group(
-                GroupMessage(group_id=group_id).add_file(File.from_base64(file.to_base64()))
+                GroupMessage(group_id=group_id).add_file(
+                    File.from_base64(file.to_base64()),
+                    file_name = file.path
+                )
             )
         return f"代码执行结果是:{execution_result.text}\n并且已经打包发送代码生成文件:{filename}"
     
