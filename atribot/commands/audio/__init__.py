@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from atribot.commands.audio.song import song
 from atribot.commands.audio.TTS import TTSService
+from atribot.core.atri_config import atriConfig
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -7,7 +10,7 @@ from atribot.core.type.chat_message_type import ChatMessage
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
-config = container.get("config")
+config:atriConfig = container.get("config")
 song_manager:song = song()
 
 
@@ -57,15 +60,14 @@ async def tts_synthesis(message_data: ChatMessage, target_text:list[str], emotio
         speed (float): 语速，取值范围0.6~1.65,默认1
     """
     tts_main = TTSService()
-    audio_path = await tts_main.get_tts_path(
+    audio_path:Path = await tts_main.get_tts_path(
         text= "".join(target_text),
         emotion= emotion,
         speed= speed
     )
     await send_message.send_group_audio(
         group_id = message_data.group_id,
-        url_audio = audio_path,
-        default = True
+        url_audio = str(audio_path),
     )
     
     
@@ -143,12 +145,12 @@ async def handle_song_command(
         if file:
             await send_message.send_group_file(
                 group_id, 
-                config.file_path.item_path + song_path
+                config.file_path.audio / "sing" / song_path
             )
         else:
             await send_message.send_group_audio(
                 group_id, 
-                config.file_path.item_path + song_path
+                config.file_path.audio / "sing" / song_path
             )
     else:
         similar_songs = song_manager.find_similar_songs(song_name)

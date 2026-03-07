@@ -1,9 +1,9 @@
-import os
 from logging import Logger
 from typing import Optional
 
 import aiohttp
 
+from atribot.core.atri_config import FilePathConfig
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
@@ -34,11 +34,10 @@ class QQAPIClient():
         token = "ATRI114514",
         http_base_url = "http://localhost:8080",
         connection_type = "http",
-        File_root_directory:str = ""
     ):
         if "_initialized" not in self.__dict__:
             
-            self.File_root_directory = File_root_directory
+            self.File_root_directory:FilePathConfig = container.get("config").file_path
             self.logger:Logger = container.get("log")
             
             if connection_type == "http":
@@ -403,7 +402,7 @@ class QQAPIClient():
     async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True, get_return = False)->dict|None:
         """发送群图片,默认图片为img_ATRI.png还有可开启默认路径"""
         if default:
-            url_img = f"{self.File_root_directory}img/{url_img}"
+            url_img = str(self.File_root_directory.img / url_img)
 
         return await self.group_message_request(group_id,"image",url_img,local_Path_type,get_return = get_return)
 
@@ -411,7 +410,7 @@ class QQAPIClient():
     async def send_group_audio(self,group_id,url_audio = "Atri my dear moments.mp3",default = False,local_Path_type = True):
         """发送群语音"""
         if default: 
-            url_audio = f"{self.File_root_directory}audio/{url_audio}"
+            url_audio = str(self.File_root_directory.audio / url_audio)
     
         await self.group_message_request(group_id,"record",url_audio,Path_type=local_Path_type)
     
@@ -419,7 +418,7 @@ class QQAPIClient():
     async def send_group_video(self,group_id,url_video = "ATRIの珍贵录像.mp4",default = False,local_Path_type = True):
         """发送群视频"""
         if default: 
-            url_video = f"{self.File_root_directory}video/{url_video}"
+            url_video = str(self.File_root_directory.video / url_video)
 
         await self.group_message_request(group_id,"video",url_video,Path_type=local_Path_type)
 
@@ -436,7 +435,7 @@ class QQAPIClient():
         """发送群文件"""
         
         if default:
-            raw_path = os.path.join(self.File_root_directory, "file", url_file)
+            raw_path = str(self.File_root_directory.file / url_file)
         else:
             raw_path = url_file
 
@@ -585,7 +584,7 @@ class QQAPIClient():
                 {
                     "type": type,
                     "data": {
-                        "file": "file://"+file_url if Path_type else file_url
+                        "file": "file://"+ file_url if Path_type else file_url
                     }
                 }
             ],
@@ -618,14 +617,14 @@ class QQAPIClient():
     async def send_personal_pictures(self,qq_id,url_img = "img_ATRI.png",default = False):
         """发送私聊图片,默认图片为img_ATRI.png还有可开启默认路径"""
 
-        data = {"file": "file://"+f"{self.File_root_directory}img/{url_img}" if default else url_img}
+        data = {"file": f"file://{self.File_root_directory.img / url_img}" if default else url_img}
 
         await self.Send_personal_message(qq_id,data,"image")
 
     async def send_personal_audio(self,qq_id,url_audio = "Atri my dear moments.mp3",default = False):
         """发送私聊语音"""
 
-        data = {"file": "file://"+ f"{self.File_root_directory}audio/{url_audio}" if default else url_audio}
+        data = {"file": f"file://{self.File_root_directory.audio / url_audio}" if default else url_audio}
 
         await self.Send_personal_message(qq_id,data,"record")
 

@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple, Union
 import ahocorasick
 
 from atribot.common_utils import construction_message_dict
+from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -22,7 +23,8 @@ class string_response:
     
     def __init__(self):
         self.send_message:QQAPIClient = container.get("SendMessage")
-        self.url_prefi:str = "file://" + container.get("config").file_path.document + "img/"
+        config:atriConfig = container.get("config")
+        self.url_prefi:str = f"file://{config.file_path.document_root / "img"}"
         self.context_management: ChatManager = container.get("ChatManager")
         self._build_automaton()
     

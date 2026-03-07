@@ -1,10 +1,9 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Union, Optional, Any
+from typing import Any, List, Optional, Union
 
 """
 能接收到的数据介绍
-但是不会将接收到的json转换成object，一般会统一处理接受到的json
 """
 
 

@@ -4,6 +4,7 @@ import logging
 import sys
 from pathlib import Path
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.service_container import container
 
@@ -11,39 +12,70 @@ from atribot.core.service_container import container
 class command_loader:
     """命令加载器 - 用于动态加载指定目录下的命令模块"""
     
-    def __init__(self):
+    def __init__(self, commands_dir: Path | None = None):
+        """初始化命令加载器，并立即加载命令目录。
+
+        Args:
+            commands_dir: 命令目录的绝对路径；如果不传，则默认使用
+                `config.file_path.commands`。
+        """
         self.command_system:CommandSystem = container.get("CommandSystem")
         self.logger:logging = container.get("log")
+        self.config:atriConfig = container.get("config")
         self.loaded_modules = []
-    
-    def load_commands_from_directory(self, commands_dir: str, base_package: str = None) -> int:
-        """
-        从指定目录加载所有命令
-        
+        self.commands_dir: Path = Path(commands_dir) if commands_dir else self.config.file_path.commands
+
+        self.load_commands_from_directory(self.commands_dir)
+
+    def _infer_base_package(self, commands_dir: Path) -> str:
+        """根据项目根目录推断命令目录对应的基础包名。
+
         Args:
-            commands_dir: 命令目录在项目的相对路径
-            base_package: 基础包名，如果为None则自动推断
-            
+            commands_dir: 命令目录的绝对路径
+
         Returns:
-            成功加载的模块数量
+            str: 可用于后续拼接子模块名的基础包名，例如 `atribot.commands`。
         """
-        commands_path = Path(commands_dir)
+        commands_dir = commands_dir.resolve()
+        project_root = self.config.file_path.project_root.resolve()
+
+        try:
+            relative_path = commands_dir.relative_to(project_root)
+        except ValueError:
+            self.logger.warning(
+                f"命令目录 {commands_dir} 不在项目根目录 {project_root} 下，将退回目录名推断包名。"
+            )
+            return commands_dir.name
+
+        return ".".join(relative_path.parts) if relative_path.parts else commands_dir.name
+    
+    def load_commands_from_directory(self, commands_dir: Path, base_package: str = None) -> int:
+        """从指定目录加载所有命令包。
+
+        Args:
+            commands_dir: 命令目录在项目中的绝对路径。
+            base_package: 基础包名；如果不传，则根据项目根目录自动推断。
+
+        Returns:
+            int: 成功加载的命令包数量。
+        """
+        commands_dir = Path(commands_dir)
+        self.commands_dir = commands_dir
         
-        if not commands_path.exists():
+        if not commands_dir.exists():
             self.logger.error(f"命令目录不存在: {commands_dir}")
             return 0
         
-        if not commands_path.is_dir():
+        if not commands_dir.is_dir():
             self.logger.error(f"指定路径不是目录: {commands_dir}")
             return 0
         
         if base_package is None:
-            base_package = self._path_to_package_name(commands_dir)
-        
+            base_package = self._infer_base_package(commands_dir)
         
         loaded_count = 0
         
-        for item in commands_path.iterdir():
+        for item in commands_dir.iterdir():
             if item.is_dir():
                 init_file = item / "__init__.py"
                 if init_file.exists():
@@ -57,21 +89,6 @@ class command_loader:
         
         self.logger.info(f"命令加载完成，共加载 {loaded_count} 个模块")
         return loaded_count
-
-    def _path_to_package_name(self, path_str: str) -> str:
-        """
-        将路径转换为包名
-        
-        Args:
-            path_str: 路径字符串，如 "atribot/commands"
-            
-        Returns:
-            包名，如 "atribot.commands"
-        """
-        normalized_path = path_str.replace('\\', '/').strip('/')
-        return normalized_path.replace('/', '.')
-
-
 
     def _load_package(self, package_path: Path, package_name: str):
         """
@@ -134,15 +151,14 @@ class command_loader:
                 del sys.modules[module_name]
             raise e
     
-    def reload_commands(self, commands_dir: str) -> int:
-        """
-        重新加载所有命令
-        
+    def reload_commands(self, commands_dir: str | Path | None = None) -> int:
+        """重新加载所有命令。
+
         Args:
-            commands_dir: 命令目录路径
-            
+            commands_dir: 新的命令目录路径；如果不传，则重载当前目录。
+
         Returns:
-            重新加载的模块数量
+            int: 重新加载的模块数量。
         """
         for module in self.loaded_modules:
             module_name = getattr(module, '__name__', None)
@@ -155,4 +171,5 @@ class command_loader:
             self.command_system.command_registry.clear()
             self.command_system.alias_registry.clear()
         
-        return self.load_commands_from_directory(commands_dir)
+        target_dir = Path(commands_dir) if commands_dir else self.commands_dir
+        return self.load_commands_from_directory(target_dir)

@@ -1,6 +1,7 @@
 import os
 import random
 import re
+from pathlib import Path
 from typing import Match
 
 from atribot.core.type.chat_message_type import File, GroupMessage
@@ -10,10 +11,10 @@ from atribot.LLMchat.prepare_model_prompt import build_prompt
 class EmojiCore:
     """管理表情包"""
     
-    def __init__(self,item_path:str ,folder_path:str = ""):
+    def __init__(self,folder_path:Path = ""):
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
-        self.file = f"{item_path}{folder_path}"
+        self.file = folder_path
         self.emoji_prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
@@ -79,7 +80,7 @@ class EmojiCore:
         Returns:
             str: 完整路径,不包含file://
         """
-        return f"{self.file}/{tag_content}/{self.get_random_emoji_name(tag_content)}"
+        return str(self.file / tag_content / self.get_random_emoji_name(tag_content))
     
     def parse_text_with_emotion_tags(self, text: str, emoji_dict: dict) -> list:
         """

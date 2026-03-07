@@ -1,7 +1,9 @@
+from pathlib import Path
 from typing import Any, Dict
 
 import aiohttp
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
 
 
@@ -35,11 +37,12 @@ class TTSService:
                     "prompt_language": "ja"
                 }
             }
-            self.base_output_path = container.get("config").file_path.procedure_root+"document/audio/"
-            self.relative_output_prefix = "TTS_output/output"
+            config:atriConfig = container.get("config")
+            self.base_output_path = config.file_path.audio
+            self.relative_output_prefix = Path("TTS_output/output")
             self._initialized = True
 
-    async def get_tts_path(self, text: str, emotion: str = "高兴", speed: float = 1) -> str:
+    async def get_tts_path(self, text: str, emotion: str = "高兴", speed: float = 1) -> Path:
         """TTS文本合成语音
         
         Args:
@@ -51,7 +54,7 @@ class TTSService:
             ValueError: 抛出包含错误信息的json
 
         Returns:
-            str: 返回wav文件的相对路径
+            Path: 返回wav文件的绝对路径
         """
         # raise ValueError("语音因为资源分配问题暂时被关了,不要再尝试使用")
         
@@ -105,17 +108,17 @@ class TTSService:
         except Exception as e:
             raise ValueError(f"处理TTS请求时发生错误: {str(e)}")
 
-    async def _save_audio_file(self, audio_bytes: bytes) -> str:
-        """保存音频文件并返回相对路径"""
-        audio_relative_path = f"{self.relative_output_prefix}{self.audio_count}.wav"
-        audio_full_path = f"{self.base_output_path}{audio_relative_path}"
+    async def _save_audio_file(self, audio_bytes: bytes) -> Path:
+        audio_full_path = self.base_output_path / self.relative_output_prefix / f"{self.audio_count}.wav"
+        
+        audio_full_path.parent.mkdir(parents=True, exist_ok=True)
         
         with open(audio_full_path, "wb") as f:
             f.write(audio_bytes)
         
         self._update_audio_count()
         
-        return audio_relative_path
+        return audio_full_path
 
     def _update_audio_count(self) -> None:
         """更新音频文件计数器"""

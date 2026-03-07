@@ -34,7 +34,7 @@
 
 ## ✨ 项目核心功能
 
-简单来说，这是一个基于 **NapCat** 对接的、专注于群聊场景的 QQ Bot。除了群聊以外的其他的功能都没没做
+简单来说，这是一个基于 **NapCat** 对接、专注于群聊场景的 QQ Bot。目前主要能力也基本都围绕群聊展开。
 
 ### 🧠 深度 LLM 聊天集成
 完全自主实现的 LLM 聊天全流程，从输入处理到输出响应完全可控：
@@ -50,7 +50,7 @@
   - 支持人设切换等基础功能。
 
 ### 💻 类 Unix 命令系统
-拥有一套可用的命令机制，在群里 `@bot` 后以 `/` 开头即可触发（例如 `@atri-bot /help --list`一定要是qq的那个@而不是@+名字文本）：
+内置一套类 Unix 风格的命令系统，在群里 `@bot` 后以 `/` 开头即可触发（例如 `@atri-bot /help --list`，这里必须使用 QQ 的真实 `@` 提及，而不是直接输入名字文本）：
 - **参数解析**：支持 `-` 和 `--` 等参数风格，内置参数类型验证。
 - **权限管理**：内置权限系统，支持拉黑或授予管理员权限。可在任意处理环节校验 User 权限，拒绝非法执行。
 - **自动帮助文档**：只要在代码中使用装饰器并添加参数说明，即可自动生成详细的 `--help` 提示。
@@ -66,15 +66,15 @@
 ## 🚀 快速开始 (How to Run)
 
 ### 1. 前端连接 (NapCat)
-首先需要一个能够与 QQ 服务器通信的前端，推荐使用 NapCat连接QQ：
+首先需要一个能够与 QQ 通信的前端，推荐使用 NapCat：
 [NapCat 安装指南](https://napneko.github.io/guide/napcat)
 [NapCat 项目地址](https://github.com/NapNeko/NapCatQQ)
 > *注：你也可以自己实现前端，只要能对接上即可。*
 
 ### 2. 数据库配置 (PostgreSQL)
-项目仅支持 PostgreSQL 数据库。
-1.  **安装数据库**：推荐使用 PostgreSQL 18 或更高版本。[官方安装文档](https://www.postgresql.org/download/)
-2.  **安装向量插件**：必须安装 `pgvector` 插件以支持 RAG 功能.[pg向量插件](https://github.com/pgvector/pgvector)
+项目当前仅支持 PostgreSQL 数据库。
+1.  **安装数据库**：建议安装较新的 PostgreSQL 版本。[官方安装文档](https://www.postgresql.org/download/)
+2.  **安装向量插件**：必须安装 `pgvector` 插件以支持 RAG 功能。[pgvector 项目地址](https://github.com/pgvector/pgvector)
 3.  **数据库初始化**：
     项目提供了初始化 SQL 文件：`docker\db\info.sql`。
     进入数据库（Linux 示例）：
@@ -86,7 +86,7 @@
 
 ### 3. 模型与环境配置
 #### 🤖 嵌入模型 (Embedding)
-推荐使用本地的 `Qwen3-Embedding-0.6B:F16`当然你有其他付费 API 也可以。(不知道其他渠道是否能使用,只测试过ollama)
+推荐优先使用本地的 `Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API，只是仓库里目前主要按 Ollama 的使用方式测试过。
 推荐使用 [Ollama](https://ollama.com/) 进行本地部署：
 ```bash
 ollama run Qwen3-Embedding-0.6B:F16
@@ -96,9 +96,9 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 
 #### 🗣️ 语音合成 (TTS) - 可选
-支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)
-实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速情感等常用参数,当然你还要有自己的语音模型  
-使用前需要修改`atribot\commands\audio\TTS.py`文件里的参考音频路径,还有GPT-SoVITS接口的端口地址  
+支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)。
+实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速、情感等常用参数；当然前提是你已经准备好了自己的语音模型。  
+使用前需要修改 `atribot\commands\audio\TTS.py` 中的参考音频路径，以及 GPT-SoVITS 接口端口地址。  
 ```json
 {
     "这里是对应的情感": {
@@ -115,24 +115,24 @@ ollama run Qwen3-Embedding-0.6B:F16
 ```
 
 
-#### 📦 沙盒环境 (sandbox)  - 可选
+#### 📦 沙盒环境 (sandbox) - 可选
 
 为 AI 模型配备了默认的**代码沙盒环境**，使其能够安全地执行用户请求或自主生成的代码片段。当前实现基于 **Docker** 🐳沙盒，支持运行 Python 等语言的代码，可用于代码解释、数据计算等场景。
 
 - **扩展性**：如需支持其他类型的沙盒（如 Web 沙盒、系统命令沙盒），可继承 `atribot\LLMchat\sandbox\sandbox_base.py` 中的基类并实现相应接口。
-- **启用与禁用**：沙盒功能**默认启用**。若运行环境未安装或配置 Docker，项目将初始化失败。若无需此功能，可在 `atribot\bot_framework.py` 中找到标记为 `# ai使用的沙盒` 的代码段，将其注释即可。
+- **文件操作**：支持了在ai上下文中看见的文件可以放到python环境中对文件进行简单处理
 
 
 #### ⚙️ 配置文件
-在启动前，请务必检查 `assets` 文件夹：
+在启动前，请务必检查 `assets` 目录中的配置：
 1.  参考 `assets\如何配置配置文件.py` 了解配置详情。
 2.  配置 `supplier_config.json` (模型供应商配置)。
 3.  配置 `config.json` (项目基础配置)。
-4.  **MCP 配置**：默认路径在 `atribot\LLMchat\MCP\mcp_server.json`，可通过 `"active": false` 开关特定的 MCP 工具。
-5.  根目录`document/`下面可参照项目结构添加对应的音频表情包文件配置
+4.  **MCP 配置**：默认路径在 `atribot\LLMchat\MCP\mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用。
+5.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
 
 ### 4. 启动项目
-项目依赖 **Python 3.13** 环境。推荐使用 `uv` 进行包管理。
+项目依赖 **Python 3.13** 环境，推荐使用 `uv` 管理依赖。
 
 **使用 uv (推荐):**
 ```bash
@@ -143,63 +143,70 @@ uv run main.py
 
 **使用 pip:**
 ```bash
-pip install -r requirements.txt
-python3 main.py
+pip install -r requirements-windows.txt
+python main.py
 ```
-> ⚠️ **重要**：执行命令时请务必保持在项目根目录下，否则可能会出现路径错误。
+Linux / macOS 请分别使用 `requirements-linux.txt`、`requirements-macos.txt`。
+
+> ⚠️ **重要**：请务必在项目根目录执行启动命令，否则可能出现路径解析错误。
 
 ---
 ## 📂 项目结构
 
 ```text
 ATRI-main/
-├─assets/                       # ⚙️ 项目配置文件及配置说明
-│
-├─atribot/                      # 核心代码实现
-│  ├─C/                         # C语言扩展模块 (编译成链接库替换相关逻辑以提升性能)
-│  ├─commands/                  # 💻 命令具体实现逻辑
+├─main.py                       # 项目入口
+├─assets/                       # ⚙️ 配置文件、示例配置与 SQL 辅助脚本
+├─atribot/                      # 核心代码
+│  ├─bot_framework.py           # Bot 初始化与整体装配入口
+│  ├─C/                         # C 扩展模块
+│  ├─commands/                  # 💻 群聊命令实现
+│  │  ├─audio/                  # 音频与 TTS 相关命令
+│  │  ├─bromidic/               # 图片 / B 站等杂项功能命令
+│  │  ├─interior/               # 内部管理与状态查询命令
+│  │  └─test/                   # 实验性 / 测试命令
+│  ├─common_utils/              # 通用工具函数
+│  │  └─file/                   # 文件、图片、文本处理工具
 │  ├─core/                      # 核心架构
-│  │  ├─cache/                  # 内存消息缓存
-│  │  ├─command/                # 命令系统与权限系统实现
-│  │  ├─db/                     # 数据库连接池实现
-│  │  ├─event_trigger/          # 基础消息事件处理
-│  │  └─network_connections/    # 网络连接与消息收发
-│  │
-│  ├─docs/                      # 开发笔记与文档
-│  │
-│  ├─LLMchat/                   # 🧠 聊天模块实现
-│  │  ├─character_setting/      # 人设预设
-│  │  ├─discard_tools/          # (已废弃的工具)
-│  │  ├─MCP/                    # MCP 协议工具与配置
-│  │  ├─memory/                 # RAG 记忆系统
-│  │  ├─sandbox/                # AI运行代码所使用的沙盒
-│  │  ├─model_api/              # LLM 供应商连接接口
-│  │  ├─RAG/                    # 检索增强生成逻辑
-│  │  └─tools/                  # 函数调用工具集
-│  │
-│  └─log/                       # 运行时日志配置
-│
-├─docker/                       # 🐳 Docker 部署相关 (WIP)
-│  ├─db/                        # 数据库初始化 SQL
-│  └─python/
-│
-├─document/                     # 🎨 资源文件夹
+│  │  ├─cache/                  # 上下文缓存与生命周期管理
+│  │  ├─command/                # 命令系统与权限管理
+│  │  ├─db/                     # 数据库连接与数据访问
+│  │  ├─event_trigger/          # 事件处理
+│  │  ├─network_connections/    # WebSocket 与消息收发
+│  │  └─type/                   # 核心类型定义
+│  ├─docs/                      # 开发过程中的文档与笔记
+│  └─LLMchat/                   # 🧠 LLM 聊天与 Agent 能力
+│     ├─character_setting/      # 人设预设
+│     ├─discard_tools/          # 已废弃的工具
+│     ├─MCP/                    # MCP 协议工具与配置
+│     ├─memory/                 # 记忆系统
+│     ├─model_api/              # 模型供应商接口
+│     ├─RAG/                    # 检索增强生成逻辑
+│     ├─sandbox/                # AI 代码沙盒
+│     ├─skills/                 # Agent 技能提示词
+│     └─tools/                  # 函数调用工具集
+├─docker/                       # 🐳 Docker 相关资源
+│  ├─db/                        # 数据库初始化脚本与镜像文件
+│  └─python/                    # Python 环境相关资源
+├─document/                     # 🎨 运行时资源目录
 │  ├─audio/                     # 音频素材
-│  ├─file/                      # 通用文件
-│  ├─img/                       # 图片素材
-│  │  └─emojis/                 # Bot 发送的表情包文件夹
-│  │     ├─RocketPunch          # Bot 发送的表情包对应的分类表情可添加配置多个文件夹
-│  │     └─happy
-│  └─video/                     # 视频素材
+│  ├─file/                      # 通用文本 / 文件资源
+│  ├─img/                       # 图片资源
+│  │  ├─ATRI_qrcode/            # 二维码资源
+│  │  ├─emojis/                 # 表情包目录
+│  │  └─tmp/                    # 临时图片目录
+│  └─video/                     # 视频资源
+├─log/                          # 运行日志
+└─privacy/                      # 私有脚本与临时笔记
 ```
 
 ---
 
 ## 🤝 参与贡献
 
-非常欢迎你参与到这个项目中来！无论是提交 Bug、修补代码还是提出新功能建议。
-让我们一起把 ATRI-bot 变得更聪明、更可爱！
-虽然这个目前其实很烂
+欢迎提交 Issue、PR，或者直接提出改进建议。
+无论是修 Bug、补文档、优化架构，还是扩展新能力，都非常欢迎。
+一起把 ATRI-bot 做得更聪明，也更顺手。
 
 ---
 

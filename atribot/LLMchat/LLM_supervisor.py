@@ -132,7 +132,6 @@ class LLMCoordinator():
     def __init__(self):
         self.supplier:AiConnectionManager = container.get("LLMSupplier")
         self.logger:Logger = container.get("log")
-        self.config = container.get("config")
         self.tool_management = tool_calls()
         
         

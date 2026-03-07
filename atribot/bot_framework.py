@@ -59,7 +59,7 @@ class BotFramework:
         )
         
         #MCP
-        mcp_server = FuncCall("atribot/LLMchat/MCP/")
+        mcp_server = FuncCall(self.config.file_path.mcp_config)
         asyncio.create_task(mcp_server.mcp_service_selector())#放到后台不等待
         mcp_server.mcp_service_queue.put_nowait({"type": "init"})#初始化
         container.register(
@@ -112,7 +112,7 @@ class BotFramework:
         #Skills的管理
         container.register(
             "SkillsManager",
-            SkillsManager()
+            SkillsManager(skill_dir=self.config.file_path.agent_skills)
         )
         
         #ai使用的沙盒
@@ -162,10 +162,7 @@ class BotFramework:
         
         container.register(
             "EmojiCore",
-            EmojiCore(
-                folder_path = self.config.file_path.emoji,
-                item_path = self.config.file_path.item_path
-            )
+            EmojiCore(folder_path = self.config.file_path.emoji)
         )
 
         #权限
@@ -259,8 +256,7 @@ class BotFramework:
         send_message = QQAPIClient(
             token = self.config.network.access_token, 
             http_base_url = self.config.network.url, 
-            connection_type = self.config.network.connection_type,
-            File_root_directory = self.config.file_path.document
+            connection_type = self.config.network.connection_type
         )
         container.register("SendMessage",send_message)
         
@@ -270,8 +266,7 @@ class BotFramework:
             "CommandSystem",
             CommandSystem()
         )
-        CommandLoader = command_loader()
-        CommandLoader.load_commands_from_directory(self.config.file_path.commands)
+        CommandLoader = command_loader(self.config.file_path.commands)
         container.register("CommandLoader",CommandLoader)
         
         #处理模型响应

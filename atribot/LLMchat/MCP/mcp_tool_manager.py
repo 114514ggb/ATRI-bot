@@ -8,6 +8,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from datetime import timedelta
 from logging import Logger
+from pathlib import Path
 from typing import Any, Awaitable, Dict, List, Literal, Optional
 
 import httpx
@@ -190,7 +191,7 @@ class MCPClient:
 
 class FuncCall:
     """用于管理MCP工具函数调用"""
-    def __init__(self, mcp_path:str = "") -> None:
+    def __init__(self, mcp_path:str|Path = "") -> None:
         self.logger:Logger = container.get("log")
         """日志配置"""
         self.func_list: List[FuncTool] = []
@@ -201,7 +202,7 @@ class FuncCall:
         """用于外部控制 MCP 服务的启停"""
         self.mcp_client_event: Dict[str, asyncio.Event] = {}
         """MCP客户端"""
-        self.mcp_path:str = mcp_path 
+        self.mcp_path:str|Path= mcp_path 
         """MCP配置文件路径"""
 
     def empty(self) -> bool:
@@ -273,7 +274,7 @@ class FuncCall:
         }
         ```
         """
-        mcp_json_file = os.path.join(self.mcp_path, "mcp_server.json")
+        mcp_json_file = os.path.join(self.mcp_path)
         if not os.path.exists(mcp_json_file):
             # 配置文件不存在错误处理
             with open(mcp_json_file, "w", encoding="utf-8") as f:

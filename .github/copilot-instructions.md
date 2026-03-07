@@ -40,7 +40,7 @@
 
 ## Coding Standards
 - **Asynchronous First**: Use `async/await` for IO-bound tasks (DB, Network, LLM APIs).
-- **Paths**: Use `container.get("config").file_path.procedure_root` to build absolute paths for assets/logs instead of using relative ones.
+- **Paths**: Use `container.get("config").file_path.document_root` to build absolute paths for assets/logs instead of using relative ones.
 - **Logging**: Use the system logger: `log = container.get("log")`.
 - **Typing**: Use type hints for all parameters and return types.
 

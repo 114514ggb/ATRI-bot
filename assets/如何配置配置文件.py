@@ -13,14 +13,23 @@
         "id":3930909243, #bot的qq号
         "name":"ATRI-bot" #bot的账号名称
     },
-    "file_path":{
-        "item_path":"E:/程序文件/python/ATRI-main/",#项目的根路径，如果你用默认的话后面要加上/如果前面用的是\\建议统一用\\就不要用/了
-        "document":"E:/程序文件/python/ATRI-main/document/",#项目的资源文件夹如bot要发送的表情包音频等
-        "procedure_root":"E:/程序文件/python/ATRI-main/",#给tts使用的缓存音频前路径
-        "emoji":"document/img/emojis",#会和项目的根路径拼接在一起的路径,会拼接作为发送表情文件的路径
-        "commands":"atribot/commands",#命令系统的文件夹的相对路径一般不用动
-        "chat_manager":"atribot/LLMchat/character_setting",#人设文件的相对路径,一般不用动
-        "supplier_config_path":"assets/supplier_config.json"#LLM供应商的配置文件的相对路径一般也不用动
+    "file_path":{#没事的话可以不配置目录,会自动
+        "document_root":None, #项目的资源根目录，如表情包、音频等目录的配置位置,如果为空就是默认在根目录下的/document文件夹下
+        "relative_to_root":{#根目录在main.py脚本的位置会自动获取
+            "commands":"atribot/commands", #命令系统目录
+            "chat_manager":"atribot/LLMchat/character_setting", #角色设定所在的目录
+            "supplier_config_path":"assets/supplier_config.json", #供应商配置文件路径
+            "mcp_config":"atribot/LLMchat/MCP/mcp_server.json", #MCP 配置文件路径
+            "agent_skills":"atribot/LLMchat/skills/agent_skills" #读取skills的目录
+        },
+        "relative_to_document":{#相对于 document_root 的目录
+            "emoji":"img/emojis", #表情包目录
+            "audio":"audio", #音频目录
+            "file":"file", #文件目录
+            "img":"img", #图片目录
+            "video":"video", #视频目录
+            "temp":"temp" #临时目录
+        }
     },
     "model":{ 
         "connect":
@@ -29,7 +38,7 @@
             "model_name":"deepseek-chat",#配置的聊天模型名称
             "visual_sense":False,#模型是否有视觉，是否能接收图片
             "system_review":False,#决定统提示词的嵌入方式，一般不用动
-            "user_global_context":True #决定了上下文的纯在形式
+            "user_global_context":True #决定了上下文的存在在形式,是一个群共用一个上下文，还是每个user单独的上下文
         },
         "chat_parameter":{#聊天模型会使用的参数配置
             "temperature":0.3,

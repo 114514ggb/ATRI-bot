@@ -12,13 +12,22 @@
         "name":"ATRI-bot"
     },
     "file_path":{
-        "item_path":"",
-        "document":"",
-        "procedure_root":"",
-        "emoji":"document/img/emojis",
-        "commands":"atribot/commands",
-        "chat_manager":"atribot/LLMchat/character_setting",
-        "supplier_config_path":"assets/supplier_config.json"
+        "document_root":null,
+        "relative_to_root":{
+            "commands":"atribot/commands",
+            "chat_manager":"atribot/LLMchat/character_setting",
+            "supplier_config_path":"assets/supplier_config.json",
+            "mcp_config":"atribot/LLMchat/MCP/mcp_server.json",
+            "agent_skills":"atribot/LLMchat/skills/agent_skills"
+        },
+        "relative_to_document":{
+            "emoji":"img/emojis",
+            "audio":"audio",
+            "file":"file",
+            "img":"img",
+            "video":"video",
+            "temp":"temp"
+        }
     },
     "model":{ 
         "connect":
