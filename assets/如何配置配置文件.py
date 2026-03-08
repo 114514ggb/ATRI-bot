@@ -13,10 +13,10 @@
         "id":3930909243, #bot的qq号
         "name":"ATRI-bot" #bot的账号名称
     },
-    "file_path":{#没事的话可以不配置目录,会自动
-        "document_root":None, #项目的资源根目录，如表情包、音频等目录的配置位置,如果为空就是默认在根目录下的/document文件夹下
+    "file_path":{#没事的话可以不配置目录,使用默认的即可,注意如果没有对应目录的话会自动创建
+        "document_root":None, #项目的资源根目录，如表情包、音频等目录的配置位置,如果为空就是默认在根目录下的/document文件夹下,有需要的人可以换个位置但是不建议
         "relative_to_root":{#根目录在main.py脚本的位置会自动获取
-            "commands":"atribot/commands", #命令系统目录
+            "commands":"atribot/commands", #加载提供系统使用命令的目录
             "chat_manager":"atribot/LLMchat/character_setting", #角色设定所在的目录
             "supplier_config_path":"assets/supplier_config.json", #供应商配置文件路径
             "mcp_config":"atribot/LLMchat/MCP/mcp_server.json", #MCP 配置文件路径
@@ -41,8 +41,10 @@
             "user_global_context":True #决定了上下文的存在在形式,是一个群共用一个上下文，还是每个user单独的上下文
         },
         "chat_parameter":{#聊天模型会使用的参数配置
+            "thinking_level":"high",#minimal,low,medium,high
             "temperature":0.3,
             "max_tokens": 8000,
+            "stream":False,
             "tool_choice": "auto"
         },
         "tavily_search_API_key":"",#一个网络搜索的api挺好用的(免费) https://docs.tavily.com/
@@ -100,8 +102,8 @@
         "playRole":"ATRI",#聊天采用的人设名要是前面chat_manager里面有的人物，不然就是没有人设
         "ai_max_record":20,#上下文的消息存储的消息轮数
         "group_max_record":20,#群消息缓存的消息条数量为ai上下文的
-        "private_max_record":20#私聊没做所以没用的配置
-    },
+        "private_max_record":20#user上下文消息轮数限制
+    },#注意消息轮数是指你输入一条消息然后等到ai回复一次这就是一轮,这一轮里面可能包含ai多次工具调用什么的
     "sand_box":{#这个是沙盒的的配置参数，需要看具体使用的沙盒实例来传递参数,默认使用的是docker，可以去atribot\LLMchat\sandbox\docker_sandbox.py看看class接受的参数
         "image":"atri-sandbox:latest"#启动的镜像名称
     },
@@ -147,7 +149,7 @@
             "name":"google",
             "base_url":"https:???",
             "api_key":[
-                "AIzaSyDsd4zsgSzI33nfv7DKy1uo-bHpJEaYAP0",#像这样可以配置一个号池，请求时会轮流使用里面的key
+                "AIzaSyDsd4zsgSzI33nfv7DKy1uo-bHpJEaYAP0",#像这样可以配置一个号池，请求时会按照顺序轮流使用里面的key
                 "AIzaSyAIlKkjK_nTDQfP84jIDqBmf51mF3e1gws",
                 "AIzaSyDdWvgr38Kl28UqmdPfD_8KapB4KHtdEwA",
                 "AIzaSyCF9hJhH3dn9Q_-SSjorkJPlsSB0Y6dzMw",

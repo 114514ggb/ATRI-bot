@@ -86,6 +86,38 @@ class TextSegment(MessageSegment):
         return self.text
 
 
+class MarkdownSegment(MessageSegment):
+    """markdown消息"""
+    __slots__ = ['text']
+    
+    def __init__(self, text: str):
+        self.text = text
+        super().__init__(MessageSegmentType.MARKDOWN.value)
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        return {"markdown": self.text}
+    
+    def __str__(self) -> str:
+        return self.text
+
+
+class XmlSegment(MessageSegment):
+    """xml"""
+    __slots__ = ['text']
+    
+    def __init__(self, text: str):
+        self.text = text
+        super().__init__(MessageSegmentType.XML.value)
+    
+    @property
+    def data(self) -> Dict[str, Any]:
+        return {"xml": self.text}
+    
+    def __str__(self) -> str:
+        return self.text
+    
+
 class AtSegment(MessageSegment):
     """@"""
     __slots__ = ['user_id']#一个qq号或是'all'全体
@@ -190,10 +222,10 @@ class NodeSegment(MessageSegment):
     
     def __init__(
         self,
-        nickname: str,
-        content: Any,
-        id: str | None = None,
-        user_id: str | None = None,
+        content: list,
+        nickname: str = "ATRI-亚托莉",
+        id: str = None,
+        user_id: str = "3889393615",
         uin: str | None = None,
         name: str | None = None,
         source: str | None = "高性能秘籍",
@@ -205,14 +237,14 @@ class NodeSegment(MessageSegment):
         """初始化合并转发消息节点。
         
         Args:
-            nickname: 发送者的昵称（必填）。
-            content: 消息的具体内容，遵循OB11MessageMixType协议（必填）。
-            id: 转发消息的唯一标识ID（可选）。
+            content: 消息的具体内容，遵循OB11MessageMixType协议（必填）
+            nickname: 发送者的昵称
+            id: 转发消息的唯一标识ID
             user_id: 发送者的QQ号（可选）。
             uin: 发送者的QQ号，兼容go-cqhttp协议格式（可选）。
             name: 发送者的昵称，兼容go-cqhttp协议格式（可选）。
             source: 标题文本（可选）。
-            news: 预览文本（可选）格式list[dict][{"text" : "文本"}]
+            news: 预览文本（可选）格式list[dict]比如[{"text" : "文本"}]
             summary: 底下文本（可选）。
             prompt: 消息的提示信息（可选）。
             time: 消息发送的时间（可选）。
@@ -690,7 +722,17 @@ class SendMessage:
         """添加纯文本消息段"""
         self.segments.append(TextSegment(text))
         return self
-    
+
+    def add_markdown(self, text: str) -> "SendMessage":
+        """添加markdown消息段"""
+        self.segments.append(MarkdownSegment(text))
+        return self
+
+    def add_xml(self, text: str) -> "SendMessage":
+        """添加xml消息段"""
+        self.segments.append(XmlSegment(text))
+        return self
+
     def add_image(
         self,
         file: str|File,
@@ -820,26 +862,26 @@ class SendMessage:
     
     def add_node(
         self,
-        nickname: str,
-        content: Any,
-        id: Optional[str] = None,
-        user_id: Optional[str] = None,
-        uin: Optional[str] = None,
-        name: Optional[str] = None,
-        source: Optional[str] = None,
-        news: Optional[List[Dict]] = None,
-        summary: Optional[str] = None,
-        prompt: Optional[str] = None,
-        time: Optional[str] = None
+        content: list,
+        nickname: str = "ATRI-亚托莉",
+        id: str = None,
+        user_id: str = "3889393615",
+        uin: str = "3889393615",
+        name: str | None = None,
+        source: str | None = "高性能秘籍",
+        news: list[dict] | None = None,
+        summary: str | None = "点击即看",
+        prompt: str | None = "果然是群聊天记录",
+        time: str | None = None
     ) -> "SendMessage":
         """
         添加合并转发消息节点
         
         Args:
-            nickname: 发送者的昵称（必填）
             content: 消息的具体内容，遵循 OneBot 消息段格式（必填）
+            nickname: 发送者的昵称
             id: 转发消息的唯一标识ID（可选）
-            user_id: 发送者的QQ号（可选）
+            user_id: 发送者的QQ号
             uin: 发送者的QQ号，兼容go-cqhttp协议格式（可选）
             name: 发送者的昵称，兼容go-cqhttp协议格式（可选）
             source: 标题文本（可选）

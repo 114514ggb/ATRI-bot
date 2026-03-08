@@ -318,7 +318,7 @@ class build_prompt:
 }
 
 规则:
-decision:string,尔选一,必填
+decision:string,多选一,必填
 reason:string,必填 
 target_message_id:integer,reply时选填
 content:list[str],reply 时必填；其它决策禁止出现
@@ -342,8 +342,8 @@ JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对�
 {
     "return":[
         {
-            "decision":"参数值",
-            //对应参数
+            "decision":"按照要求的参数值",
+            //要求参数
         },
         {
             "decision":"参数值",
@@ -352,7 +352,7 @@ JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对�
     ]
 }
 ```
-请根据情况完成任务并且给出你的decision
+请根据情况给出你的decision,不能用decision来调用tool
 </example>
 """
             "</output_requirement>"

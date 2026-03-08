@@ -120,22 +120,36 @@ class QQAPIClient():
                 
             return await self.async_send(url, payload=message.to_dict())
 
-    async def send_group(self, message: GroupMessage) -> dict | None:
-        """
-        专门发送群聊消息对象
+    async def send_group(self, message: GroupMessage, echo:bool=False) -> dict | None:
+        """专门发送群聊消息对象
+
+        Args:
+            message (GroupMessage): 消息体
+            echo (bool, optional): 是否等待获取并且返回消息发送的结果. Defaults to False.
+
+        Returns:
+            dict | None: echo为真的时候返回的消息发送结果
         """
         return await self.async_send(
             url="send_group_msg", 
-            payload=message.to_dict()
+            payload=message.to_dict(),
+            echo=echo
         )
 
-    async def send_private(self, message: PrivateMessage) -> dict | None:
+    async def send_private(self, message: PrivateMessage, echo:bool=False) -> dict | None:
+        """专门发送私聊消息对象
+
+        Args:
+            message (PrivateMessage): 消息体
+            echo (bool, optional): 是否等待获取并且返回消息发送的结果. Defaults to False.
+
+        Returns:
+            dict | None: echo为真的时候返回的消息发送结果
         """
-        专门发送私聊消息对象
-        """ 
         return await self.async_send(
             url="send_private_msg", 
-            payload=message.to_dict()
+            payload=message.to_dict(),
+            echo=echo
         )
 
     async def send_group_message(self,group_id: int, message:str|list):
@@ -439,10 +453,8 @@ class QQAPIClient():
         else:
             raw_path = url_file
 
-        file_str = f"file://{raw_path}" if local_Path_type else raw_path
-
         data_payload = {
-            "file": file_str
+            "file": f"file://{raw_path}" if local_Path_type else raw_path
         }
         
         if name:

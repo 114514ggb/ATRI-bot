@@ -1,12 +1,17 @@
+import shutil
+from uuid import uuid4
+
+from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import File, FileMessageSegment, GroupMessage
+from atribot.core.type.chat_message_type import FileMessageSegment, GroupMessage, SendMessage
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
 from atribot.LLMchat.tools.run_python_code.run_code import run_python_code_with_segments
 
 send_message:QQAPIClient = container.get("SendMessage")
 chat_manager: ChatManager = container.get("ChatManager")
+config:atriConfig = container.get("config")
 
 tool_json = {
     "name": "run_python_code",
@@ -57,29 +62,39 @@ async def main(code:str, group_id:int, files:list[str] | None = None):
         file_segments = file_segments,
     )
     
-    await send_message.send_group_merge_text(
-        group_id = group_id,
-        message = code,
-        source = "执行的代码"
+    await send_message.send_group(
+        GroupMessage(group_id=group_id).add_node(
+            content = SendMessage().add_text(f"{code}\n\n执行的结果:\n{execution_result.text}").data,
+            source = "执行的代码"
+        )
     )
-    
+
     if execution_result.files:
         file = execution_result.files[0]
-        filename = file.path 
+        filename = file.path
         
-        if filename.split('.')[-1].lower() if '.' in filename else '' in {'png', 'jpg', 'jpeg', 'gif'}:#不需要太严格的检查这样应该够了吧
+        if (filename.rsplit('.', 1)[-1].lower() if '.' in filename else '') in {'png', 'jpg', 'jpeg', 'gif'}:
             await send_message.send_group_pictures(
                 group_id = group_id,
                 url_img = "base64://"+file.to_base64(),
                 local_Path_type = False
             )
+            return f"代码执行结果是:{execution_result.text}\n并且已经发送代码生成图片:{filename}"
         else:
-            await send_message.send_group(
-                GroupMessage(group_id=group_id).add_file(
-                    File.from_base64(file.to_base64()),
-                    file_name = file.path
+            temp_dir = config.file_path.temp / f"run_python_code_{uuid4().hex}"
+            temp_file_path = temp_dir / (filename or "output.bin")
+            temp_file_path.parent.mkdir(parents=True, exist_ok=True) 
+            temp_file_path.write_bytes(file.content)
+
+            try:
+                await send_message.send_group_file(
+                    group_id = group_id,
+                    url_file = str(temp_file_path),
+                    local_Path_type = True,
+                    echo = True
                 )
-            )
-        return f"代码执行结果是:{execution_result.text}\n并且已经打包发送代码生成文件:{filename}"
+            finally:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            return f"代码执行结果是:{execution_result.text}\n并且已经打包发送代码生成文件:{filename}"
     
     return f"代码执行结果是:{execution_result.text}"

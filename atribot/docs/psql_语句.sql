@@ -31,7 +31,17 @@ GROUP BY m.group_id, m.user_id, u.nickname
 ORDER BY "发言次数" DESC;
 
 
-
+SELECT
+    m.group_id  AS "群号",
+    m.user_id   AS "qq号",
+    u.nickname  AS "网名",
+    COUNT(*)    AS "发言次数",
+    DENSE_RANK() OVER (ORDER BY COUNT(*) DESC) AS "名次"
+FROM message m
+JOIN users u ON u.user_id = m.user_id
+WHERE m.time >= EXTRACT(EPOCH FROM (CURRENT_DATE - INTERVAL '30 days'))::bigint
+GROUP BY m.group_id, m.user_id, u.nickname
+ORDER BY "发言次数" DESC;
 
 
 

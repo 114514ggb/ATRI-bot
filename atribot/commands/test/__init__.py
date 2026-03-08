@@ -1,7 +1,9 @@
+import textwrap
+
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_type import ChatMessage, GroupMessage
 
 from .ATRI_encrypt import Encrypt
 
@@ -93,5 +95,37 @@ async def atri_encrypt_command(
             message=f"错误: {str(e)}",
             source="ATRI编码错误"
         )
+
+@cmd_system.register_command(
+    name='run',
+    description='执行异步Python代码',
+    examples=[
+        "/run \"await send_message.send_group_message(984466158,\'hello\')\"",
+    ],
+    authority_level=3
+)
+@cmd_system.argument(
+    name="code",
+    description="要执行的代码",
+    required=True,
+    multiple=True,
+    type=str
+)
+async def run_async_code(message_data: ChatMessage, code: list):
+    """
+    异步执行代码的测试命令
+    """
+
+    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_markdown('#这是**ATRI**'))
+    
+    GroupMessage
+    src = f"""
+async def function():
+{textwrap.indent(" ".join(code), "  ")}
+"""
+    locs = {}
+    exec(src, globals(), locs)
+    coro = locs["function"]()
+    await coro
 
 

@@ -6,8 +6,6 @@ import os
 import tarfile
 import uuid
 import zipfile
-from tarfile import TarInfo
-from typing import List
 
 import aiohttp
 
@@ -94,30 +92,34 @@ async def _collect_generated_files(
     max_file_size: int,
     max_total_size: int,
 ) -> tuple[list[GeneratedFile], str]:
-    """从沙盒运行目录收集新产生的文件。
+    """从沙盒运行目录收集新产生的文件
 
     Args:
         run_dir: 执行目录路径。
-        ignored_names: 需要忽略的文件名集合（通常是脚本本身和输入文件）。
-        max_file_size: 单个文件最大大小限制。
-        max_total_size: 所有文件总大小限制。
+        ignored_names: 需要忽略的文件名集合（通常是脚本本身和输入文件）
+        max_file_size: 单个文件最大大小限制
+        max_total_size: 所有文件总大小限制
 
     Returns:
         tuple: (生成的 GeneratedFile 列表, 警告信息字符串)。
     """
-    if not sand_box.container:
-        return [], ""
-
-    generated_files: List[GeneratedFile] = []
-
     bits, _ = await asyncio.to_thread(sand_box.container.get_archive, run_dir)
     file_obj = io.BytesIO()
+    downloaded_size = 0
+    safe_download_limit = max_total_size + 1024 * 1024 
+
     for chunk in bits:
         file_obj.write(chunk)
+        downloaded_size += len(chunk)
+        if downloaded_size > safe_download_limit:
+            return [], "\n[System Warning] Archive download aborted. Size exceeds memory safety limit."
+    
     file_obj.seek(0)
 
-    valid_members: List[TarInfo] = []
+    generated_files: list[GeneratedFile] = []
+    valid_members: list[tuple[tarfile.TarInfo, str]] = []
     total_size = 0
+    warnings = []
 
     with tarfile.open(fileobj=file_obj, mode="r") as tar:
         for member in tar.getmembers():
@@ -128,61 +130,55 @@ async def _collect_generated_files(
             if filename in ignored_names:
                 continue
 
-            valid_members.append(member)
+            if member.size > max_file_size:
+                warnings.append(
+                    f"\n[System Warning] File '{filename}' ignored. "
+                    f"Size ({member.size} bytes) exceeds limit ({max_file_size} bytes)."
+                )
+                continue
+
+            valid_members.append((member, filename))
             total_size += member.size
 
-    if total_size > max_total_size:
-        return [], (
-            f"\n[System Warning] Generated files ignored. Total size ({total_size} bytes) "
-            f"exceeds limit ({max_total_size} bytes)."
-        )
-
-    if len(valid_members) == 0:
-        return [], ""
-
-    if len(valid_members) == 1:
-        member = valid_members[0]
-        filename = os.path.basename(member.name)
-
-        if member.size > max_file_size:
+        if total_size > max_total_size:
             return [], (
-                f"\n[System Warning] File '{filename}' ignored. Size ({member.size} bytes) "
-                f"exceeds limit ({max_file_size} bytes)."
+                f"\n[System Warning] Generated files ignored. Total size ({total_size} bytes) "
+                f"exceeds limit ({max_total_size} bytes)."
             )
 
-        file_obj.seek(0)
-        with tarfile.open(fileobj=file_obj, mode="r") as tar:
+        if not valid_members:
+            return [], "".join(warnings)
+
+        if len(valid_members) == 1:
+            member, filename = valid_members[0]
             extracted = tar.extractfile(member)
             if extracted:
-                content = extracted.read()
                 mime_type, _ = mimetypes.guess_type(filename)
                 generated_files.append(
                     GeneratedFile(
                         path=filename,
-                        content=content,
+                        content=extracted.read(),
                         type=mime_type or "application/octet-stream",
                     )
                 )
-        return generated_files, ""
+            return generated_files, "".join(warnings)
 
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        file_obj.seek(0)
-        with tarfile.open(fileobj=file_obj, mode="r") as tar:
-            for member in valid_members:
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+            for member, filename in valid_members:
                 extracted = tar.extractfile(member)
                 if extracted:
-                    filename = os.path.basename(member.name)
                     zip_file.writestr(filename, extracted.read())
 
-    generated_files.append(
-        GeneratedFile(
-            path="output.zip",
-            content=zip_buffer.getvalue(),
-            type="application/zip",
+        generated_files.append(
+            GeneratedFile(
+                path="output.zip",
+                content=zip_buffer.getvalue(),
+                type="application/zip",
+            )
         )
-    )
-    return generated_files, ""
+
+    return generated_files, "".join(warnings)
 
 
 

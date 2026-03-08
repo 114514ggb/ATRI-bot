@@ -7,7 +7,7 @@ from typing import List
 
 @dataclass(slots=True)
 class GeneratedFile:
-    path: str               # 文件名或相对路径
+    path: str               # 文件名
     content: bytes          # 文件的二进制内容
     type: str = "unknown"   #文件类型
 
