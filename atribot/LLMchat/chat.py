@@ -16,7 +16,6 @@ from atribot.core.type.chat_message_type import (
     ChatMessage,
     FileMessageSegment,
     FileSegment,
-    GroupMessage,
     ImageSegment,
     ReplySegment,
 )
@@ -48,7 +47,7 @@ TEXT_EXTENSIONS = {
     'py', 'js', 'java', 'c', 'cpp', 'php', 'rb', 'kt', 'sh', 'bash', 'bat', 'cmd', 'ps1', 'sql',
 }
 IMAGE_EXTENSIONS = {
-    'jpg', 'jpeg''png','gif','psd',
+    'jpg', 'jpeg', 'png', 'gif', 'psd',
 }
 
 
@@ -73,16 +72,12 @@ class chat_baseics(ABC):
         ].connection_object
 
     @abstractmethod
-    async def step(self, data: Dict) -> None:
-        """主的聊天逻辑处理
-
-        Args:
-            data (Dict): 原始消息
-        """
+    async def step(self) -> None:
+        """主的聊天逻辑处理的全流程"""
 
     @abstractmethod
-    def prompt_structure(self) -> str:
-        """构建模型提示词"""
+    async def prompt_structure(self) -> None:
+        """模型的提示词构建"""
 
     @abstractmethod
     async def send_reply_message_separator(self) -> None:
@@ -162,8 +157,6 @@ class GroupChat(chat_baseics):
         data = message.primeval
         user_id = message.user_id
         uid: str = uuid.uuid4().hex
-        message_builder = MessageBuilder()
-        """最新一条消息的构造,包含系统提示词和群历史"""
         
         self.log.info(f"[{uid}]群LLM聊天json处理")
 
@@ -171,24 +164,14 @@ class GroupChat(chat_baseics):
             message_id = data['message_id'],
             emoji_id = 183 #表情:我最可爱
         )
-
-        message_builder.add_text(f"<group_history>{(await self.chat_manager.get_group_messages_str(group_id))[:10000]}</group_history>")
-        #群聊内容
-
-        await self.prompt_structure(
-            message,
-            message_builder,
-            self.visual_sense
-        )#添加user的部分
-
-        message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>")
-        #user信息
         
-        message_builder.add_text(self.build_prompt.decision_whether_responses(
-            group_id = group_id,
-            prompt = prompt,
-            else_prompt = self.emoji_core.emoji_prompt
-        ))#主提示词
+        message_builder: MessageBuilder = await self.prompt_structure(
+            message=message,
+            prompt=prompt,
+            group_id=group_id,
+            user_id=user_id,
+            including_pictures=self.visual_sense,
+        )
         
         original_context:Context = await self.get_chat_context(
             group_id = group_id,
@@ -273,12 +256,62 @@ class GroupChat(chat_baseics):
                 self.log.exception(f"[{uid}]聊天上下文信息总结出现了错误:{e}")
     
     async def prompt_structure(
+        self,
+        message: ChatMessage,
+        prompt: str,
+        group_id: int,
+        user_id: int,
+        including_pictures: bool,
+    ) -> MessageBuilder:
+        """构建提示结构
+
+        Args:
+            message: 当前传入的聊天消息
+            prompt: 主要的决策提示文本
+            group_id: 当前群组ID
+            user_id: 当前用户ID
+            including_pictures: 目标模型是否能够接收图像
+
+        Returns:
+            MessageBuilder: 包含组装好的提示负载的构建器
+        """
+        message_builder = MessageBuilder()
+        group_history = await self.chat_manager.get_group_messages_str(group_id)
+
+        message_builder.add_text(
+            f"<group_history>{group_history[:10000]}</group_history>"
+        )
+        await self.append_message_segments_prompt(
+            message,
+            message_builder,
+            including_pictures,
+        )
+        message_builder.add_text(
+            f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
+        )
+        message_builder.add_text(
+            self.build_prompt.decision_whether_responses(
+                group_id=group_id,
+                prompt=prompt,
+                else_prompt=self.emoji_core.emoji_prompt,
+            )
+        )
+
+        return message_builder
+
+    async def append_message_segments_prompt(
         self, 
-        chat_message:ChatMessage,
-        message_builder:MessageBuilder,
-        Including_pictures:bool
-    ):
-        """用来解析最新的输入格式化ai读的上下文,对ChatMessage的解析,会包含图片等信息"""
+        chat_message: ChatMessage,
+        message_builder: MessageBuilder,
+        including_pictures: bool,
+    ) -> None:
+        """为当前用户输入附加结构化的消息片段
+
+        Args:
+            chat_message: 当前传入的聊天消息
+            message_builder: 用于附加内容的提示构建器
+            including_pictures: 目标模型是否能够接收图像
+        """
         
         Segment = chat_message.segments[0]
         quote_message = None
@@ -293,7 +326,7 @@ class GroupChat(chat_baseics):
             "<user_message>"
         )
         
-        if Including_pictures:
+        if including_pictures:
             async def dispose_img(message:ImageSegment):
                 """给自己解析图像"""
                 if img := await url_to_base64(message.url,""):
@@ -350,7 +383,7 @@ class GroupChat(chat_baseics):
     
     async def reply_conduct(self, response_json:Dict, data:Dict)->None:
         
-        self.log.info(f"LLM决定回复消息。理由:{response_json.get("reason")}")
+        self.log.info(f"LLM决定回复消息理由:{response_json.get("reason")}")
         group_id = data["group_id"]
         
         chat_condition =await self.chat_manager.get_group_LLM_decision_parameters(group_id)
@@ -366,7 +399,7 @@ class GroupChat(chat_baseics):
         )
     
     async def update_conduct(self, response_json:Dict, data:Dict)->None:
-        self.log.info(f"LLM决定更新用户信息。理由:{response_json.get("reason")}")
+        self.log.info(f"LLM决定更新用户信息理由:{response_json.get("reason")}")
         
         if user_id := response_json.get("user_id"):
             user_id = int(user_id)
@@ -384,10 +417,10 @@ class GroupChat(chat_baseics):
         
     
     async def silence_conduct(self, response_json:Dict, data:Dict)->None:
-        self.log.info(f"LLM决定静默。理由:{response_json.get("reason")}")
+        self.log.info(f"LLM决定静默理由:{response_json.get("reason")}")
     
     async def use_tools_conduct(self, response_json:Dict, data:Dict)->None:
-        self.log.info(f"LLM决定调用工具。理由:{response_json.get("reason")}")
+        self.log.info(f"LLM决定调用工具理由:{response_json.get("reason")}")
 
 
     async def _request_model_with_fallback_(
@@ -445,25 +478,14 @@ class GroupChat(chat_baseics):
                 )
             else:
                 if not opposite_structure_increment_messages:
-                    
-                    #重新构建一次,再缓存后面可能还要用
-                    message_builder = MessageBuilder()
 
-                    message_builder.add_text(f"<group_history>{(await self.chat_manager.get_group_messages_str(message.group_id))[:10000]}</group_history>")#其实这个历史记录会不和前面一致
-
-                    await self.prompt_structure(
-                        message,
-                        message_builder,
-                        visual_sense
+                    message_builder = await self.prompt_structure(
+                        message=message,
+                        prompt=prompt,
+                        group_id=message.group_id,
+                        user_id=message.user_id,
+                        including_pictures=visual_sense,
                     )
-
-                    message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(message.user_id)}</current_user_info>")
-                    
-                    message_builder.add_text(self.build_prompt.decision_whether_responses(
-                        group_id = message.group_id,
-                        prompt = prompt,
-                        else_prompt = self.emoji_core.emoji_prompt
-                    ))
                     
                     opposite_structure_increment_messages = [message_builder.build()]
 
@@ -511,7 +533,7 @@ class GroupChat(chat_baseics):
             since_llm (float): 距离上一次llm发言时间
         """
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
-        MAX_SINGLE_MESSAGE_LENGTH = 4  # 分条发送长度阈值
+        MAX_SINGLE_MESSAGE_LENGTH = 5  # 分条发送长度阈值
         LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
         STRING_LENGTH_LIMIT = 120 #字符串长度限制
         
@@ -525,67 +547,28 @@ class GroupChat(chat_baseics):
             # or MESSAGE_DELIMITER in chat_text
         ):
             # 分条发送
-            messages_list = self.emoji_core.parse_list_with_emotion_tags(
-                chat_text_list,
-                self.emoji_file_dict
-            )
             
-            if message_id:
-                message = messages_list[0]
-                if message['type'] == 'text':
-                    await self.send_message.send_group_message(group_id, f"[CQ:reply,id={message_id}]{message['data']['text']}")
-                else:
-                    await self.send_message.send_group_message(
-                        group_id, [{"type": "reply", "data": {"id": message_id}}, message]
-                    )
-
-                if len(messages_list) == 1:
-                    return
-
+            for message in self.emoji_core.parse_list_to_cqcode_with_emotion(
+                chat_text_list,
+                self.emoji_file_dict,
+                reply_id = message_id 
+            ):
+                await self.send_message.send_group_message(
+                    group_id,
+                    message,
+                )
                 await asyncio.sleep(MESSAGE_DELAY)
-
-                for message in messages_list[1:]:
-                    await self.send_message.send_group_message(
-                        group_id,
-                        [message],
-                    )
-                    await asyncio.sleep(MESSAGE_DELAY)
-                return
-            else:
-                for message in messages_list:
-                    await self.send_message.send_group_message(
-                        group_id,
-                        [message],
-                    )
-                    await asyncio.sleep(MESSAGE_DELAY)
-                return
+            return
+        
         else:
             # 合并发送完
             
-            # chat_text = "\n".join(chat_text_list)
-            # messages_list = self.emoji_core.parse_text_with_emotion_tags(
-            #     chat_text, self.emoji_file_dict
-            # )
-            # if message_id:
-            #     await self.send_message.send_group_message(
-            #         group_id,
-            #         [{"type": "reply", "data": {"id": message_id}}, *messages_list],
-            #     )
-            # else:
-            #     await self.send_message.send_group_message(
-            #         group_id,
-            #         messages_list,
-            #     )
-            #原来的实现说不定快些留着
-            
-            send_mesage_structure = GroupMessage(group_id=group_id)
-            
-            if message_id:
-                send_mesage_structure.add_reply(message_id)
-                
-            self.emoji_core.parse_text_with_emotion_tags_return_construction(
-                 "\n".join(chat_text_list), self.emoji_file_dict, send_mesage_structure
+            await self.send_message.send_group_message(
+                group_id,
+                self.emoji_core.parse_text_to_cqcode_with_emotion(
+                    text  = "\n".join(chat_text_list),
+                    emoji_dict = self.emoji_file_dict,
+                    reply_id = message_id 
+                )
             )
-            
-            await self.send_message.send_group(send_mesage_structure)
             return

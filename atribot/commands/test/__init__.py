@@ -117,6 +117,7 @@ async def run_async_code(message_data: ChatMessage, code: list):
     """
 
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_markdown('#这是**ATRI**'))
+    # await send_message.send_group_message(984466158, '你好[CQ:image,file=file:///home/atri/py_project/ATRI-main/document/img/ATGRI_在瑶亚.gif]')
     
     GroupMessage
     src = f"""

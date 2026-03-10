@@ -48,7 +48,7 @@ class initiativeChat:
         if message.pure_text.strip():
             
             #追问检测
-            if params.get_seconds_since_user_time() < 10 and user_id == params.last_trigger_user_id:
+            if params.get_seconds_since_user_time() < 10 and user_id == params.last_trigger_user_id:#这个看起来不太对,好像包括了响应时间
                 return await self._execute_reply(
                     message, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",

@@ -62,11 +62,10 @@ async def main(code:str, group_id:int, files:list[str] | None = None):
         file_segments = file_segments,
     )
     
-    await send_message.send_group(
-        GroupMessage(group_id=group_id).add_node(
-            content = SendMessage().add_text(f"{code}\n\n执行的结果:\n{execution_result.text}").data,
-            source = "执行的代码"
-        )
+    await send_message.send_group_merge_text(
+        group_id = group_id,
+        message = f"{code}\n\n执行的输出:\n{execution_result.text}",
+        source = "执行的代码"
     )
 
     if execution_result.files:

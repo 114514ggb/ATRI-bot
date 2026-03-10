@@ -1,7 +1,7 @@
 import logging
-import re
 import sqlite3
 
+from atribot.common_utils import is_qq
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 
@@ -79,7 +79,7 @@ class permissions_management:
         if operator_level < required_level:
             raise PermissionError("操作失败：您的权限不足。")
 
-        if not self.is_qq(target_user_id):
+        if not is_qq(target_user_id):
             raise ValueError(f"无法操作：{target_user_id} 不是一个合法的QQ号。")
             
         target_role = self._get_user_role(target_user_id)
@@ -208,16 +208,6 @@ class permissions_management:
             return True
         else:
             raise PermissionError(f"权限不足：需要等级 {required_level}，但用户 {user_id} 只有等级 {user_level}。")
-
-    def is_qq(self, qq):
-        """判断是否是合法的QQ号
-        
-        Args:
-            qq (int|str): 要检查的QQ号
-            
-        Returns:
-            bool: True表示是合法QQ号，False表示不合法"""
-        return bool(re.fullmatch(r'[1-9]\d{4,14}', str(qq)))
 
     def synchronous_database(self,qq_id,permissions,add = True):
         """把添加或删除同步到数据库"""

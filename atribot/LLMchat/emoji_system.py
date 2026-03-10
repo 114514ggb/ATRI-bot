@@ -169,7 +169,7 @@ class EmojiCore:
         text: str, 
         emoji_dict: dict,
         send_mesage: GroupMessage
-        ):
+    ):
         """
         解析文本并提取表情标签，保留原始位置信息，在原有的GroupMessage后构造完成消息
         
@@ -182,6 +182,7 @@ class EmojiCore:
             send_mesage.add_text(text)
             return
         
+        get_complete_file_path = self.get_complete_file_path
         emoji_set = set(emoji_dict)
         text_len = len(text)
         start_pos = 0
@@ -214,7 +215,7 @@ class EmojiCore:
                     send_mesage.add_text(before_text)
                 
                 # 添加表情图片
-                send_mesage.add_image(File.from_local_path(self.get_complete_file_path(tag_content)))
+                send_mesage.add_image(File.from_local_path(get_complete_file_path(tag_content)))
                 
                 # 更新位置
                 add_start = start_pos = bracket_end + 1
@@ -315,9 +316,96 @@ class EmojiCore:
         for text in text_list:
             segments.extend(self.parse_text_with_emotion_tags(text, emoji_dict))
         return segments
-        
 
-    
+    def parse_text_to_cqcode_with_emotion(
+        self,
+        text: str,
+        emoji_dict: dict,
+        reply_id: str | int = None
+    ) -> str:
+        """把字符串中的表情标签替换成CQ码
+
+        Args:
+            text (str): 要处理的文本
+            emoji_dict (dict): 可用的表情标签字典
+            reply_id (str | int, optional): 回复消息 ID
+
+        Returns:
+            str: 转换后的带有CQ码的字符串。
+        """
+        if not text:
+            return ""
+
+        if '[' not in text:
+            return f"[CQ:reply,id={reply_id}]{text}" if reply_id else text
+
+        emoji_set = set(emoji_dict)
+        text_len = len(text)
+        current_pos = 0
+        text_start = 0
+        parts = []
+        append_part = parts.append
+        get_complete_file_path = self.get_complete_file_path
+
+        while current_pos < text_len:
+            bracket_start = text.find('[', current_pos)
+
+            if bracket_start == -1:
+                append_part(text[text_start:])
+                break
+
+            bracket_end = text.find(']', bracket_start + 1)
+
+            if bracket_end == -1:
+                append_part(text[text_start:])
+                break
+
+            tag_content = text[bracket_start + 1:bracket_end]
+
+            if tag_content in emoji_set:
+                if bracket_start > text_start:
+                    append_part(text[text_start:bracket_start])
+                append_part(f"[CQ:image,file=file://{get_complete_file_path(tag_content)}]")
+                text_start = current_pos = bracket_end + 1
+            else:
+                current_pos = bracket_start + 1
+
+        result = ''.join(parts)
+        if reply_id:
+            result = f"[CQ:reply,id={reply_id}]{result}"
+
+        return result
+        
+    def parse_list_to_cqcode_with_emotion(
+        self, 
+        text_list: list[str], 
+        emoji_dict: dict,
+        reply_id: str|int = None
+    )->list[str]:
+        """把字符串列表中的表情标签替换成CQ码
+
+        Args:
+            text_list (list[str]): 要处理的文本列表。每个元素都会原位替换其中的表情标签
+            emoji_dict (dict): 可用的表情标签字典
+            reply_id (str | int, optional): 回复消息 ID
+            
+        Returns:
+            list[str]: 转换后的带有CQ码的列表，顺序与输入一致。
+        """
+        if not text_list:
+            return []
+
+        result = [
+            self.parse_text_to_cqcode_with_emotion(text, emoji_dict)
+            for text in text_list
+        ]
+
+        if reply_id:
+            result[0] = f"[CQ:reply,id={reply_id}]{result[0]}"
+
+        return result
+        
+        
     def _levenshtein_distance(self, s1: str, s2: str) -> int:
         """计算两个字符串的编辑距离
 

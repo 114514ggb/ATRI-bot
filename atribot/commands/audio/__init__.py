@@ -145,12 +145,12 @@ async def handle_song_command(
         if file:
             await send_message.send_group_file(
                 group_id, 
-                config.file_path.audio / "sing" / song_path
+                str(config.file_path.audio / "sing" / song_path)
             )
         else:
             await send_message.send_group_audio(
                 group_id, 
-                config.file_path.audio / "sing" / song_path
+                str(config.file_path.audio / "sing" / song_path)
             )
     else:
         similar_songs = song_manager.find_similar_songs(song_name)

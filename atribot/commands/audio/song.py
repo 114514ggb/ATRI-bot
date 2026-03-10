@@ -50,7 +50,7 @@ class song:
             song_name: 歌曲名称
             
         Returns:
-            如果找到完全匹配的文件，返回完整路径；
+            如果找到完全匹配的文件，返回文件名；
             否则返回空字符串
         """
         song_name_without_ext = self._remove_extension(song_name)
@@ -58,7 +58,7 @@ class song:
         for song in self.song_list:
             song_without_ext = self._remove_extension(song)
             if song_without_ext == song_name_without_ext:
-                return os.path.join(self.base_path, song)
+                return song
         
         return ""
     
