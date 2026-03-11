@@ -37,6 +37,12 @@ class BotFramework:
     def __init__(self):
         self.logger:Logger = container.get("log")
         self._shutdown_handlers: dict[str, Callable[[], Any | Awaitable[Any]]] = {}
+        """保存各组件注册的清理函数"""
+        self._background_tasks: set[asyncio.Task[Any]] = set()
+        """退出时统一回收的后台任务"""
+        self._shutdown_task: asyncio.Task[None] | None = None
+        self._is_shutdown = False
+        """标记是否已经完成关闭"""
     
     @classmethod
     async def create(cls):
@@ -44,8 +50,8 @@ class BotFramework:
         self = cls()
         try:
             await self.initialize()
-        except Exception:
-            await self.shutdown()
+        except BaseException:
+            await self.graceful_shutdown()
             raise
         return self
     
@@ -65,7 +71,7 @@ class BotFramework:
         
         #MCP
         mcp_server = FuncCall(self.config.file_path.mcp_config)
-        asyncio.create_task(mcp_server.mcp_service_selector())#放到后台不等待
+        self.create_background_task(mcp_server.mcp_service_selector())#放到后台不等待
         mcp_server.mcp_service_queue.put_nowait({"type": "init"})#初始化
         container.register(
             "MCP",
@@ -205,6 +211,7 @@ class BotFramework:
                 "WebSocket",
                 WSServer
             )
+            self.register_shutdown_handler("WebSocket", WSServer.close)
             
             self.creation_send_message()
             
@@ -248,6 +255,7 @@ class BotFramework:
             "WebSocket",
             WSClient
         )
+        self.register_shutdown_handler("WebSocket", WSClient.close)
         
         self.creation_send_message()
 
@@ -295,9 +303,35 @@ class BotFramework:
             raise ValueError(f"清理函数已注册: {name}")
         self._shutdown_handlers[name] = handler
 
+    def create_background_task(self, coro: Awaitable[Any]) -> asyncio.Task[Any]:
+        """创建受控后台任务，方便关闭阶段统一回收"""
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+
+    async def graceful_shutdown(self) -> None:
+        """在取消态下也尽量等待关闭流程执行完成"""
+        if self._shutdown_task is None:
+            self._shutdown_task = asyncio.create_task(self.shutdown(), name="BotFramework.shutdown")
+
+        try:
+            await asyncio.shield(self._shutdown_task)
+        except asyncio.CancelledError:
+            current_task = asyncio.current_task()
+            if current_task is not None:
+                while current_task.cancelling():
+                    current_task.uncancel()
+
+            await self._shutdown_task
+            raise
+
     async def shutdown(self) -> None:
         """关闭可显式回收的服务"""
-        for name, handler in list(self._shutdown_handlers.items()):
+        if self._is_shutdown:
+            return
+
+        for name, handler in reversed(list(self._shutdown_handlers.items())):
             try:
                 result = handler()
                 if isawaitable(result):
@@ -305,4 +339,14 @@ class BotFramework:
             except Exception as e:
                 self.logger.exception(f"关闭资源失败 [{name}]: {e}")
 
+        if self._background_tasks:
+            for task in list(self._background_tasks):
+                if not task.done():
+                    task.cancel()
+
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
+
+        self._background_tasks.clear()
+
         self._shutdown_handlers.clear()
+        self._is_shutdown = True

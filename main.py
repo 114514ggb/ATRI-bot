@@ -20,9 +20,13 @@ async def main():
     logger:Logger = container.get("log")
     logger.info(logo_tmpl) 
 
-    framework = await BotFramework.create()
+    framework: BotFramework | None = None
 
-    await framework.shutdown()
+    try:
+        framework = await BotFramework.create()
+    finally:
+        if framework is not None:
+            await framework.graceful_shutdown()
 
 
 

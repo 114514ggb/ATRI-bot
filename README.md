@@ -235,15 +235,14 @@ ATRI-main/
 │  ├─db/                        # 数据库初始化脚本与镜像文件
 │  └─python/                    # Python 容器环境相关资源
 ├─document/                     # 🎨 运行时资源目录
-│  ├─audio/                     # 音频素材
-│  ├─file/                      # 通用文本 / 文件资源
-│  ├─img/                       # 图片资源
-│  │  ├─ATRI_qrcode/            # 二维码资源
-│  │  ├─emojis/                 # 表情包目录
-│  │  └─tmp/                    # 临时图片目录
-│  ├─video/                     # 视频资源
-│  └──temp/                     # 临时运行文件
-└─log/                          # 运行日志
+   ├─audio/                     # 音频素材
+   ├─file/                      # 通用文本 / 文件资源
+   ├─img/                       # 图片资源
+   │  ├─ATRI_qrcode/            # 二维码资源
+   │  ├─emojis/                 # 表情包目录
+   │  └─tmp/                    # 临时图片目录
+   ├─video/                     # 视频资源
+   └──temp/                     # 临时运行文件
 ```
 
 ---

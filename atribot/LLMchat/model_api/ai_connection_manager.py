@@ -146,7 +146,7 @@ class LLMConnectionManager:
     
     async def close(self):
         """关闭所有连接"""
-        for _, conn in self.connections.items:
+        for _, conn in self.connections.items():
             conn:ai_api_connection
             await conn.connection_object.close()
             
