@@ -8,7 +8,6 @@ from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile,
 
 try:
     from e2b_code_interpreter import AsyncSandbox
-    from e2b_code_interpreter.models import ExecutionError
 except ImportError:
     print("错误：e2b_code_interpreter 模块未安装")
     print("请使用以下命令安装：")

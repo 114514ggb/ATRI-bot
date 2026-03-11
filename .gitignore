@@ -2,6 +2,7 @@
 __pycache__
 *.pyc
 *.py[oc]
+.ruff_cache
 build/
 dist/
 wheels/

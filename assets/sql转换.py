@@ -1,5 +1,6 @@
 import re
 
+
 def convert_mysql_to_pgsql(input_file, output_file):
     """
     转换MySQL SQL文件到PostgreSQL格式

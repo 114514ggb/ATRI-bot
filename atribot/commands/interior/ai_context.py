@@ -4,9 +4,9 @@ from logging import Logger
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.type.chat_message_type import ChatMessage
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_type import ChatMessage
 from atribot.LLMchat.memory.user_info_system import UserSystem
 
 

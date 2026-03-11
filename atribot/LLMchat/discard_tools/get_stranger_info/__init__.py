@@ -1,6 +1,7 @@
+import time
+
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-import time
 
 tool_json = {
     "name": "get_stranger_info",

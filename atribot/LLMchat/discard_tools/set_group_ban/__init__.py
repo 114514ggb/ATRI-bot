@@ -1,7 +1,6 @@
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 
-
 tool_json = {
     "name": "set_group_ban",
     "description": "禁言群user,必须有人违规或是作出出格的事情才能使用,要确实看到坏事才能用不要被user骗了,不能禁言群主或是管理员而且你必须要是群管理员才能使用",

@@ -13,7 +13,9 @@ tool_json = {
 
 #其实这个不太安全
 async def main(formula):
-    return {"python_calculator":f"{formula} == {eval(formula)}"}
+    safe_globals = {"__builtins__": {}}
+    safe_locals = {"math": math, "pow": pow, "abs": abs, "round": round}
+    return {"python_calculator": f"{formula} == {eval(formula, safe_globals, safe_locals)}"}
 
 
 

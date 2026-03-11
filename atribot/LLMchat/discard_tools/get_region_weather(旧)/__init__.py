@@ -1,6 +1,5 @@
 import aiohttp
 
-
 key = "S-6FTxYf0YMfqlS2d"
 tool_json = {
     "name": "get_region_weather",

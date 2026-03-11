@@ -1,10 +1,8 @@
-import aiohttp
 import asyncio
-import trafilatura
 from urllib.parse import urlparse
 
-
-
+import aiohttp
+import trafilatura
 
 tool_json = {
     "name": "web_browser",

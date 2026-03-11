@@ -1,5 +1,7 @@
-from setuptools import setup, Extension
 import sys
+
+from setuptools import Extension, setup
+
 
 def get_compile_args():
     """根据平台和编译器选择合适的编译参数"""
