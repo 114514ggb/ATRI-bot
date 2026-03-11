@@ -61,7 +61,7 @@ class Logger:
             ))
             self.logger.addHandler(file_handler)
     
-    def get_logger(self):
+    def get_logger(self) -> logging.Logger:
         return self.logger
 
 

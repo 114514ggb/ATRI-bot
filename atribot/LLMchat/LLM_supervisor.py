@@ -8,7 +8,7 @@ from mcp.types import CallToolResult
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import Context, ToolCallsStopIteration
 from atribot.LLMchat.MCP.model_tools import tool_calls
-from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
+from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 
 
@@ -130,7 +130,7 @@ class LLMCoordinator():
     """获取LLM响应的主类,面向openAI的格式"""
     
     def __init__(self):
-        self.supplier:AiConnectionManager = container.get("LLMSupplier")
+        self.supplier:LLMConnectionManager = container.get("LLMSupplier")
         self.logger:Logger = container.get("log")
         self.tool_management = tool_calls()
         

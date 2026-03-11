@@ -1,0 +1,63 @@
+services:
+  db:
+    build:
+      context: .
+      dockerfile: docker/db/dockerfile
+    container_name: atri-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${ATRI_DB_SUPERUSER_PASSWORD:-180710}
+      ATRI_DB_NAME: ${ATRI_DB_NAME:-atri}
+      ATRI_DB_APP_USER: ${ATRI_DB_APP_USER:-atri}
+      ATRI_DB_APP_PASSWORD: ${ATRI_DB_APP_PASSWORD:-180710}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - atri-postgres-data:/var/lib/postgresql/data
+      - ./docker/db/init/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    ports:
+      - "${ATRI_DB_PORT_FORWARD:-5432}:5432"
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/python/Dockerfile
+    container_name: atri-bot
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      ATRI_SUPPLIER_CONFIG_PATH: /app/assets/supplier_config.json
+      ATRI_DOCUMENT_ROOT: /app/document
+      ATRI_DB_HOST: db
+      ATRI_DB_PORT: 5432
+      ATRI_DB_USER: ${ATRI_DB_APP_USER:-atri}
+      ATRI_DB_PASSWORD: ${ATRI_DB_APP_PASSWORD:-180710}
+      ATRI_NETWORK_CONNECTION_TYPE: ${ATRI_CONNECTION_TYPE:-WebSocket_server}
+      ATRI_NETWORK_HOST: 0.0.0.0
+      ATRI_NETWORK_SERVER_PORT: 8888
+      ATRI_NETWORK_URL: ${ATRI_NAPCAT_URL:-host.docker.internal:3001}
+      ATRI_NETWORK_ACCESS_TOKEN: ${ATRI_ACCESS_TOKEN:-ATRI114514}
+      ATRI_SANDBOX_IMAGE: ${ATRI_SANDBOX_IMAGE:-python:3.13-slim}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${ATRI_BOT_PORT:-8888}:8888"
+    volumes:
+      - ./assets:/app/assets
+      - ./document:/app/document
+      - ./log:/app/log
+      - ./temp:/app/temp
+      - /var/run/docker.sock:/var/run/docker.sock
+
+volumes:
+  atri-postgres-data:

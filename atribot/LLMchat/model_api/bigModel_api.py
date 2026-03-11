@@ -133,7 +133,12 @@ class AsyncBigModelApi():
         """初始化"""
         await self.client.initialize()
         await self.client_image.initialize()
-        
+
+    async def close(self):
+        """异步关闭客户端"""
+        await self.client.close()
+        await self.client_image.close()
+
     async def generate_text(self,
             model:str,
             messages:list,

@@ -137,8 +137,8 @@ ollama run Qwen3-Embedding-0.6B:F16
 项目依赖 **Python 3.13** 环境，推荐使用 `uv` 管理依赖。
 
 **使用 uv (推荐):**
+先进入项目根目录
 ```bash
-# 进入项目根目录
 uv sync
 uv run main.py
 ```
@@ -152,16 +152,60 @@ Linux / macOS 请分别使用 `requirements-linux.txt`、`requirements-macos.txt
 
 > ⚠️ **重要**：请务必在项目根目录执行启动命令，否则可能出现路径解析错误。
 
+### 5. 使用 Docker 启动
+仓库已经补齐了可直接运行的 `Docker Compose` 配置，默认会启动：
+- `atri-db`：带 `pgvector` 的 PostgreSQL
+- `atri-bot`：ATRI 主程序容器
+
+首次使用前，至少确认两件事：
+1. `assets/supplier_config.json` 中的模型接口可用。
+2. NapCat 能连接到 `ws://宿主机IP:8888/websocket?access_token=你的token`，或者你按需改 `.env` / Compose 里的端口和 token。
+
+推荐先复制一份环境变量文件：
+```bash
+cp .env.docker.example .env
+```
+
+然后直接启动：
+```bash
+docker compose up -d --build
+```
+
+查看日志：
+```bash
+docker compose logs -f app
+docker compose logs -f db
+```
+
+停止并删除容器：
+```bash
+docker compose down
+```
+
+如果需要连数据库看表：
+```bash
+docker compose exec db psql -U postgres -d postgres
+```
+
+说明：
+- 容器启动时会基于 `assets/config.json` 生成一份运行时配置，不会覆盖你原本的本地配置。
+- 默认把宿主机的 `assets/`、`document/`、`log/`、`temp/` 挂进容器，便于直接改配置和保留运行数据。
+- 内置 AI 沙盒默认只做镜像名覆盖；如果你还想让容器内再调用 Docker 沙盒，需要额外挂载 Docker Socket。
+
 ---
 ## 📂 项目结构
 
 ```text
 ATRI-main/
 ├─main.py                       # 项目入口
+├─pyproject.toml                # Python 项目依赖与构建配置
+├─docker-compose.yml            # Docker Compose 启动配置
+├─README.md / README.en.md      # 中英文说明文档
+├─requirements-*.txt            # 各平台依赖导出文件
 ├─assets/                       # ⚙️ 配置文件、示例配置与 SQL 辅助脚本
 ├─atribot/                      # 核心代码
 │  ├─bot_framework.py           # Bot 初始化与整体装配入口
-│  ├─C/                         # C 扩展模块
+│  ├─C/                         # C 扩展模块(没什么用，之前感觉py解析字符串太慢了整的,还需要编译真麻烦，现在感觉没必要)
 │  ├─commands/                  # 💻 群聊命令实现
 │  │  ├─audio/                  # 音频与 TTS 相关命令
 │  │  ├─bromidic/               # 图片 / B 站等杂项功能命令
@@ -184,12 +228,12 @@ ATRI-main/
 │     ├─memory/                 # 记忆系统
 │     ├─model_api/              # 模型供应商接口
 │     ├─RAG/                    # 检索增强生成逻辑
-│     ├─sandbox/                # AI 代码沙盒
-│     ├─skills/                 # skills提示词相关模块
+│     ├─sandbox/                # 沙盒
+│     ├─skills/                 # skills 提示词相关模块
 │     └─tools/                  # 函数调用工具集
 ├─docker/                       # 🐳 Docker 相关资源
 │  ├─db/                        # 数据库初始化脚本与镜像文件
-│  └─python/                    # Python 环境相关资源
+│  └─python/                    # Python 容器环境相关资源
 ├─document/                     # 🎨 运行时资源目录
 │  ├─audio/                     # 音频素材
 │  ├─file/                      # 通用文本 / 文件资源
@@ -197,18 +241,17 @@ ATRI-main/
 │  │  ├─ATRI_qrcode/            # 二维码资源
 │  │  ├─emojis/                 # 表情包目录
 │  │  └─tmp/                    # 临时图片目录
-│  └─video/                     # 视频资源
-├─log/                          # 运行日志
-└─privacy/                      # 私有脚本与临时笔记
+│  ├─video/                     # 视频资源
+│  └──temp/                     # 临时运行文件
+└─log/                          # 运行日志
 ```
 
 ---
 
 ## 🤝 参与贡献
 
-欢迎提交 Issue、PR，或者直接提出改进建议。
-无论是修 Bug、补文档、优化架构，还是扩展新能力，都非常欢迎。
-一起把 ATRI-bot 做得更聪明，也更顺手。
+欢迎提交 Issue、PR，或者直接提出改进建议(我个人用的项目真的有人会提交吗)
+无论是修 Bug、补文档、优化架构，还是扩展新能力，都非常欢迎
 
 ---
 

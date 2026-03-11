@@ -1,8 +1,7 @@
 import asyncio
+from inspect import isawaitable
 from logging import Logger
-
-# from atribot.common import common
-from typing import Any, Dict
+from typing import Any, Awaitable, Callable, Dict
 
 import uvicorn
 from fastapi import FastAPI
@@ -25,7 +24,7 @@ from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
-from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
+from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
@@ -37,12 +36,17 @@ class BotFramework:
     
     def __init__(self):
         self.logger:Logger = container.get("log")
+        self._shutdown_handlers: dict[str, Callable[[], Any | Awaitable[Any]]] = {}
     
     @classmethod
     async def create(cls):
         """工厂方法，替代 __ainit__"""
         self = cls()
-        await self.initialize()
+        try:
+            await self.initialize()
+        except Exception:
+            await self.shutdown()
+            raise
         return self
     
     async def initialize(self):
@@ -57,6 +61,7 @@ class BotFramework:
             "TimeTriggerSupervisor",
             TriggerSupervisor
         )
+        self.register_shutdown_handler("TimeTriggerSupervisor", TriggerSupervisor.stop)
         
         #MCP
         mcp_server = FuncCall(self.config.file_path.mcp_config)
@@ -66,20 +71,23 @@ class BotFramework:
             "MCP",
             mcp_server
         )
+        self.register_shutdown_handler("MCP", mcp_server.terminate)
         
         #数据库
+        database = await atriAsyncPostgreSQL.create(
+            host = self.config.database.host, 
+            user = self.config.database.user,
+            port = self.config.database.port,
+            password = self.config.database.password
+        )
         container.register(
             "database",
-            await atriAsyncPostgreSQL.create(
-                host = self.config.database.host, 
-                user = self.config.database.user,
-                port = self.config.database.port,
-                password = self.config.database.password
-            )
+            database
         )
+        self.register_shutdown_handler("database", database.close_pool)
         
         #模型供应商
-        LLMSupplier = AiConnectionManager()
+        LLMSupplier = LLMConnectionManager()
         await LLMSupplier.initialize_connections(self.config.file_path.supplier_config_path)
         container.register(
             "LLMSupplier",
@@ -108,6 +116,7 @@ class BotFramework:
                 }
             }
         )
+        self.register_shutdown_handler("LLMSupplier", LLMSupplier.close)
         
         #Skills的管理
         container.register(
@@ -125,6 +134,7 @@ class BotFramework:
                 "SandBox",    
                 sand_box
             )
+            self.register_shutdown_handler("SandBox", sand_box.stop)
         except Exception as e:
             self.logger.exception(f"LLM使用的使用的沙盒初始化失败{e}")
         
@@ -139,12 +149,6 @@ class BotFramework:
             "UserSystem",    
             UserSystem()
         )
-        
-        #常用
-        # container.register(
-        #     "Common",
-        #     common()
-        # )
         
         #群类管理什么的
         container.register(
@@ -280,3 +284,25 @@ class BotFramework:
             "GroupChat",
             GroupChat()
         )
+
+    def register_shutdown_handler(
+        self,
+        name: str,
+        handler: Callable[[], Any | Awaitable[Any]]
+    ) -> None:
+        """注册关闭阶段需要执行的清理函数"""
+        if name in self._shutdown_handlers:
+            raise ValueError(f"清理函数已注册: {name}")
+        self._shutdown_handlers[name] = handler
+
+    async def shutdown(self) -> None:
+        """关闭可显式回收的服务"""
+        for name, handler in list(self._shutdown_handlers.items()):
+            try:
+                result = handler()
+                if isawaitable(result):
+                    await result
+            except Exception as e:
+                self.logger.exception(f"关闭资源失败 [{name}]: {e}")
+
+        self._shutdown_handlers.clear()

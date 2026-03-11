@@ -62,7 +62,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
             headers=self.headers
         )
         
-    async def aclose(self):
+    async def close(self):
         """异步关闭客户端"""
         await self.client.close()
 

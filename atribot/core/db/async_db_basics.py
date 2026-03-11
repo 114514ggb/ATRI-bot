@@ -6,6 +6,8 @@ from typing import Any, Optional, Tuple
 
 from aiomysql import IntegrityError, Pool
 
+from atribot.core.service_container import container
+
 
 class AsyncDatabaseBase(ABC):
     """异步数据库连接池抽象基类"""
@@ -15,8 +17,7 @@ class AsyncDatabaseBase(ABC):
     _context_cursor: ContextVar[Optional[Any]] = ContextVar('cursor', default=None)
     
     def __init__(self):
-        # self.log: Logger = container.get("log")
-        self.log: Logger = Logger("atri")
+        self.log: Logger = container.get("log")
     
     @classmethod
     @abstractmethod

@@ -623,6 +623,7 @@ class FuncCall:
         return str(self.func_list)
 
     async def terminate(self):
+        """关闭清理"""
         for name in self.mcp_client_dict.keys():
             await self._terminate_mcp_client(name)
             self.logger.info(f"清理 MCP 客户端 {name} 资源")

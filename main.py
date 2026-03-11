@@ -1,7 +1,7 @@
 import asyncio
+from logging import Logger
 
 from atribot.bot_framework import BotFramework
-from atribot.core.logger import Logger
 from atribot.core.service_container import container
 
 logo_tmpl = r"""
@@ -17,12 +17,12 @@ _____/\\\\\\\\\____        __/\\\\\\\\\\\\\\\_        ____/\\\\\\\\\_____       
 """
 
 async def main():
-    
-    logger = Logger().get_logger()
+    logger:Logger = container.get("log")
     logger.info(logo_tmpl) 
-    container.register("log",logger)
-    
-    await BotFramework.create()
+
+    framework = await BotFramework.create()
+
+    await framework.shutdown()
 
 
 

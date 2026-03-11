@@ -1,4 +1,5 @@
 import asyncio
+import atexit
 import base64
 import io
 import mimetypes
@@ -38,6 +39,13 @@ class DockerSandbox(SandBoxBase):
         self.container_name = self.config.get('container_name', f"sandbox_{uuid.uuid4().hex[:8]}")
         self.container = None
         self.work_dir = "/workspace"
+        self.container_labels = {
+            "atri.sandbox.managed": "true",
+            "atri.sandbox.backend": "docker",
+            "atri.sandbox.image": self.image,
+        }
+        self.cleanup_stale_on_start = self.config.get('cleanup_stale_on_start', True)
+        atexit.register(self._cleanup_container_sync)
         
         # 资源限制配置
         self.mem_limit = self.config.get('mem_limit', '1024m')
@@ -58,6 +66,9 @@ class DockerSandbox(SandBoxBase):
             return
 
         try:
+            if self.cleanup_stale_on_start:
+                await asyncio.to_thread(self._cleanup_stale_sandboxes_sync)
+
             # 检查镜像是否存在，不存在则拉取
             try:
                 await asyncio.to_thread(self.client.images.get, self.image)
@@ -79,6 +90,7 @@ class DockerSandbox(SandBoxBase):
                 cpu_quota=self.cpu_quota,
                 pids_limit=self.pids_limit,
                 network_mode=self.network_mode,
+                labels=self.container_labels,
                 # cap_drop=['ALL'] # 丢弃所有 Linux 能力
             )
 
@@ -94,17 +106,7 @@ class DockerSandbox(SandBoxBase):
 
         如果容器不存在或已经停止，会静默处理。
         """
-        if self.container:
-            try:
-                await asyncio.to_thread(self.container.stop, timeout=1)
-                await asyncio.to_thread(self.container.remove, force=True)
-            except NotFound:
-                pass
-            except Exception as e:
-                print(f"Error stopping container: {e}")
-            finally:
-                self.container = None
-                self.is_running = False
+        await asyncio.to_thread(self._cleanup_container_sync)
 
     async def restart(self):
         """重启沙盒环境。
@@ -535,5 +537,73 @@ class DockerSandbox(SandBoxBase):
             path=self.work_dir,
             data=tar_stream
         )
+
+    def _cleanup_stale_sandboxes_sync(self):
+        """清理上次运行遗留的沙盒容器。"""
+        try:
+            stale_containers = self.client.containers.list(
+                all=True,
+                filters={
+                    "label": [
+                        "atri.sandbox.managed=true",
+                        "atri.sandbox.backend=docker",
+                    ]
+                },
+            )
+        except Exception as e:
+            print(f"Error listing stale sandbox containers: {e}")
+            return
+
+        current_id = getattr(self.container, "id", None)
+        for stale_container in stale_containers:
+            if stale_container.id == current_id:
+                continue
+
+            try:
+                stale_container.stop(timeout=1)
+            except NotFound:
+                continue
+            except Exception:
+                pass
+
+            try:
+                stale_container.remove(force=True)
+            except NotFound:
+                continue
+            except Exception as e:
+                print(f"Error removing stale sandbox container {stale_container.name}: {e}")
+
+    def _cleanup_container_sync(self):
+        """同步清理当前容器，供退出钩子和 stop 复用。"""
+        container_ref = self.container
+        if not container_ref:
+            self.is_running = False
+            return
+
+        try:
+            container_ref.reload()
+        except NotFound:
+            self.container = None
+            self.is_running = False
+            return
+        except Exception:
+            pass
+
+        try:
+            container_ref.stop(timeout=1)
+        except NotFound:
+            pass
+        except Exception as e:
+            print(f"Error stopping container: {e}")
+
+        try:
+            container_ref.remove(force=True)
+        except NotFound:
+            pass
+        except Exception as e:
+            print(f"Error removing container: {e}")
+        finally:
+            self.container = None
+            self.is_running = False
 
 

@@ -135,7 +135,7 @@ async def model_api():
     text = await chat.request_fetch_primary(messages = messages, model = model, tools = tools)
     
     
-    await chat.aclose()
+    await chat.close()
     
     pp(text)
     

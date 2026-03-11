@@ -1,4 +1,5 @@
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Mapping
@@ -306,6 +307,7 @@ class atriConfig:
         Args:
             config_path (str): 配置文件相对于项目根目录或绝对路径默认为 "assets/config.json"
         """
+        config_path = os.environ.get("ATRI_CONFIG_PATH", config_path)
         project_root = self._find_project_root(Path(__file__).resolve())
         config_file = Path(config_path)
         if not config_file.is_absolute():

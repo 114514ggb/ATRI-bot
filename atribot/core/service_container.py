@@ -1,5 +1,7 @@
 from typing import Any, Dict
 
+from atribot.core.logger import Logger
+
 
 class DIContainer:
     _instance = None
@@ -8,6 +10,7 @@ class DIContainer:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
+            cls._services["log"] = Logger().get_logger()
         return cls._instance
     
     def register(self, name: str, service: Any):

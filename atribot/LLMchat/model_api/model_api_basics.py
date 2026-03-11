@@ -72,7 +72,7 @@ class model_api_basics(ABC):
         self.api_key = api_key
     
     @abstractmethod
-    async def aclose(self):
+    async def close(self):
         """异步关闭客户端"""
         
     @abstractmethod

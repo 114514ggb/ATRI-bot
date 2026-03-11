@@ -43,7 +43,7 @@ class ai_api_connection:
         if self.model_parameter is not None:
             self.connection_object.update_parameters(self.model_parameter)
     
-class AiConnectionManager:
+class LLMConnectionManager:
     """ai供应商的api连接管理类"""
     
     def __init__(self):
@@ -139,7 +139,7 @@ class AiConnectionManager:
             bool: 是否成功删除
         """
         if name in self.connections:
-            await self.connections[name].connection_object.aclose()
+            await self.connections[name].connection_object.close()
             del self.connections[name]
             return True
         return False
@@ -148,7 +148,7 @@ class AiConnectionManager:
         """关闭所有连接"""
         for _, conn in self.connections.items:
             conn:ai_api_connection
-            await conn.connection_object.aclose()
+            await conn.connection_object.close()
             
     def get_filtration_connection(
         self,

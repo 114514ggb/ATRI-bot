@@ -13,7 +13,7 @@ from atribot.LLMchat.memory.prompts import (
     PURE_GROUP_FACT_RETRIEVAL_PROMPT,
     SUMMARIZE_CONTEXT_SYSTEM_PROMPT,
 )
-from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
+from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.LLMchat.RAG.rag import RAGManager
 
@@ -22,7 +22,7 @@ class memorySystem:
     """管理记忆类"""
     def __init__(self):
         self.logger:Logger = container.get("log")
-        self.api_supplier:AiConnectionManager = container.get("LLMSupplier")
+        self.api_supplier:LLMConnectionManager = container.get("LLMSupplier")
         self.config = container.get("config")
         self.model = self.config.model.memory.summarize_model.model_name
         self.supplier:universal_ai_api = (self.api_supplier.get_filtration_connection(

@@ -29,7 +29,7 @@ from atribot.LLMchat.LLM_supervisor import (
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
-from atribot.LLMchat.model_api.ai_connection_manager import AiConnectionManager
+from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.skills.skills_manager import SkillsManager
@@ -56,7 +56,7 @@ class chat_baseics(ABC):
 
     def __init__(self):
         self.model_api_supervisor: LLMCoordinator = container.get("LLMsupervisor")
-        self.supplier: AiConnectionManager = container.get("LLMSupplier")
+        self.supplier: LLMConnectionManager = container.get("LLMSupplier")
         self.memiry_system: memorySystem = container.get("memirySystem")       
         self.send_message: QQAPIClient = container.get("SendMessage")
         self.chat_manager: ChatManager = container.get("ChatManager")
