@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 使用文档
+    url: https://github.com/114514ggb/ATRI/blob/main/README.md
+    about: 先阅读 README 中的运行、配置和数据库初始化说明。

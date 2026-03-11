@@ -31,7 +31,7 @@ class QQAPIClient():
 
     def __init__(
         self,
-        token = "ATRI114514",
+        token = "ATRI",
         http_base_url = "http://localhost:8080",
         connection_type = "http",
     ):
@@ -273,7 +273,7 @@ class QQAPIClient():
             "messages": messages,
             "news": [
                 {
-                "text": preview
+                    "text": preview
                 }
             ],
             "prompt": "果然是群聊天记录", #外显

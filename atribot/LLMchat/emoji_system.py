@@ -15,7 +15,7 @@ class EmojiCore:
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
         self.file = folder_path
-        self.emoji_prompt = ""
+        self.prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
     
@@ -29,13 +29,12 @@ class EmojiCore:
         for item in os.listdir(folder_path):
             item_path = os.path.join(folder_path, item)
             if os.path.isdir(item_path):
-                files = [f for f in os.listdir(item_path) 
-                         if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))]
+                files = [f for f in os.listdir(item_path) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.gif'))]
                 if files:
                     self.emoji_file_dict[item] = files
 
         if self.emoji_file_dict:
-            self.emoji_prompt = build_prompt.append_tag_hint(
+            self.prompt = build_prompt.append_tag_hint(
                 tag_prompt = "可以在输出中加入被[]包裹的标签,这个格式的标签会解析成对应分类的表情包,在对话中自然加入且不要超过一个,绝对不要加入没有的标签",
                 tag_list = list(self.emoji_file_dict.keys())
             )

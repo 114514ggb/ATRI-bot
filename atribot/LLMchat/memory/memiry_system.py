@@ -166,7 +166,7 @@ class memorySystem:
                 self.logger.error(f"第{i}次总结请求出错:{e}")
                 await asyncio.sleep(1)
                 
-            if assistant_content and assistant_content != "[响应为空，请重新尝试]":
+            if assistant_content:
                 try:
                     return json.loads(assistant_content)
                 except json.JSONDecodeError: 

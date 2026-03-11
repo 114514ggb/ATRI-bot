@@ -127,7 +127,7 @@ class LLMSRequestFailed(Exception):
 
 
 class LLMCoordinator():
-    """LLM响应的主类"""
+    """获取LLM响应的主类,面向openAI的格式"""
     
     def __init__(self):
         self.supplier:AiConnectionManager = container.get("LLMSupplier")
@@ -476,7 +476,7 @@ class LLMCoordinator():
             assistant_message:Dict = api_reply['choices'][0]['message']
             content = assistant_message.get('content')
             
-            if content and content != "[响应为空，请重新尝试]":
+            if content:
                 return api_reply,assistant_message, content
             elif "tool_calls" in assistant_message:
                 return api_reply,assistant_message, None

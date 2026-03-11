@@ -19,7 +19,7 @@ _____/\\\\\\\\\____        __/\\\\\\\\\\\\\\\_        ____/\\\\\\\\\_____       
 async def main():
     
     logger = Logger().get_logger()
-    logger.info(logo_tmpl)
+    logger.info(logo_tmpl) 
     container.register("log",logger)
     
     await BotFramework.create()

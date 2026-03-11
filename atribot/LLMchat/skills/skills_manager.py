@@ -1,6 +1,7 @@
 import html
 from logging import Logger
 from pathlib import Path
+from typing import Optional
 
 from atribot.core.service_container import container
 
@@ -13,9 +14,10 @@ class SkillsManager:
     """用于管理和加载 Agent 技能"""
     
     prompt: str
-    """提示词缓存"""
+    """Skills提示词缓存"""
     skills_dict: dict[str, SkillProperties]
     """skills的缓存字典, key: skill_name, value: SkillProperties对象"""
+    
     
     def __init__(self, skill_dir=Path(__file__).parent / "agent_skills"):
         self.log:Logger = container.get("log")
@@ -86,6 +88,7 @@ class SkillsManager:
             # lines.append("<location>")
             # lines.append(str(props.path.resolve()))
             # lines.append("</location>")
+            #因为不是命令行的ai给出路径也没有意义，里面要是有脚本什么的也运行不了要额外适配什么的
 
             lines.append("</skill>")
 
@@ -117,10 +120,10 @@ class SkillsManager:
     
     def get_skill_document_path(self, skill_name:str, relative_path:str)->Path:
         """
-        获取指定技能文档的完整路径。
+        获取指定技能文档的完整路径
         
         根据技能名称从技能字典中查找对应的技能对象，并将技能的根路径
-        与提供的相对路径拼接，返回完整的文件路径。
+        与提供的相对路径拼接，返回完整的文件路径
         
         Args:
             skill_name (str): 技能名称，用于在 skills_dict 中查找对应的技能对象
@@ -141,11 +144,52 @@ class SkillsManager:
         skill = self.skills_dict.get(skill_name)
         
         if skill is None:
-            raise ValueError(f"尝试获取了不存在的 skill_key: {skill_name}")
+            raise ValueError(f"尝试获取了不存在的skill_key:{skill_name}")
         
-        path = skill.path / relative_path
+        skill_root = skill.path.resolve()
+        path = (skill.path / relative_path).resolve()
+
+        if skill_root not in path.parents and path != skill_root:
+            raise ValueError(f"技能'{skill_name}'的相对路径非法:{relative_path}")
+
         if path.exists():
             return path
         
-        raise ValueError(f"技能 '{skill_name}' 中不存在文件路径: {relative_path}")
+        raise ValueError(f"技能'{skill_name}'中不存在文件路径:{relative_path}")
+
+    def get_skill_relative_file_content(
+        self,
+        skill_name: str,
+        relative_path: str,
+        max_length: Optional[int] = None,
+    ) -> str:
+        """按文本格式读取技能目录下某个相对路径文件的内容。
+
+        Args:
+            skill_name (str): 技能名称。
+            relative_path (str): 相对于技能根目录的文件路径。
+            max_length (Optional[int], optional): 返回字符串最大长度，None 表示不截断。
+
+        Returns:
+            str: 读取到的文本内容。
+
+        Raises:
+            ValueError: 当技能不存在、路径非法、目标不是文件或读取失败时抛出。
+        """
+        path = self.get_skill_document_path(skill_name, relative_path)
+
+        if not path.is_file():
+            raise ValueError(f"技能'{skill_name}'中的路径不是文件:{relative_path}")
+
+        try:
+            content = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            raise ValueError(f"技能'{skill_name}'中的文件不是有效的 UTF-8 文本: {relative_path}")
+        except Exception as exc:
+            raise ValueError(f"读取技能'{skill_name}'的文件失败:{relative_path},error: {exc}")
+
+        if max_length is not None and len(content) > max_length:
+            return content[:max_length]
+
+        return content
             

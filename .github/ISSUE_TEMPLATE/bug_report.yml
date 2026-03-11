@@ -1,0 +1,92 @@
+name: Bug 反馈
+description: 报告一个可复现的问题，帮助我们定位并修复。
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈问题。请尽量提供可复现信息，这会显著提高修复效率。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题概述
+      description: 用一两句话描述你遇到的问题。
+      placeholder: 启动后连接 NapCat 正常，但收到群消息时 Bot 没有回复。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 按顺序描述如何稳定复现该问题。
+      placeholder: |
+        1. 配置 `assets/config.json`
+        2. 启动 `python main.py`
+        3. 在群内 `@ATRI-bot /help`
+        4. 观察报错或异常现象
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为
+      description: 说明你原本预期程序应该如何表现。
+      placeholder: Bot 应正常响应命令并返回帮助信息。
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 说明实际发生了什么，包含报错、堆栈、截图或日志片段。
+      placeholder: |
+        实际没有返回消息，控制台输出如下：
+        ```text
+        Traceback ...
+        ```
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: 相关配置与上下文
+      description: 可脱敏后提供与问题相关的配置、数据库环境、MCP/模型配置等。
+      placeholder: 使用 PostgreSQL + pgvector，本地 NapCat，Python 3.13，未启用 Docker sandbox。
+
+  - type: input
+    id: version
+    attributes:
+      label: 项目版本 / 提交
+      description: 填写版本号、commit hash，或说明是最新 main。
+      placeholder: v1.2.4 / main / abc1234
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 运行平台
+      options:
+        - Windows
+        - Linux
+        - macOS
+        - 其他
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python 版本
+      placeholder: 3.13.x
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 其他你认为有帮助的信息，比如是否能稳定复现、是否与特定命令/群聊场景相关。

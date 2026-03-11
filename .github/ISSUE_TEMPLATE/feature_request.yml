@@ -1,0 +1,48 @@
+name: 功能建议
+description: 提出一个新功能、改进点或架构优化建议。
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提出改进建议。请尽量说明场景和收益，方便评估优先级。
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决的问题
+      description: 描述当前痛点、限制或缺失能力。
+      placeholder: 目前命令系统没有统一的别名机制，导致某些常用命令记忆成本较高。
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 期望的方案
+      description: 描述你期望新增或改进的功能。
+      placeholder: 为命令注册器增加 `aliases` 参数，并自动在帮助文档中显示。
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: 使用场景
+      description: 说明该功能会如何被使用、适合哪些群聊或开发场景。
+      placeholder: 管理员可以使用短别名快速执行管理命令，降低操作成本。
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案
+      description: 你是否考虑过其他实现方式？如果有，请一并说明。
+      placeholder: 也可以只在客户端侧维护命令映射，但不如在框架层统一支持。
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充信息
+      description: 可附带原型、伪代码、参考链接或相关截图。

@@ -162,7 +162,8 @@ class GroupChat(chat_baseics):
 
         await self.send_message.set_msg_emoji_like(
             message_id = data['message_id'],
-            emoji_id = 183 #表情:我最可爱
+            # emoji_id = 183 #表情:我最可爱
+            emoji_id = 66 #爱心❤
         )
         
         message_builder: MessageBuilder = await self.prompt_structure(
@@ -293,7 +294,10 @@ class GroupChat(chat_baseics):
             self.build_prompt.decision_whether_responses(
                 group_id=group_id,
                 prompt=prompt,
-                else_prompt=self.emoji_core.emoji_prompt,
+                else_prompt=(
+                    self.emoji_core.prompt + #表情包的提示词
+                    self.skills.prompt #skills的提示词
+                )
             )
         )
 

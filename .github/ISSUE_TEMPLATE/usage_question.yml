@@ -1,0 +1,49 @@
+name: 使用问题
+description: 提交部署、配置或使用上的问题。
+title: "[Question]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        如果你遇到的是使用、配置或部署问题，可以使用这个模板。
+        提问前建议先查看 `README.md`、`assets/如何配置配置文件.py` 和 `docker/db/info.sql`。
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 问题描述
+      description: 清楚说明你卡在哪一步、当前现象是什么。
+      placeholder: 我已经配置了 PostgreSQL 和 NapCat，但启动后一直提示数据库连接失败。
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的操作
+      description: 说明你已经做过哪些排查，避免重复建议。
+      placeholder: 已检查数据库账号密码、端口、防火墙和 `config.json`。
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境信息
+      description: 提供系统、Python 版本、数据库版本、NapCat/模型供应商等关键信息。
+      placeholder: Windows 11 / Python 3.13 / PostgreSQL 16 + pgvector / NapCat 最新版
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或报错
+      description: 粘贴相关日志，注意脱敏。
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: 补充说明
+      description: 其他有助于定位的信息。
