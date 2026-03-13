@@ -46,7 +46,7 @@ class BotFramework:
     
     @classmethod
     async def create(cls):
-        """工厂方法，替代 __ainit__"""
+        """工厂初始化方法"""
         self = cls()
         try:
             await self.initialize()
@@ -304,14 +304,14 @@ class BotFramework:
         self._shutdown_handlers[name] = handler
 
     def create_background_task(self, coro: Awaitable[Any]) -> asyncio.Task[Any]:
-        """创建受控后台任务，方便关闭阶段统一回收"""
+        """创建受控后台任务"""
         task = asyncio.create_task(coro)
         self._background_tasks.add(task)
         task.add_done_callback(self._background_tasks.discard)
         return task
 
     async def graceful_shutdown(self) -> None:
-        """在取消态下也尽量等待关闭流程执行完成"""
+        """等待关闭流程执行完成"""
         if self._shutdown_task is None:
             self._shutdown_task = asyncio.create_task(self.shutdown(), name="BotFramework.shutdown")
 
@@ -330,6 +330,8 @@ class BotFramework:
         """关闭可显式回收的服务"""
         if self._is_shutdown:
             return
+
+        self.logger.info("正在清理回收资源~")
 
         for name, handler in reversed(list(self._shutdown_handlers.items())):
             try:

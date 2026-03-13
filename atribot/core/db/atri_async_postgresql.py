@@ -184,7 +184,7 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         args_list: List[Tuple]
     ) -> None:
         """
-        批量执行同一条 SQL，利用 asyncpg 原生 executemany
+        批量执行同一条 SQL,需要提前获取浮标
         Args:
             query: 含有占位符的 SQL，例如
                 INSERT INTO atri_memory (group_id,user_id,event_time,event,event_vector)

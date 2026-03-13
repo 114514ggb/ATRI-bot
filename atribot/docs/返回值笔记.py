@@ -2886,4 +2886,72 @@ google_gemini_ret = {
 
 
 
-{'time': 1772040806, 'self_id': 3930909243, 'post_type': 'notice', 'notice_type': 'notify', 'sub_type': 'poke', 'target_id': 215176364, 'user_id': 168238719, 'group_id': 2169027872, 'raw_info': [{'col': '1', 'nm': '', 'type': 'qq', 'uid': 'u_K0ahGoXMecVMLrnO92_orw'}, {'jp': 'https://zb.vip.qq.com/v2/pages/nudgeMall?_wv=2&actionId=0', 'src': 'http://tianquan.gtimg.cn/nudgeaction/item/0/expression.jpg', 'type': 'img'}, {'txt': '戳了戳', 'type': 'nor'}, {'col': '1', 'nm': '', 'tp': '0', 'type': 'qq', 'uid': 'u_s3kekkFE0yeSUL1Mr4KEhQ'}, {'txt': '的身体，对方变成了泡沫', 'type': 'nor'}]}
+戳一戳={'time': 1772040806, 'self_id': 3930909243, 'post_type': 'notice', 'notice_type': 'notify', 'sub_type': 'poke', 'target_id': 215176364, 'user_id': 168238719, 'group_id': 2169027872, 'raw_info': [{'col': '1', 'nm': '', 'type': 'qq', 'uid': 'u_K0ahGoXMecVMLrnO92_orw'}, {'jp': 'https://zb.vip.qq.com/v2/pages/nudgeMall?_wv=2&actionId=0', 'src': 'http://tianquan.gtimg.cn/nudgeaction/item/0/expression.jpg', 'type': 'img'}, {'txt': '戳了戳', 'type': 'nor'}, {'col': '1', 'nm': '', 'tp': '0', 'type': 'qq', 'uid': 'u_s3kekkFE0yeSUL1Mr4KEhQ'}, {'txt': '的身体，对方变成了泡沫', 'type': 'nor'}]}
+
+
+
+
+某json消息={'self_id': 168238719,
+ 'user_id': 2925774824,
+ 'time': 1773372000,
+ 'message_id': 450065523,
+ 'message_seq': 450065523,
+ 'real_id': 450065523,
+ 'real_seq': '123757',
+ 'message_type': 'group',
+ 'sender': {'user_id': 2925774824,
+            'nickname': '星火燃愿(◕ ω＜)ಣ',
+            'card': '哈基愿',
+            'role': 'member'},
+ 'raw_message': '[CQ:json,data={"app":"com.tencent.tuwen.lua"&#44;"desc":""&#44;"view":"news"&#44;"bizsrc":"favorites.note"&#44;"ver":"0.0.0.1"&#44;"prompt":"&#91;QQ收藏&#93; '
+                '位置分享"&#44;"appID":""&#44;"sourceName":""&#44;"actionData":""&#44;"actionData_A":""&#44;"sourceUrl":""&#44;"meta":{"news":{"title":"你已被封移除群聊"&#44;"desc":"你已被群主移除群聊"&#44;"preview":"https:\\/\\/downv6.qq.com\\/extendfriend\\/lbsshare_icon.jpg"&#44;"jumpUrl":"https:\\/\\/apis.map.qq.com\\/uri\\/v1\\/geocoder?coord=1.000000&#44;1.000000&amp;referer=macqq&amp;_wv=800"&#44;"tag":"QQ '
+                '收藏"&#44;"tagIcon":"https:\\/\\/downv6.qq.com\\/extendfriend\\/collection.png"}}&#44;"config":{"autosize":0&#44;"collect":1&#44;"ctime":1773371998&#44;"forward":1&#44;"height":318&#44;"reply":1&#44;"round":1&#44;"token":"ad9f331ca168748ac3ca3e97a2b41bbf"&#44;"type":"normal"&#44;"width":526}&#44;"text":""&#44;"extraApps":&#91;&#93;&#44;"sourceAd":""&#44;"extra":""}]',
+ 'font': 14,
+ 'sub_type': 'normal',
+ 'message': [{'type': 'json',
+              'data': {'data': '{"app":"com.tencent.tuwen.lua","desc":"","view":"news","bizsrc":"favorites.note","ver":"0.0.0.1","prompt":"[QQ收藏] '
+                               '位置分享","appID":"","sourceName":"","actionData":"","actionData_A":"","sourceUrl":"","meta":{"news":{"title":"你已被封移除群聊","desc":"你已被群主移除群聊","preview":"https:\\/\\/downv6.qq.com\\/extendfriend\\/lbsshare_icon.jpg","jumpUrl":"https:\\/\\/apis.map.qq.com\\/uri\\/v1\\/geocoder?coord=1.000000,1.000000&referer=macqq&_wv=800","tag":"QQ '      
+                               '收藏","tagIcon":"https:\\/\\/downv6.qq.com\\/extendfriend\\/collection.png"}},"config":{"autosize":0,"collect":1,"ctime":1773371998,"forward":1,"height":318,"reply":1,"round":1,"token":"ad9f331ca168748ac3ca3e97a2b41bbf","type":"normal","width":526},"text":"","extraApps":[],"sourceAd":"","extra":""}'}}],
+ 'message_format': 'array',
+ 'post_type': 'message',
+ 'group_id': 2169027872,
+ 'group_name': '入机窝'}
+
+{'self_id': 168238719,
+ 'user_id': 2925774824,
+ 'time': 1773371026,
+ 'message_id': 1765656926,
+ 'message_seq': 1765656926,
+ 'real_id': 1765656926,
+ 'real_seq': '123754',
+ 'message_type': 'group',
+ 'sender': {'user_id': 2925774824,
+            'nickname': '星火燃愿(◕ ω＜)ಣ',
+            'card': '哈基愿',
+            'role': 'member'},
+ 'raw_message': '[CQ:json,data={ "app": "com.tencent.map"&#44; "config": { '
+                '"autoSize": 1&#44; "forward": 1&#44; "height": "60"&#44; '
+                '"type": "normal"&#44; "width": "666" }&#44; "desc": ""&#44; '
+                '"meta": { "Location.Search": { "address": "你已被群主强奸"&#44; '
+                '"enum_relation_type": 1&#44; "from": "plusPanel"&#44; '
+                '"from_account": 2147483647&#44; "id": ""&#44; "lat": "1"&#44; '
+                '"lng": "1"&#44; "name": "你已被群主强奸"&#44; "uint64_peer_account": '
+                '"chaijun" } }&#44; "prompt": "你已被移除群聊"&#44; "ver": '
+                '"1.1.2.21"&#44; "view": "LocationShare" }]',
+ 'font': 14,
+ 'sub_type': 'normal',
+ 'message': [{'type': 'json',
+              'data': {'data': '{ "app": "com.tencent.map", "config": { '
+                               '"autoSize": 1, "forward": 1, "height": "60", '
+                               '"type": "normal", "width": "666" }, "desc": '
+                               '"", "meta": { "Location.Search": { "address": '
+                               '"你已被群主强奸", "enum_relation_type": 1, "from": '
+                               '"plusPanel", "from_account": 2147483647, "id": '
+                               '"", "lat": "1", "lng": "1", "name": "你已被群主强奸", '
+                               '"uint64_peer_account": "chaijun" } }, '
+                               '"prompt": "你已被移除群聊", "ver": "1.1.2.21", '
+                               '"view": "LocationShare" }'}}],
+ 'message_format': 'array',
+ 'post_type': 'message',
+ 'group_id': 2169027872,
+ 'group_name': '入机窝'}

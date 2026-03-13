@@ -382,7 +382,7 @@ class GroupChat(chat_baseics):
                 text = chat_message.pure_text,
                 limit = 10
             )
-        ] if chat_message.pure_text else None:
+        ] if len(chat_message.pure_text) >= 5 else None:#文本长度要大于一个值不然没什么意义
             message_builder.add_text(f"以下是可能相关的最近记忆片段：<recent_memory_snippet>{memory}</recent_memory_snippet>")
     
     async def reply_conduct(self, response_json:Dict, data:Dict)->None:

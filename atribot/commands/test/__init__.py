@@ -1,6 +1,7 @@
 import textwrap
 
 from atribot.core.command.command_parsing import CommandSystem
+from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_type import ChatMessage, GroupMessage
@@ -9,7 +10,7 @@ from .ATRI_encrypt import Encrypt
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
-
+db:atriAsyncPostgreSQL = container.get("database")
 
 @cmd_system.register_command(
     name='atri',
@@ -100,33 +101,28 @@ async def atri_encrypt_command(
     name='run',
     description='执行异步Python代码',
     examples=[
-        "/run \"await send_message.send_group_message(984466158,\'hello\')\"",
+        "/run await send_message.send_group_message(984466158, 'hello')",
     ],
     authority_level=3
 )
-@cmd_system.argument(
-    name="code",
-    description="要执行的代码",
-    required=True,
-    multiple=True,
-    type=str
-)
-async def run_async_code(message_data: ChatMessage, code: list):
+async def run_async_code(message_data: ChatMessage):
     """
     异步执行代码的测试命令
     """
 
-    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_markdown('#这是**ATRI**'))
+    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text('消息'))
     # await send_message.send_group_message(984466158, '你好[CQ:image,file=file:///home/atri/py_project/ATRI-main/document/img/ATGRI_在瑶亚.gif]')
+    # await send_message.send_group_message(984466158,'[CQ:json,data={ "app": "com.tencent.map"&#44; "config": { "autoSize": 1&#44; "forward": 1&#44; "height": "60"&#44; "type": "normal"&#44; "width": "666" }&#44; "desc": ""&#44; "meta": { "Location.Search": { "address": "你已被群主强奸"&#44; "enum_relation_type": 1&#44; "from": "plusPanel"&#44; "from_account": 2147483647&#44; "id": ""&#44; "lat": "1"&#44; "lng": "1"&#44; "name": "你已被群主强奸"&#44; "uint64_peer_account": "chaijun" } }&#44; "prompt": "你已被移除群聊"&#44; "ver": "1.1.2.21"&#44; "view": "LocationShare" }]')
     
     GroupMessage
+    
+    raw = message_data.pure_text.strip()
     src = f"""
-async def function():
-{textwrap.indent(" ".join(code), "  ")}
+async def function(message_data):
+{textwrap.indent(raw[raw.find(' ') + 1:].strip(), "  ")}
 """
     locs = {}
     exec(src, globals(), locs)
-    coro = locs["function"]()
-    await coro
+    await locs["function"](message_data)
 
 

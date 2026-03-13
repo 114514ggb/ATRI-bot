@@ -50,7 +50,6 @@ class TimedTask:
 class TimeTriggerSupervisor:
     """基于 asyncio 和最小堆的高效时间调度器。
 
-    使用 asyncio.Event 实现精确的睡眠唤醒机制，避免了轮询（busy loop）
     支持一次性任务和周期性任务的调度
     """
 
