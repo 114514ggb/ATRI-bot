@@ -2,6 +2,7 @@ import time
 
 from atribot.core.service_container import container
 from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 tool_json = {
     "name": "memory_storage",
@@ -15,18 +16,61 @@ tool_json = {
         "content_text": {
             "type": "string",
             "description": "要存储的记忆内容,建议详细描述记忆的具体内容，以便后续检索时能够更准确地找到相关记忆",
+        },
+        "category": {
+            "type": "string",
+            "description": "记忆类型可选值:preference(用户偏好)、fact(事实)、experience(经历)、emotion(情感)、group_topic(群聊话题)、knowledge(通用知识)、domain(领域专业知识)、guideline(行为准则)",
+            "default": "fact"
+        },
+        "importance": {
+            "type": "number",
+            "description": "记忆的重要度",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 5
+        },
+        "credibility": {
+            "type": "number",
+            "description": "记忆的可信度",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 5
         }
     }
 }
 
-memiry_system:memorySystem = container.get("memirySystem")
+memiry_system: memorySystem = container.get("memorySystem")
 
-async def main(content_text:str,user_id:str|int=None):
+async def main(
+    content_text: str,
+    user_id: str | int = None,
+    category: MemoryCategory = "fact",
+    importance: int = 5,
+    credibility: int = 5,
+):
+    event_vector = str((await memiry_system.rag.calculate_embedding(content_text))[0])
+
     if user_id:
-        args_list = (0, user_id, int(time.time()), content_text, str((await memiry_system.rag.calculate_embedding(content_text))[0]))
+        await memiry_system.vector_store.storage(
+            group_id=None,
+            user_id=int(user_id),
+            event_time=int(time.time()),
+            event=content_text,
+            event_vector=event_vector,
+            category=category,
+            importance=importance,
+            credibility=credibility,
+        )
     else:
-        args_list = (None, None, int(time.time()), content_text, str((await memiry_system.rag.calculate_embedding(content_text))[0]))
+        await memiry_system.vector_store.storage(
+            group_id=None,
+            user_id=None,
+            event_time=int(time.time()),
+            event=content_text,
+            event_vector=event_vector,
+            category=category,
+            importance=importance,
+            credibility=credibility,
+        )
 
-    await memiry_system.vector_store.add_memory(args_list)
-    
     return "存储记忆成功"

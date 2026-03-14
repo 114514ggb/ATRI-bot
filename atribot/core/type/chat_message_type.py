@@ -32,11 +32,11 @@ class MessageSegmentType(Enum):
     TEXT = "text"          # 纯文本消息段
     VIDEO = "video"        # 视频消息段
     XML = "xml"            # XML消息段
-    UNKNOWN = "unknown"    # 不支持的消息段
+    UNKNOWN = "unknown"    # 不支持的消息段,用于使用我没适配的消息统一换成这个
 
 
 class MessageSegment(ABC):
-    """基础消息段（抽象基类）"""
+    """基础消息段"""
     
     __slots__ = ['type']
     
@@ -234,20 +234,20 @@ class NodeSegment(MessageSegment):
         prompt: str | None = "果然是群聊天记录",
         time: str | None = None
     ):
-        """初始化合并转发消息节点。
+        """初始化合并转发消息节点
         
         Args:
-            content: 消息的具体内容，遵循OB11MessageMixType协议（必填）
+            content: 消息的具体内容,遵循OB11MessageMixType协议(必填)
             nickname: 发送者的昵称
             id: 转发消息的唯一标识ID
-            user_id: 发送者的QQ号（可选）。
-            uin: 发送者的QQ号，兼容go-cqhttp协议格式（可选）。
-            name: 发送者的昵称，兼容go-cqhttp协议格式（可选）。
-            source: 标题文本（可选）。
-            news: 预览文本（可选）格式list[dict]比如[{"text" : "文本"}]
-            summary: 底下文本（可选）。
-            prompt: 消息的提示信息（可选）。
-            time: 消息发送的时间（可选）。
+            user_id: 发送者的QQ号(可选)
+            uin: 发送者的QQ号,兼容go-cqhttp协议格式(可选)
+            name: 发送者的昵称,兼容go-cqhttp协议格式(可选)
+            source: 标题文本(可选)
+            news: 预览文本(可选)格式list[dict]比如[{"text" : "文本"}]
+            summary: 底下文本(可选)
+            prompt: 消息的提示信息(可选)
+            time: 消息发送的时间(可选)
         """
         self.id = id
         self.user_id = user_id
@@ -265,7 +265,7 @@ class NodeSegment(MessageSegment):
     
     @property
     def data(self) -> Dict[str, Any]:
-        """返回消息段的用于发送的字典。"""
+        """返回消息段的用于发送的字典"""
         data_dict: Dict[str, Any] = {
             "nickname": self.nickname,
             "content": self.content
@@ -293,16 +293,16 @@ class NodeSegment(MessageSegment):
         return data_dict
     
     def __str__(self) -> str:
-        """返回简化的CQ码格式的字符串表示。"""
+        """返回简化的CQ码格式的字符串表示"""
         return f"[CQ:node,content={str(self.content)[:4000]}]"
 
 
 @dataclass(slots=True)
 class File:
-    """要发送的文件。
+    """要发送的文件
 
     Attributes:
-        file: 包含协议前缀的文件路径、URL 或 Base64 编码字符串。
+        file: 包含协议前缀的文件路径、URL 或 Base64 编码字符串
     """
     file: str
     """用于发送的文件,是文件路径、URL 或 Base64 编码其中一个"""
@@ -312,10 +312,10 @@ class File:
         """从本地路径创建 File 对象,自动添加file://前缀
 
         Args:
-            path: 本地文件绝对路径，例如 "D:/a.jpg"。
+            path: 本地文件绝对路径,例如 "D:/a.jpg"
 
         Returns:
-            File: 包含正确前缀的 File 实例。
+            File: 包含正确前缀的 File 实例
         """
         return cls(file="file://" + path)
 
@@ -327,31 +327,31 @@ class File:
             url: URL 字符串
 
         Returns:
-            File: 包含正确前缀的 File 实例。
+            File: 包含正确前缀的 File 实例
         """
         return cls(file=url)
 
     @classmethod
     def from_base64(cls, data: str) -> "File":
-        """从 Base64 编码字符串创建 File 对象，自动添加 base64:// 前缀。
+        """从 Base64 编码字符串创建 File 对象,自动添加 base64:// 前缀
 
         Args:
-            data: Base64 编码的字符串，例如 "iVBORw0KGgo..."。
+            data: Base64 编码的字符串,例如 "iVBORw0KGgo..."
 
         Returns:
-            File: 包含正确前缀的 File 实例。
+            File: 包含正确前缀的 File 实例
         """
         return cls(file="base64://" + data)
 
     @staticmethod
     def detect_type(file_str: str) -> str:
-        """根据前缀判断文件字符串的类型。
+        """根据前缀判断文件字符串的类型
 
         Args:
-            file_str: 带有协议前缀的字符串。
+            file_str: 带有协议前缀的字符串
 
         Returns:
-            str: 类型名称，可能为 "local", "http", "https", "base64", "unknown"。
+            str: 类型名称,可能为 "local", "http", "https", "base64", "unknown"
         """
         if file_str.startswith("file://"):   return "local"
         if file_str.startswith("http://"):   return "http"
@@ -365,7 +365,7 @@ class File:
 
 
 class FileMessageSegment(MessageSegment, ABC):
-    """文件类消息基类，强制要求 file 字段，其余为可选元信息"""
+    """文件类消息基类,强制要求 file 字段,其余为可选元信息"""
 
     __slots__ = ['file', 'url', 'path', 'file_size', 'file_name']
 
@@ -559,7 +559,7 @@ class ChatMessage:
     llm_formatted_message: str = ""
     """重新处理过的短文本LLM友好的文本"""
     pure_text: str = ""
-    """消息的文本部分"""
+    """消息的纯文本部分"""
     segments: List[MessageSegment] = field(default_factory=list)
     """消息段"""
     sender_info: Dict[str, Any] = field(default_factory=dict)
@@ -686,7 +686,7 @@ class ChatMessage:
 
     def to_list(self) -> List[Dict[str, Any]]:
         """
-        将消息链转换为 JSON List 格式，用于原样发送整条消息
+        将消息链转换为 JSON List 格式,用于原样发送整条消息
         """
         return [seg.to_dict() for seg in self.segments]
     
@@ -698,7 +698,7 @@ class ChatMessage:
         """获取llm可读的字符串"""
         return (
             "<MESSAGE>"
-            f"<qq_id>{self.user_id}</qq_id>"
+            f"<user_id>{self.user_id}</user_id>"
             f"<nick_name>{self.sender_info.get('nickname')}</nick_name>"
             f"<time>{datetime.datetime.fromtimestamp(self.time).strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
             f"<user_message>{self.get_cq_code()[:2000]}</user_message>"
@@ -706,7 +706,6 @@ class ChatMessage:
             "</MESSAGE>"
         )
 
-    
     def __str__(self):
         return self.llm_formatted_message
 
@@ -744,8 +743,8 @@ class SendMessage:
         
         Args:
             file: 文件路径、URL、Base64字符串或 File 对象
-            file_name: 文件名（可选）
-            summary: 图片描述（可选）
+            file_name: 文件名(可选)
+            summary: 图片描述(可选)
         """
         if isinstance(file, str):
             if file.startswith(("file://", "http://", "https://", "base64://")):
@@ -852,7 +851,7 @@ class SendMessage:
         
         Args:
             id: 合并转发ID
-            content: 消息内容列表，每个元素为符合 OneBot 标准的消息段字典（可选）
+            content: 消息内容列表,每个元素为符合 OneBot 标准的消息段字典(可选)
         
         Returns:
             Self, 用于链式调用
@@ -878,17 +877,17 @@ class SendMessage:
         添加合并转发消息节点
         
         Args:
-            content: 消息的具体内容，遵循 OneBot 消息段格式（必填）
+            content: 消息的具体内容,遵循 OneBot 消息段格式(必填)
             nickname: 发送者的昵称
-            id: 转发消息的唯一标识ID（可选）
+            id: 转发消息的唯一标识ID(可选)
             user_id: 发送者的QQ号
-            uin: 发送者的QQ号，兼容go-cqhttp协议格式（可选）
-            name: 发送者的昵称，兼容go-cqhttp协议格式（可选）
-            source: 标题文本（可选）
-            news: 预览文本，格式为 [{"text": "文本"}]（可选）
-            summary: 底部文本（可选）
-            prompt: 消息的提示信息（可选）
-            time: 消息发送的时间（可选）
+            uin: 发送者的QQ号,兼容go-cqhttp协议格式(可选)
+            name: 发送者的昵称,兼容go-cqhttp协议格式(可选)
+            source: 标题文本(可选)
+            news: 预览文本,格式为 [{"text": "文本"}](可选)
+            summary: 底部文本(可选)
+            prompt: 消息的提示信息(可选)
+            time: 消息发送的时间(可选)
         
         Returns:
             Self, 用于链式调用

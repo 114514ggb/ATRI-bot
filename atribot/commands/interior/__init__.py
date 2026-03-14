@@ -14,7 +14,7 @@ from atribot.LLMchat.memory.memiry_system import memorySystem
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
 perm_manager:PermissionsManagement = container.get("PermissionsManagement")
-memiry_system:memorySystem = container.get("memirySystem") 
+memiry_system:memorySystem = container.get("memorySystem") 
 AIContextCommands()
 
 
@@ -222,7 +222,7 @@ async def handle_status_command(message_data: ChatMessage, components: list):
 
 @cmd_system.register_command(
     name="query",
-    description="查询记忆库中的相关信息，会把输入转换成向量然后进行余弦距离搜索,不提供文本会按照时间降序排序",
+    description="查询记忆库中的相关信息，支持向量+全文混合检索与时间衰减评分，不提供文本会按照时间降序排序",
     aliases=["search", "记忆"],
     authority_level=1,
     examples=[
@@ -231,7 +231,8 @@ async def handle_status_command(message_data: ChatMessage, components: list):
         "/query 编程相关内容 --group 123456",
         "/query 某人说过什么 --user 789012 --days 7",
         "/query 知识库内容 --kb-only",
-        "/query 喜欢的事情 --exclude-kb --threshold 0.3"
+        "/query 喜欢的事情 --exclude-kb --category preference",
+        "/query 重要的事 --min-importance 5 --no-decay"
     ]
 )
 @cmd_system.argument(
@@ -298,14 +299,34 @@ async def handle_status_command(message_data: ChatMessage, components: list):
     long="--kb-only",
     description="只查询知识库记忆"
 )
+@cmd_system.flag(
+    name="no_decay",
+    long="--no-decay",
+    description="禁用时间衰减，所有类别记忆平等对待"
+)
 @cmd_system.option(
-    name="threshold",
-    short="t",
-    long="--threshold",
-    description="向量距离阈值(0-1之间，越小越相似)",
-    type=float,
-    default=0.5,
-    metavar="FLOAT"
+    name="category",
+    short="c",
+    long="--category",
+    description="筛选记忆类型",
+    choices = ["preference","fact","experience","emotion","group_topic","knowledge","domain","guideline"],
+    metavar="CATEGORY"
+)
+@cmd_system.option(
+    name="min_importance",
+    long="--min-importance",
+    description="重要度下界(1-10)",
+    type=int,
+    default=1,
+    metavar="NUM"
+)
+@cmd_system.option(
+    name="min_credibility",
+    long="--min_credibility",
+    description="可信度度下界(1-10)",
+    type=int,
+    default=1,
+    metavar="NUM"
 )
 async def cmd_query_memories(
     limit: int,
@@ -316,80 +337,111 @@ async def cmd_query_memories(
     end_time: int,
     exclude_kb: bool,
     kb_only: bool,
-    threshold: float,
+    no_decay: bool,
+    category: str,
+    min_importance: int,
+    min_credibility: int,
     message_data: ChatMessage,
     query_text: list[str] = None,
 ):
     """查询记忆命令处理函数"""
+    from datetime import datetime as dt
+
     if query_text:
         query_string = " ".join(query_text)
     else:
         query_string = None
-        
+
     if days is not None:
-        import time
         end_time = int(time.time())
         start_time = end_time - (days * 24 * 60 * 60)
-    
+
     group_id = group or None
-    
-    results = await memiry_system.query_memories(
-        query_text=query_string,
-        limit=limit,
-        group_id=group_id if not kb_only else None,
-        user_id=user,
-        start_time=start_time,
-        end_time=end_time,
-        exclude_knowledge_base=exclude_kb,
-        only_knowledge_base=kb_only,
-        distance_threshold=threshold
-    )
-    
+    decay_weight = 0.0 if no_decay else 0.3
+
+    if query_string:
+        results = await memiry_system.hybrid_recall(
+            query_text=query_string,
+            limit=limit,
+            group_id=group_id if not kb_only else None,
+            user_id=user,
+            start_time=start_time,
+            end_time=end_time,
+            exclude_knowledge_base=exclude_kb,
+            only_knowledge_base=kb_only,
+            category=category,
+            min_importance = min_importance if min_importance > 1 else 1,
+            min_credibility = min_credibility if min_credibility > 1 else 1,
+            time_decay_weight = decay_weight,
+        )
+    else:
+        results = await memiry_system.vector_store.query_memories(
+            query_text=None,
+            limit=limit,
+            group_id=group_id if not kb_only else None,
+            user_id=user,
+            start_time=start_time,
+            end_time=end_time,
+            exclude_knowledge_base=exclude_kb,
+            only_knowledge_base=kb_only,
+            category=category,
+            min_importance = min_importance if min_importance > 1 else 1,
+            min_credibility = min_credibility if min_credibility > 1 else 1,
+        )
 
     if not results:
         await send_message.send_group_merge_text(
-            message_data.group_id, 
-            message = f"🔍 未找到与「{query_string}」相关的记忆",
-            source = "记忆查询结果"
+            message_data.group_id,
+            message=f"🔍 未找到与「{query_string or '最近记忆'}」相关的记忆",
+            source="记忆查询结果"
         )
         return
-    
+
+    decay_tip = "⏸️ 已禁用时间衰减" if no_decay else "⏱️ 已启用时间衰减评分"
     result_lines = [
-        f"🔍 查询字段: 「{query_string}」",
-        f"📊 找到 {len(results)} 条相关记忆",
+        f"🔍 查询字段: 「{query_string or '(按时间倒序)'}」",
+        f"📊 找到 {len(results)} 条相关记忆  {decay_tip}",
         "=" * 10
     ]
-    
+
     for result in results:
-        
-        timestamp = result["event_time"]
-        if timestamp:
-            from datetime import datetime
-            time_str = datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        timestamp = result.get("event_time")
+        time_str = dt.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S') if timestamp else "未知时间"
+
+        cat = result.get('category') or ''
+        cat_str = f" [{cat}]" if cat else ""
+        imp = result.get('importance')
+        imp_str = f" 重要度:{imp}" if imp else ""
+
+        if result.get('hybrid_score') is not None:
+            score_str = f" 综合评分:{result['hybrid_score']:.4f}"
+        elif result.get('distance') is not None:
+            score_str = f" 向量距离:{result['distance']:.4f}"
         else:
-            time_str = "未知时间"
-        
+            score_str = ""
+
         memory_info = [
-            f"\n[记忆ID:{result["memory_id"]}]相似度: {result["distance"]}",
+            f"\n[记忆ID:{result.get('memory_id', '?')}]{cat_str}{imp_str}{score_str}",
             f"⏰ 时间: {time_str}"
         ]
-        
-        if result["user_id"]:
+
+        if result.get("user_id"):
             memory_info.append(f"👤 用户: {result['user_id']}")
-        
-        # 记忆内容
+        if result.get("group_id"):
+            memory_info.append(f"👥 群组: {result['group_id']}")
+
         content = result.get('event', '无内容')
-        if len(content) > 500:
-            content = content[:100] + "..."
+        if len(content) > 300:
+            content = content[:300] + "..."
         memory_info.append(f"💭 内容:\n {content}")
-        
-        if not result['group_id'] and not result['user_id']:
+
+        if not result.get('group_id') and not result.get('user_id'):
             memory_info.append("📚 [知识库]")
-        
+
         result_lines.extend(memory_info)
-    
+
     result_lines.append("=" * 10)
-    
+
     await send_message.send_group_merge_text(
         group_id=message_data.group_id,
         message="\n".join(result_lines),

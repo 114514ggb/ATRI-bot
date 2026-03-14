@@ -5,7 +5,7 @@ from atribot.core.service_container import container
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.LLMchat.RAG.text_chunker import RecursiveCharacterTextSplitter
-from atribot.LLMchat.RAG.vector_store import VectorStore
+from atribot.LLMchat.RAG.vector_store import MemoryVectorStore
 
 
 class RAGManager:
@@ -20,7 +20,7 @@ class RAGManager:
         self.text_chunker = RecursiveCharacterTextSplitter(
             200,50
         )
-        self.vector_store = VectorStore()
+        self.vector_store = MemoryVectorStore()
         
     
     def generate_response(self, question:str, context:str)->str:
@@ -47,7 +47,6 @@ class RAGManager:
         return self.text_chunker.split_text(text)
         
         
-        
     async def calculate_embedding(self, document:str|List[str])->list[list[float]]:
         """用嵌入式模型把文本转换成向量
 
@@ -63,6 +62,7 @@ class RAGManager:
             dimensions=1024,
             encoding="float"
         )
+        
         
     def calculate_reranker(self, chunks:list[str], question:str, k:int=2)->list[str]:
         """根据问题对文本块列表进行相关性重排序，并返回得分最高的前 K 个文本块。
@@ -108,7 +108,7 @@ class RAGManager:
                 return_text += await db.execute_with_pool(
                     sql = sql,
                     params = (embedding,k)
-                )
+                )["event"]
                 
         return tuple(return_text)
         

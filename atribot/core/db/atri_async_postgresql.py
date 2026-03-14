@@ -113,7 +113,7 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         query: str,
         params: Tuple = None, 
         fetch_type: str = None
-    ) -> Record|None:
+    ) -> list[Record]|Record|None:
         """使用连接池执行SQL,会自动处理%s转换成$1"""
         
         conn = self._context_conn.get()
@@ -152,7 +152,7 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         query: str,
         params: Tuple = None, 
         fetch_type: str = None
-    ) -> Record|None:
+    ) -> list[Record]|Record|None:
         """使用连接池执行SQL,需要提前获取浮标,用于多条语句的情况下"""
         
         conn = self._context_conn.get()

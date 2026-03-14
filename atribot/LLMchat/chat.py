@@ -57,7 +57,7 @@ class chat_baseics(ABC):
     def __init__(self):
         self.model_api_supervisor: LLMCoordinator = container.get("LLMsupervisor")
         self.supplier: LLMConnectionManager = container.get("LLMSupplier")
-        self.memiry_system: memorySystem = container.get("memirySystem")       
+        self.memiry_system: memorySystem = container.get("memorySystem")       
         self.send_message: QQAPIClient = container.get("SendMessage")
         self.chat_manager: ChatManager = container.get("ChatManager")
         self.skills:SkillsManager = container.get("SkillsManager")
@@ -154,14 +154,13 @@ class GroupChat(chat_baseics):
     ) -> None:
         """群聊天用的json处理版的加强版本,会携带消息中图片的位置信息"""
         
-        data = message.primeval
         user_id = message.user_id
         uid: str = uuid.uuid4().hex
         
         self.log.info(f"[{uid}]群LLM聊天json处理")
 
         await self.send_message.set_msg_emoji_like(
-            message_id = data['message_id'],
+            message_id = message.message_id,
             # emoji_id = 183 #表情:我最可爱
             emoji_id = 66 #爱心❤
         )
@@ -206,7 +205,7 @@ class GroupChat(chat_baseics):
                         
                         if fun := self.decision_function.get(decision):
                             
-                            await fun(response_json, data)
+                            await fun(response_json, message)
                             
                         else:
                             self.log.error(f"[{uid}]无效decision:{response_json}")
@@ -378,20 +377,28 @@ class GroupChat(chat_baseics):
         message_builder.add_text("</user_message></MESSAGE>")
         
         if memory := [
-            (f"user_id:{r[0]}",datetime.datetime.fromtimestamp(r[1]).strftime("%Y-%m-%d %H:%M:%S"),r[2]) for r in await self.memiry_system.query_user_recently_memory(
+            (
+                f"user:{r[0]}",
+                f"group:{r[1]}",
+                datetime.datetime.fromtimestamp(r[2]).strftime("%Y-%m-%d %H:%M:%S"),
+                r[2],
+                f"可信度:{r[3]}"
+            ) 
+            for r in await self.memiry_system.query_user_recently_memory(
                 text = chat_message.pure_text,
                 limit = 10
             )
-        ] if len(chat_message.pure_text) >= 5 else None:#文本长度要大于一个值不然没什么意义
+        ] if len(chat_message.pure_text) >= 5 else False:#文本长度要大于一个值不然大概率没什么意义
             message_builder.add_text(f"以下是可能相关的最近记忆片段：<recent_memory_snippet>{memory}</recent_memory_snippet>")
     
-    async def reply_conduct(self, response_json:Dict, data:Dict)->None:
+    async def reply_conduct(self, response_json:Dict, message:ChatMessage)->None:
         
         self.log.info(f"LLM决定回复消息理由:{response_json.get("reason")}")
-        group_id = data["group_id"]
+        group_id = message.group_id
         
         chat_condition =await self.chat_manager.get_group_LLM_decision_parameters(group_id)
         
+        #更新参数
         since = chat_condition.get_seconds_since_llm_time()
         await chat_condition.update_last_time()
         
@@ -402,13 +409,13 @@ class GroupChat(chat_baseics):
             since_llm = since
         )
     
-    async def update_conduct(self, response_json:Dict, data:Dict)->None:
+    async def update_conduct(self, response_json:Dict, message:ChatMessage)->None:
         self.log.info(f"LLM决定更新用户信息理由:{response_json.get("reason")}")
         
         if user_id := response_json.get("user_id"):
             user_id = int(user_id)
         else:
-            user_id = data["user_id"]
+            user_id = message.user_id
         
         if await self.user_system.update_user_info(
             user_id = user_id,
@@ -420,10 +427,10 @@ class GroupChat(chat_baseics):
             self.log.info(f"用户信息无变化无需更新!user_id:{user_id}")
         
     
-    async def silence_conduct(self, response_json:Dict, data:Dict)->None:
+    async def silence_conduct(self, response_json:Dict, message:ChatMessage)->None:
         self.log.info(f"LLM决定静默理由:{response_json.get("reason")}")
     
-    async def use_tools_conduct(self, response_json:Dict, data:Dict)->None:
+    async def use_tools_conduct(self, response_json:Dict, message:ChatMessage)->None:
         self.log.info(f"LLM决定调用工具理由:{response_json.get("reason")}")
 
 

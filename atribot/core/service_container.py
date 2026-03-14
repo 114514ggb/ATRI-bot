@@ -10,7 +10,7 @@ class DIContainer:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
-            cls._services["log"] = Logger().get_logger()
+            cls._services["log"] = Logger().get_logger()#日志
         return cls._instance
     
     def register(self, name: str, service: Any):

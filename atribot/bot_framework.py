@@ -146,7 +146,7 @@ class BotFramework:
         
         #向量数据库实现的记忆系统
         container.register(
-            "memirySystem",    
+            "memorySystem",    
             memorySystem()
         )
         

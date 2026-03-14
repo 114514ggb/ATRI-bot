@@ -74,19 +74,23 @@
 ### 2. 数据库配置 (PostgreSQL)
 项目当前仅支持 PostgreSQL 数据库。
 1.  **安装数据库**：建议安装较新的 PostgreSQL 版本。[官方安装文档](https://www.postgresql.org/download/)
-2.  **安装向量插件**：必须安装 `pgvector` 插件以支持 RAG 功能。[pgvector 项目地址](https://github.com/pgvector/pgvector)
+2.  **安装数据库插件**：
+    - 必须安装 `pgvector`（向量检索）
+    - 必须安装 `pgroonga`（全文检索）
+    [pgvector 项目地址](https://github.com/pgvector/pgvector)
+    [PGroonga 文档](https://pgroonga.github.io/)
 3.  **数据库初始化**：
-    项目提供了初始化 SQL 文件：`docker\db\info.sql`。
+    项目提供了初始化 SQL 文件：`assets\PostgreSQL基础.sql`（开发版）和 `docker\db\info.sql`（Docker 初始化版）。
     进入数据库（Linux 示例）：
     ```bash
     sudo -u postgres psql
     ```
-    然后按顺序执行 `info.sql` 中的内容创建表结构。
+    然后按顺序执行对应 SQL 文件创建表结构。
 
 
 ### 3. 模型与环境配置
 #### 🤖 嵌入模型 (Embedding)
-推荐优先使用本地的 `Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API，只是仓库里目前主要按 Ollama 的使用方式测试过。
+推荐优先使用本地的 `Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API(opneAI格式的兼容)，只是仓库里目前主要按 Ollama 的使用方式测试过。
 推荐使用 [Ollama](https://ollama.com/) 进行本地部署：
 ```bash
 ollama run Qwen3-Embedding-0.6B:F16
@@ -154,7 +158,7 @@ Linux / macOS 请分别使用 `requirements-linux.txt`、`requirements-macos.txt
 
 ### 5. 使用 Docker 启动
 仓库已经补齐了可直接运行的 `Docker Compose` 配置，默认会启动：
-- `atri-db`：带 `pgvector` 的 PostgreSQL
+- `atri-db`：带 `pgvector + pgroonga` 的 PostgreSQL
 - `atri-bot`：ATRI 主程序容器
 
 首次使用前，至少确认两件事：
@@ -168,6 +172,12 @@ cp .env.docker.example .env
 
 然后直接启动：
 ```bash
+docker compose up -d --build
+```
+
+如果你已经跑过旧版本数据库结构，升级后建议先清理旧数据卷再重建：
+```bash
+docker compose down -v
 docker compose up -d --build
 ```
 

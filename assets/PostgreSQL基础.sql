@@ -1,5 +1,5 @@
 -- mysqldump -u root -p atri > atri.sql
-
+-- sudo -i -u postgres
 -- sudo apt install postgresql-18-pgvector
 -- 提供向量支持的插件
 -- create extension vector;
@@ -15,20 +15,17 @@
 -- <~> - Hamming distance (binary vectors, added in 0.7.0)
 -- <%> - Jaccard distance (binary vectors, added in 0.7.0)
 
--- 1. 创建用户
 -- CREATE USER atri WITH PASSWORD '180710';
 
--- 2. 创建数据库并指定所有者
 -- CREATE DATABASE atri OWNER atri;
 
--- 3. 连接到 atri 数据库后执行以下操作：
 -- \c atri
 
--- 4. 启用扩展
+-- 启用扩展
 CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pgroonga;
 
--- 5. 优化向量索引配置
+-- 向量索引配置
 ALTER SYSTEM SET hnsw.ef_search = 100;
 -- SELECT pg_reload_conf();
 

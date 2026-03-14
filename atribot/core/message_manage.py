@@ -88,7 +88,7 @@ class message_manage(ABC):
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
         self.command_system:CommandSystem = container.get("CommandSystem")
         self.send_message:QQAPIClient = container.get("SendMessage")
-        self.memiry_system:memorySystem = container.get("memirySystem")
+        self.memiry_system:memorySystem = container.get("memorySystem")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.logger:Logger = container.get("log")
         self.initiative_chat = initiativeChat()
