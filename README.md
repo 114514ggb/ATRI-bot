@@ -1,4 +1,4 @@
-<img src=".\assets\ATRI-bot.png" width = "400" height = "400" alt="ATRI-bot" align=right />
+﻿<img src=".\assets\ATRI-bot.png" width = "400" height = "400" alt="ATRI-bot" align=right />
 <div align="center">
 
 <p align="right">
@@ -34,32 +34,39 @@
 
 ## ✨ 项目核心功能
 
-简单来说，这是一个基于 **NapCat** 对接、专注于群聊场景的 QQ Bot。目前主要能力也基本都围绕群聊展开。
+一个基于 **NapCat** 对接、专注于群聊场景的 QQ Bot，所有能力均围绕群聊深度定制。
 
 ### 🧠 深度 LLM 聊天集成
-完全自主实现的 LLM 聊天全流程，从输入处理到输出响应完全可控：
-- **全异步高并发**：回复流程完全异步，支持 Key 号池轮询，面对多个群聊的高并发场景也能轻松应对。
-- **自主可控**：支持函数调用（Function Calling）及 **MCP (Model Context Protocol)** 还有 **skills** 配置(虽然对skills支持不全)。
-- **RAG 记忆系统**：基于 RAG（检索增强生成）实现的记忆功能，支持知识库问答，让 Bot 拥有“长期记忆”。
-- **高可用设计**：设计了备用 API 响应机制。当主模型响应错误时，会自动降级到配置的其他模型（虽然速度可能稍慢，但保证有问必达）。
+
+完全自主实现的 LLM 聊天全链路，从输入处理到输出决策全部可控：
+
+- **全异步高并发**：回复流程完全异步，支持多供应商 Key 池轮询，多群并发场景下也能稳定运行。
+- **结构化决策输出**：模型以 JSON 格式返回结构化决策（回复 / 更新画像 / 静默 / 调用工具），行为完全可控且易于扩展。
+- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词技能(未完全支持Skills)。
+- **两级记忆系统**：
+  - *短期*：每个群 / 用户维护独立的滑动上下文窗口，超限时由 LLM 自动压缩摘要、无损续接。
+  - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让Bot有个比较可靠的长期记忆。
+- **用户画像**：为每位用户维护称呼、关系、性格、偏好等画像文档，嵌入每次对话上下文，保证跨会话态度一致。
+- **高可用降级**：主模型 API 出现异常时，自动按配置顺序切换到备用供应商和模型，保证有问必达。
 - **拟人化交互**：
-  - 支持自然地发送表情包。
-  - 模拟人类说话习惯，支持分段发送消息。
-  - **主动话题参与**：达到一定条件时，会尝试主动回复群消息，融入话题。
-  - **用户画像维护**：维护 User 文档用于嵌入上下文，保证对同一用户的态度一致性。
+  - 自然发送表情包，支持分段回复模拟真实打字节奏。
+  - 达到条件时主动融入群聊话题，而不只是被动等待 @。
   - 支持人设切换等基础功能。
 
 ### 💻 类 Unix 命令系统
-内置一套类 Unix 风格的命令系统，在群里 `@bot` 后以 `/` 开头即可触发（例如 `@atri-bot /help --list`，这里必须使用 QQ 的真实 `@` 提及，而不是直接输入名字文本）：
-- **参数解析**：支持 `-` 和 `--` 等参数风格，内置参数类型验证。
-- **权限管理**：内置权限系统，支持拉黑或授予管理员权限。可在任意处理环节校验 User 权限，拒绝非法执行。
-- **自动帮助文档**：只要在代码中使用装饰器并添加参数说明，即可自动生成详细的 `--help` 提示。
+
+在群里 `@bot` 后以 `/` 开头即可触发（例如 `@atri-bot /help --list`，需使用QQ的@而非直接输入名字）：
+
+- **参数解析**：支持 `-` / `--` 参数风格，内置参数类型校验。
+- **权限管理**：内置多级权限系统，支持拉黑或授予管理员权限，可在任意处理环节拒绝非法调用。
+- **自动帮助文档**：通过装饰器声明参数描述后，`--help` 文档自动生成，无需手写。
 
 ### 🛠️ 其他实用功能
-- **高性能关键词匹配**：配置文件支持关键词响应，底层采用 **AC 自动机** 算法，即使配置上万条匹配项也能保持毫秒级响应
-- **群成员变动提醒**：有人加入或退出群聊时自动通知
-- **戳一戳互动**：被戳时会有反应，甚至会“戳回去”
-- **强健的架构**：数据库采用连接池，消息接收引入消息队列机制，抗压能力 Max
+
+- **高性能关键词匹配**：关键词响应底层采用 **AC 自动机**，即使配置上万条规则也能保持毫秒级响应。
+- **群成员变动提醒**：成员加入或退出时自动通知。
+- **戳一戳互动**：被戳时不只会响应，还会「戳回去」。
+- **稳健架构基础**：数据库连接池 + 消息队列，从容应对并发压力。
 
 ---
 
@@ -254,6 +261,124 @@ ATRI-main/
    ├─video/                     # 视频资源
    └──temp/                     # 临时运行文件
 ```
+
+---
+
+## 🏗️ 架构设计
+
+### 整体消息流
+
+```
+NapCat (QQ客户端)
+      │  WebSocket
+      ▼
+WebSocketClient (单例，消息队列)
+      │
+      ▼
+message_router.main()
+      │
+      ├──► EventTrigger       (关键词/戳一戳/群成员变动等事件)
+      ├──► CommandSystem       (@bot /cmd 命令)
+      └──► LLMCoordinator      (LLM 聊天主流程)
+```
+
+所有服务通过单例 `DIContainer`（`atribot/core/service_container.py`）进行依赖注入，使用 `container.get("ServiceName")` 获取实例，服务初始化顺序在 `BotFramework.initialize()` 中严格保证。
+
+---
+
+### 🧠 LLM 聊天流程设计
+
+LLM 聊天的核心链路在 `atribot/LLMchat/` 目录下，整体采用**全异步流水线**设计：
+
+```
+用户消息 (ChatMessage)
+      │
+      ▼
+chat.py → GroupChat.step()          ← 聊天主入口
+      │
+      ├─① prompt_structure()        构建提示词
+      │     ├─ 群聊历史 (近期消息窗口)
+      │     ├─ 用户画像 (UserSystem)
+      │     ├─ 最近记忆片段 (memorySystem.query_user_recently_memory)
+      │     ├─ 表情包提示词 (EmojiCore)
+      │     └─ Skills 提示词 (SkillsManager)
+      │
+      ├─② LLMCoordinator.run()      调度模型请求
+      │     ├─ 主模型请求 (model_api)
+      │     ├─ Function Calling 循环 (MCP/tools)
+      │     └─ 主模型失败时降级备用模型 (_request_model_with_fallback_)
+      │
+      ├─③ 解析 JSON 响应            模型输出结构化决策
+      │     ├─ "reply"    → 回复消息 (分段发送 / 表情包)
+      │     ├─ "update"   → 更新用户画像
+      │     ├─ "silence"  → 不回复
+      │     └─ "use_tools"→ 调用工具
+      │
+      └─④ 事后处理
+            ├─ 上下文写回 (ChatManager)
+            └─ 上下文超长时触发 summarize_context() 压缩
+```
+
+**高可用降级机制**：当主模型 API 响应异常时，`_request_model_with_fallback_` 会按照 `config.model.standby_model` 列表依次尝试备用供应商和模型，保证即使主力 Key 失效也能正常回复。
+
+**结构化输出**：模型被要求返回 JSON 格式的决策列表（`return` 数组），每一项包含 `decision` 字段，使回复行为完全可控和可扩展。
+
+---
+
+### 💾 记忆系统设计
+
+记忆系统分为**短期上下文缓存**和**长期向量记忆**两层：
+
+#### 短期上下文 (ChatManager)
+- 每个群/用户维护一个滑动的消息窗口 `Context`，直接嵌入每次请求的 `messages` 列表。
+- 当上下文 token 数超限时，触发 `memorySystem.summarize_context()` 对旧消息进行 LLM 压缩摘要，压缩后的文本以 `assistant` 角色消息插入上下文头部，实现无损的"记忆压缩"。
+
+#### 长期向量记忆 (memorySystem + pgvector)
+
+```
+聊天结束后
+      │
+      ▼
+memorySystem.extract_stored_group_message()
+      │
+      ├─ LLM 信息提取 (PURE_GROUP_FACT_RETRIEVAL_PROMPT)
+      │     └─ 输出结构化 JSON：per-user 事件 + 群话题
+      │
+      ├─ RAGManager.calculate_embedding()   文本 → 1024维向量
+      │
+      └─ MemoryVectorStore.batch_add_memories()  写入 PostgreSQL atri_memory 表
+```
+
+**记忆分类 (MemoryCategory)**：
+
+| 分类 | 含义 | 时间半衰期 |
+|------|------|-----------|
+| `preference` | 用户偏好 | 90 天 |
+| `fact` | 事实性记忆（默认） | 90 天 |
+| `experience` | 经历记忆 | 60 天 |
+| `emotion` | 情感记忆 | 30 天 |
+| `group_topic` | 群聊话题 | 7 天 |
+| `knowledge` | 通用知识 | ~10 年 |
+| `domain` | 领域专业知识 | ~10 年 |
+| `guideline` | 行为准则 | ~10 年 |
+
+**混合召回 (hybrid_recall)**：使用一条带 CTE 的 SQL 同时进行**向量检索**（pgvector 余弦距离）和**全文检索**（pgroonga），再通过 RRF（Reciprocal Rank Fusion）融合两路结果，最终叠加重要度、访问频次和时间衰减进行综合排序。
+
+```
+查询文本
+    │
+    ├─ pgvector 向量路     (余弦距离，取前 40 候选)
+    ├─ pgroonga 全文路     (全文评分，取前 40 候选)
+    │
+    └─ RRF 融合
+           + importance / 10.0     × 权重
+           + ln(1 + access_count)  × 权重
+           + EXP(-λ × age_days)    × 时间衰减 (λ 按 category 差异化)
+           │
+           └─► 返回 Top-N 记忆
+```
+
+**用户画像 (UserSystem)**：为每个用户维护一份 JSON 画像文档（称呼、关系、性格、近期话题、偏好风格等），在每次对话的 prompt 中嵌入，确保 Bot 对同一用户的态度前后一致，画像由 LLM 在对话后自动更新。
 
 ---
 
