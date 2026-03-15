@@ -107,7 +107,7 @@ CREATE TABLE IF NOT EXISTS message (
     message_id BIGINT NOT NULL,
     user_id BIGINT NOT NULL,
     group_id BIGINT,
-    time BIGINT, -- Unix 时间戳
+    time BIGINT, -- Unix 时间戳秒级别
     message_content TEXT,
     FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
@@ -133,14 +133,14 @@ CREATE TABLE IF NOT EXISTS message (
 CREATE TABLE IF NOT EXISTS atri_memory (
     memory_id   BIGSERIAL PRIMARY KEY,
     user_id     BIGINT,
-    group_id    BIGINT,             -- NULL=知识库, 0=私聊, 其他=具体群
-    event_time  BIGINT NOT NULL,    -- 记忆对应的事件时间,这个不一定和数据库时间一致，可能补充一个时间的记忆
+    group_id    BIGINT,             -- NULL=私聊或知识库, 其他=具体群
+    event_time  BIGINT NOT NULL,    -- 记忆对应的事件时间,这个不一定和数据库时间一致,可能补充一个时间的记忆
     --   user_id IS NULL  AND group_id IS NULL → 知识库
-    --   user_id NOT NULL AND group_id = 0     → 私聊记忆
+    --   user_id NOT NULL AND group_id = NULL  → 私聊记忆
     --   user_id NOT NULL AND group_id != 0    → 群聊中的用户记忆
     --   user_id IS NULL  AND group_id != 0    → 群聊公共记忆/话题
     --   或许不严格按照这样也行,知识库绑定一个user或group,什么的?
-    created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, -- 写入DB的时间
+    created_at  BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::bigint, -- 写入DB的时间,Unix时间戳(秒)
     event           TEXT,           -- 记忆的文本内容,应该长度大于2,这个就没必要在数据库层面限制了
     event_vector    VECTOR(1024),   -- 语义向量
     category    memory_category NOT NULL DEFAULT 'fact', -- 记忆类型
@@ -151,7 +151,7 @@ CREATE TABLE IF NOT EXISTS atri_memory (
     credibility SMALLINT NOT NULL DEFAULT 5             -- 可信度 1~10
                     CHECK (credibility BETWEEN 1 AND 10),
     access_count    INT NOT NULL DEFAULT 0,          -- 被检索命中的次数
-    last_accessed   TIMESTAMP,                       -- 最后一次被检索的时间
+    last_accessed   BIGINT,                          -- 最后一次被检索的时间,Unix时间戳(秒)
     CONSTRAINT uq_user_event_hash UNIQUE (user_id, event),--同一用户不允许记忆的文本重复
     CONSTRAINT chk_quality_both_set CHECK (
         (importance IS NOT NULL AND credibility IS NOT NULL)
@@ -190,17 +190,17 @@ CREATE TABLE IF NOT EXISTS chat_context (
 -- 消息表：查询某用户按时间倒序的消息
 CREATE INDEX IF NOT EXISTS idx_message_user_time ON message(user_id, time DESC);
 
--- 用户信息表：JSONB GIN 索引，加速 JSON 查询 目前没必要
+-- 用户信息表：JSONB GIN 索引,加速 JSON 查询 目前没必要
 -- CREATE INDEX IF NOT EXISTS idx_user_info_info_gin ON user_info USING GIN (info);
-
--- 记忆表：普通查询索引
-CREATE INDEX IF NOT EXISTS idx_atri_memory_user_time ON atri_memory (user_id, event_time);
 
 -- 记忆表：HNSW 向量索引 (余弦距离)
 CREATE INDEX IF NOT EXISTS idx_atri_memory_vector 
 ON atri_memory 
 USING hnsw (event_vector vector_cosine_ops) 
 WITH (m = 16, ef_construction = 64);
+
+-- 记忆表：普通查询索引
+CREATE INDEX IF NOT EXISTS idx_atri_memory_user_time ON atri_memory (user_id, event_time);
 
 -- 记忆表：按分类过滤
 CREATE INDEX IF NOT EXISTS idx_atri_memory_category
@@ -211,10 +211,10 @@ CREATE INDEX IF NOT EXISTS idx_atri_memory_knowledge
     ON atri_memory (category, importance DESC)
     WHERE user_id IS NULL;
 
--- 记忆表：群聊记忆按群组过滤
+-- 记忆表：群聊记忆按群组过滤(group_id IS NOT NULL 即为群聊,NULL 表示私聊/知识库)
 CREATE INDEX IF NOT EXISTS idx_atri_memory_group
     ON atri_memory (group_id, event_time DESC)
-    WHERE group_id IS NOT NULL AND group_id != 0;
+    WHERE group_id IS NOT NULL;
 
 -- 记忆表：PGroonga 全文检索索引
 CREATE INDEX idx_atri_memory_event_pgroonga ON atri_memory USING pgroonga (event);
@@ -276,17 +276,21 @@ COMMENT ON TABLE user_info IS '用户画像表';
 COMMENT ON TABLE permissions IS '权限控制表';
 COMMENT ON TABLE message IS '接收过的聊天记录消息表';
 COMMENT ON TABLE chat_context IS '聊天的上下文缓存表';
-COMMENT ON TABLE atri_memory IS '记忆表：存储用户记忆、群聊话题及知识库条目，支持向量检索与全文检索';
+COMMENT ON TABLE atri_memory IS '记忆表：存储用户记忆、群聊话题及知识库条目,支持向量检索与全文检索';
 
 COMMENT ON COLUMN atri_memory.user_id IS
     'NULL=知识库条目；有值=用户相关记忆';
 COMMENT ON COLUMN atri_memory.group_id IS
-    'NULL=知识库；0=私聊；正整数=群聊ID';
+    'NULL=私聊或知识库；正整数=群聊ID';
 COMMENT ON COLUMN atri_memory.event_time IS
-    '记忆对应的事件发生时间，Unix时间戳（秒）';
+    '记忆对应的事件发生时间,Unix时间戳(秒)';
+COMMENT ON COLUMN atri_memory.created_at IS
+    '记忆写入数据库的时间,Unix时间戳(秒)';
+COMMENT ON COLUMN atri_memory.last_accessed IS
+    '最后一次被检索命中的时间,Unix时间戳(秒)';
 COMMENT ON COLUMN atri_memory.importance IS
-    '重要度1~10：1~3日常闲聊；4~6有价值信息；7~9重要个人信息；10极其重要';
+    '重要度1~101~3日常闲聊4~6有价值信息7~9重要个人信息10极其重要';
 COMMENT ON COLUMN atri_memory.credibility IS
-    '可信度1~10：取代source字段，综合表达信息的可靠程度';
+    '可信度1~10取代source字段,综合表达信息的可靠程度';
 COMMENT ON COLUMN atri_memory.access_count IS
-    '检索命中次数，高频记忆可在排序时获得额外加权';
+    '检索命中次数,高频记忆可在排序时获得额外加权';

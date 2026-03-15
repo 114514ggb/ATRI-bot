@@ -55,7 +55,7 @@ class chat_baseics(ABC):
     """聊天基类"""
 
     def __init__(self):
-        self.model_api_supervisor: LLMCoordinator = container.get("LLMsupervisor")
+        self.model_api_supervisor: LLMCoordinator = container.get("LLMSupervisor")
         self.supplier: LLMConnectionManager = container.get("LLMSupplier")
         self.memiry_system: memorySystem = container.get("memorySystem")       
         self.send_message: QQAPIClient = container.get("SendMessage")

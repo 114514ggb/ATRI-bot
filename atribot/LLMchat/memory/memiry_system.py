@@ -46,8 +46,8 @@ class memorySystem:
             
             event_time = int(time.time())
             await self.vector_store.batch_add_memories([
-                (0, user_id, event_time, text, emb)
-                for text, emb in zip(summarize_list, str(await self.rag.calculate_embedding(summarize_list)[0]))
+                (user_id, 0, event_time, text, emb, "fact", 5, 5)
+                for text, emb in zip(summarize_list, await self.rag.calculate_embedding(summarize_list))
             ])
 
 
@@ -257,10 +257,11 @@ class memorySystem:
                 group_id,
                 event_time,
                 event,
-                credibility
+                credibility,
+                (event_vector <=> $1::vector(1024)) AS distance
             FROM atri_memory
-            WHERE event_vector <=> $1::vector(1024) <= 0.5
-            AND event_time >= EXTRACT(EPOCH FROM CURRENT_TIMESTAMP - INTERVAL '30 days')::bigint
+            WHERE (event_vector <=> $1::vector(1024)) <= 0.5
+            AND event_time >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '30 days'))::bigint
             ORDER BY distance ASC
             LIMIT $2
             """
@@ -295,7 +296,7 @@ class memorySystem:
         通用向量查询接口
 
         Args:
-            query_text: 要查询的文本,会转换成向量。如果其值为假则按创建时间倒序返回。
+            query_text: 要查询的文本,会转换成向量。如果其值为假则按创建时间倒序返回
             limit: 返回结果数量限制
             group_id: 群组ID筛选 (None不筛选, 0=私聊, 正整数=群聊)
             user_id: 用户ID筛选 (None表示不筛选)
@@ -380,10 +381,10 @@ class memorySystem:
         最终按 hybrid_score DESC LIMIT $limit 返回
 
         Args:
-            query_text:                查询文本(自动计算 embedding)
+            query_text:                查询文本
             limit:                     最终返回记忆条数,默认 10
             user_id:                   用户 ID 筛选,None 不筛选
-            group_id:                  群组 ID 筛选,None 不筛选,0=私聊,正整数=群聊
+            group_id:                  群组 ID 筛选,None 不筛选
             start_time:                事件时间下界(Unix 秒,包含)
             end_time:                  事件时间上界(Unix 秒,包含)
             category:                  记忆类型过滤,None 不过滤
@@ -416,11 +417,6 @@ class memorySystem:
             return []
         query_vector = embedding_list[0]
 
-        #   $1 = query_vector (vector)
-        #   $2 = fulltext_query (text)
-        #   $3 = vector_distance_threshold (float8)
-        #   $4 = vector_candidates (int)
-        #   $5 = fulltext_candidates (int)
         filter_clauses: List[str] = []
         filter_params: List[Any] = []
         idx = 6 
@@ -467,12 +463,18 @@ class memorySystem:
         limit_param = idx
         idx += 1
 
+
+        #   $1 = query_vector (vector)
+        #   $2 = fulltext_query (text)
+        #   $3 = vector_distance_threshold (float8)
+        #   $4 = vector_candidates (int)
+        #   $5 = fulltext_candidates (int)
         params: tuple = (
-            str(query_vector),          # $1
-            query_text[:200],           # $2 
-            vector_distance_threshold,  # $3
-            vector_candidates,          # $4
-            fulltext_candidates,        # $5
+            str(query_vector),         
+            query_text[:200],           
+            vector_distance_threshold, 
+            vector_candidates,          
+            fulltext_candidates,        
             *filter_params,             # $6 ~ $N
             limit,                      # $limit_param
         )
@@ -501,10 +503,10 @@ class memorySystem:
                 memory_id,
                 user_id, group_id, event_time, event, created_at,
                 category, importance, credibility, access_count,
-                pgroonga_score(tableoid, ctid)               AS ft_score,
+                pgroonga_score(tableoid, ctid) AS ft_score,
                 ROW_NUMBER() OVER (
                     ORDER BY pgroonga_score(tableoid, ctid) DESC
-                )                                            AS ft_rank
+                )                              AS ft_rank
             FROM atri_memory
             WHERE TRUE
                 {ft_extra}
@@ -557,12 +559,12 @@ class memorySystem:
                             ELSE                     0.0077
                           END
                         * GREATEST(
-                            (EXTRACT(EPOCH FROM NOW()) - COALESCE(event_time, EXTRACT(EPOCH FROM created_at)::bigint))
+                            (FLOOR(EXTRACT(EPOCH FROM NOW()))::bigint - COALESCE(event_time, created_at))
                             / 86400.0,
                             0
                           )
                     )
-                )                                                AS hybrid_score
+                )  AS hybrid_score
             FROM merged
         )
         SELECT *
@@ -596,11 +598,7 @@ class memorySystem:
                 self.logger.error(f"hybrid_recall 降级查询也失败: {e2}")
                 return []
 
-        results = [dict(r) for r in rows] if rows else []
+        if update_stats and rows:
+            await self.vector_store.batch_update_access_stats([r["memory_id"] for r in rows if r.get("memory_id")])
 
-        if update_stats and results:
-            ids = [r["memory_id"] for r in results if r.get("memory_id")]
-            if ids:
-                await self.vector_store.batch_update_access_stats(ids)
-
-        return results
+        return rows

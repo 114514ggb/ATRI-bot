@@ -283,7 +283,7 @@ class BotFramework:
         
         #处理模型响应
         container.register(
-            "LLMsupervisor",
+            "LLMSupervisor",
             LLMCoordinator()
         )
         
@@ -338,6 +338,7 @@ class BotFramework:
                 result = handler()
                 if isawaitable(result):
                     await result
+                self.logger.debug(f"资源已关闭:{name}")
             except Exception as e:
                 self.logger.exception(f"关闭资源失败 [{name}]: {e}")
 

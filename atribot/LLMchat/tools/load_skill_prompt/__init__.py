@@ -5,7 +5,7 @@ from atribot.LLMchat.skills.skills_manager import SkillsManager
 
 tool_json = {
     "name": "load_skill_prompt",
-    "description": "根据技能名称加载对应 skill.md 提示词，或读取该技能目录下相对路径文本文件的内容。适合按需补充技能说明、附加文档或脚本文本。",
+    "description": "根据技能名称加载对应skill.md提示词,或读取该技能目录下相对路径文本文件的内容。适合按需补充技能说明、附加文档或脚本文本",
     "properties": {
         "skill_name": {
             "type": "string",
@@ -13,7 +13,7 @@ tool_json = {
         },
         "relative_path": {
             "type": "string",
-            "description": "可选。要读取的技能目录下相对文件路径，例如 `docs/readme.md` 或 `scripts/example.py`。不填时默认读取该技能的 skill.md 提示词。"
+            "description": "可选。要读取的技能目录下相对文件路径,例如`docs/readme.md`或`scripts/example.py`不填时默认读取该技能的skill.md提示词"
         }
     }
 }

@@ -16,7 +16,7 @@
 | `database` | `atriAsyncPostgreSQL` | 需 `async with` 使用 |
 | `SendMessage` | `QQAPIClient` | |
 | `LLMSupplier` | `LLMConnectionManager` | |
-| `LLMsupervisor` | `LLMCoordinator` | 注意小写 `s` |
+| `LLMSupervisor` | `LLMCoordinator` ||
 | `CommandSystem` | `CommandSystem` | |
 | `memorySystem` | `memorySystem` | |
 | `SandBox` | `DockerSandbox` | 初始化可能失败，使用前调用 `container.exists("SandBox")` |

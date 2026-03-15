@@ -25,7 +25,7 @@ async def main():
     try:
         framework = await BotFramework.create()
     finally:
-        if framework is not None:
+        if framework:
             await framework.graceful_shutdown()
 
 

@@ -98,7 +98,7 @@ CREATE TABLE message (
         ON DELETE SET NULL ON UPDATE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS chat_context (
+CREATE TABLE chat_context (
     context_id BIGSERIAL PRIMARY KEY,
     user_id BIGINT,
     group_id BIGINT,
@@ -122,14 +122,14 @@ CREATE TABLE atri_memory (
     user_id BIGINT,
     group_id BIGINT,
     event_time BIGINT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::bigint,
     event TEXT,
     event_vector VECTOR(1024),
     category memory_category NOT NULL DEFAULT 'fact',
     importance SMALLINT NOT NULL DEFAULT 5 CHECK (importance BETWEEN 1 AND 10),
     credibility SMALLINT NOT NULL DEFAULT 5 CHECK (credibility BETWEEN 1 AND 10),
     access_count INT NOT NULL DEFAULT 0,
-    last_accessed TIMESTAMP,
+    last_accessed BIGINT,
     CONSTRAINT uq_user_event_hash UNIQUE (user_id, event),
     CONSTRAINT chk_quality_both_set CHECK (
         (importance IS NOT NULL AND credibility IS NOT NULL)
@@ -154,7 +154,7 @@ CREATE INDEX idx_atri_memory_knowledge
     WHERE user_id IS NULL;
 CREATE INDEX idx_atri_memory_group
     ON atri_memory (group_id, event_time DESC)
-    WHERE group_id IS NOT NULL AND group_id != 0;
+    WHERE group_id IS NOT NULL;
 CREATE INDEX idx_atri_memory_event_pgroonga ON atri_memory USING pgroonga (event);
 
 CREATE OR REPLACE FUNCTION update_timestamp_func()
@@ -196,8 +196,10 @@ COMMENT ON TABLE chat_context IS '聊天的上下文缓存表';
 COMMENT ON TABLE atri_memory IS '记忆表：存储用户记忆、群聊话题及知识库条目，支持向量检索与全文检索';
 
 COMMENT ON COLUMN atri_memory.user_id IS 'NULL=知识库条目；有值=用户相关记忆';
-COMMENT ON COLUMN atri_memory.group_id IS 'NULL=知识库；0=私聊；正整数=群聊ID';
+COMMENT ON COLUMN atri_memory.group_id IS 'NULL=私聊或知识库；正整数=群聊ID';
 COMMENT ON COLUMN atri_memory.event_time IS '记忆对应的事件发生时间，Unix时间戳（秒）';
+COMMENT ON COLUMN atri_memory.created_at IS '记忆写入数据库的时间，Unix时间戳（秒）';
+COMMENT ON COLUMN atri_memory.last_accessed IS '最后一次被检索命中的时间，Unix时间戳（秒）';
 COMMENT ON COLUMN atri_memory.importance IS '重要度1~10：1~3日常闲聊；4~6有价值信息；7~9重要个人信息；10极其重要';
 COMMENT ON COLUMN atri_memory.credibility IS '可信度1~10：取代source字段，综合表达信息的可靠程度';
 COMMENT ON COLUMN atri_memory.access_count IS '检索命中次数，高频记忆可在排序时获得额外加权';

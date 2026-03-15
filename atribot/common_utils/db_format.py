@@ -8,6 +8,7 @@ from asyncpg import Record
 
 
 def _ts(ts: int | float | None) -> str:
+    """将时间戳格式化为可读字符串"""
     return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S") if ts else "None"
 
 

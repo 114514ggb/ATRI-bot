@@ -32,10 +32,10 @@ class VectorStoreBasics(ABC):
         """存储到记忆表"""
         pass
     
-    # @abstractmethod
-    # async def batch_storage(self)->None:
-    #     """批量存储到记忆表"""
-    #     pass
+    @abstractmethod
+    async def batch_add_memories(self):
+        """批量存储到记忆表"""
+        pass
     
     @abstractmethod
     async def query_memories(self):
@@ -119,7 +119,6 @@ class MemoryVectorStore(VectorStoreBasics):
         Args:
             args: 包含记忆数据的元组
         """
-        uid, gid, et, ev, vec, cat, imp, cred = args
         sql = """
             INSERT INTO atri_memory
                 (user_id, group_id, event_time, event, event_vector,
@@ -127,7 +126,7 @@ class MemoryVectorStore(VectorStoreBasics):
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         """
         async with self.vector_database as db:
-            await db.execute_with_pool(sql, (uid, gid, et, ev, vec, cat, imp, cred))
+            await db.execute_with_pool(sql, args)
 
     async def add_to_knowledge_base(
         self,
@@ -170,7 +169,7 @@ class MemoryVectorStore(VectorStoreBasics):
         sql = """
             UPDATE atri_memory
             SET access_count = access_count + 1,
-                last_accessed = CURRENT_TIMESTAMP
+                last_accessed = EXTRACT(EPOCH FROM NOW())::bigint
             WHERE memory_id = $1
         """
         async with self.vector_database as db:
@@ -187,7 +186,7 @@ class MemoryVectorStore(VectorStoreBasics):
         sql = """
             UPDATE atri_memory
             SET access_count = access_count + 1,
-                last_accessed = CURRENT_TIMESTAMP
+                last_accessed = EXTRACT(EPOCH FROM NOW())::bigint
             WHERE memory_id = ANY($1::bigint[])
         """
         async with self.vector_database as db:

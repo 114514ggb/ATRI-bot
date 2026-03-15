@@ -1,7 +1,7 @@
 # db/Dockerfile
 FROM postgres:18
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --fix-missing \
     curl \
     ca-certificates \
     gnupg \
@@ -18,7 +18,7 @@ RUN . /etc/os-release && \
     | gpg --dearmor -o /usr/share/keyrings/groonga-archive-keyring.gpg && \
     sh -c "echo 'deb [signed-by=/usr/share/keyrings/groonga-archive-keyring.gpg] https://packages.groonga.org/debian/ ${VERSION_CODENAME} main' > /etc/apt/sources.list.d/groonga.list"
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --fix-missing \
     git \
     make \
     gcc \

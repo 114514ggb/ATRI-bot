@@ -130,12 +130,11 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
             args = params or ()
             
             if fetch_type == "one":
-                return await conn.fetchrow(query, *args)
+                return await conn.fetchrow(query, *args)#返回一行
             elif fetch_type == "all":
-                return await conn.fetch(query, *args)
+                return await conn.fetch(query, *args)#返回里面有行的列表
             else:
-                await conn.execute(query, *args)
-                return True
+                return await conn.execute(query, *args)#返回执行后的结果的状态字符串
                 
         except (UniqueViolationError, ForeignKeyViolationError) as e:
             self.log.error(f"数据库约束冲突: {e}")
