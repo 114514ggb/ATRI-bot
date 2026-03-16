@@ -1,4 +1,4 @@
-﻿<img src=".\assets\ATRI-bot.png" width = "400" height = "400" alt="ATRI-bot" align=right />
+﻿<img src="./assets/ATRI-bot.png" width = "400" height = "400" alt="ATRI-bot" align="right" />
 <div align="center">
 
 <p align="right">
@@ -12,7 +12,7 @@
 
 # ATRI-bot
 
->_时间流逝吧，你是多么的残酷；时间停止吧，你是多么的美丽_
+> _时间流逝吧，你是多么的残酷；时间停止吧，你是多么的美丽_
 >
 > — *𝓐𝓣𝓡𝓘 -𝓜𝔂 𝓓𝓮𝓪𝓻 𝓜𝓸𝓶𝓮𝓷𝓽𝓼-*
 >
@@ -21,13 +21,15 @@
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg)](https://www.docker.com/)
 [![NapCat](https://img.shields.io/badge/Backend-NapCat-green.svg)](https://github.com/NapNeko/NapCatQQ)
+[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](./LICENSE)
 
 </div>
 
 ## 📖 前言
 
-来自萌新到处学习(抄袭，不对是集百家之长✨)做出来私用的神秘项目.
-主要是**按照自己的需求**编写一个专到狭窄的学习性质的项目(专注于提供一个深度定制化的群聊机器人体验),发出来是用来交流学习的.
+来自萌新到处学习(抄袭，不对是集百家之长✨)做出来私用的神秘项目
+主要是**按照自己的需求**编写一个专到狭窄的学习性质的项目(专注于提供一个深度定制化的群聊机器人体验),发出来是用来交流学习的
+你可以在里面了解到一个完整的LLM聊天的流程从工具调用到上下文管理,项目有比较清晰的结构和详细的注释
 希望这个 Bot 能像亚托莉一样成为你珍贵的伙伴(虽然现在还不是很完善)
 
 ---
@@ -42,10 +44,11 @@
 
 - **全异步高并发**：回复流程完全异步，支持多供应商 Key 池轮询，多群并发场景下也能稳定运行。
 - **结构化决策输出**：模型以 JSON 格式返回结构化决策（回复 / 更新画像 / 静默 / 调用工具），行为完全可控且易于扩展。
-- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词技能(未完全支持Skills)。
+- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词技能。
 - **两级记忆系统**：
   - *短期*：每个群 / 用户维护独立的滑动上下文窗口，超限时由 LLM 自动压缩摘要、无损续接。
-  - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让Bot有个比较可靠的长期记忆。
+  - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让 Bot 有个比较可靠的长期记忆。
+  (但是只能记住一些发生的事情，不能做到直接记住很长的文档什么的，对于聊天来说够用了)
 - **用户画像**：为每位用户维护称呼、关系、性格、偏好等画像文档，嵌入每次对话上下文，保证跨会话态度一致。
 - **高可用降级**：主模型 API 出现异常时，自动按配置顺序切换到备用供应商和模型，保证有问必达。
 - **拟人化交互**：
@@ -87,17 +90,17 @@
     [pgvector 项目地址](https://github.com/pgvector/pgvector)
     [PGroonga 文档](https://pgroonga.github.io/)
 3.  **数据库初始化**：
-    项目提供了初始化 SQL 文件：`assets\PostgreSQL基础.sql`（开发版）和 `docker\db\info.sql`（Docker 初始化版）。
+    项目提供了初始化 SQL 文件：`assets/PostgreSQL基础.sql`（开发版）和 `docker/db/info.sql`（Docker 初始化版）。
     进入数据库（Linux 示例）：
     ```bash
     sudo -u postgres psql
     ```
     然后按顺序执行对应 SQL 文件创建表结构。
 
-
 ### 3. 模型与环境配置
+
 #### 🤖 嵌入模型 (Embedding)
-推荐优先使用本地的 `Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API(opneAI格式的兼容)，只是仓库里目前主要按 Ollama 的使用方式测试过。
+推荐优先使用本地的 `Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API（OpenAI 格式兼容），只是仓库里目前主要按 Ollama 的使用方式测试过。
 推荐使用 [Ollama](https://ollama.com/) 进行本地部署：
 ```bash
 ollama run Qwen3-Embedding-0.6B:F16
@@ -105,11 +108,10 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 > **注意**：如果更换 Embedding 模型，之前构建的向量数据需要重新构建。
 
-
 #### 🗣️ 语音合成 (TTS) - 可选
 支持接入 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)。
 实现 Bot 主动发送语音或通过命令调用语音功能，可以设置语速、情感等常用参数；当然前提是你已经准备好了自己的语音模型。  
-使用前需要修改 `atribot\commands\audio\TTS.py` 中的参考音频路径，以及 GPT-SoVITS 接口端口地址。  
+使用前需要修改 `atribot/commands/audio/TTS.py` 中的参考音频路径，以及 GPT-SoVITS 接口端口地址。  
 ```json
 {
     "这里是对应的情感": {
@@ -125,41 +127,39 @@ ollama run Qwen3-Embedding-0.6B:F16
 }
 ```
 
-
 #### 📦 沙盒环境 (sandbox) - 可选
 
 为 AI 模型配备了默认的**代码沙盒环境**，使其能够安全地执行用户请求或自主生成的代码片段。当前实现基于 **Docker** 🐳沙盒，支持运行 Python 等语言的代码，可用于代码解释、数据计算等场景。
 
-- **扩展性**：如需支持其他类型的沙盒（如 Web 沙盒、系统命令沙盒），可继承 `atribot\LLMchat\sandbox\sandbox_base.py` 中的基类并实现相应接口。
-- **文件操作**：支持了在ai上下文中看见的文件可以放到python环境中对文件进行简单处理
-
+- **扩展性**：如需支持其他类型的沙盒（如 Web 沙盒、系统命令沙盒），可继承 `atribot/LLMchat/sandbox/sandbox_base.py` 中的基类并实现相应接口。
+- **文件操作**：AI 上下文中能够看到的文件可以放到 Python 环境中进行简单处理。
 
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
-1.  参考 `assets\如何配置配置文件.py` 了解配置详情。
-2.  配置 `supplier_config.json` (模型供应商配置)。
-3.  配置 `config.json` (项目基础配置)。
-4.  **MCP 配置**：默认路径在 `atribot\LLMchat\MCP\mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用。
-5.  **skills 文件夹**：默认路径在 `atribot\LLMchat\skills\agent_skills`
-6.  根目录 `document\` 下可按项目结构放置音频、表情包等资源文件
-7.  关于bot发送的表情包需要在`document\img\emojis`文件夹下新建**文件名代表内部表情的文件夹**然后里面放上对应文件夹名称的表情包的图片(支持:'.jpg', '.jpeg', '.png', '.gif')然后LLM会在聊天中自然发送了(没有的表情包话可以来找我)
+1.  将 `config copy.json` 重命名为 `config.json` 并配置。
+2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置(模型供应商配置)。
+3.  **MCP 配置**：默认路径在 `atribot/LLMchat/MCP/mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用。
+4.  **Skills 文件夹**：默认路径在 `atribot/LLMchat/skills/agent_skills`。
+5.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
+6.  **表情包**：在 `document/img/emojis` 文件夹下新建**文件名代表内部表情的文件夹**，放入对应名称的图片（支持 .jpg, .jpeg, .png, .gif），LLM 即可在聊天中自然发送。
+
 
 ### 4. 启动项目
 项目依赖 **Python 3.13** 环境，推荐使用 `uv` 管理依赖。
 
 **使用 uv (推荐):**
-先进入项目根目录
 ```bash
+# 进入项目根目录
 uv sync
 uv run main.py
 ```
 
 **使用 pip:**
+Linux / macOS 请分别使用 `requirements-linux.txt`、`requirements-macos.txt`。
 ```bash
 pip install -r requirements-windows.txt
 python main.py
 ```
-Linux / macOS 请分别使用 `requirements-linux.txt`、`requirements-macos.txt`。
 
 > ⚠️ **重要**：请务必在项目根目录执行启动命令，否则可能出现路径解析错误。
 
@@ -170,12 +170,13 @@ Linux / macOS 请分别使用 `requirements-linux.txt`、`requirements-macos.txt
 
 首次使用前，至少确认两件事：
 1. `assets/supplier_config.json` 中的模型接口可用。
-2. NapCat 能连接到 `ws://宿主机IP:8888/websocket?access_token=你的token`，或者你按需改 `.env` / Compose 里的端口和 token。
+2. NapCat 能连接到 `ws://宿主机IP:8888/websocket?access_token=你的token`。
 
-推荐先复制一份环境变量文件：
+**推荐先复制一份环境变量文件：**
 ```bash
 cp .env.docker.example .env
 ```
+> **注意**：请检查 `.env` 文件中的端口与 Token 设置，确保与 NapCat 配置一致。
 
 然后直接启动：
 ```bash
@@ -384,8 +385,13 @@ memorySystem.extract_stored_group_message()
 
 ## 🤝 参与贡献
 
-欢迎提交 Issue、PR，或者直接提出改进建议(我个人用的项目真的有人会提交吗)
-无论是修 Bug、补文档、优化架构，还是扩展新能力，都非常欢迎
+欢迎提交 Issue、PR，或者直接提出改进建议。
+无论是修 Bug、补文档、优化架构，还是扩展新能力，都非常欢迎。
+
+## 📄 开源协议
+
+本项目遵循 **GNU General Public License v3.0 (GPLv3)** 协议。
+详情请参阅 [LICENSE](./LICENSE) 文件。
 
 ---
 
@@ -397,5 +403,3 @@ _私は、高性能ですから!_
 
 ❤️ ATRI-bot ❤️
 </div>
-
-

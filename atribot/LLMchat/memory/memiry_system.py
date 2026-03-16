@@ -90,18 +90,17 @@ class memorySystem:
         group_topic: Dict = result.get("group_topic", {})
         if group_topic and group_topic.get("event"):
             topic_text = group_topic["event"]
-            if len(event_text) > 2:
+            if len(topic_text) > 2:
                 try:
                     timestamp = int(datetime.strptime(group_topic.get("occurrence_time"), "%Y-%m-%d %H:%M:%S").timestamp())
                 except (ValueError, TypeError):
                     timestamp = int(datetime.now().timestamp())
-                topic_embeddings = await self.rag.calculate_embedding([topic_text])
-                if topic_embeddings:
+                if topic_embeddings := await self.rag.calculate_embedding(topic_text):
                     args_list.append((
                         None,
                         group_id,
                         timestamp,
-                        group_topic["event"],
+                        topic_text,
                         str(topic_embeddings[0]),
                         "group_topic",
                         int(group_topic.get("importance", 5)),
