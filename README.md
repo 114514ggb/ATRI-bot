@@ -12,7 +12,7 @@
 
 # ATRI-bot
 
-> _时间流逝吧，你是多么的残酷；时间停止吧，你是多么的美丽_
+>_時よ止まれ、おまえは美しい_
 >
 > — *𝓐𝓣𝓡𝓘 -𝓜𝔂 𝓓𝓮𝓪𝓻 𝓜𝓸𝓶𝓮𝓷𝓽𝓼-*
 >
@@ -29,14 +29,22 @@
 
 来自萌新到处学习(抄袭，不对是集百家之长✨)做出来私用的神秘项目
 主要是**按照自己的需求**编写一个专到狭窄的学习性质的项目(专注于提供一个深度定制化的群聊机器人体验),发出来是用来交流学习的
-你可以在里面了解到一个完整的LLM聊天的流程从工具调用到上下文管理,项目有比较清晰的结构和详细的注释
-希望这个 Bot 能像亚托莉一样成为你珍贵的伙伴(虽然现在还不是很完善)
+你可以在里面了解到以下这些技术实践：
+
+- **完整的 LLM 聊天全链路**：从提示词构建、Function Calling、MCP 工具调用，到结构化 JSON 决策解析
+- **两级记忆系统**：短期滑动上下文 + LLM 压缩摘要，以及基于 pgvector 的长期向量记忆
+- **混合检索（Hybrid RAG）**：向量检索 + 全文检索（pgroonga）双路召回，RRF 融合 + 时间衰减评分
+- **依赖注入架构**：基于单例 `DIContainer` 的服务解耦与管理，全异步设计
+
+项目结构清晰，核心链路注释详细，适合想了解「如何从零搭建一个 LLM Bot」的同学参考
+
+- [ATRI-bot官网:亚托莉.top](https://亚托莉.top/)
 
 ---
 
 ## ✨ 项目核心功能
 
-一个基于 **NapCat** 对接、专注于群聊场景的 QQ Bot，所有能力均围绕群聊深度定制。
+一个基于 **NapCat** 对接、专注于群聊场景的 QQ Bot，所有能力均围绕群聊深度定制
 
 ### 🧠 深度 LLM 聊天集成
 
@@ -48,7 +56,7 @@
 - **两级记忆系统**：
   - *短期*：每个群 / 用户维护独立的滑动上下文窗口，超限时由 LLM 自动压缩摘要、无损续接。
   - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让 Bot 有个比较可靠的长期记忆。
-  (但是只能记住一些发生的事情，不能做到直接记住很长的文档什么的，对于聊天来说够用了)
+  > 注：长期记忆聚焦于对话中的事件与偏好，不适用于存储长文档，对于聊天场景下已足够实用。
 - **用户画像**：为每位用户维护称呼、关系、性格、偏好等画像文档，嵌入每次对话上下文，保证跨会话态度一致。
 - **高可用降级**：主模型 API 出现异常时，自动按配置顺序切换到备用供应商和模型，保证有问必达。
 - **拟人化交互**：
@@ -77,8 +85,8 @@
 
 ### 1. 前端连接 (NapCat)
 首先需要一个能够与 QQ 通信的前端，推荐使用 NapCat：
-[NapCat 安装指南](https://napneko.github.io/guide/napcat)
-[NapCat 项目地址](https://github.com/NapNeko/NapCatQQ)
+- [NapCat 安装指南](https://napneko.github.io/guide/napcat)
+- [NapCat 项目地址](https://github.com/NapNeko/NapCatQQ)
 > *注：你也可以自己实现前端，只要能对接上即可。*
 
 ### 2. 数据库配置 (PostgreSQL)
@@ -137,7 +145,11 @@ ollama run Qwen3-Embedding-0.6B:F16
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
 1.  将 `config copy.json` 重命名为 `config.json` 并配置。
-2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置(模型供应商配置)。
+2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置）。
+    ```bash
+    cp "assets/config copy.json" assets/config.json
+    cp "assets/supplier_config copy.json" assets/supplier_config.json
+    ```
 3.  **MCP 配置**：默认路径在 `atribot/LLMchat/MCP/mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用。
 4.  **Skills 文件夹**：默认路径在 `atribot/LLMchat/skills/agent_skills`。
 5.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
