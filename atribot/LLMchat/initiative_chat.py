@@ -19,11 +19,11 @@ class initiativeChat:
     
     async def decision(self, message: ChatMessage, group_context:GroupContext, at: bool = False) -> bool:
         """决策是否应该发言"""
-        if not message.segments:
-            return False
-
-        # if not message.pure_text:#你不输入文本内容在那里@什么呢
+        # if not message.segments:
         #     return False
+
+        if not message.pure_text:#你不输入文本内容在那里@什么呢
+            return False
 
         group_id: int = message.group_id
         user_id: int = message.user_id
