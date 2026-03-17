@@ -292,11 +292,11 @@ class build_prompt:
             "<output_requirement>"
             """
 **可用的decision**
-参数:reply
-功能描述:对一条消息进行回复或是主动发言,可以自然的顺着正在进行的聊天内容进行回复或直接发送消息,可以在其中添加[CQ:at,qq=user_id]@某人
+参数:speak
+功能描述:在群里发送消息,可以在其中添加[CQ:at,qq=user_id]@某人
 {
-    "decision":"reply",
-    "target_message_id":"想要引用的消息id,可以不引用",
+    "decision":"speak",
+    "reply_message_id":"可选,引用看到的消息id",
     "reason":"做出此决策的原因",
     "content":"将解析发送给群内的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送到群聊中,除非太长"
 }
@@ -320,8 +320,8 @@ class build_prompt:
 规则:
 decision:string,多选一,必填
 reason:string,必填 
-target_message_id:integer,reply时选填
-content:list[str],reply 时必填；其它决策禁止出现
+reply_message_id:integer,speak时选填
+content:list[str],speak 时必填；其它决策禁止出现
 user_id:integer,update时选填
 update_field:dict[str,any],update时必填,其它决策禁止出现
 
@@ -333,14 +333,14 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 5.如果有人对你进行攻击，或者情绪激动，请无视或劝阻，不要骂人
 
 输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON.
-JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对应值list里可以使用同一个decision或不同decision。
+JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。
 <example>
 <think>
 //让我来分析一下当前情况，这是自己对当前情况下做出的一些思考或是一些自己的理解和想法
 </think>
 ```json
 {
-    "return":[
+    "actions":[
         {
             "decision":"按照要求的参数值",
             //要求参数
@@ -352,7 +352,7 @@ JSON里要求是包含"return"键及其对应的JSON列表,JSON列表return对�
     ]
 }
 ```
-请根据情况给出你的decision,不能用decision来调用tool
+请根据情况给出你的decision的JSON,不能用decision来调用tool
 </example>
 """
             "</output_requirement>"

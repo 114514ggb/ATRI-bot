@@ -72,7 +72,6 @@ WHERE m.group_id = 936819059
 GROUP BY m.group_id, g.group_name, m.user_id, u.nickname
 ORDER BY "次数" DESC;
 
-
 SELECT
     m.group_id                     AS "群号",
     g.group_name                   AS "群名",
@@ -84,10 +83,23 @@ FROM message m
 JOIN users      u ON u.user_id = m.user_id
 JOIN user_group g ON g.group_id = m.group_id
 CROSS JOIN LATERAL
-      (SELECT array_length(regexp_matches(m.message_content, '亚托莉', 'g'), 1) AS cnt) AS t
+      (SELECT array_length(regexp_matches(m.message_content, '\[CQ:at,qq=168238719\]', 'g'), 1) AS cnt) AS t
+WHERE m.time >= EXTRACT(EPOCH FROM (CURRENT_DATE - INTERVAL '30 days'))
 GROUP BY m.group_id, g.group_name, m.user_id, u.nickname
 ORDER BY "次数" DESC;
 
+SELECT
+    m.user_id                      AS "用户ID",
+    u.nickname                     AS "昵称",
+    SUM(t.cnt)                     AS "次数",
+    DENSE_RANK() OVER (ORDER BY SUM(t.cnt) DESC) AS "名次"
+FROM message m
+JOIN users      u ON u.user_id = m.user_id
+CROSS JOIN LATERAL
+      (SELECT array_length(regexp_matches(m.message_content, '\[CQ:at,qq=168238719\]', 'g'), 1) AS cnt) AS t
+WHERE m.time >= EXTRACT(EPOCH FROM (CURRENT_DATE - INTERVAL '30 days'))::bigint
+GROUP BY m.user_id, u.nickname
+ORDER BY "次数" DESC;
 
 
 -- 查询数据库中所有表的大小，并按大小降序排列

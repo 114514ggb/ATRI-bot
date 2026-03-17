@@ -147,7 +147,7 @@ class FaceSegment(MessageSegment):
         return {"id": self.face_id}
     
     def __str__(self) -> str:
-        return "[CQ:face]"
+        return f"[CQ:face,id={self.face_id}]"
 
 
 class ReplySegment(MessageSegment):

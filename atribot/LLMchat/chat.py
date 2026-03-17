@@ -135,7 +135,7 @@ class GroupChat(chat_baseics):
         )
         
         self.decision_function:Dict[str,Coroutine[Dict]] = {
-            "reply" : self.reply_conduct,
+            "speak" : self.reply_conduct,
             "update" : self.update_conduct,
             "silence" : self.silence_conduct,
             "use_tools" : self.use_tools_conduct,
@@ -198,7 +198,7 @@ class GroupChat(chat_baseics):
             
             if isinstance(response_json, dict):
                 
-                for response_json in response_json.get("return",[]):
+                for response_json in response_json.get("actions",[]):
                     
                     response_json:dict[str: str|int]
                     if decision := response_json.get("decision"):
@@ -404,9 +404,9 @@ class GroupChat(chat_baseics):
         
         await self.send_reply_message_separator(
             chat_text_list = response_json.get("content",[]),
-            message_id = response_json.get("target_message_id"),
+            message_id = response_json.get("reply_message_id"),
             group_id = group_id,
-            since_llm = since
+            since_llm = since,
         )
     
     async def update_conduct(self, response_json:Dict, message:ChatMessage)->None:
@@ -541,6 +541,7 @@ class GroupChat(chat_baseics):
             chat_text_list (List[str]): 要解析发送的文本list
             group_id (int): 群号
             message_id (int): 回复引用消息的id
+            trigger_message_id (int): 触发回复的消息id
             since_llm (float): 距离上一次llm发言时间
         """
         MESSAGE_DELAY = 1.5  # 多条消息间隔时间
