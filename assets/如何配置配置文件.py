@@ -82,7 +82,7 @@
             },
             {
                 "supplier":"bigModel",
-                "model_name":"GLM-4.5-Flash"
+                "model_name":"GLM-4.6-Flash"
             }
         ],
         "RAG":{#对模型提供记忆搜索支持的嵌入式模型

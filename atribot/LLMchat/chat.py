@@ -71,7 +71,7 @@ class chat_baseics(ABC):
         self.image_classifier_supplier:universal_ai_api = self.supplier.connections[
             self.config.model.detection_image.supplier
         ].connection_object
-        self.image_classifier_model:str = self.config.model.detection_image.supplier.model_name
+        self.image_classifier_model:str = self.config.model.detection_image.model_name
 
     @abstractmethod
     async def step(self) -> None:
