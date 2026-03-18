@@ -25,7 +25,6 @@ from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
-from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 from atribot.LLMchat.skills.skills_manager import SkillsManager
@@ -99,29 +98,6 @@ class BotFramework:
             "LLMSupplier",
             LLMSupplier
         )
-        bigModel = AsyncBigModelApi()
-        await bigModel.initialize()
-        LLMSupplier.add_connection(
-            name = "bigModel",
-            connection_object = bigModel,
-            model_dict = {
-                "GLM-4.5-Flash": {
-                    "visual_sense": False
-                },
-                "GLM-4.6V-Flash": {
-                    "visual_sense": True
-                },
-                "GLM-4V-Flash": {
-                    "visual_sense": True
-                },
-                "GLM-4.1V-Thinking-Flash": {
-                    "visual_sense": True
-                },
-                "GLM-Z1-Flash": {
-                    "visual_sense": False
-                }
-            }
-        )
         self.register_shutdown_handler("LLMSupplier", LLMSupplier.close)
         
         #Skills的管理
@@ -184,9 +160,6 @@ class BotFramework:
         #启动时间触发器的主循环
         await TriggerSupervisor.start()
 
-        # ── 阶段一：注册 WebSocket 连接对象 ──────────────────────────────────────
-        # QQAPIClient 在 WS 模式下 __init__ 时会直接从容器获取 WebSocket，
-        # 因此必须在 _init_messaging_services() 之前完成注册。
         server_type: str = self.config.network.connection_type
         if server_type == "WebSocket_server":
             ws = WebSocketServer(
@@ -206,42 +179,37 @@ class BotFramework:
         elif server_type != "http":
             raise ValueError(f"不支持的连接类型: {server_type}")
 
-        # ── 阶段二：初始化依赖 WebSocket 的消息服务及上层应用 ────────────────────
         self._init_messaging_services()
-
-        # ── 阶段三：启动网络连接，开始收发消息 ───────────────────────────────────
+        
         await self._start_network(server_type)
 
     def _init_messaging_services(self) -> None:
-        """初始化消息发送及依赖它的上层应用服务。
-
-        前置依赖（WS 模式）：WebSocket 对象必须已注册到容器，
-        因为 QQAPIClient 在 __init__ 时会立即从容器获取 WebSocket 单例。
-
-        注册顺序：SendMessage → CommandSystem → CommandLoader → LLMSupervisor → GroupChat
-        """
-        send_message = QQAPIClient(
+        """发送消息以及相关的依赖"""
+        container.register(
+            "SendMessage", 
+            QQAPIClient(
             token=self.config.network.access_token,
             http_base_url=self.config.network.url,
-            connection_type=self.config.network.connection_type,
+            connection_type=self.config.network.connection_type,)
         )
-        container.register("SendMessage", send_message)
 
-        # 指令系统（__init__ 时依赖 SendMessage、PermissionsManagement）
+        #指令
         container.register("CommandSystem", CommandSystem())
+        
+        #指令加载器
         container.register("CommandLoader", command_loader(self.config.file_path.commands))
 
-        # LLM 协调与对话（GroupChat.__init__ 依赖几乎所有已注册服务）
+        #处理模型响应
         container.register("LLMSupervisor", LLMCoordinator())
+        
+        #AIchat
         container.register("GroupChat", GroupChat())
 
     async def _start_network(self, server_type: str) -> None:
-        """根据连接类型启动网络服务并开始消息监听。所有服务应在此前初始化完毕。"""
+        """根据连接类型启动网络服务并开始消息监听"""
         if server_type == "WebSocket_server":
             ws: WebSocketServer = container.get("WebSocket")
             ws.add_listener(message_router().main)
-            # start() 内含无限循环，需以后台任务运行；
-            # wait_for_connection() 等待 NapCat 首次接入后返回，再持续阻塞在任务上。
             ws_task = self.create_background_task(ws.start())
             await ws.wait_for_connection()
             await ws_task
@@ -251,7 +219,7 @@ class BotFramework:
             ws_client.add_listener(message_router().main)
             await ws_client.start()
 
-        else:  # http
+        elif server_type == "http":
             _message_router = message_router()
             app = FastAPI()
 
@@ -269,6 +237,8 @@ class BotFramework:
             )
             server = uvicorn.Server(uvicorn_app)
             await server.serve()
+        else:
+            raise ValueError(f"启动连接的时候接收了错误的连接类型:{server_type}")
 
     def register_shutdown_handler(
         self,

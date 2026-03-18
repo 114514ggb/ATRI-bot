@@ -1,6 +1,5 @@
 import asyncio
 from contextvars import ContextVar, Token
-from logging import Logger
 from typing import List, Optional, Tuple
 
 import asyncpg
@@ -8,7 +7,6 @@ from asyncpg import Record
 from asyncpg.exceptions import ForeignKeyViolationError, UniqueViolationError
 
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
-from atribot.core.service_container import container
 
 
 class AsyncPostgreSQL(AsyncDatabaseBase):
@@ -20,7 +18,7 @@ class AsyncPostgreSQL(AsyncDatabaseBase):
     _context_token: ContextVar[Optional[Token]] = ContextVar('token', default=None)
 
     def __init__(self):
-        self.log: Logger = container.get("log")
+        super().__init__()
     
     @classmethod
     async def create(

@@ -30,7 +30,7 @@ from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
-from atribot.LLMchat.model_api.bigModel_api import AsyncBigModelApi
+from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.skills.skills_manager import SkillsManager
 
@@ -67,9 +67,11 @@ class chat_baseics(ABC):
         self.config = container.get("config")
         self.log: Logger = container.get("log")
         self.build_prompt = build_prompt()
-        self.bigModel: AsyncBigModelApi = self.supplier.connections[
-            "bigModel"
+        
+        self.image_classifier_supplier:universal_ai_api = self.supplier.connections[
+            self.config.model.detection_image.supplier
         ].connection_object
+        self.image_classifier_model:str = self.config.model.detection_image.supplier.model_name
 
     @abstractmethod
     async def step(self) -> None:
@@ -83,11 +85,11 @@ class chat_baseics(ABC):
     async def send_reply_message_separator(self) -> None:
         """模型响应结束最终回复的阶段"""
 
-    async def image_processing(self, image_urls: list) -> str:
+    async def image_processing(self, image_url: str) -> str:
         """为不支持图片的model提供图片解析服务，支持多图片最大解析数量为5,
 
         Args:
-            image_urls:包含链接的图像列表
+            image_url:图像链接
 
         Returns:
             图片描述文本，如果没有图片则没有返回
@@ -95,24 +97,21 @@ class chat_baseics(ABC):
         Raises:
             可能抛出网络请求或图片处理相关的异常
         """
-        try:
-            descriptions = await asyncio.gather(
-                *(
-                    self.bigModel.get_image_recognition(url, file_path=False)
-                    for url in image_urls[:5]
-                )
-            )
-
-        except Exception as e:
-            return f"user传入图片处理过程中发生错误: {str(e)}"
-
-        self.log.info(descriptions)
-
-        return "\n".join(
-            f"<image index={idx + 1}>\n{desc}</image>"
-            for idx, desc in enumerate(descriptions)
+        return_dict =await self.image_classifier_supplier.generate_text_lightweight(
+            model = self.image_classifier_model,
+            messages = [{
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": image_url}},
+                    {"type": "text", "text": "请详细描述你看到的东西,上面是什么有什么在什么地方，如果上面有文字也要详细说清楚,如果有什么自己的理解可以说出来，如果上面是什么你认识的可以介绍一下"}
+                ]
+            }]
         )
-
+        
+        try:
+            return return_dict['choices'][0]['message']['content']
+        except Exception: 
+            raise ValueError(f"识图出现错误:{return_dict}")
 
 class GroupChat(chat_baseics):
     """处理群聊天"""
@@ -339,7 +338,7 @@ class GroupChat(chat_baseics):
         else:
             async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""
-                message_builder.add_text(await self.image_processing([message.url]))
+                message_builder.add_text(await self.image_processing(message.url))
 
         async def append_segments(segments) -> None:
             """用来统一处理对各种不同类型的消息段的加入"""

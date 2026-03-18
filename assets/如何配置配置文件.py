@@ -48,7 +48,10 @@
             "tool_choice": "auto"
         },
         "tavily_search_API_key":"",#一个网络搜索的api挺好用的(免费) https://docs.tavily.com/
-        "bigModel_key":"fc57c8c15fe94a83a56aa",#https://open.bigmodel.cn/ (免费)质谱模型的api_key用于视觉辅助没有的视觉的模型提供文字描述
+        "detection_image":{#用于视觉辅助,给没有的视觉的模型提供文字描述使用的模型
+            "supplier":"bigModel",
+            "model_name":"GLM-4.1V-Thinking-Flash"
+        },
         "memory":{#总结群聊天内容做为模型记忆的模型
             "summarize_model":{
                 "supplier":"zaxprisのapi",
@@ -142,6 +145,25 @@
                 },
                 "deepseek-reasoner": {
                     "visual_sense": False
+                }
+            }
+        },
+        {
+            "name":"bigModel",
+            "base_url":"https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            "api_key":"???",#https://open.bigmodel.cn/ (免费)质谱模型的api_key用于视觉辅助没有的视觉的模型提供文字描述
+            "models":{
+                "GLM-4.7-Flash": {
+                    "visual_sense": False
+                },
+                "GLM-4.6V-Flash": {
+                    "visual_sense": True
+                },
+                "GLM-4-Flash-250414": {
+                    "visual_sense": True
+                },
+                "GLM-4.1V-Thinking-Flash": {
+                    "visual_sense": True
                 }
             }
         },

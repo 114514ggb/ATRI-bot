@@ -18,7 +18,7 @@ class atriAsyncMySQL(AsyncDatabaseBase):
     _context_cursor: ContextVar[Optional[aiomysql.Cursor]] = ContextVar('cursor', default=None)
     
     def __init__(self):
-        self.log: Logger = container.get("log")
+        super().__init__()
 
     
     @classmethod

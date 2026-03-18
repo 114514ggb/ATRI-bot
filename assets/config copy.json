@@ -44,7 +44,10 @@
             "tool_choice": "auto"
         },
         "tavily_search_API_key":"",
-        "bigModel_key":"",
+        "detection_image":{
+            "supplier":"bigModel",
+            "model_name":"GLM-4.1V-Thinking-Flash"
+        },
         "memory":{
             "summarize_model":{
                 "supplier":"",

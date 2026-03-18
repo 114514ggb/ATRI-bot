@@ -3,13 +3,32 @@
         {
             "name":"deepseek",
             "base_url":"https://api.deepseek.com/chat/completions",
-            "api_key":"",
+            "api_key":"sk-114514",
             "models":{
                 "deepseek-chat": {
                     "visual_sense": false
                 },
                 "deepseek-reasoner": {
                     "visual_sense": false
+                }
+            }
+        },
+        {
+            "name":"bigModel",
+            "base_url":"https://open.bigmodel.cn/api/paas/v4/chat/completions",
+            "api_key":"https://open.bigmodel.cn/ (免费)质谱模型的api_key用于视觉辅助没有的视觉的模型提供文字描述",
+            "models":{
+                "GLM-4.7-Flash": {
+                    "visual_sense": false
+                },
+                "GLM-4.6V-Flash": {
+                    "visual_sense": true
+                },
+                "GLM-4-Flash-250414": {
+                    "visual_sense": true
+                },
+                "GLM-4.1V-Thinking-Flash": {
+                    "visual_sense": true
                 }
             }
         },
