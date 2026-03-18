@@ -3,7 +3,7 @@ import time
 from logging import Logger
 from typing import Any, Optional
 
-from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import Context
 
@@ -26,7 +26,7 @@ class ContextLifecycleManager:
     
     def __init__(self, archival_after:float):
         self.logger:Logger = container.get("log")
-        self.database:atriAsyncPostgreSQL = container.get("database")
+        self.database:AsyncPostgreSQL = container.get("database")
         self.archival_after: float = archival_after
         """归档的时间，超过这个时间不活跃的会被归档"""
     

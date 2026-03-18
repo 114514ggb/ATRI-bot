@@ -11,7 +11,7 @@ from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_loader import command_loader
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.message_manage import message_router
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
@@ -80,7 +80,7 @@ class BotFramework:
         self.register_shutdown_handler("MCP", mcp_server.terminate)
         
         #数据库
-        database = await atriAsyncPostgreSQL.create(
+        database = await AsyncPostgreSQL.create(
             host = self.config.database.host, 
             user = self.config.database.user,
             port = self.config.database.port,
@@ -184,114 +184,91 @@ class BotFramework:
         #启动时间触发器的主循环
         await TriggerSupervisor.start()
 
-        #连接配置
-        server_type:str = self.config.network.connection_type
-        if server_type in ["http", "WebSocket_server"]:
-            await self.bot_side(server_type)
-        elif server_type == "WebSocket_client":
-            await self.bot_client()
-        else:
-            raise ValueError(f"不支持的连接类型: {server_type}")
-        
-        
-    async def bot_side(self, server_type:str)->None:
-        """bot作为服务端的时候连接
-
-        Args:
-            type (str): 连接类型
-        """
+        # ── 阶段一：注册 WebSocket 连接对象 ──────────────────────────────────────
+        # QQAPIClient 在 WS 模式下 __init__ 时会直接从容器获取 WebSocket，
+        # 因此必须在 _init_messaging_services() 之前完成注册。
+        server_type: str = self.config.network.connection_type
         if server_type == "WebSocket_server":
-            WSServer = WebSocketServer(
-                host = self.config.network.host, 
-                port = self.config.network.server_port,
-                access_token = self.config.network.access_token, 
+            ws = WebSocketServer(
+                host=self.config.network.host,
+                port=self.config.network.server_port,
+                access_token=self.config.network.access_token,
             )
-            
-            container.register(
-                "WebSocket",
-                WSServer
+            container.register("WebSocket", ws)
+            self.register_shutdown_handler("WebSocket", ws.close)
+        elif server_type == "WebSocket_client":
+            ws = WebSocketClient(
+                url=self.config.network.url,
+                access_token=self.config.network.access_token,
             )
-            self.register_shutdown_handler("WebSocket", WSServer.close)
-            
-            self.creation_send_message()
-            
-            WSServer.add_listener(message_router().main)
-        
-            await WSServer.start()
-            
-            await WSServer.wait_for_connection()
-            return
-        
-        
-        self.creation_send_message()
-        _message_router = message_router()
-        
-        app = FastAPI() 
-        
-        @app.post("/")
-        async def handle_http_event(data: Dict[str, Any]):
-            """处理HTTP事件"""
-            asyncio.create_task(_message_router.main(data))
-            return {"status": "OK", "code": 200}
-                
-        uvicorn_app = uvicorn.Config(
-            app, 
-            host="localhost", 
-            port=self.config.network.server_port,
-            workers=8 #进程数
-        )
-        
-        server = uvicorn.Server(uvicorn_app)
-        await server.serve()
-        
-    async def bot_client(self)->None:
-        """bot作为客户端"""
-        WSClient = WebSocketClient(
-            url=self.config.network.url, 
-            access_token=self.config.network.access_token
-        )
-        
-        container.register(
-            "WebSocket",
-            WSClient
-        )
-        self.register_shutdown_handler("WebSocket", WSClient.close)
-        
-        self.creation_send_message()
+            container.register("WebSocket", ws)
+            self.register_shutdown_handler("WebSocket", ws.close)
+        elif server_type != "http":
+            raise ValueError(f"不支持的连接类型: {server_type}")
 
-        WSClient.add_listener(message_router().main)
-        
-        await WSClient.start()
-    
-    def creation_send_message(self)->None:
-        """初始化发送消息class,还有环节最后的加载"""
+        # ── 阶段二：初始化依赖 WebSocket 的消息服务及上层应用 ────────────────────
+        self._init_messaging_services()
+
+        # ── 阶段三：启动网络连接，开始收发消息 ───────────────────────────────────
+        await self._start_network(server_type)
+
+    def _init_messaging_services(self) -> None:
+        """初始化消息发送及依赖它的上层应用服务。
+
+        前置依赖（WS 模式）：WebSocket 对象必须已注册到容器，
+        因为 QQAPIClient 在 __init__ 时会立即从容器获取 WebSocket 单例。
+
+        注册顺序：SendMessage → CommandSystem → CommandLoader → LLMSupervisor → GroupChat
+        """
         send_message = QQAPIClient(
-            token = self.config.network.access_token, 
-            http_base_url = self.config.network.url, 
-            connection_type = self.config.network.connection_type
+            token=self.config.network.access_token,
+            http_base_url=self.config.network.url,
+            connection_type=self.config.network.connection_type,
         )
-        container.register("SendMessage",send_message)
-        
-        
-        #指令
-        container.register(
-            "CommandSystem",
-            CommandSystem()
-        )
-        CommandLoader = command_loader(self.config.file_path.commands)
-        container.register("CommandLoader",CommandLoader)
-        
-        #处理模型响应
-        container.register(
-            "LLMSupervisor",
-            LLMCoordinator()
-        )
-        
-        #AIchat
-        container.register(
-            "GroupChat",
-            GroupChat()
-        )
+        container.register("SendMessage", send_message)
+
+        # 指令系统（__init__ 时依赖 SendMessage、PermissionsManagement）
+        container.register("CommandSystem", CommandSystem())
+        container.register("CommandLoader", command_loader(self.config.file_path.commands))
+
+        # LLM 协调与对话（GroupChat.__init__ 依赖几乎所有已注册服务）
+        container.register("LLMSupervisor", LLMCoordinator())
+        container.register("GroupChat", GroupChat())
+
+    async def _start_network(self, server_type: str) -> None:
+        """根据连接类型启动网络服务并开始消息监听。所有服务应在此前初始化完毕。"""
+        if server_type == "WebSocket_server":
+            ws: WebSocketServer = container.get("WebSocket")
+            ws.add_listener(message_router().main)
+            # start() 内含无限循环，需以后台任务运行；
+            # wait_for_connection() 等待 NapCat 首次接入后返回，再持续阻塞在任务上。
+            ws_task = self.create_background_task(ws.start())
+            await ws.wait_for_connection()
+            await ws_task
+
+        elif server_type == "WebSocket_client":
+            ws_client: WebSocketClient = container.get("WebSocket")
+            ws_client.add_listener(message_router().main)
+            await ws_client.start()
+
+        else:  # http
+            _message_router = message_router()
+            app = FastAPI()
+
+            @app.post("/")
+            async def handle_http_event(data: Dict[str, Any]):
+                """处理HTTP事件"""
+                asyncio.create_task(_message_router.main(data))
+                return {"status": "OK", "code": 200}
+
+            uvicorn_app = uvicorn.Config(
+                app,
+                host="localhost",
+                port=self.config.network.server_port,
+                workers=8,
+            )
+            server = uvicorn.Server(uvicorn_app)
+            await server.serve()
 
     def register_shutdown_handler(
         self,

@@ -6,11 +6,12 @@ from typing import Optional, Tuple
 import aiomysql
 from aiomysql import IntegrityError, Pool
 
+from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 
 
-class AtriDB_Async:
-    """异步数据库连接池"""
+class atriAsyncMySQL(AsyncDatabaseBase):
+    """msyql异步数据库连接池"""
     _pool: Optional[Pool] = None
     _init_lock = asyncio.Lock()
     _context_conn: ContextVar[Optional[aiomysql.Connection]] = ContextVar('conn', default=None)
@@ -28,7 +29,7 @@ class AtriDB_Async:
         password: str, 
         pool_minsize: int = 2, 
         pool_maxsize: int = 8
-    ) -> "AtriDB_Async":
+    ) -> "atriAsyncMySQL":
         """推荐初始创建连接池（单例模式）的方法"""
         log: Logger = container.get("log")
         
@@ -83,7 +84,26 @@ class AtriDB_Async:
             params: Tuple = None, 
             fetch_type: str = None
         ) -> any:
-        """使用连接池执行SQL（内部方法）"""
+        """
+        使用连接池执行 SQL 语句，并根据 fetch_type 返回结果。
+
+        Args:
+            query (str): 需要执行的 SQL 语句。
+            params (Tuple, optional): SQL 语句的参数，用于防止 SQL 注入。默认为 None。
+            fetch_type (str, optional): 指定返回结果的类型。
+                - "one": 返回查询结果的第一条记录。
+                - "all": 返回查询结果的所有记录。
+                - 其他值或不传: 不返回查询结果，仅返回 True 表示执行成功。
+
+        Returns:
+            any: 根据 fetch_type 返回不同的结果：
+                - fetch_type == "one": 返回查询结果的第一条记录（通常是一个元组或字典）。
+                - fetch_type == "all": 返回查询结果的所有记录（通常是列表嵌套元组或字典）。
+                - 其他情况: 返回 True，表示 SQL 执行成功。
+
+        Raises:
+            RuntimeError: 如果连接池未初始化（即 self._pool 为 None）。
+        """
         if hasattr(self, '_cursor') and self._cursor and not self._cursor.closed:
 
             await self._cursor.execute(query, params)

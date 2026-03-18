@@ -25,6 +25,44 @@
 
 </div>
 
+---
+
+<details open>
+<summary><b>📑 点击展开目录 (Table of Contents)</b></summary>
+
+- [📖 前言](#前言)
+- [✨ 项目核心功能](#项目核心功能)
+  - [🧠 深度 LLM 聊天集成](#深度-llm-聊天集成)
+  - [💻 类 Unix 命令系统](#类-unix-命令系统)
+  - [🛠️ 其他实用功能](#其他实用功能)
+- [🚀 快速开始 (How to Run)](#快速开始-how-to-run)
+  - [1. 前端连接 (NapCat)](#1-前端连接-napcat)
+  - [2. 数据库配置 (PostgreSQL)](#2-数据库配置-postgresql)
+  - [3. 模型与环境配置](#3-模型与环境配置)
+    - [🤖 嵌入模型 (Embedding)](#嵌入模型-embedding)
+    - [🗣️ 语音合成 (TTS) - 可选](#语音合成-tts---可选)
+    - [📦 沙盒环境 (sandbox) - 可选](#沙盒环境-sandbox---可选)
+    - [⚙️ 配置文件](#配置文件)
+  - [4. 启动项目](#4-启动项目)
+  - [5. 使用 Docker 启动](#5-使用-docker-启动)
+- [📂 项目结构](#项目结构)
+- [🏗️ 架构设计](#架构设计)
+  - [整体消息流](#整体消息流)
+  - [🧠 LLM 聊天流程设计](#llm-聊天流程设计)
+  - [💾 记忆系统设计](#记忆系统设计)
+    - [短期上下文 (ChatManager)](#短期上下文-chatmanager)
+    - [长期向量记忆 (memorySystem + pgvector)](#长期向量记忆-memorysystem--pgvector)
+- [🤝 参与贡献](#参与贡献)
+- [📄 开源协议](#开源协议)
+
+</details>
+
+---
+
+</details>
+
+---
+
 ## 📖 前言
 
 来自萌新到处学习(抄袭，不对是集百家之长✨)做出来私用的神秘项目
@@ -93,10 +131,8 @@
 项目当前仅支持 PostgreSQL 数据库。
 1.  **安装数据库**：建议安装较新的 PostgreSQL 版本。[官方安装文档](https://www.postgresql.org/download/)
 2.  **安装数据库插件**：
-    - 必须安装 `pgvector`（向量检索）
-    - 必须安装 `pgroonga`（全文检索）
-    [pgvector 项目地址](https://github.com/pgvector/pgvector)
-    [PGroonga 文档](https://pgroonga.github.io/)
+    - 必须安装 `pgvector`（向量检索）[pgvector 项目地址](https://github.com/pgvector/pgvector)
+    - 必须安装 `pgroonga`（全文检索）[PGroonga 文档](https://pgroonga.github.io/)
 3.  **数据库初始化**：
     项目提供了初始化 SQL 文件：`assets/PostgreSQL基础.sql`（开发版）和 `docker/db/info.sql`（Docker 初始化版）。
     进入数据库（Linux 示例）：
@@ -144,8 +180,8 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
-1.  将 `config copy.json` 重命名为 `config.json` 并配置。
-2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置）。
+1.  将 `config copy.json` 重命名为 `config.json` 并配置(记得查看"如何配置配置文件.py")。
+2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置,支持任意opneAI兼容的）。
     ```bash
     cp "assets/config copy.json" assets/config.json
     cp "assets/supplier_config copy.json" assets/supplier_config.json

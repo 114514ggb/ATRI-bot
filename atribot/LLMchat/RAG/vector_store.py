@@ -5,7 +5,7 @@ from typing import Any, List, Literal
 
 from asyncpg import Record
 
-from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
 
 MemoryCategory = Literal[
@@ -25,7 +25,7 @@ class VectorStoreBasics(ABC):
     
     def __init__(self):
         self.logger:Logger = container.get("log")
-        self.vector_database:atriAsyncPostgreSQL = container.get("database")
+        self.vector_database:AsyncPostgreSQL = container.get("database")
         
     @abstractmethod
     async def storage(self)->None:

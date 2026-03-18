@@ -1,6 +1,6 @@
 from typing import Optional
 
-from asyncpg.protocol.record import Record
+from asyncpg import Record
 
 from atribot.common_utils import format_memory_records, parse_time_to_timestamp
 from atribot.core.service_container import container

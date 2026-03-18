@@ -4,7 +4,7 @@ from contextvars import ContextVar
 from logging import Logger
 from typing import Any, Optional, Tuple
 
-from aiomysql import IntegrityError, Pool
+from aiomysql import Pool
 
 from atribot.core.service_container import container
 
@@ -64,104 +64,3 @@ class AsyncDatabaseBase(ABC):
     async def execute_SQL(self, sql: str, argument: Tuple = None) -> Tuple:
         """执行SQL语句"""
         return await self._execute_with_pool(sql, argument, fetch_type="all")
-    
-    async def add_user(self, user_id: int, nickname: str) -> bool:
-        """添加用户"""
-        try:
-            await self._execute_with_pool(
-                """
-                INSERT INTO users (user_id, nickname) 
-                VALUES (%s, %s) AS new
-                ON DUPLICATE KEY UPDATE 
-                    nickname = new.nickname,
-                    last_updated = CURRENT_TIMESTAMP
-                """,
-                (user_id, nickname)
-            )
-            return True
-        except IntegrityError as e:
-            self.log.error(f"添加用户失败: {e}")
-            return False
-    
-    async def get_user(self, user_id: int) -> Optional[Tuple]:
-        """查询单个用户"""
-        return await self._execute_with_pool(
-            "SELECT * FROM users WHERE user_id = %s",
-            (user_id,),
-            fetch_type="one"
-        )
-    
-    async def add_group(self, group_id: int, group_name: str) -> bool:
-        """添加群组"""
-        try:
-            await self._execute_with_pool(
-                """
-                INSERT INTO user_group (group_id, group_name) 
-                VALUES (%s, %s) AS new
-                ON DUPLICATE KEY UPDATE 
-                    group_name = new.group_name
-                """,
-                (group_id, group_name)
-            )
-            return True
-        except IntegrityError as e:
-            self.log.error(f"添加群组失败: {e}")
-            return False
-    
-    async def get_group(self, group_id: int) -> Optional[Tuple]:
-        """查询单个群组"""
-        return await self._execute_with_pool(
-            "SELECT * FROM user_group WHERE group_id = %s",
-            (group_id,),
-            fetch_type="one"
-        )
-    
-    async def get_all_group(self) -> Tuple:
-        """查询所有群组"""
-        return await self._execute_with_pool(
-            "SELECT * FROM user_group",
-            fetch_type="all"
-        )
-    
-    async def add_message(
-        self, 
-        message_id: int, 
-        user_id: int, 
-        group_id: int,
-        timestamp: int, 
-        content: str
-    ) -> bool:
-        """添加消息"""
-        try:
-            await self._execute_with_pool(
-                """INSERT INTO message 
-                (message_id, user_id, group_id, time, message_content)
-                VALUES (%s, %s, %s, %s, %s)""",
-                (message_id, user_id, group_id, timestamp, content)
-            )
-            return True
-        except IntegrityError as e:
-            self.log.error(f"添加消息失败: {e}")
-            return False
-    
-    async def get_messages_by_user(self, user_id: int, limit: int = 50) -> Tuple:
-        """查询用户最近消息"""
-        return await self._execute_with_pool(
-            """SELECT * FROM message 
-            WHERE user_id = %s 
-            ORDER BY time DESC 
-            LIMIT %s""",
-            (user_id, limit),
-            fetch_type="all"
-        )
-    
-    async def get_messages_by_group(self, group_id: int, limit: int = 50) -> Tuple:
-        """查询群组最近消息"""
-        return await self._execute_with_pool(
-            """SELECT * FROM message 
-            WHERE group_id = %s 
-            ORDER BY time DESC 
-            LIMIT %s""",
-            (group_id, limit),
-            fetch_type="all"
-        )

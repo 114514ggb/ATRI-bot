@@ -2,7 +2,7 @@ import json
 from logging import Logger
 from typing import Any, Dict
 
-from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
 
 
@@ -15,7 +15,7 @@ class UserSystem:
     
     def __init__(self):
         self.logger:Logger = container.get("log")
-        self.database:atriAsyncPostgreSQL = container.get("database")
+        self.database:AsyncPostgreSQL = container.get("database")
         self.base_json_data = self.get_base_user_json()
         """参考的基础用户信息结构"""
 

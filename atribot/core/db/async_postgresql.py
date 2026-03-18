@@ -1,5 +1,6 @@
 import asyncio
 from contextvars import ContextVar, Token
+from logging import Logger
 from typing import List, Optional, Tuple
 
 import asyncpg
@@ -7,19 +8,19 @@ from asyncpg import Record
 from asyncpg.exceptions import ForeignKeyViolationError, UniqueViolationError
 
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
+from atribot.core.service_container import container
 
 
-class atriAsyncPostgreSQL(AsyncDatabaseBase):
+class AsyncPostgreSQL(AsyncDatabaseBase):
     """PostgreSQL异步数据库实现"""
-    
+
     _pool: Optional[asyncpg.Pool] = None
     _init_lock = asyncio.Lock()
     _context_conn: ContextVar[Optional[asyncpg.Connection]] = ContextVar('conn', default=None)
     _context_token: ContextVar[Optional[Token]] = ContextVar('token', default=None)
-    
+
     def __init__(self):
-        super().__init__()
-        self._conn_token = None
+        self.log: Logger = container.get("log")
     
     @classmethod
     async def create(
@@ -32,22 +33,22 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         min_size: int = 2,
         max_size: int = 8,
         **kwargs
-    ) -> "atriAsyncPostgreSQL":
+    ) -> "AsyncPostgreSQL":
         """
-        创建并初始化一个 PostgreSQL 连接池（单例模式）。
+        创建并初始化一个 PostgreSQL 连接池（单例模式）
 
         Args:
-            host (str): 数据库主机地址，默认为 "localhost"。
-            port (int): 数据库端口，默认为 5432。
-            user (str): 数据库用户名，默认为 "postgres"。
-            password (str): 数据库密码，默认为空字符串。
-            database (str): 数据库名称，默认为 "postgres"。
-            min_size (int): 连接池最小连接数，默认为 2。
-            max_size (int): 连接池最大连接数，默认为 8。
-            **kwargs: 其他传递给 `asyncpg.create_pool` 的关键字参数，如 `command_timeout`、`server_settings` 等。
+            host (str): 数据库主机地址,默认为 "localhost"
+            port (int): 数据库端口,默认为 5432
+            user (str): 数据库用户名,默认为 "postgres"
+            password (str): 数据库密码,默认为空字符串。
+            database (str): 数据库名称,默认为 "postgres"
+            min_size (int): 连接池最小连接数,默认为 2
+            max_size (int): 连接池最大连接数,默认为 8
+            **kwargs: 其他传递给 `asyncpg.create_pool` 的关键字参数,如 `command_timeout`、`server_settings` 等
 
         Returns:
-            atriAsyncPostgreSQL: 返回当前类的一个实例，后续可通过该实例执行 SQL。
+            atriAsyncPostgreSQL: 返回当前类的一个实例,后续可通过该实例执行 SQL。
 
         Raises:
             Exception: 如果连接池创建失败
@@ -109,32 +110,29 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         return conn
     
     async def _execute_with_pool(
-        self, 
+        self,
         query: str,
-        params: Tuple = None, 
+        params: Tuple = None,
         fetch_type: str = None
-    ) -> list[Record]|Record|None:
-        """使用连接池执行SQL,会自动处理%s转换成$1"""
-        
+    ) -> list[Record] | Record | None:
+        """使用连接池执行SQL,自动借用临时连接"""
+
         conn = self._context_conn.get()
         temp_conn = None
-        
+
         try:
-            # 如果没有上下文连接，临时获取一个
             if conn is None:
                 temp_conn = await self._pool.acquire()
                 conn = temp_conn
-            
-            # 转换占位符兼容原有语句
-            query = self._convert_query_placeholders(query) if params else query
+
             args = params or ()
             
             if fetch_type == "one":
-                return await conn.fetchrow(query, *args)#返回一行
+                return await conn.fetchrow(query, *args)
             elif fetch_type == "all":
-                return await conn.fetch(query, *args)#返回里面有行的列表
+                return await conn.fetch(query, *args)
             else:
-                return await conn.execute(query, *args)#返回执行后的结果的状态字符串
+                return await conn.execute(query, *args)
                 
         except (UniqueViolationError, ForeignKeyViolationError) as e:
             self.log.error(f"数据库约束冲突: {e}")
@@ -147,29 +145,26 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
                 await self._pool.release(temp_conn)
                 
     async def execute_with_pool(
-        self, 
+        self,
         query: str,
-        params: Tuple = None, 
+        params: Tuple = None,
         fetch_type: str = None
-    ) -> list[Record]|Record|None:
-        """使用连接池执行SQL,需要提前获取浮标,用于多条语句的情况下"""
-        
-        conn = self._context_conn.get()
-        
-        try:
+    ) -> list[Record] | Record | None:
+        """使用连接池执行SQL,需要提前在上下文中获取连接"""
 
+        conn = self._context_conn.get()
+
+        try:
             args = params or ()
-            
+
             if fetch_type == "one":
                 return await conn.fetchrow(query, *args)
             elif fetch_type == "all":
                 return await conn.fetch(query, *args)
             else:
                 await conn.execute(query, *args)
-            
                 return True
-                
-                
+
         except (UniqueViolationError, ForeignKeyViolationError) as e:
             self.log.error(f"数据库约束冲突: {e}")
             raise
@@ -185,7 +180,7 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
         """
         批量执行同一条 SQL,需要提前获取浮标
         Args:
-            query: 含有占位符的 SQL，例如
+            query: 含有占位符的 SQL,例如
                 INSERT INTO atri_memory (group_id,user_id,event_time,event,event_vector)
                 VALUES ($1,$2,$3,$4,$5)
             args_list: 每条记录对应的参数元组
@@ -201,19 +196,54 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
             raise
     
     
-    def _convert_query_placeholders(self, query: str) -> str:
-        """将 %s 占位符转换为 $1, $2 格式"""
-        parts = query.split('%s')
-        if len(parts) == 1:
-            return query
-        
-        new_parts = []
-        for i, part in enumerate(parts):
-            new_parts.append(part)
-            if i < len(parts) - 1:
-                new_parts.append(f"${i+1}")
-        
-        return ''.join(new_parts)
+    async def execute_SQL(self, sql: str, argument: Tuple = None) -> list[Record]:
+        """执行SQL语句,返回所有结果行"""
+        return await self._execute_with_pool(sql, argument, fetch_type="all")
+
+    async def get_user(self, user_id: int) -> Optional[Record]:
+        """查询单个用户"""
+        return await self._execute_with_pool(
+            "SELECT * FROM users WHERE user_id = $1",
+            (user_id,),
+            fetch_type="one"
+        )
+
+    async def get_group(self, group_id: int) -> Optional[Record]:
+        """查询单个群组"""
+        return await self._execute_with_pool(
+            "SELECT * FROM user_group WHERE group_id = $1",
+            (group_id,),
+            fetch_type="one"
+        )
+
+    async def get_all_group(self) -> list[Record]:
+        """查询所有群组"""
+        return await self._execute_with_pool(
+            "SELECT * FROM user_group",
+            fetch_type="all"
+        )
+
+    async def get_messages_by_user(self, user_id: int, limit: int = 50) -> list[Record]:
+        """查询用户最近消息"""
+        return await self._execute_with_pool(
+            """SELECT * FROM message
+            WHERE user_id = $1
+            ORDER BY time DESC
+            LIMIT $2""",
+            (user_id, limit),
+            fetch_type="all"
+        )
+
+    async def get_messages_by_group(self, group_id: int, limit: int = 50) -> list[Record]:
+        """查询群组最近消息"""
+        return await self._execute_with_pool(
+            """SELECT * FROM message
+            WHERE group_id = $1
+            ORDER BY time DESC
+            LIMIT $2""",
+            (group_id, limit),
+            fetch_type="all"
+        )
 
     async def add_user(self, user_id: int, nickname: str) -> bool:
         """添加用户"""
@@ -266,7 +296,6 @@ class atriAsyncPostgreSQL(AsyncDatabaseBase):
             try:
                 for query, params in queries:
                     if params:
-                        query = self._convert_query_placeholders(query)
                         await conn.execute(query, *params)
                     else:
                         await conn.execute(query)

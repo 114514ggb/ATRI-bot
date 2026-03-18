@@ -2,7 +2,7 @@ from pprint import pp
 
 
 async def db_sql():    
-    from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+    from atribot.core.db.async_postgresql import AsyncPostgreSQL
     from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
     
     http = "http://localhost:11434/api/embed"
@@ -11,7 +11,7 @@ async def db_sql():
     
     chat:universal_ai_api = await universal_ai_api.create(base_url = http, api_key = key)
     
-    psql_db = await atriAsyncPostgreSQL.create(
+    psql_db = await AsyncPostgreSQL.create(
       user = "postgres",
       database = "atri"
     )

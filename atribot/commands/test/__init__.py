@@ -1,7 +1,7 @@
 import textwrap
 
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.db.atri_async_postgresql import atriAsyncPostgreSQL
+from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_type import ChatMessage, GroupMessage
@@ -10,7 +10,7 @@ from .ATRI_encrypt import Encrypt
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
-db:atriAsyncPostgreSQL = container.get("database")
+db:AsyncPostgreSQL = container.get("database")
 
 @cmd_system.register_command(
     name='atri',
