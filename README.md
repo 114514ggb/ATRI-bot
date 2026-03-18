@@ -1,4 +1,4 @@
-﻿﻿<img src="./assets/ATRI-bot.png" width = "400" height = "400" alt="ATRI-bot" align="right" />
+﻿<img src="./assets/ATRI-bot.png" width = "400" height = "400" alt="ATRI-bot" align="right" />
 <div align="center">
 
 <p align="right">
