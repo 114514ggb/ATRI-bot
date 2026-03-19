@@ -80,7 +80,7 @@
 
 - **全异步高并发**：回复流程完全异步，支持多供应商 Key 池轮询，多群并发场景下也能稳定运行。
 - **结构化决策输出**：模型以 JSON 格式返回结构化决策（回复 / 更新画像 / 静默 / 调用工具），行为完全可控且易于扩展。
-- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词技能。
+- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词。
 - **两级记忆系统**：
   - *短期*：每个群 / 用户维护独立的滑动上下文窗口，超限时由 LLM 自动压缩摘要、无损续接。
   - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让 Bot 有个比较可靠的长期记忆。
@@ -321,7 +321,7 @@ message_router.main()
       └──► LLMCoordinator      (LLM 聊天主流程)
 ```
 
-所有服务通过单例 `DIContainer`（`atribot/core/service_container.py`）进行依赖注入，使用 `container.get("ServiceName")` 获取实例，服务初始化顺序在 `BotFramework.initialize()` 中严格保证。
+因为是专门用来聊天的，只关心必要的消息处理不需要插件系统或其他复杂什么的过度设计,先简单过滤只处理群相关的消息简单分为@和其他,@就是区分命令和聊天,其他就会分发到一个简单的分发处理器EventTrigger
 
 ---
 
@@ -370,7 +370,7 @@ chat.py → GroupChat.step()          ← 聊天主入口
 
 #### 短期上下文 (ChatManager)
 - 每个群/用户维护一个滑动的消息窗口 `Context`，直接嵌入每次请求的 `messages` 列表。
-- 当上下文 token 数超限时，触发 `memorySystem.summarize_context()` 对旧消息进行 LLM 压缩摘要，压缩后的文本以 `assistant` 角色消息插入上下文头部，实现无损的"记忆压缩"。
+- 当上下文 token 数超限时，触发 `memorySystem.summarize_context()` 对旧消息进行 LLM 压缩摘要，压缩后的文本以 `assistant` 角色消息插入上下文头部，简单的进行记忆压缩。
 
 #### 长期向量记忆 (memorySystem + pgvector)
 

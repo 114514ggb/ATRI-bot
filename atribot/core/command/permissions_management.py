@@ -2,7 +2,6 @@ import logging
 import sqlite3
 
 from atribot.common_utils import is_qq
-from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 
 
@@ -19,7 +18,6 @@ class permissions_management:
     ROLE_BLACKLIST = "blacklist"
 
     def __init__(self):
-        self.db: AsyncDatabaseBase = container.get("database")
         self.logging: logging.Logger = container.get("log")
         
         # 初始超级管理员ID

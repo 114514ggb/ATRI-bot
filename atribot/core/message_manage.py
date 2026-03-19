@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 from logging import Logger
 
@@ -37,19 +38,20 @@ class message_router():
                 self.logger.debug(f"原始消息:\n{data}")
             chat_message = ChatMessage.from_not_chat_event(data)
         
-        if chat_message.group_id:            
+        if chat_message.group_id:  #有群号就是群相关的直接简单分发处理了
             await self.group_manage.handle_message(chat_message, chat_message.group_id)
         else:
             #私聊处理
             return
 
         if chat_message.segments:
-            await self.store_data(chat_message,chat_message.group_id) #存储群消息
+            await self.store_data(chat_message) #存储群消息
             
 
-    async def store_data(self, chat_message:ChatMessage, group_id:int)->None:
+    async def store_data(self, chat_message:ChatMessage)->None:
         """存储消息"""
         data = chat_message.primeval
+        group_id = chat_message.group_id
         
         if group_id not in self.group_set:
             group_name = (await self.send_message.get_group_info(group_id))["data"]["group_name"]
@@ -129,7 +131,7 @@ class group_manage(message_manage):
         group_context.time_window.add()
 
         if data.get("message_sent_type") == "self":
-            await self._process_memory_summary(chat_message, group_id)
+            asyncio.create_task(self._process_memory_summary(chat_message, group_id))
             return
 
         self.logger.debug(f"Received group message: {data}")
@@ -146,10 +148,10 @@ class group_manage(message_manage):
             except Exception as e:
                 self.error_occurred(e, "事件触发器")
         
-        await self._process_memory_summary(chat_message, group_id)
+        asyncio.create_task(self._process_memory_summary(chat_message, group_id))
 
     def _check_is_mentioned(self, chat_message:ChatMessage) -> bool:
-        """辅助函数：检查bot是否被 @"""
+        """检查bot是否被 @"""
         for segment in chat_message.segments:
             if isinstance(segment,AtSegment) and segment.user_id == str(chat_message.self_id):
                 return True

@@ -64,3 +64,15 @@ class AsyncDatabaseBase(ABC):
     async def execute_SQL(self, sql: str, argument: Tuple = None) -> Tuple:
         """执行SQL语句"""
         return await self._execute_with_pool(sql, argument, fetch_type="all")
+
+    @abstractmethod
+    async def add_user(self):
+        pass
+    
+    @abstractmethod
+    async def add_message(self):
+        pass
+    
+    @abstractmethod
+    async def get_user(self):
+        pass
