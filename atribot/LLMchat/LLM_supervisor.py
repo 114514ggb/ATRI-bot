@@ -131,9 +131,8 @@ class LLMCoordinator():
     
     def __init__(self):
         self.supplier:LLMConnectionManager = container.get("LLMSupplier")
+        self.tool_management:tool_calls = container.get("ToolCalls")
         self.logger:Logger = container.get("log")
-        self.tool_management = tool_calls()
-        
         
     async def step(self, request:GenerationRequest)->GenerationResponse:
         """对于GenerationRequest的主处理函数

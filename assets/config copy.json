@@ -17,6 +17,7 @@
             "commands":"atribot/commands",
             "chat_manager":"atribot/LLMchat/character_setting",
             "supplier_config_path":"assets/supplier_config.json",
+            "tool_calls":"atribot/LLMchat/tools",
             "mcp_config":"atribot/LLMchat/MCP/mcp_server.json",
             "agent_skills":"atribot/LLMchat/skills/agent_skills"
         },

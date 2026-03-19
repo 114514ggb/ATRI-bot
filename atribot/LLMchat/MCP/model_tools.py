@@ -2,11 +2,11 @@ import importlib.util
 import json
 import os
 from logging import Logger
+from pathlib import Path
 from typing import Any
 
 from mcp.types import CallToolResult
 
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 
@@ -15,16 +15,48 @@ class tool_calls:
     """
     工具调用类
     """
+    _registry: list[tuple[dict, Any]] = []
 
-    def __init__(self):
+    @classmethod
+    def register(cls, tool_json: dict):
+        """工具注册装饰器
+
+        用法::
+
+            @tool_calls.register({
+                "name": "my_tool",
+                "description": "工具描述",
+                "properties": {
+                    "param": {"type": "string", "description": "参数描述"}
+                }
+            })
+            async def my_tool(param: str):
+                ...
+        """
+        def decorator(func: Any) -> Any:
+            cls._registry.append((tool_json, func))
+            return func
+        return decorator
+
+    def __init__(self, tool_path:Path):
         self.logger:Logger = container.get("log")
-        self.send_message:QQAPIClient = container.get("SendMessage")
         self.mcp_tool:FuncCall = container.get("MCP")
         """掌管MCP的""" 
         
         #tool
-        self.get_files_in_folder()
+        self.get_files_in_folder(str(tool_path))
+        self._load_registered_tools()
         
+
+    def _load_registered_tools(self) -> None:
+        """加载通过 @tool_calls.register 装饰器注册的工具"""
+        for tool_json, func in self._registry:
+            self.mcp_tool.add_func(
+                name=tool_json["name"],
+                func_args={} if tool_json.get("properties") is None else tool_json["properties"],
+                desc=tool_json["description"],
+                handler=func,
+            )
 
     async def calls(self, tool_name:str, arguments_str:str)-> CallToolResult | Any:
         """调用工具"""
@@ -34,10 +66,9 @@ class tool_calls:
         else:
             raise Exception(f"Request function {tool_name} not found.")
 
-    def get_files_in_folder(self):
+    def get_files_in_folder(self, folder_path:str):
         """获添加文件夹中的所有工具函数和工具json"""
-
-        folder_path = "atribot/LLMchat/tools"
+        
         default_module_name = "main"
 
         for name in os.listdir(folder_path):

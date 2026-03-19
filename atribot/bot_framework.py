@@ -1,7 +1,6 @@
 import asyncio
-from inspect import isawaitable
 from logging import Logger
-from typing import Any, Awaitable, Callable, Dict
+from typing import Any, Awaitable, Dict
 
 import uvicorn
 from fastapi import FastAPI
@@ -12,6 +11,7 @@ from atribot.core.command.async_permissions_management import PermissionsManagem
 from atribot.core.command.command_loader import command_loader
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
+from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.message_manage import message_router
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
@@ -22,6 +22,7 @@ from atribot.LLMchat.chat import GroupChat
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
+from atribot.LLMchat.MCP.model_tools import tool_calls
 from atribot.LLMchat.memory.memiry_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
@@ -34,9 +35,7 @@ class BotFramework:
     """主初始化类"""
     
     def __init__(self):
-        self.logger:Logger = container.get("log")
-        self._shutdown_handlers: dict[str, Callable[[], Any | Awaitable[Any]]] = {}
-        """保存各组件注册的清理函数"""
+        self.logger: Logger = container.get("log")
         self._background_tasks: set[asyncio.Task[Any]] = set()
         """退出时统一回收的后台任务"""
         self._shutdown_task: asyncio.Task[None] | None = None
@@ -64,9 +63,9 @@ class BotFramework:
         TriggerSupervisor = TimeTriggerSupervisor()
         container.register(
             "TimeTriggerSupervisor",
-            TriggerSupervisor
+            TriggerSupervisor,
+            cleanup=TriggerSupervisor.stop
         )
-        self.register_shutdown_handler("TimeTriggerSupervisor", TriggerSupervisor.stop)
         
         #MCP
         mcp_server = FuncCall(self.config.file_path.mcp_config)
@@ -74,9 +73,9 @@ class BotFramework:
         mcp_server.mcp_service_queue.put_nowait({"type": "init"})#初始化
         container.register(
             "MCP",
-            mcp_server
+            mcp_server,
+            cleanup=mcp_server.terminate
         )
-        self.register_shutdown_handler("MCP", mcp_server.terminate)
         
         #数据库
         database = await AsyncPostgreSQL.create(
@@ -87,18 +86,18 @@ class BotFramework:
         )
         container.register(
             "database",
-            database
+            database,
+            cleanup=database.close_pool
         )
-        self.register_shutdown_handler("database", database.close_pool)
         
         #模型供应商
         LLMSupplier = LLMConnectionManager()
         await LLMSupplier.initialize_connections(self.config.file_path.supplier_config_path)
         container.register(
             "LLMSupplier",
-            LLMSupplier
+            LLMSupplier,
+            cleanup=LLMSupplier.close
         )
-        self.register_shutdown_handler("LLMSupplier", LLMSupplier.close)
         
         #Skills的管理
         container.register(
@@ -113,10 +112,10 @@ class BotFramework:
             )
             await sand_box.start()
             container.register(
-                "SandBox",    
-                sand_box
+                "SandBox",
+                sand_box,
+                cleanup=sand_box.stop
             )
-            self.register_shutdown_handler("SandBox", sand_box.stop)
         except Exception as e:
             self.logger.exception(f"LLM使用的使用的沙盒初始化失败{e}")
         
@@ -167,15 +166,13 @@ class BotFramework:
                 port=self.config.network.server_port,
                 access_token=self.config.network.access_token,
             )
-            container.register("WebSocket", ws)
-            self.register_shutdown_handler("WebSocket", ws.close)
+            container.register("WebSocket", ws, cleanup=ws.close)
         elif server_type == "WebSocket_client":
             ws = WebSocketClient(
                 url=self.config.network.url,
                 access_token=self.config.network.access_token,
             )
-            container.register("WebSocket", ws)
-            self.register_shutdown_handler("WebSocket", ws.close)
+            container.register("WebSocket", ws, cleanup=ws.close)
         elif server_type != "http":
             raise ValueError(f"不支持的连接类型: {server_type}")
 
@@ -193,11 +190,20 @@ class BotFramework:
             connection_type=self.config.network.connection_type,)
         )
 
+        #消息分发处理
+        container.register("EventTrigger", EventTrigger())
+
         #指令
         container.register("CommandSystem", CommandSystem())
         
-        #指令加载器
+        #指令加载器,必须在后面
         container.register("CommandLoader", command_loader(self.config.file_path.commands))
+
+        #LLM使用的tool
+        container.register(
+            "ToolCalls",
+            tool_calls(self.config.file_path.tool_calls)
+        )
 
         #处理模型响应
         container.register("LLMSupervisor", LLMCoordinator())
@@ -240,16 +246,6 @@ class BotFramework:
         else:
             raise ValueError(f"启动连接的时候接收了错误的连接类型:{server_type}")
 
-    def register_shutdown_handler(
-        self,
-        name: str,
-        handler: Callable[[], Any | Awaitable[Any]]
-    ) -> None:
-        """注册关闭阶段需要执行的清理函数"""
-        if name in self._shutdown_handlers:
-            raise ValueError(f"清理函数已注册: {name}")
-        self._shutdown_handlers[name] = handler
-
     def create_background_task(self, coro: Awaitable[Any]) -> asyncio.Task[Any]:
         """创建受控后台任务"""
         task = asyncio.create_task(coro)
@@ -280,14 +276,7 @@ class BotFramework:
 
         self.logger.info("正在清理回收资源~")
 
-        for name, handler in reversed(list(self._shutdown_handlers.items())):
-            try:
-                result = handler()
-                if isawaitable(result):
-                    await result
-                self.logger.debug(f"资源已关闭:{name}")
-            except Exception as e:
-                self.logger.exception(f"关闭资源失败 [{name}]: {e}")
+        await container.shutdown()
 
         if self._background_tasks:
             for task in list(self._background_tasks):
@@ -297,6 +286,4 @@ class BotFramework:
             await asyncio.gather(*self._background_tasks, return_exceptions=True)
 
         self._background_tasks.clear()
-
-        self._shutdown_handlers.clear()
         self._is_shutdown = True

@@ -19,6 +19,7 @@
             "commands":"atribot/commands", #加载提供系统使用命令的目录
             "chat_manager":"atribot/LLMchat/character_setting", #角色设定所在的目录
             "supplier_config_path":"assets/supplier_config.json", #供应商配置文件路径
+            "tool_calls":"atribot/LLMchat/tools",#供ai调用工具实现文件夹
             "mcp_config":"atribot/LLMchat/MCP/mcp_server.json", #MCP 配置文件路径
             "agent_skills":"atribot/LLMchat/skills/agent_skills" #读取skills的目录
         },

@@ -10,6 +10,7 @@ from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_type import ChatMessage
 
 
 class ResponseType(Enum):
@@ -37,8 +38,10 @@ class string_response:
         
         self.automaton.make_automaton()
         
-    async def manage(self, group_id, data)->None:
+    async def manage(self, message:ChatMessage, data)->None:
         """主处理逻辑"""
+        group_id = message.group_id
+        
         async def send(send_type, document):
             if send_type is ResponseType.TEXT:
                 await self.send_message.send_group_message(group_id, document)

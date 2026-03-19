@@ -87,7 +87,7 @@ async def model_api():
     from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
     
     http = "http://40.83.223.214:3000/v1/chat/completions"
-    key = "sk-YL9iOaWSfetLK9LiBfw61bzx2cgt0piBLi0DZ4UfVfOfkM5y"
+    key = ""
     model = "google-ai-studio/gemini-2.5-flash"
     # model = "google-ai-studio/gemini-2.5-pro"
     

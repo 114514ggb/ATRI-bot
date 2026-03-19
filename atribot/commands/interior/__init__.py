@@ -376,7 +376,7 @@ async def cmd_query_memories(
         )
     else:
         results = await memiry_system.vector_store.query_memories(
-            query_text=None,
+            query_vector=None,
             limit=limit,
             group_id=group_id if not kb_only else None,
             user_id=user,

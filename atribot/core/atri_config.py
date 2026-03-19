@@ -76,6 +76,7 @@ class FilePathConfig:
         commands (Path): 指令目录的绝对路径
         chat_manager (Path): 角色设定目录的绝对路径
         supplier_config_path (Path): 供应商配置文件路径
+        tool_calls (Path): LLM使用的本地工具函数导入文件夹路径
         mcp_config (Path): MCP 配置文件路径
         agent_skills (Path): Agent 技能目录的绝对路径
         emoji (Path): 表情包目录的绝对路径
@@ -98,6 +99,8 @@ class FilePathConfig:
     """角色设定目录的绝对路径"""
     supplier_config_path: Path
     """供应商配置文件路径"""
+    tool_calls:Path
+    """LLM使用的本地工具函数导入文件夹路径"""
     mcp_config: Path
     """MCP 配置文件路径"""
     agent_skills: Path
@@ -180,6 +183,7 @@ class FilePathConfig:
             "commands": "atribot/commands",
             "chat_manager": "atribot/LLMchat/character_setting",
             "supplier_config_path": "assets/supplier_config.json",
+            "tool_calls":"atribot/LLMchat/tools",
             "mcp_config": "atribot/LLMchat/MCP/mcp_server.json",
             "agent_skills": "atribot/LLMchat/skills/agent_skills",
         }
@@ -217,6 +221,7 @@ class FilePathConfig:
             supplier_config_path=resolved_root.get("supplier_config_path", Path()),
             mcp_config=resolved_root.get("mcp_config", Path()),
             agent_skills=resolved_root.get("agent_skills", Path()),
+            tool_calls=resolved_root.get("tool_calls", Path()),
             emoji=resolved_document.get("emoji", Path()),
             audio=resolved_document.get("audio", Path()),
             file=resolved_document.get("file", Path()),

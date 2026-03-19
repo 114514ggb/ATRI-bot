@@ -116,7 +116,7 @@ class group_manage(message_manage):
         super().__init__()
         self.group_white_list:list = container.get("config").group_white_list
         self.group_chet:GroupChat = container.get("GroupChat")
-        self.event_trigger = EventTrigger()
+        self.event_trigger:EventTrigger = container.get("EventTrigger")
         
     async def handle_message(self, chat_message:ChatMessage, group_id: int) -> None:
         data = chat_message.primeval
@@ -142,7 +142,7 @@ class group_manage(message_manage):
         elif has_permission:
             try:
                 if not await self.initiative_chat.decision(chat_message, group_context):
-                    await self.event_trigger.dispatch(data, group_id)
+                    await self.event_trigger.dispatch(chat_message,data)
             except Exception as e:
                 self.error_occurred(e, "事件触发器")
         

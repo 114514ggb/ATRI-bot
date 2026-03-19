@@ -12,8 +12,11 @@ class PermissionsManagement:
     """
     PERM_LEVEL_ROOT = 3
     PERM_LEVEL_ADMIN = 2
+    """管理员"""
     PERM_LEVEL_TOURIST = 1
+    """默认权限"""
     PERM_LEVEL_BLACKLIST = 0
+    """黑名单"""
 
     ROLE_ROOT = "root"
     ROLE_ADMIN = "administrator"
@@ -132,7 +135,7 @@ class PermissionsManagement:
     async def remove_from_blacklist(self, user_id: int, operator_id: int):
         """从黑名单中移除用户"""
         if self._get_user_permission_level(user_id) >= self.PERM_LEVEL_ADMIN:
-            raise PermissionError("无法将管理员或更高权限者从黑名单移除（他们本身也不应在黑名单中）。")
+            raise PermissionError("无法将管理员或更高权限者从黑名单移除（他们本身也不应在黑名单中）")
         await self._modify_permission(user_id, operator_id, self.PERMISSION_MAP[self.ROLE_BLACKLIST], self.PERM_LEVEL_ADMIN, 'remove')
     
     async def _sync_to_db(self, user_id: int, permission_type: str, operator_id: int, action: str):
@@ -164,7 +167,7 @@ class PermissionsManagement:
                 """
                 await self.db.execute_SQL(sql, (user_id, permission_type, operator_id))
             elif action == 'remove':
-                sql = "DELETE FROM permissions WHERE user_id = %s"
+                sql = "DELETE FROM permissions WHERE user_id = $1"
                 await self.db.execute_SQL(sql, (user_id,))
             
             self.logging.info(f"数据库同步成功: 用户 {user_id}, 权限 {permission_type}, 操作 {action}.")
