@@ -428,11 +428,10 @@ async def cmd_query_memories(
             score_str = ""
 
         result_lines.append(
-            f"\n[记忆ID:{result.get('memory_id')}]",
-            f"[{CATEGORY_MAP.get(cat, cat)}]",
-            f"重要度:{result['importance']}",
-            f"可信度:{result['credibility']}\n",
-            {score_str},
+            f"\n[记忆ID:{result.get('memory_id')}]"
+            f"[{CATEGORY_MAP.get(cat, cat)}]"
+            f"重要度:{result['importance']}"
+            f"可信度:{result['credibility']}\n{score_str}\n"
             f"⏰ 时间: {time_str}"
         )
 
