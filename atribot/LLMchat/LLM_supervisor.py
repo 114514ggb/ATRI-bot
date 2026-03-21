@@ -386,16 +386,6 @@ class LLMCoordinator():
     def _update_response(self, response: GenerationResponse, assistant_message: Dict) -> GenerationResponse:
         """更新response"""
         
-        # extracted_thought, cleaned_content = self.extract_thought(assistant_message.get("content") or "")
-        
-        # if explicit_reasoning:= assistant_message.get("reasoning_content"):
-        #     response.reasoning_content.append(explicit_reasoning)
-        # elif extracted_thought:
-        #     response.reasoning_content.append(extracted_thought)
-
-        # if cleaned_content:
-        #     response.reply_text.append(cleaned_content)
-        
         if explicit_reasoning := assistant_message.get("reasoning_content"):
             response.reasoning_content.append(explicit_reasoning)
             
@@ -477,7 +467,7 @@ class LLMCoordinator():
             
             if content:
                 return api_reply,assistant_message, content
-            elif "tool_calls" in assistant_message:
+            elif assistant_message.get("tool_calls"):
                 return api_reply,assistant_message, None
         
         raise ValueError(f"在{max_retries}次尝试后仍未能获取有效回复")

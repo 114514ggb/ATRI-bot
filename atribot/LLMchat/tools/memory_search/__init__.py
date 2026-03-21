@@ -115,7 +115,7 @@ async def main(
         category: 记忆类型筛选
         min_importance: 重要度下界 (1~10)
         min_credibility: 可信度下界 (1~10)
-        time_decay_weight: 时间衰减权重，0=禁用，值越大时间影响越强
+        time_decay_weight: 时间衰减权重,0=禁用，值越大时间影响越强
     """
     exclude_knowledge_base = False
     only_knowledge_base = False

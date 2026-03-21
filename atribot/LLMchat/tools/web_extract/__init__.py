@@ -4,7 +4,7 @@ from atribot.LLMchat.tools.web_search import web_extract
 
 tool_json = {
     "name": "web_extract",
-    "description": "网页内容提取工具，通常配合搜索工具使用，可从指定的一个或多个URL中获取清洗后的Markdown正文内容。支持去除广告、智能分块与重排序，是深入阅读和分析特定网页内容的理想选择",
+    "description": "网页内容提取工具,可从指定的一个或多个URL中获取清洗后的Markdown正文内容。在深入阅读和分析特定网页内容的时候使用",
     "properties": {
         "urls": {
             "type": "array",

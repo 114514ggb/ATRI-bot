@@ -5,7 +5,7 @@ send_message:QQAPIClient = container.get("SendMessage")
 
 tool_json = {
     "name": "send_image_message",
-    "description": "向群里发送一个url图像",
+    "description": "向群里发送一个url图像,在需要发送图像的时候使用",
     "properties": {
         "group_id": {
             "type": "number",

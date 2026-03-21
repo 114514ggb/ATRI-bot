@@ -72,6 +72,10 @@ class AsyncDatabaseBase(ABC):
     @abstractmethod
     async def add_message(self):
         pass
+
+    @abstractmethod
+    async def add_group(self):
+        pass
     
     @abstractmethod
     async def get_user(self):

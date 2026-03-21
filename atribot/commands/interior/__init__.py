@@ -399,46 +399,52 @@ async def cmd_query_memories(
 
     decay_tip = "⏸️ 已禁用时间衰减" if no_decay else "⏱️ 已启用时间衰减评分"
     result_lines = [
-        f"🔍 查询字段: 「{query_string or '(按时间倒序)'}」",
+        f"🔍 查询字段: 「{query_string or '(没输入查询文本按时间倒序)'}」",
         f"📊 找到 {len(results)} 条相关记忆  {decay_tip}",
         "=" * 10
     ]
 
+    CATEGORY_MAP = {
+        "preference": "偏好",
+        "fact": "事实", 
+        "experience": "经历",
+        "emotion": "情感",
+        "group_topic": "群话题",
+        "knowledge": "知识",
+        "domain": "领域知识",
+        "guideline": "行为准则"
+    }
+
     for result in results:
-        timestamp = result.get("event_time")
-        time_str = dt.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S') if timestamp else "未知时间"
+        time_str = dt.fromtimestamp(result.get("event_time")).strftime('%Y-%m-%d %H:%M:%S')
 
-        cat = result.get('category') or ''
-        cat_str = f" [{cat}]" if cat else ""
-        imp = result.get('importance')
-        imp_str = f" 重要度:{imp}" if imp else ""
+        cat = result['category']
 
-        if result.get('hybrid_score') is not None:
-            score_str = f" 综合评分:{result['hybrid_score']:.4f}"
-        elif result.get('distance') is not None:
-            score_str = f" 向量距离:{result['distance']:.4f}"
+        if result.get('hybrid_score'):
+            score_str = f"综合评分:{result['hybrid_score']:.4f}"
+        elif result.get('distance'):
+            score_str = f"向量距离:{result['distance']:.4f}"
         else:
             score_str = ""
 
-        memory_info = [
-            f"\n[记忆ID:{result.get('memory_id', '?')}]{cat_str}{imp_str}{score_str}",
+        result_lines.append(
+            f"\n[记忆ID:{result.get('memory_id')}]",
+            f"[{CATEGORY_MAP.get(cat, cat)}]",
+            f"重要度:{result['importance']}",
+            f"可信度:{result['credibility']}\n",
+            {score_str},
             f"⏰ 时间: {time_str}"
-        ]
+        )
 
         if result.get("user_id"):
-            memory_info.append(f"👤 用户: {result['user_id']}")
+            result_lines.append(f"👤 用户: {result['user_id']}")
         if result.get("group_id"):
-            memory_info.append(f"👥 群组: {result['group_id']}")
+            result_lines.append(f"👥 群组: {result['group_id']}")
 
         content = result.get('event', '无内容')
         if len(content) > 300:
             content = content[:300] + "..."
-        memory_info.append(f"💭 内容:\n {content}")
-
-        if not result.get('group_id') and not result.get('user_id'):
-            memory_info.append("📚 [知识库]")
-
-        result_lines.extend(memory_info)
+        result_lines.append(f"💭 内容:\n {content}")
 
     result_lines.append("=" * 10)
 

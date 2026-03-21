@@ -7,7 +7,7 @@ tool_json = {
     "properties": {
         "user_id": {
             "type": "number",
-            "description": "用户的唯一标识,qq号",
+            "description": "用户的唯一标识",
         }
     }
 }

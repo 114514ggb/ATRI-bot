@@ -6,7 +6,7 @@ from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 tool_json = {
     "name": "memory_storage",
-    "description": "用于存储一条信息或记忆的工具,用于记忆要长期记忆的事情,可以将一句话存储为可以被memory_search工具检索到的长期的记忆,还可以关联到特定的用户",
+    "description": "用于存储一条信息或记忆的工具,要用于存储需要长期记录的事情",
     "properties": {
         "user_id": {
             "type": "number",

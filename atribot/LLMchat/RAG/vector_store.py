@@ -231,7 +231,7 @@ class MemoryVectorStore(VectorStoreBasics):
         Returns:
             记忆记录字典列表如果提供了 `query_vector`,则按距离升序排列；
             否则按 `created_at` 降序排列
-            每条记录包含：memory_id, user_id, group_id, event_time, event,
+            每条记录包含:memory_id, user_id, group_id, event_time, event,
                          created_at, category, importance, credibility,
                          access_count, distance
         """

@@ -15,7 +15,7 @@ config:atriConfig = container.get("config")
 
 tool_json = {
     "name": "run_python_code",
-    "description": "在 Docker 沙盒中执行 Python 代码，可传入输入文件并返回执行结果与新生成文件。可用库：numpy, pandas, matplotlib, seaborn, pillow, opencv-python-headless。图表如需显示中文，linux 系统中有安装 fonts-wqy-zenhei 字体,环境中还有ffmpeg",
+    "description": "在沙盒中执行Python代码,可传入输入文件并返回执行结果与新生成文件。可用库:numpy, pandas, matplotlib, seaborn, pillow, opencv-python-headless。图表如需显示中文,linux 系统中有安装 fonts-wqy-zenhei 字体,环境中还有ffmpeg",
     "properties": {
         "group_id": {
             "type": "number",

@@ -5,11 +5,11 @@ from atribot.LLMchat.skills.skills_manager import SkillsManager
 
 tool_json = {
     "name": "load_skill_prompt",
-    "description": "根据技能名称加载对应skill.md提示词,或读取该技能目录下相对路径文本文件的内容。适合按需补充技能说明、附加文档或脚本文本",
+    "description": "根据技能名称加载对应<available_skills>里面的skill提示词,或读取该技能目录下相对路径文本文件的内容。可以获取对应方面的补充技能说明、附加文档或脚本文本",
     "properties": {
         "skill_name": {
             "type": "string",
-            "description": "要加载的技能名称"
+            "description": "要加载的skill里面的name"
         },
         "relative_path": {
             "type": "string",
