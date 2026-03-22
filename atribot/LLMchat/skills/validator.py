@@ -4,7 +4,8 @@ import unicodedata
 from pathlib import Path
 from typing import Optional
 
-from .errors import ParseError
+from .errors import ParseError, ValidationError
+from .models import SkillProperties
 from .parser import find_skill_md, parse_frontmatter
 
 MAX_SKILL_NAME_LENGTH = 64
@@ -26,7 +27,7 @@ ALLOWED_FIELDS = {
 def _validate_name(name: str, skill_dir: Path) -> list[str]:
     """验证技能名称格式和目录匹配。
 
-    技能名称支持国际化字符（Unicode 字母）加连字符。
+    技能名称支持国际化字符(Unicode 字母)加连字符。
     名称必须为小写，且不能以连字符开头或结尾。
     """
     errors = []
@@ -132,12 +133,12 @@ def validate_metadata(metadata: dict, skill_dir: Optional[Path] = None) -> list[
     errors.extend(_validate_metadata_fields(metadata))
 
     if "name" not in metadata:
-        errors.append("前置元数据中缺少必填字段：name")
+        errors.append("前置元数据中缺少必填字段:name")
     else:
         errors.extend(_validate_name(metadata["name"], skill_dir))
 
     if "description" not in metadata:
-        errors.append("前置元数据中缺少必填字段：description")
+        errors.append("前置元数据中缺少必填字段:description")
     else:
         errors.extend(_validate_description(metadata["description"]))
 
@@ -145,6 +146,53 @@ def validate_metadata(metadata: dict, skill_dir: Optional[Path] = None) -> list[
         errors.extend(_validate_compatibility(metadata["compatibility"]))
 
     return errors
+
+
+def load_validated_properties(skill_dir: Path) -> SkillProperties:
+    """读取、验证并返回技能属性。
+
+    启动加载路径应优先使用此函数，避免先 validate() 再
+    read_properties() 造成重复的文件读取和 YAML 解析。
+
+    Args:
+        skill_dir: 技能目录的路径
+
+    Returns:
+        SkillProperties: 通过验证后的技能属性对象
+
+    Raises:
+        ParseError: 当 SKILL.md 缺失或 frontmatter 解析失败时抛出
+        ValidationError: 当技能元数据校验失败时抛出
+    """
+    skill_dir = Path(skill_dir)
+
+    if not skill_dir.exists():
+        raise ValidationError(f"路径不存在：{skill_dir}")
+
+    if not skill_dir.is_dir():
+        raise ValidationError(f"不是目录：{skill_dir}")
+
+    skill_md = find_skill_md(skill_dir)
+    if skill_md is None:
+        raise ParseError("缺少必需文件：SKILL.md")
+
+    metadata, _ = parse_frontmatter(skill_md.read_text(encoding="utf-8"))
+    errors = validate_metadata(metadata, skill_dir)
+    if errors:
+        raise ValidationError(
+            f"技能目录校验失败：{skill_dir}",
+            errors=errors,
+        )
+
+    return SkillProperties(
+        name=metadata["name"].strip(),
+        description=metadata["description"].strip(),
+        path=skill_dir,
+        license=metadata.get("license"),
+        compatibility=metadata.get("compatibility"),
+        allowed_tools=metadata.get("allowed-tools"),
+        metadata=metadata.get("metadata"),
+    )
 
 
 def validate(skill_dir: Path) -> list[str]:
@@ -156,21 +204,11 @@ def validate(skill_dir: Path) -> list[str]:
     Rteurns:
         验证错误消息列表。空列表表示验证通过。
     """
-    skill_dir = Path(skill_dir)
-
-    if not skill_dir.exists():
-        return [f"路径不存在：{skill_dir}"]
-
-    if not skill_dir.is_dir():
-        return [f"不是目录：{skill_dir}"]
-
-    skill_md = find_skill_md(skill_dir)
-    if skill_md is None:
-        return ["缺少必需文件：SKILL.md"]
-
     try:
-        metadata, _ = parse_frontmatter(skill_md.read_text(encoding='utf-8'))
+        load_validated_properties(skill_dir)
     except ParseError as e:
         return [str(e)]
+    except ValidationError as e:
+        return e.errors
 
-    return validate_metadata(metadata, skill_dir)
+    return []

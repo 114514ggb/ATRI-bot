@@ -12,7 +12,7 @@ from .models import SkillProperties
 def find_skill_md(skill_dir: Path) -> Optional[Path]:
     """在技能目录中查找 SKILL.md 文件。
 
-    优先使用大写的 SKILL.md，但也接受小写的 skill.md。
+    优先使用大写的 SKILL.md,但也接受小写的 skill.md。
 
     Args:
         skill_dir: 技能目录的路径

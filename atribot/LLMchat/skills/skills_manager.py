@@ -6,8 +6,8 @@ from typing import Optional
 from atribot.core.service_container import container
 
 from .models import SkillProperties
-from .parser import find_skill_md, read_properties
-from .validator import validate
+from .parser import find_skill_md
+from .validator import load_validated_properties
 
 
 class SkillsManager:
@@ -43,9 +43,9 @@ class SkillsManager:
             return
 
         for item in base_path.iterdir():
-            if item.is_dir() and not validate(item):
+            if item.is_dir():
                 try:
-                    props = read_properties(item)
+                    props = load_validated_properties(item)
                 
                     self.skills_dict[props.name] = props
                 except Exception as e:
@@ -127,10 +127,10 @@ class SkillsManager:
         
         Args:
             skill_name (str): 技能名称，用于在 skills_dict 中查找对应的技能对象
-            relative_path (str): 相对于技能根目录的文件路径（如 "docs/readme.md"）
+            relative_path (str): 相对于技能根目录的文件路径（如 "docs/readme.md")
             
         Returns:
-            Path: 拼接后的完整文件路径（pathlib.Path 对象）
+            Path: 拼接后的完整文件路径(pathlib.Path 对象）
             
         Raises:
             ValueError: 当指定的 skill_name 不存在于 skills_dict 中，
