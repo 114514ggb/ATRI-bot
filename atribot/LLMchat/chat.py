@@ -27,7 +27,7 @@ from atribot.LLMchat.LLM_supervisor import (
     LLMSRequestFailed,
 )
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
-from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
@@ -51,13 +51,18 @@ IMAGE_EXTENSIONS = {
 }
 
 
-class chat_baseics(ABC):
+MESSAGE_DELAY = 1.5  # 多条消息间隔时间
+MAX_SINGLE_MESSAGE_LENGTH = 5  # 分条发送长度阈值
+LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
+STRING_LENGTH_LIMIT = 120 #字符串长度限制
+
+class chat_basics(ABC):
     """聊天基类"""
 
     def __init__(self):
         self.model_api_supervisor: LLMCoordinator = container.get("LLMSupervisor")
         self.supplier: LLMConnectionManager = container.get("LLMSupplier")
-        self.memiry_system: memorySystem = container.get("memorySystem")       
+        self.memory_system: memorySystem = container.get("memorySystem")       
         self.send_message: QQAPIClient = container.get("SendMessage")
         self.chat_manager: ChatManager = container.get("ChatManager")
         self.skills:SkillsManager = container.get("SkillsManager")
@@ -113,7 +118,7 @@ class chat_baseics(ABC):
         except Exception: 
             raise ValueError(f"识图出现错误:{return_dict}")
 
-class GroupChat(chat_baseics):
+class GroupChat(chat_basics):
     """处理群聊天"""
 
     def __init__(self):
@@ -137,7 +142,7 @@ class GroupChat(chat_baseics):
             "speak" : self.reply_conduct,
             "update" : self.update_conduct,
             "silence" : self.silence_conduct,
-            "use_tools" : self.use_tools_conduct,
+            # "use_tools" : self.use_tools_conduct,
         }
         
         if self.config.model.connect.user_global_context:
@@ -199,7 +204,7 @@ class GroupChat(chat_baseics):
                 
                 for response_json in response_json.get("actions",[]):
                     
-                    response_json:dict[str: str|int]
+                    response_json:dict[str,str|int]
                     if decision := response_json.get("decision"):
                         
                         if fun := self.decision_function.get(decision):
@@ -243,7 +248,7 @@ class GroupChat(chat_baseics):
         
         if truncated_context := original_context.record_validity_check():
             try:
-                if summarize_context := await self.memiry_system.summarize_context(str(truncated_context)):
+                if summarize_context := await self.memory_system.summarize_context(str(truncated_context)):
                     original_context.messages.insert(
                         0,
                         {"role": "assistant", "content":  summarize_context[:3000]}#简单做一个限制让这个不要太长
@@ -383,7 +388,7 @@ class GroupChat(chat_baseics):
                 r[2],
                 f"可信度:{r[3]}"
             ) 
-            for r in await self.memiry_system.query_user_recently_memory(
+            for r in await self.memory_system.query_user_recently_memory(
                 text = chat_message.pure_text,
                 limit = 10
             )
@@ -543,11 +548,6 @@ class GroupChat(chat_baseics):
             trigger_message_id (int): 触发回复的消息id
             since_llm (float): 距离上一次llm发言时间
         """
-        MESSAGE_DELAY = 1.5  # 多条消息间隔时间
-        MAX_SINGLE_MESSAGE_LENGTH = 5  # 分条发送长度阈值
-        LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
-        STRING_LENGTH_LIMIT = 120 #字符串长度限制
-        
         if not chat_text_list:
             return
 

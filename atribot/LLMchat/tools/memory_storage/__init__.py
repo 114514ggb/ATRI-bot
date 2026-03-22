@@ -1,7 +1,7 @@
 import time
 
 from atribot.core.service_container import container
-from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 tool_json = {
@@ -39,7 +39,7 @@ tool_json = {
     }
 }
 
-memiry_system: memorySystem = container.get("memorySystem")
+memory_system: memorySystem = container.get("memorySystem")
 
 async def main(
     content_text: str,
@@ -48,10 +48,10 @@ async def main(
     importance: int = 5,
     credibility: int = 5,
 ):
-    event_vector = str((await memiry_system.rag.calculate_embedding(content_text))[0])
+    event_vector = str((await memory_system.rag.calculate_embedding(content_text))[0])
 
     if user_id:
-        await memiry_system.vector_store.storage(
+        await memory_system.vector_store.storage(
             group_id=None,
             user_id=int(user_id),
             event_time=int(time.time()),
@@ -62,7 +62,7 @@ async def main(
             credibility=credibility,
         )
     else:
-        await memiry_system.vector_store.storage(
+        await memory_system.vector_store.storage(
             group_id=None,
             user_id=None,
             event_time=int(time.time()),

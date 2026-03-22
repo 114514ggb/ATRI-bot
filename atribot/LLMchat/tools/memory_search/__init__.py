@@ -4,7 +4,7 @@ from asyncpg import Record
 
 from atribot.common_utils import format_memory_records, parse_time_to_timestamp
 from atribot.core.service_container import container
-from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 tool_json = {
@@ -87,7 +87,7 @@ tool_json = {
     },
 }
 
-memiry_system: memorySystem = container.get("memorySystem")
+memory_system: memorySystem = container.get("memorySystem")
 
 
 async def main(
@@ -133,7 +133,7 @@ async def main(
     min_cred = min_credibility if min_credibility > 1 else None
 
     if question_text and question_text.strip():
-        ret_list: list[Record] = await memiry_system.hybrid_recall(
+        ret_list: list[Record] = await memory_system.hybrid_recall(
             query_text=question_text,
             limit=limit,
             user_id=user_id,
@@ -149,7 +149,7 @@ async def main(
             update_stats = True
         )
     else:
-        ret_list: list[Record] = await memiry_system.vector_store.query_memories(
+        ret_list: list[Record] = await memory_system.vector_store.query_memories(
             query_vector=None,
             limit=limit,
             user_id=user_id,

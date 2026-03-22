@@ -13,7 +13,7 @@ from atribot.core.type.bot_types import GroupContext
 from atribot.core.type.chat_message_type import AtSegment, ChatMessage
 from atribot.LLMchat.chat import GroupChat
 from atribot.LLMchat.initiative_chat import initiativeChat
-from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.memory.memory_system import memorySystem
 
 
 class message_router():
@@ -90,7 +90,7 @@ class message_manage(ABC):
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
         self.command_system:CommandSystem = container.get("CommandSystem")
         self.send_message:QQAPIClient = container.get("SendMessage")
-        self.memiry_system:memorySystem = container.get("memorySystem")
+        self.memory_system:memorySystem = container.get("memorySystem")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.logger:Logger = container.get("log")
         self.initiative_chat = initiativeChat()
@@ -194,7 +194,7 @@ class group_manage(message_manage):
                 async with group_context.summarizing() as ctx:
                     if ctx is not None:
                         self.logger.info(f"开始总结 {group_id} 群消息!")
-                        await self.memiry_system.extract_stored_group_message(
+                        await self.memory_system.extract_stored_group_message(
                             messages_str=messages,
                             bot_id=chat_message.self_id,
                             group_id=group_id

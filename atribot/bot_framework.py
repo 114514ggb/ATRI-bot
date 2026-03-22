@@ -23,7 +23,7 @@ from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.LLMchat.MCP.model_tools import tool_calls
-from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox

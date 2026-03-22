@@ -9,12 +9,12 @@ from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_type import ChatMessage
-from atribot.LLMchat.memory.memiry_system import memorySystem
+from atribot.LLMchat.memory.memory_system import memorySystem
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 send_message:QQAPIClient = container.get("SendMessage")
 perm_manager:PermissionsManagement = container.get("PermissionsManagement")
-memiry_system:memorySystem = container.get("memorySystem") 
+memory_system:memorySystem = container.get("memorySystem") 
 AIContextCommands()
 
 
@@ -360,7 +360,7 @@ async def cmd_query_memories(
     decay_weight = 0.0 if no_decay else 0.3
 
     if query_string:
-        results = await memiry_system.hybrid_recall(
+        results = await memory_system.hybrid_recall(
             query_text=query_string,
             limit=limit,
             group_id=group_id if not kb_only else None,
@@ -375,7 +375,7 @@ async def cmd_query_memories(
             time_decay_weight = decay_weight,
         )
     else:
-        results = await memiry_system.vector_store.query_memories(
+        results = await memory_system.vector_store.query_memories(
             query_vector=None,
             limit=limit,
             group_id=group_id if not kb_only else None,
