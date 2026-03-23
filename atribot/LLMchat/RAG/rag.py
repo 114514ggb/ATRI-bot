@@ -33,6 +33,7 @@ class RAGManager:
         Returns:
             str: 回复
         """
+        pass
         
     
     def Split_text(self, text:str)->list[str]:
@@ -82,6 +83,7 @@ class RAGManager:
                 如果 `k` 大于 `chunks` 的长度，则返回所有排序后的文本块。
                 如果输入的 `chunks` 列表为空，则返回一个空列表。
         """
+        pass
         
     async def search(self, embeddings:list[float], k:int=2)->tuple[dict]:
         """

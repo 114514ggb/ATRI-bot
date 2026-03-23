@@ -4,6 +4,7 @@ from typing import Any, Awaitable, Dict
 
 import uvicorn
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
@@ -177,7 +178,10 @@ class BotFramework:
             raise ValueError(f"不支持的连接类型: {server_type}")
 
         self._init_messaging_services()
-        
+
+        #管理面板
+        self.create_background_task(self._start_admin_panel())
+
         await self._start_network(server_type)
 
     def _init_messaging_services(self) -> None:
@@ -210,6 +214,30 @@ class BotFramework:
         
         #AIchat
         container.register("GroupChat", GroupChat())
+
+    async def _start_admin_panel(self) -> None:
+        """在独立端口启动 Web 管理面板"""
+        from atribot.web_panel.panel_router import router as admin_router
+
+        admin_app = FastAPI(title="ATRI Admin Panel", docs_url=None, redoc_url=None)
+        admin_app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["http://localhost", "http://127.0.0.1"],
+            allow_methods=["GET", "POST"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
+        admin_app.include_router(admin_router)
+
+        admin_port = getattr(self.config.network, "admin_port", self.config.network.server_port + 1)
+        cfg = uvicorn.Config(
+            admin_app,
+            host="127.0.0.1",
+            port=admin_port,
+            log_level="warning",
+        )
+        server = uvicorn.Server(cfg)
+        self.logger.info(f"管理面板已就绪: http://127.0.0.1:{admin_port}/admin/")
+        await server.serve()
 
     async def _start_network(self, server_type: str) -> None:
         """根据连接类型启动网络服务并开始消息监听"""

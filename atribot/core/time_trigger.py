@@ -58,7 +58,9 @@ class TimeTriggerSupervisor:
         self._queue: List[TimedTask] = []
         """任务最小堆：存储 TimedTask 对象，堆顶永远是最近需要执行的任务"""
         self._task_map: Dict[int, TimedTask] = {}
-        """任务索引表：用于通过task_id快速查找任务，主要用于取消任务"""
+        """任务索引表:用于通过task_id快速查找任务,主要用于取消任务"""
+        self._id_counter: int = 10000
+        """自增任务 ID 计数器，用于自动分配唯一 task_id"""
         self._wakeup_event = asyncio.Event()
         """唤醒事件：当有新任务插入且比堆顶任务更早执行时，用于唤醒主循环"""
         self._running = False
@@ -95,59 +97,72 @@ class TimeTriggerSupervisor:
         else:
             return 0
 
+    def _alloc_id(self) -> int:
+        """分配一个全局唯一的自增 task_id"""
+        self._id_counter += 1
+        return self._id_counter
+
     def add_task(
         self, 
-        task_id: int, 
         func: Callable, 
         trigger_delta: float, 
+        task_id: Optional[int] = None,
         priority: int = 10,
         interval: float = 0.0, 
         timeout: float = 5.0,
         kwargs: Optional[dict] = None, 
         remarks: str = ""
-    ):
+    ) -> int:
         """添加一个新的定时任务到调度器
 
         如果 task_id 已存在，旧任务将被标记取消并被新任务替换
 
         Args:
-            task_id (int): 任务的唯一标识 ID
             func (Callable): 任务触发时执行的函数
             trigger_delta (float): 延迟多少秒后执行(相对于当前时间)
+            task_id (Optional[int]): 任务的唯一标识 ID，不传则自动分配
             priority(int): 任务的优先级,越小越高
             interval (float, optional): 循环执行间隔默认为 0.0(一次性任务)
             timeout (float, optional): 单次执行超时时间(秒)默认为 5.0
             kwargs (dict, optional): 传递给 func 的参数字典默认为 None
             remarks (str, optional): 任务备注信息默认为空字符串
+
+        Returns:
+            int: 实际使用的 task_id（可用于后续取消任务）
         """
-        self._add_task_internal(
+        if task_id is None:
+            task_id = self._alloc_id()
+        return self._add_task_internal(
             task_id, func, trigger_delta, priority, interval, None, timeout, kwargs, remarks
         )
 
     def add_cron_task(
         self,
-        task_id: int,
         func: Callable,
         cron_expression: str,
+        task_id: Optional[int] = None,
         priority: int = 10,
         timeout: float = 5.0,
         kwargs: Optional[dict] = None,
         remarks: str = ""
-    ):
+    ) -> int:
         """添加一个基于 Cron 表达式调度的定时任务
 
         该方法会校验 Cron 表达式的合法性，计算首次执行的延迟时间，并将任务加入调度队列
         任务执行后会根据 Cron 规则自动重新调度
 
         Args:
-            task_id (int): 任务的唯一标识 ID如果 ID 已存在，旧任务将被替换
             func (Callable): 任务触发时执行的可调用对象(支持协程或普通函数)
             cron_expression (str): Cron 调度表达式 (例如 "30 8 * * 1" 表示每周一 08:30)
                 支持 croniter 允许的 5 位或 6 位(含秒)格式
+            task_id (Optional[int]): 任务的唯一标识 ID,不传则自动分配
             priority (int, optional): 任务优先级，数值越小优先级越高默认为 10
             timeout (float, optional): 单次执行超时时间(秒)默认为 5.0
             kwargs (dict, optional): 传递给 func 的关键字参数字典默认为 None
             remarks (str, optional): 任务备注信息，用于日志或调试默认为空字符串
+
+        Returns:
+            int: 实际使用的 task_id（可用于后续取消任务）
 
         Raises:
             ValueError: 如果提供的 `cron_expression` 格式无效
@@ -155,12 +170,15 @@ class TimeTriggerSupervisor:
         if not croniter.is_valid(cron_expression):
             raise ValueError(f"Invalid cron expression: {cron_expression}")
 
+        if task_id is None:
+            task_id = self._alloc_id()
+
         now_dt = datetime.now()
         next_dt = croniter(cron_expression, now_dt).get_next(datetime)
         delay = (next_dt - now_dt).total_seconds()
         delay = delay if delay > 0 else 0
         
-        self._add_task_internal(
+        return self._add_task_internal(
             task_id, func, delay, priority, 0.0, cron_expression, timeout, kwargs, remarks
         )
     
@@ -175,7 +193,7 @@ class TimeTriggerSupervisor:
         timeout: float,
         kwargs: Optional[Dict[str, Any]], 
         remarks: str
-    ) -> None:
+    ) -> int:
         """内部辅助方法：统一处理任务对象的创建与入队逻辑
 
         负责封装 TimedTask 对象，更新任务索引表，将任务推入最小堆，
@@ -219,6 +237,7 @@ class TimeTriggerSupervisor:
         self.logger.debug(f"添加任务 {task_id} [{mode}], 将在 {trigger_delta:.2f}s 后执行，单次超时 {timeout:.2f}s")
         
         self._wakeup_event.set()
+        return task_id
 
     def remove_task(self, task_id: int) -> bool:
         """移除指定的任务

@@ -7,7 +7,8 @@
         "access_token":"ATRI114514", #和napcat连接要的验证token
         "url":"127.0.0.1:8888", #连接端口在WebSocket_client和http的时候需要
         "host":"127.0.0.1", #作为服务端的时候开的端口
-        "server_port":8888 #作为服务端的时候开的端口号
+        "server_port":8888, #作为服务端的时候开的端口号
+        "admin_port":1314#Web管理面板
     },
     "account":{
         "id":3930909243, #bot的qq号

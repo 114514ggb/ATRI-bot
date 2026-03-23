@@ -323,9 +323,15 @@ class atriConfig:
 
         self._raw_config: Dict[str, Any] = config_data
         self._config = ConfigObject(config_data)
+        self._config_file: Path = config_file
 
         file_path_data = config_data.get("file_path", {})
         self.file_path = FilePathConfig.from_dict(file_path_data, project_root)
+
+    @property
+    def config_file_path(self) -> Path:
+        """返回当前加载的配置文件绝对路径"""
+        return self._config_file
 
     def __getattr__(self, name: str) -> Any:
         """代理获取配置项

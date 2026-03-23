@@ -5,7 +5,8 @@
         "access_token":"ATRI",
         "url":"127.0.0.1:8888",
         "host":"127.0.0.1",
-        "server_port":8888
+        "server_port":8888,
+        "admin_port":1314
     },
     "account":{
         "id":3930909243,
