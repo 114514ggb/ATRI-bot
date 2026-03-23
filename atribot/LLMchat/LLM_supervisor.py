@@ -121,7 +121,7 @@ class LLMSRequestFailed(Exception):
         """获取原始异常类型"""
         return type(self.exception).__name__
     
-    def get_response(self) -> List[Dict[str, Any]]|None:
+    def get_response(self) -> GenerationResponse|None:
         """获取中断的状态信息属性"""
         return self.response
 
@@ -344,7 +344,7 @@ class LLMCoordinator():
                 raise LLMSRequestFailed(e, response)
             
             if usage := api_reply.get("usage"):
-                response.metadata["usage"] = usage
+                response.metadata = usage
                 
             if tool_calls := assistant_message.get('tool_calls'):
                 increase_context.add_assistant_tool_message(

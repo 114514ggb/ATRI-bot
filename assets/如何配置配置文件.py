@@ -38,7 +38,6 @@
             "supplier":"deepseek",#配置的聊天模型来自的供应商
             "model_name":"deepseek-chat",#配置的聊天模型名称
             "visual_sense":False,#模型是否有视觉，是否能接收图片
-            "system_review":False,#决定统提示词的嵌入方式，一般不用动
             "user_global_context":True #决定了上下文的存在在形式,是一个群共用一个上下文，还是每个user单独的上下文
         },
         "chat_parameter":{#聊天模型会使用的参数配置

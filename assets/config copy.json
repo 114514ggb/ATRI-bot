@@ -36,7 +36,6 @@
             "supplier":"deepseek",
             "model_name":"deepseek-chat",
             "visual_sense":false,
-            "system_review":false,
             "user_global_context":true
         },
         "chat_parameter":{
