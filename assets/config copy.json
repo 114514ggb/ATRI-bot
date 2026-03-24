@@ -8,6 +8,7 @@
         "server_port":8888,
         "admin_port":1314
     },
+    "root_user_id": 114514,
     "account":{
         "id":3930909243,
         "name":"ATRI-bot"

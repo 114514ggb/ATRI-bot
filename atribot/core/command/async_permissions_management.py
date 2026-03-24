@@ -31,8 +31,7 @@ class PermissionsManagement:
     def __init__(self):
         self.db: AsyncDatabaseBase = container.get("database")
         self.logging: logging.Logger = container.get("log")
-        
-        self.root: Set[int] = {2631018780} 
+        self.root: Set[int] = {container.get("config").root_user_id}
         self.administrator: Set[int] = set()
         self.blacklist: Set[int] = set()
 

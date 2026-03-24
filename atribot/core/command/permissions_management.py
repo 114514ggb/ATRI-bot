@@ -19,9 +19,7 @@ class permissions_management:
 
     def __init__(self):
         self.logging: logging.Logger = container.get("log")
-        
-        # 初始超级管理员ID
-        self.root = {2631018780} 
+        self.root = {{container.get("config").root_user_id}}
         self.administrator = set()
         self.blacklist = set()
 
@@ -32,7 +30,7 @@ class permissions_management:
             user_id (int|str): 要查询的用户ID
             
         Returns:
-            int: 用户权限等级，对应PERM_LEVEL_*常量"""
+            int: 用户权限等级,对应PERM_LEVEL_*常量"""
         if user_id in self.root:
             return self.PERM_LEVEL_ROOT
         if user_id in self.administrator:

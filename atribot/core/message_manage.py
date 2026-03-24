@@ -65,7 +65,7 @@ class message_router():
         
         try:
             users = {"user_id":chat_message.user_id,"nickname":data['sender']['nickname']}
-            message ={"message_id":data["message_id"],"content":chat_message.llm_formatted_message,"timestamp":data["time"],"group_id":group_id,"user_id":chat_message.user_id}
+            message ={"message_id":data["message_id"],"content":chat_message.user_cq_message,"timestamp":data["time"],"group_id":group_id,"user_id":chat_message.user_id}
         except Exception as e:
             self.logger.warning(f"获取db存储参数失败:{e}")
             return
@@ -116,7 +116,9 @@ class group_manage(message_manage):
     
     def __init__(self):
         super().__init__()
-        self.group_white_list:list = container.get("config").group_white_list
+        config = container.get("config")
+        self.group_white_list:list = config.group_white_list
+        self.root_user_id:int = config.root_user_id
         self.group_chet:GroupChat = container.get("GroupChat")
         self.event_trigger:EventTrigger = container.get("EventTrigger")
         
@@ -124,7 +126,7 @@ class group_manage(message_manage):
         data = chat_message.primeval
         user_id = chat_message.user_id
         
-        if group_id not in self.group_white_list and not (user_id == 2631018780):
+        if group_id not in self.group_white_list and not (user_id == self.root_user_id):
             return
         
         group_context: GroupContext = await self.chat_manager.get_group_context(group_id)
@@ -135,6 +137,7 @@ class group_manage(message_manage):
             return
 
         self.logger.debug(f"Received group message: {data}")
+        chat_message.update_llm_formatted_message()
 
         has_permission = self.permissions_management.check_access(user_id)
 

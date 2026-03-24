@@ -554,6 +554,8 @@ class ChatMessage:
     """时间戳秒级"""
     raw_message: str 
     """原始cq码文本消息"""
+    user_cq_message: str 
+    """存储消息用的精简cq码文本消息"""
     primeval:dict
     """原始接收的data的dict"""
     llm_formatted_message: str = ""
@@ -657,13 +659,14 @@ class ChatMessage:
             time=event.get('time', int(time.time())),
             primeval=event,
             raw_message=event.get('raw_message', ''),
+            user_cq_message="",
             llm_formatted_message="",
             pure_text="".join(pure_text_parts).strip(),
             segments=parsed_segments,
             sender_info=event.get('sender', {})
         )
         
-        chat_message.llm_formatted_message = chat_message.format_for_llm()
+        chat_message.user_cq_message = chat_message.get_cq_code()
         
         return chat_message
         
@@ -679,6 +682,7 @@ class ChatMessage:
             primeval=event,
             raw_message=event.get('raw_message', ''),
             llm_formatted_message="",
+            user_cq_message="",
             pure_text="",
             segments=[],
             sender_info=event.get('sender', {})
@@ -701,10 +705,13 @@ class ChatMessage:
             f"<user_id>{self.user_id}</user_id>"
             f"<nick_name>{self.sender_info.get('nickname')}</nick_name>"
             f"<time>{datetime.datetime.fromtimestamp(self.time).strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-            f"<user_message>{self.get_cq_code()[:2000]}</user_message>"
+            f"<user_message>{self.user_cq_message[:2000]}</user_message>"
             f"<message_id>{self.message_id}</message_id>"
             "</MESSAGE>"
         )
+
+    def update_llm_formatted_message(self):
+        self.llm_formatted_message = self.format_for_llm()
 
     def __str__(self):
         return self.llm_formatted_message

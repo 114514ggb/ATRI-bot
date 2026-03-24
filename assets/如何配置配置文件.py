@@ -10,6 +10,7 @@
         "server_port":8888, #作为服务端的时候开的端口号
         "admin_port":1314#Web管理面板
     },
+    "root_user_id": 114514,#root用户的qq号，有执行命令的最高权限，不管在哪个群都会无视其他配置名单强制接受这个qq号的消息
     "account":{
         "id":3930909243, #bot的qq号
         "name":"ATRI-bot" #bot的账号名称
