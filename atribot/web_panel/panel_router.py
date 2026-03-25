@@ -5,6 +5,7 @@ import os
 import sys
 import time
 from datetime import datetime
+from logging import Logger
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -21,9 +22,10 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 _security = HTTPBearer(auto_error=False)
 _start_time = time.time()
 db:AsyncPostgreSQL = container.get("database")
+cfg:Logger = container.get("config")
 
 def _access_token() -> str:
-    return container.get("config").network.access_token
+    return cfg.network.access_token
 
 
 async def _auth(
@@ -40,7 +42,6 @@ async def panel_index() -> HTMLResponse:
 
 @router.get("/api/status")
 async def api_status(_: None = Depends(_auth)) -> Dict[str, Any]:
-    cfg = container.get("config")
     uptime = int(time.time() - _start_time)
     h, r = divmod(uptime, 3600)
     m, s = divmod(r, 60)
@@ -274,7 +275,6 @@ async def api_send_message(
 
 @router.get("/api/config")
 async def api_get_config(_: None = Depends(_auth)) -> Dict[str, Any]:
-    cfg = container.get("config")
     return {
         "content": json.dumps(cfg._raw_config, ensure_ascii=False, indent=2),
         "path": str(cfg.config_file_path),
@@ -290,7 +290,6 @@ async def api_save_config(
     body: ConfigBody,
     _: None = Depends(_auth),
 ) -> Dict[str, str]:
-    cfg = container.get("config")
     try:
         parsed = json.loads(body.content)
     except json.JSONDecodeError as e:
@@ -306,7 +305,6 @@ async def api_save_config(
 
 @router.get("/api/supplier_config")
 async def api_get_supplier_config(_: None = Depends(_auth)) -> Dict[str, Any]:
-    cfg = container.get("config")
     supplier_path = cfg.file_path.supplier_config_path
     raw = supplier_path.read_text(encoding="utf-8")
     return {
@@ -337,7 +335,6 @@ async def api_save_supplier_config(
     body: SupplierConfigBody,
     _: None = Depends(_auth),
 ) -> Dict[str, str]:
-    cfg = container.get("config")
     try:
         parsed = json.loads(body.content)
     except json.JSONDecodeError as e:
@@ -361,13 +358,11 @@ async def api_system_stop(_: None = Depends(_auth)) -> Dict[str, str]:
 
 @router.post("/api/system/restart")
 async def api_system_restart(_: None = Depends(_auth)) -> Dict[str, str]:
-    cfg = container.get("config")
     subprocess_args = [sys.executable] + sys.argv
-    cwd = str(cfg.file_path.project_root)
 
     def _do_restart() -> None:
         import subprocess as _sp
-        _sp.Popen(subprocess_args, cwd=cwd)
+        _sp.Popen(subprocess_args, cwd=str(cfg.file_path.project_root))
         os._exit(0)
 
     loop = asyncio.get_event_loop()
