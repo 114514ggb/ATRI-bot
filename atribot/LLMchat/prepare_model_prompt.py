@@ -342,17 +342,17 @@ JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对
 {
     "actions":[
         {
-            "decision":"按照要求的参数值",
+            "decision":"参数值:只能是update,silence,speak其中之一",
             //要求参数
         },
         {
-            "decision":"参数值",
+            "decision":"speak",
             //对应参数
         }
     ]
 }
 ```
-请根据情况给出你的decision的JSON,不能用decision来调用tool
+请根据情况灵活的进行工具调用完成任务最后给出你的actions的JSON
 </example>
 """
             "</output_requirement>"
