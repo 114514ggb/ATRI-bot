@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import os
 import textwrap
@@ -64,11 +65,13 @@ class FuncTool:
     def __repr__(self):
         return f"FuncTool(name={self.name}, parameters={self.parameters}, description={self.description}, active={self.active}, origin={self.origin})"
 
-    async def execute(self, **args) -> Any:
+    async def execute(self, _message_data=None, **args) -> Any:
         """执行函数调用"""
         if self.origin == "local":
             if not self.handler:
                 raise Exception(f"Local function {self.name} has no handler")
+            if _message_data is not None and 'message_data' in inspect.signature(self.handler).parameters:
+                args['message_data'] = _message_data
             return await self.handler(**args)
         elif self.origin == "mcp":
             if not self.mcp_client or not self.mcp_client.session:

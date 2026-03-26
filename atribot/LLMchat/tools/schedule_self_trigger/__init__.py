@@ -36,10 +36,6 @@ tool_json = {
             "default": 0,
             "minimum": 0,
         },
-        "group_id": {
-            "type": "number",
-            "description": "要在哪个群触发自己，填入群号",
-        },
         "note": {
             "type": "string",
             "description": "留给未来的自己的一句话，触发时这段话会作为提示输入给自己",
@@ -90,14 +86,15 @@ async def _trigger_self(group_id: int, note: str) -> None:
 
 
 async def main(
-    group_id: int,
     note: str,
+    message_data: ChatMessage,
     target_datetime: Optional[str] = None,
     hours: float = 0,
     minutes: float = 0,
     seconds: float = 0,
 ) -> str:
     trigger: TimeTriggerSupervisor = container.get("TimeTriggerSupervisor")
+    group_id = message_data.group_id
 
     if target_datetime:
         try:

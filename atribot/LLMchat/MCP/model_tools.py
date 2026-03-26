@@ -17,9 +17,16 @@ class tool_calls:
     """
     _registry: list[tuple[dict, Any]] = []
 
+    def __init__(self, tool_path:Path):
+        self.logger:Logger = container.get("log")
+        self.mcp_tool:FuncCall = container.get("MCP")
+        #tool
+        self.get_files_in_folder(str(tool_path))
+        self._load_registered_tools()
+
     @classmethod
     def register(cls, tool_json: dict):
-        """工具注册装饰器
+        """工具注册装饰器,如果有message_data参数会自动注入聊天的时候传入的消息
 
         用法::
 
@@ -38,15 +45,37 @@ class tool_calls:
             return func
         return decorator
 
-    def __init__(self, tool_path:Path):
-        self.logger:Logger = container.get("log")
-        self.mcp_tool:FuncCall = container.get("MCP")
-        """掌管MCP的""" 
-        
-        #tool
-        self.get_files_in_folder(str(tool_path))
-        self._load_registered_tools()
-        
+    @classmethod
+    def register_tool(
+        cls,
+        name: str,
+        description: str,
+        properties: dict | None = None,
+    ):
+        """工具注册装饰器（便捷版）
+        如果有 message_data 参数会自动注入聊天时传入的消息。
+
+        用法::
+
+            @tool_calls.register_tool(
+                name="my_tool",
+                description="工具描述",
+                properties={
+                    "param": {"type": "string", "description": "参数描述"}
+                }
+            )
+            async def my_tool(param: str):
+                ...
+        """
+        tool_json = {
+            "name": name,
+            "description": description,
+            "properties": properties or {},
+        }
+        def decorator(func: Any) -> Any:
+            cls._registry.append((tool_json, func))
+            return func
+        return decorator
 
     def _load_registered_tools(self) -> None:
         """加载通过 @tool_calls.register 装饰器注册的工具"""
@@ -58,11 +87,10 @@ class tool_calls:
                 handler=func,
             )
 
-    async def calls(self, tool_name:str, arguments_str:str)-> CallToolResult | Any:
+    async def calls(self, tool_name: str, arguments_str: str, message_data: Any = None) -> CallToolResult | Any:
         """调用工具"""
         if func_tool := self.mcp_tool.get_func(tool_name):
-            #MCP工具的调用
-            return await func_tool.execute(**json.loads(arguments_str))
+            return await func_tool.execute(_message_data=message_data, **json.loads(arguments_str))
         else:
             raise Exception(f"Request function {tool_name} not found.")
 

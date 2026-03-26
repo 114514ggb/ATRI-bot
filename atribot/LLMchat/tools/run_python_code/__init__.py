@@ -5,7 +5,7 @@ from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import FileMessageSegment
+from atribot.core.type.chat_message_type import ChatMessage, FileMessageSegment
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
 from atribot.LLMchat.tools.run_python_code.run_code import run_python_code_with_segments
 
@@ -17,10 +17,6 @@ tool_json = {
     "name": "run_python_code",
     "description": "在沙盒中执行Python代码,可传入输入文件并返回执行结果与新生成文件。可用库:numpy, pandas, matplotlib, seaborn, pillow, opencv-python-headless。图表如需显示中文,linux 系统中有安装 fonts-wqy-zenhei 字体,环境中还有ffmpeg",
     "properties": {
-        "group_id": {
-            "type": "number",
-            "description": "所在的当前群号",
-        },
         "code": {
             "type": "string",
             "description": "The Python code to execute"
@@ -35,10 +31,11 @@ tool_json = {
     }
 }
 
-async def main(code:str, group_id:int, files:list[str] | None = None):
-    
+async def main(code: str, message_data: ChatMessage, files: list[str] | None = None) -> str:
+
     file_segments = []
-    
+    group_id = message_data.group_id
+
     if files:
         remaining_files = set(files)
 

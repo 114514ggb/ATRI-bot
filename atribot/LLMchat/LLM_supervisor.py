@@ -7,6 +7,7 @@ from mcp.types import CallToolResult
 
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import Context, ToolCallsStopIteration
+from atribot.core.type.chat_message_type import ChatMessage
 from atribot.LLMchat.MCP.model_tools import tool_calls
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
@@ -56,6 +57,8 @@ class GenerationRequest():
     如果是调用工具时出现api响应错误时重试的时候这个会有值\n
     如果是初始请求则为None
     """
+    message_data: ChatMessage = None
+    """触发此次请求的 ChatMessage,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
 
 @dataclass(slots=True)
 class GenerationRequestSimplify():
@@ -81,6 +84,8 @@ class GenerationRequestSimplify():
     如果是调用工具时出现api响应错误时重试的时候这个会有值\n
     如果是初始请求则为None
     """
+    message_data: ChatMessage|None = None
+    """触发此次请求的 ChatMessage,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
 
 class LLMSRequestFailed(Exception):
     """LLM请求失败异常
@@ -311,7 +316,7 @@ class LLMCoordinator():
                     tool_name = function['name']
                     tool_input = function['arguments']
 
-                    tool_output: CallToolResult | Any = await self.tool_management.calls(tool_name,tool_input)
+                    tool_output: CallToolResult | Any = await self.tool_management.calls(tool_name, tool_input, request.message_data)
                     tool_output = self.format_mcp_result(tool_output) if isinstance(tool_output,CallToolResult) else str(tool_output)
                     
                 except ToolCallsStopIteration:
