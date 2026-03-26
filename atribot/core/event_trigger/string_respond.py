@@ -38,7 +38,7 @@ class string_response:
         
         self.automaton.make_automaton()
         
-    async def manage(self, message:ChatMessage, data)->None:
+    async def manage(self, message:ChatMessage, data) -> bool:
         """主处理逻辑"""
         group_id = message.group_id
         
@@ -54,11 +54,13 @@ class string_response:
         
         if time.time() - (await self.context_management.get_group_context(group_id)).last_msg_at < 5:
             #如果间隔太短不处理
-            return 
+            return False
         
         if template := self.process_string(data['raw_message']):
             send_type, document = template
             await send(send_type, document)
+            return True
+        return False
         
     def process_string(self, text: str) -> Tuple[ResponseType, Union[str, List[str], Dict[str, Any]]] | None:
         """

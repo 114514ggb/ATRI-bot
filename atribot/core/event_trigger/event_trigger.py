@@ -25,26 +25,26 @@ class EventType(Enum):
 
 
 class EventTrigger:
-    """事件分类触发器，支持装饰器注册钩子。
+    """事件分类触发器(用于处理非主聊天等效果的之外的消息分发处理)
 
-    该类用于根据事件类型 (post_type) 将事件分发给对应的处理函数。
-    支持通过装饰器的方式注册特定条件下的事件处理器。
+    该类用于根据事件类型 (post_type) 将事件分发给对应的处理函数
+    支持通过装饰器的方式注册特定条件下的事件处理器，如果返回一个真值就不会继续传递这个消息了
 
     用法示例:
         trigger = EventTrigger()
 
         @trigger.on_notice(lambda data: data.get('sub_type') == 'poke')
-        async def my_poke_handler(group_id: int, data: dict) -> None:
+        async def my_poke_handler(message:ChatMessage, data: dict) -> bool::
             pass
 
         # 无条件响应所有消息
         @trigger.on_message()
-        async def my_message_handler(group_id: int, data: dict) -> None:
+        async def my_message_handler(message:ChatMessage, data: dict) -> bool:
             pass
     """
 
     def __init__(self):
-        """初始化 EventTrigger 实例，并注册默认的事件处理器。"""
+        """初始化 EventTrigger 实例，并注册默认的事件处理器"""
         self.log: Logger = container.get("log")
         self.send_message:QQAPIClient = container.get("SendMessage")
         self.str_response = string_response()
@@ -69,15 +69,16 @@ class EventTrigger:
         )(self.manage_add_group)
 
     def on(self, event_type: EventType, condition: Optional[Callable] = None) -> Callable:
-        """注册事件处理钩子的通用装饰器工厂。
+        """注册事件处理钩子的通用装饰器工厂
 
         Args:
-            event_type (EventType): 需要监听的事件类型枚举。
+            event_type (EventType): 需要监听的事件类型枚举
             condition (Optional[Callable], optional): 过滤条件函数。接收原始 data 字典作为参数，
                 返回 bool 值。如果为 None,则无条件响应所有该类型的事件。默认为 None。
 
         Returns:
-            Callable: 装饰器函数。被装饰的函数签名应为 `async def handler(group_id: int, data: dict) -> None`。
+            Callable: 装饰器函数。被装饰的函数签名应为 `async def handler(message:ChatMessage, data: dict) -> bool:`
+            如果函数返回一个真值就不会继续传递这个消息了
         """
         def decorator(func: Callable) -> Callable:
             self._processors[event_type].append((condition if condition is not None else (lambda _: True), func))
@@ -86,57 +87,57 @@ class EventTrigger:
         return decorator
 
     def on_meta(self, condition: Optional[Callable] = None) -> Callable:
-        """注册元事件 (meta_event) 钩子。
+        """注册元事件 (meta_event) 钩子
 
         Args:
-            condition (Optional[Callable], optional): 过滤条件函数。默认为 None。
+            condition (Optional[Callable], optional): 过滤条件函数。默认为 None
 
         Returns:
-            Callable: 装饰器函数。
+            Callable: 装饰器函数
         """
         return self.on(EventType.META, condition)
 
     def on_request(self, condition: Optional[Callable] = None) -> Callable:
-        """注册请求事件 (request) 钩子。
+        """注册请求事件 (request) 钩子
 
         Args:
             condition (Optional[Callable], optional): 过滤条件函数。默认为 None。
 
         Returns:
-            Callable: 装饰器函数。
+            Callable: 装饰器函数
         """
         return self.on(EventType.REQUEST, condition)
 
     def on_notice(self, condition: Optional[Callable] = None) -> Callable:
-        """注册通知事件 (notice) 钩子。
+        """注册通知事件 (notice) 钩子
 
         Args:
             condition (Optional[Callable], optional): 过滤条件函数。默认为 None。
 
         Returns:
-            Callable: 装饰器函数。
+            Callable: 装饰器函数
         """
         return self.on(EventType.NOTICE, condition)
 
     def on_message(self, condition: Optional[Callable] = None) -> Callable:
-        """注册消息事件 (message) 钩子。
+        """注册消息事件 (message) 钩子
 
         Args:
             condition (Optional[Callable], optional): 过滤条件函数。默认为 None。
 
         Returns:
-            Callable: 装饰器函数。
+            Callable: 装饰器函数
         """
         return self.on(EventType.MESSAGE, condition)
 
     def on_message_sent(self, condition: Optional[Callable] = None) -> Callable:
-        """注册自身消息发送事件 (message_sent) 钩子。
+        """注册自身消息发送事件 (message_sent) 钩子
 
         Args:
             condition (Optional[Callable], optional): 过滤条件函数。默认为 None。
 
         Returns:
-            Callable: 装饰器函数。
+            Callable: 装饰器函数
         """
         return self.on(EventType.MESSAGE_SENT, condition)
 
@@ -155,11 +156,12 @@ class EventTrigger:
         for condition, handler in self._processors.get(event_type, []):
             if condition(data):
                 try:
-                    await handler(message, data)
+                    if await handler(message, data):
+                        break
                 except Exception as e:
                     self.log.exception(f"处理器执行失败: {handler.__name__}, 错误: {e}")
 
-    async def manage_group_inform(self, message:ChatMessage, data: dict) -> None:
+    async def manage_group_inform(self, message:ChatMessage, data: dict) -> bool:
         """管理群通知事件"""
 
         sub_type = data['sub_type']
@@ -178,8 +180,9 @@ class EventTrigger:
             await self.send_message.send_group_message(group_id, f"[CQ:at,qq={user_id}]({user_id})被[CQ:at,qq={data['operator_id']}]请出群聊！")
         elif sub_type == 'leave':
             await self.send_message.send_group_message(group_id, f"[CQ:at,qq={user_id}]({user_id})永久的离开了我们！希望以后安好~")
+        return True
             
-    async def manage_add_group(self, message:ChatMessage, data: dict) -> None:
+    async def manage_add_group(self, message:ChatMessage, data: dict) -> bool:
         """管理加群的请求"""
         white_list_gropup:dict = {
             1038698883 : [
@@ -194,10 +197,11 @@ class EventTrigger:
         if group_id in white_list_gropup and data['comment'] in white_list_gropup[group_id]:
             await self.send_message.set_group_add_request(data['flag'], True)
         else:
-            await self.send_message.send_group_message(group_id, f"有人申请加群了!\n验证信息:\n{data['comment']}") 
+            await self.send_message.send_group_message(group_id, f"有人申请加群了!\n验证信息:\n{data['comment']}")
+        return True
 
 
-    async def poke(self, message:ChatMessage, data: dict) -> None:
+    async def poke(self, message:ChatMessage, data: dict) -> bool:
         """戳一戳的反馈"""
         reactivity_list = [
             "使用 ATRI-bot 时出现错误，错误码为 1314。请给ATRI-bot投喂螃蟹以解决此问题~",
@@ -465,11 +469,12 @@ class EventTrigger:
             "我……我可以再说一次吗？亚托莉……最喜欢主人了。",
             "就算明天不会到来……此刻被主人抚摸着的亚托莉，是世界上最幸福的机器人。",
         ]
-        
+    
         text = random.choice(reactivity_list)
         group_id = message.group_id
         
         await self.send_message.send_group_message(group_id, text)
         await self.send_message.send_group_poke(group_id,data['user_id'])
+        return True
 
     
