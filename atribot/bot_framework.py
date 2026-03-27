@@ -70,6 +70,7 @@ class BotFramework:
         
         #MCP
         mcp_server = FuncCall(self.config.file_path.mcp_config)
+        mcp_server.load_presets_from_config(self.config.tool_presets)#加载工具列表配置
         self.create_background_task(mcp_server.mcp_service_selector())#放到后台不等待
         mcp_server.mcp_service_queue.put_nowait({"type": "init"})#初始化
         container.register(

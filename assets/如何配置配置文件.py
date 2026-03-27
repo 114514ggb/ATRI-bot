@@ -112,6 +112,24 @@
     "sand_box":{#这个是沙盒的的配置参数，需要看具体使用的沙盒实例来传递参数,默认使用的是docker，可以去atribot\LLMchat\sandbox\docker_sandbox.py看看class接受的参数
         "image":"atri-sandbox:latest"#启动的镜像名称
     },
+    "tool_presets": {#各个聊天模块所使用的工具列表,可以配置列表是空代表没有工具,配置为空值代表使用全部工具
+        "chat_full": [
+            "web_search", "web_extract",
+            "memory_search", "memory_storage",
+            "run_python_code",
+            "send_image_message", "send_speech_message",
+            "load_skill_prompt", "get_user_info",
+            "schedule_self_trigger"
+        ],
+        "chat_lite": [
+            "web_search", "memory_search",
+            "load_skill_prompt", "get_user_info"
+        ],
+        "tool_only": [
+            "run_python_code", "web_search", "web_extract"
+        ],
+        "使用全部工具": None
+    },
     "group_white_list":[
         984466158#有效的群白名单
     ],

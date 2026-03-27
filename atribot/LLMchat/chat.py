@@ -186,7 +186,7 @@ class GroupChat(chat_basics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.mcp_tool.get_func_desc_openai_style(),
+            tool_json=self.mcp_tool.get_func_desc_openai_style(preset=None),
             message_data=message
         )
         

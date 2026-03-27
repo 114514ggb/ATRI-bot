@@ -92,6 +92,24 @@
     "sand_box":{
         "image":"atri-sandbox:latest"
     },
+    "tool_presets": {
+        "chat_full": [
+            "web_search", "web_extract",
+            "memory_search", "memory_storage",
+            "run_python_code",
+            "send_image_message", "send_speech_message",
+            "load_skill_prompt", "get_user_info",
+            "schedule_self_trigger"
+        ],
+        "chat_lite": [
+            "web_search", "memory_search",
+            "load_skill_prompt", "get_user_info"
+        ],
+        "tool_only": [
+            "run_python_code", "web_search", "web_extract"
+        ],
+        "使用全部工具": null
+    },
     "group_white_list":[
     ],
     "group_initiative_chat_white_list":[
