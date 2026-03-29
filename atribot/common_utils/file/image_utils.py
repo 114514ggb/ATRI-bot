@@ -5,6 +5,8 @@ import io
 import aiohttp
 from PIL import Image
 
+from atribot.core.service_container import container
+
 
 def compress_image(image_bytes: bytes, max_size_kb: int) -> bytes:
     """
@@ -101,40 +103,31 @@ async def urls_list_to_base64(
                 失败的URL对应位置返回空字符串。
     """
     semaphore = asyncio.Semaphore(concurrency)
+    session:aiohttp.ClientSession = container.get("HTTPClient").session
 
-    async with aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=concurrency * 2),
-        headers={
-            "User-Agent": "QQ/9.9.21-39038 CFNetwork/1220.1 Darwin/20.3.0",
-            "Accept": "image/*;q=0.8",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Connection": "keep-alive",
-            "Cache-Control": "no-cache",
-            "Pragma": "no-cache",
-        },
-        timeout=aiohttp.ClientTimeout(total=30),
-    ) as session:
+    async def fetch(url: str) -> str:
+        async with semaphore:
+            try:
+                async with session.get(
+                    url,
+                    headers={"Accept": "image/*;q=0.8"},
+                ) as resp:
+                    if resp.status != 200:
+                        return ""
 
-        async def fetch(url: str) -> str:
-            async with semaphore:
-                try:
-                    async with session.get(url) as resp:
-                        if resp.status != 200:
-                            return ""
+                    content = await resp.read()
+                    if len(content) == 0:
+                        return ""
 
-                        content = await resp.read()
-                        if len(content) == 0:
-                            return ""
+                    if max_size_kb is not None:
+                        content = await asyncio.to_thread(compress_image, content, max_size_kb)
 
-                        if max_size_kb is not None:
-                            content = await asyncio.to_thread(compress_image, content, max_size_kb)
+                    return f"{prefix}{base64.b64encode(content).decode('utf-8')}"
+            except Exception as error:
+                print(f"下载失败 {url}: {error}")
+                return ""
 
-                        return f"{prefix}{base64.b64encode(content).decode('utf-8')}"
-                except Exception as error:
-                    print(f"下载失败 {url}: {error}")
-                    return ""
-
-        return await asyncio.gather(*(fetch(url) for url in urls))
+    return await asyncio.gather(*(fetch(url) for url in urls))
 
 
 async def url_to_base64(
@@ -167,29 +160,16 @@ async def url_to_base64(
         失败时返回空字符串。
     """
     try:
-        async with aiohttp.ClientSession(
-            headers={
-                "User-Agent": "QQ/9.9.21-39038 CFNetwork/1220.1 Darwin/20.3.0",
-                "Accept": "image/*;q=0.8",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Connection": "keep-alive",
-                "Cache-Control": "no-cache",
-                "Pragma": "no-cache",
-            },
-            timeout=aiohttp.ClientTimeout(total=30),
-        ) as session:
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    return ""
-
-                content = await resp.read()
-                if len(content) == 0:
-                    return ""
-
-                if max_size_kb is not None:
-                    content = await asyncio.to_thread(compress_image, content, max_size_kb)
-
-                return f"{prefix}{base64.b64encode(content).decode('utf-8')}"
+        http = container.get("HTTPClient")
+        content = await http.get_bytes(
+            url,
+            headers={"Accept": "image/*;q=0.8"},
+        )
+        if not content:
+            return ""
+        if max_size_kb is not None:
+            content = await asyncio.to_thread(compress_image, content, max_size_kb)
+        return f"{prefix}{base64.b64encode(content).decode('utf-8')}"
     except Exception as error:
         print(f"下载失败 {url}: {error}")
         return ""

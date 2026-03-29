@@ -6,6 +6,8 @@ from typing import List, Optional, Union
 
 import aiohttp
 
+from atribot.core.service_container import container
+
 
 class pictureProcessing:
     
@@ -36,23 +38,23 @@ class pictureProcessing:
         
         url = f"https://gen.pollinations.ai/image/{urllib.parse.quote(prompt)}"
 
-        async with aiohttp.ClientSession(headers=self.HEADERS) as session:
-            for attempt in range(3):
-                try:
-                    async with session.get(url, params=params, timeout=20) as response:
-                        if response.status >= 500 and attempt < 2:
-                            await asyncio.sleep(1)
-                            continue
-                        
-                        response.raise_for_status()
-                        return base64.b64encode(await response.read()).decode('utf-8')
-                        
-                except aiohttp.ClientError as e:
-                    if attempt == 2:
-                        raise aiohttp.ClientError(f"网络请求错误: {e}")
-                except Exception as e:
-                    if attempt == 2:
-                        raise Exception(f"图片生成失败: {e}")
+        session:aiohttp.ClientSession = container.get("HTTPClient").session
+        for attempt in range(3):
+            try:
+                async with session.get(url, params=params, headers=self.HEADERS, timeout=20) as response:
+                    if response.status >= 500 and attempt < 2:
+                        await asyncio.sleep(1)
+                        continue
+                    
+                    response.raise_for_status()
+                    return base64.b64encode(await response.read()).decode('utf-8')
+                    
+            except aiohttp.ClientError as e:
+                if attempt == 2:
+                    raise aiohttp.ClientError(f"网络请求错误: {e}")
+            except Exception as e:
+                if attempt == 2:
+                    raise Exception(f"图片生成失败: {e}")
 
     @classmethod
     async def generate_image_base64(
@@ -122,16 +124,16 @@ class pictureProcessing:
     
         last_exception = None
         
-        async with aiohttp.ClientSession(headers=cls.HEADERS) as session:
-            for _ in range(3):
-                try:
-                    async with session.get(url, params=params, timeout=timeout) as response:
-                        response.raise_for_status()
-                        return base64.b64encode(await response.read()).decode('utf-8')
-                        
-                except (aiohttp.ClientError, Exception) as e:
-                    last_exception = e
-                    await asyncio.sleep(0.5)
+        session:aiohttp.ClientSession = container.get("HTTPClient").session
+        for _ in range(3):
+            try:
+                async with session.get(url, params=params, headers=cls.HEADERS, timeout=timeout) as response:
+                    response.raise_for_status()
+                    return base64.b64encode(await response.read()).decode('utf-8')
+                    
+            except (aiohttp.ClientError, Exception) as e:
+                last_exception = e
+                await asyncio.sleep(0.5)
 
         if isinstance(last_exception, aiohttp.ClientError):
             raise aiohttp.ClientError(f"网络请求失败: {last_exception}")

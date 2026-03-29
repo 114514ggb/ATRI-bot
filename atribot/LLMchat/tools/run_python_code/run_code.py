@@ -10,6 +10,7 @@ import zipfile
 import aiohttp
 
 from atribot.common_utils import resolve_file_to_bytes
+from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import File, FileMessageSegment
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
@@ -78,12 +79,8 @@ async def _download_https_file(url: str) -> bytes:
     if not url.startswith("https://"):
         raise ValueError(f"文件地址必须是 https:// ，当前为: {url}")
 
-    timeout = aiohttp.ClientTimeout(total=30, connect=10)
-    async with aiohttp.ClientSession(timeout=timeout) as session:
-        async with session.get(url) as response:
-            if response.status < 200 or response.status >= 300:
-                raise ValueError(f"下载文件失败，状态码: {response.status}，url: {url}")
-            return await response.read()
+    http:HTTPClient = container.get("HTTPClient")
+    return await http.get_bytes(url, timeout=aiohttp.ClientTimeout(total=30, connect=10))
 
 
 async def _collect_generated_files(

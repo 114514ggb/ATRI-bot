@@ -6,6 +6,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from atribot.common_utils.http_client import HTTPClient
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
@@ -59,7 +60,11 @@ class BotFramework:
         #配置参数
         self.config = atriConfig()
         container.register("config",self.config)
-        
+
+        #统一HTTP客户端
+        http_client = HTTPClient()
+        container.register("HTTPClient", http_client, cleanup=http_client.close)
+
         # 时间触发器,后面服务会依赖就只能放最前面了
         TriggerSupervisor = TimeTriggerSupervisor()
         container.register(

@@ -1,4 +1,5 @@
-import aiohttp
+from atribot.common_utils.http_client import HTTPClient
+from atribot.core.service_container import container
 
 
 async def search_music(keywords: str, limit: int = 5) -> list[dict]:
@@ -21,9 +22,8 @@ async def search_music(keywords: str, limit: int = 5) -> list[dict]:
         "Accept-Encoding": "gzip, deflate",
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, data=data, headers=headers) as response:
-            response_data = await response.json()
+    http:HTTPClient = container.get("HTTPClient")
+    response_data = await http.post_form(url, data, headers=headers)
 
     return [
         {"name": music_item["name"], "id": music_item["id"]}

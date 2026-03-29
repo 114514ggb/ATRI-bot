@@ -1,10 +1,9 @@
-import asyncio
 import base64
 import os
 from urllib.parse import urlparse
 
-import aiohttp
-
+from atribot.common_utils.http_client import HTTPClient
+from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import File
 
 
@@ -93,26 +92,12 @@ async def download_binary(url: str, max_bytes: int = 20 * 1024 * 1024) -> bytes:
         >>> len(data)
         1024
     """
-    timeout = aiohttp.ClientTimeout(total=30, connect=10)
-    headers = {
-        "User-Agent": "QQ/9.9.27-45758 CFNetwork/1220.1 Darwin/20.3.0",
-        "Accept": "*/*",
-        "Connection": "keep-alive",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-    }
-
+    http:HTTPClient = container.get("HTTPClient")
     try:
-        async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
-            async with session.get(url) as resp:
-                if resp.status < 200 or resp.status >= 300:
-                    raise ValueError(f"下载失败，状态码: {resp.status}")
-
-                data = await resp.content.read(max_bytes + 1)
-                if len(data) > max_bytes:
-                    raise ValueError(f"下载文件超过大小限制 ({max_bytes} bytes)")
-                return data
-    except (aiohttp.ClientError, asyncio.TimeoutError) as error:
+        return await http.get_bytes(url, max_bytes)
+    except ValueError:
+        raise
+    except Exception as error:
         raise ValueError(f"下载文件失败: {error}") from error
 
 

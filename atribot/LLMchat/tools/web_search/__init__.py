@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional
 
-import aiohttp
-
+from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
 
 headers = {
@@ -143,7 +142,7 @@ async def web_search(
     """
     Tavily Search api
     https://docs.tavily.com/documentation/api-reference/endpoint/search
-    该函数封装了 Tavily Search API，支持通用搜索和新闻搜索，允许自定义搜索深度、
+    该函数封装了 Tavily Search API,支持通用搜索和新闻搜索,允许自定义搜索深度、
     时间范围、结果数量以及内容过滤（如包含/排除特定域名）。
 
     Args:
@@ -237,15 +236,10 @@ async def web_search(
     if include_answer:
         payload["include_answer"] = include_answer
 
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            url="https://api.tavily.com/search",
-            headers=headers,
-            json=payload
-        ) as resp:
-            json = await resp.json()
-            print(json)
-            return format_search_results(json)
+    http:HTTPClient = container.get("HTTPClient")
+    data = await http.post_json("https://api.tavily.com/search", payload, headers=headers)
+    print(data)
+    return format_search_results(data)
         
 
 
@@ -367,23 +361,12 @@ async def web_extract(
     if timeout:
         payload["timeout"] = timeout
 
-    async with aiohttp.ClientSession() as session:
-        try:
-            async with session.post(
-                url="https://api.tavily.com/extract",
-                headers=headers,
-                json=payload
-            ) as resp:
-                # 处理非 200 错误
-                if resp.status != 200:
-                    error_text = await resp.text()
-                    return f"❌ API 请求失败: {resp.status} - {error_text}"
-                
-                data = await resp.json()
-                # print(json.dumps(data, indent=2, ensure_ascii=False)) # 调试用
-                return format_extract_results(data)
-        except Exception as e:
-            return f"❌ 请求过程中发生异常: {str(e)}"
+    http:HTTPClient = container.get("HTTPClient")
+    try:
+        data = await http.post_json("https://api.tavily.com/extract", payload, headers=headers)
+        return format_extract_results(data)
+    except Exception as e:
+        return f"❌ 请求过程中发生异常: {str(e)}"
 
 
 def format_extract_results(response_data: Dict[str, Any]) -> str:

@@ -2,6 +2,8 @@ import asyncio
 
 import aiohttp
 
+from atribot.core.service_container import container
+
 
 async def download_text(
     url: str,
@@ -33,19 +35,15 @@ async def download_text(
         >>> txt = await download_text('https://example.com/legacy.txt', encoding='gbk')
     """
     try:
-        async with aiohttp.ClientSession(
+        session:aiohttp.ClientSession = container.get("HTTPClient").session
+        async with session.get(
+            url,
             headers={
-                'User-Agent': 'QQ/9.9.21-39038 CFNetwork/1220.1 Darwin/20.3.0',
                 'Accept': 'text/plain,text/html,text/*,application/json,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
                 'Range': f'bytes=0-{max_bytes-1}',
             },
-            timeout=aiohttp.ClientTimeout(total=30, connect=10)
-        ) as session:
-            async with session.get(url) as resp:
+            timeout=aiohttp.ClientTimeout(total=30, connect=10),
+        ) as resp:
                 if resp.status not in (200, 206):
                     return ""
                 
@@ -74,7 +72,7 @@ async def download_text(
                 if len(text) > max_chars:
                     return text[:max_chars] 
                 return text
-                
+
     except (aiohttp.ClientError, asyncio.TimeoutError) as e:
         print(f"下载失败 {url}: {e}")
         return ""

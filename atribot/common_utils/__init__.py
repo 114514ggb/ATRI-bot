@@ -3,6 +3,7 @@ from .db_format import format_memory_records
 from .file.file_utils import download_binary, resolve_file_to_bytes
 from .file.image_utils import compress_image, url_to_base64, urls_list_to_base64
 from .file.text_utils import download_text
+from .http_client import HTTPClient
 from .json_utils import extract_json_from_text
 from .message_utils import construction_message_dict, format_duration, parse_time_to_timestamp
 from .music import search_music
@@ -24,6 +25,7 @@ __all__ = [
     "extract_json_from_text",
     "format_duration",
     "format_memory_records",
+    "HTTPClient",
     "is_qq",
     "jaro_winkler_similarity",
     "levenshtein_distance",
