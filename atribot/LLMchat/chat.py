@@ -344,7 +344,9 @@ class GroupChat(chat_basics):
         else:
             async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""
-                message_builder.add_text(await self.image_processing(message.url))
+                Image_description_text = await self.image_processing(message.url)
+                self.log.info(f"图像识别文本结果:{Image_description_text}")
+                message_builder.add_text(Image_description_text)
 
         async def append_segments(segments) -> None:
             """用来统一处理对各种不同类型的消息段的加入"""
