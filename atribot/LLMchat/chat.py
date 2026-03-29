@@ -11,14 +11,14 @@ from atribot.common_utils import download_text, extract_json_from_text, url_to_b
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import Context, MessageBuilder
-from atribot.core.type.chat_message_type import (
+from atribot.core.type.chat_message_types import (
     ChatMessage,
     FileMessageSegment,
     FileSegment,
     ImageSegment,
     ReplySegment,
 )
+from atribot.core.type.context_types import Context, MessageBuilder
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import (
     GenerationRequestSimplify,

@@ -10,23 +10,23 @@ async def download_text(
     encoding: str | None = None,
 ) -> str:
     """
-    流式下载文本文件，支持字节和字符双重限制，防止大文件爆内存
+    流式下载文本文件,支持字节和字符双重限制,防止大文件爆内存
     
-    优先使用 HTTP Range 请求只下载前 max_bytes 字节，节省带宽。
-    若服务器不支持 Range，则通过流式读取限制在 max_bytes 后强制断开。
+    优先使用 HTTP Range 请求只下载前 max_bytes 字节,节省带宽。
+    若服务器不支持 Range,则通过流式读取限制在 max_bytes 后强制断开。
     
     Args:
         url: 文件URL
-        max_chars: 最大字符数（解码后截断），默认4000字符
-        max_bytes: 最大下载字节数（网络传输硬限制），默认100KB
-        encoding: 指定编码如'utf-8'，None则自动检测
+        max_chars: 最大字符数（解码后截断）,默认4000字符
+        max_bytes: 最大下载字节数（网络传输硬限制）,默认100KB
+        encoding: 指定编码如'utf-8',None则自动检测
     
     Returns:
         str: 文本内容。失败、超时或非文本内容返回空字符串。
-            若内容超过 max_chars，返回前 max_chars 个字符（带省略号提示可自定义）。
+            若内容超过 max_chars,返回前 max_chars 个字符（带省略号提示可自定义）。
     
     Examples:
-        >>> # 下载代码文件，最多1MB字节/5000字符
+        >>> # 下载代码文件,最多1MB字节/5000字符
         >>> code = await download_text('https://example.com/large.log', max_bytes=1024*512, max_chars=5000)
         >>> 
         >>> # 明确指定GBK编码

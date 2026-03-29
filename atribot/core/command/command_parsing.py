@@ -9,7 +9,7 @@ from atribot.common_utils import jaro_winkler_similarity
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_types import ChatMessage
 
 
 class ParamType(Enum):

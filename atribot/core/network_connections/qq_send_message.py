@@ -7,7 +7,7 @@ from atribot.core.atri_config import FilePathConfig
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import GroupMessage, PrivateMessage, SendMessage
+from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 
 # import asyncio
 """

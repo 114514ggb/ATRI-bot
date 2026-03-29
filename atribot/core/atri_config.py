@@ -8,7 +8,7 @@ from typing import Any, Dict, Mapping
 class ConfigObject(dict):
     """将字典转换为支持点操作访问的对象
 
-    该类继承自 dict，允许通过属性访问（.）来读取、设置和删除字典中的项
+    该类继承自 dict 允许通过属性访问（.）来读取、设置和删除字典中的项
     如果值是嵌套字典，它也会被递归地转换为 ConfigObject
     """
 

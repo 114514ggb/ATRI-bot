@@ -7,7 +7,7 @@ from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.event_trigger.string_respond import string_response
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_types import ChatMessage
 
 
 class EventType(Enum):

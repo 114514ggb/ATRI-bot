@@ -5,7 +5,7 @@ from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import ChatMessage, FileMessageSegment
+from atribot.core.type.chat_message_types import ChatMessage, FileMessageSegment
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
 from atribot.LLMchat.tools.run_python_code.run_code import run_python_code_with_segments
 

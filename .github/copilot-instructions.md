@@ -66,7 +66,7 @@ class ChatMessage:
 
 ### MessageBuilder（多模态消息构建）
 ```python
-from atribot.core.type.bot_types import MessageBuilder
+from atribot.core.type.context_types import MessageBuilder
 
 msg = (MessageBuilder()
     .add_text("说明文字")

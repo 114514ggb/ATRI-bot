@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from asyncpg import Record
 
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import Context
+from atribot.core.type.context_types import Context
 from atribot.LLMchat.memory.prompts import (
     FACT_RETRIEVAL_PROMPT,
     PURE_GROUP_FACT_RETRIEVAL_PROMPT,

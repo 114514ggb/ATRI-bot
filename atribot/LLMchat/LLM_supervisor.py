@@ -6,8 +6,8 @@ from typing import Any, Dict, List
 from mcp.types import CallToolResult
 
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import Context, ToolCallsStopIteration
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.context_types import Context, ToolCallsStopIteration
 from atribot.LLMchat.MCP.model_tools import tool_calls
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics

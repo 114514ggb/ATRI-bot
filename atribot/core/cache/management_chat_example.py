@@ -1,13 +1,12 @@
 from logging import Logger
-
-# from collections import defaultdict
 from typing import Dict, List
 
 from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
-from atribot.core.type.bot_types import Context, GroupContext, LLMGroupChatCondition, PrivateContext
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition, PrivateContext
+from atribot.core.type.context_types import Context
 
 
 class ChatManager:

@@ -5,7 +5,7 @@ from typing import Any, Optional
 
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import Context
+from atribot.core.type.context_types import Context
 
 
 class ContextContainer:

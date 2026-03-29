@@ -11,7 +11,7 @@ import aiohttp
 
 from atribot.common_utils import resolve_file_to_bytes
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import File, FileMessageSegment
+from atribot.core.type.chat_message_types import File, FileMessageSegment
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile
 

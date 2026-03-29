@@ -9,8 +9,8 @@ from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import GroupContext
-from atribot.core.type.chat_message_type import AtSegment, ChatMessage
+from atribot.core.type.chat_message_types import AtSegment, ChatMessage
+from atribot.core.type.chat_types import GroupContext
 from atribot.LLMchat.chat import GroupChat
 from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.memory.memory_system import memorySystem

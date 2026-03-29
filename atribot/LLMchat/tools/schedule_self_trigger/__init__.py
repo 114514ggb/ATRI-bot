@@ -4,7 +4,7 @@ from typing import Optional
 
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
-from atribot.core.type.chat_message_type import ChatMessage, TextSegment
+from atribot.core.type.chat_message_types import ChatMessage, TextSegment
 from atribot.LLMchat.chat import GroupChat
 
 tool_json = {

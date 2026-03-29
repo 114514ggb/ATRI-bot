@@ -3,8 +3,8 @@ from typing import List, Literal, Optional
 
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import GroupContext, LLMGroupChatCondition
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition
 from atribot.LLMchat.chat import GroupChat
 
 

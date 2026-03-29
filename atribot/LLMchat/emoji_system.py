@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import Match
 
-from atribot.core.type.chat_message_type import File, GroupMessage
+from atribot.core.type.chat_message_types import File, GroupMessage
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 
 

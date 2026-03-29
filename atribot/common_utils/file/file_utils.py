@@ -5,18 +5,18 @@ from urllib.parse import urlparse
 
 import aiohttp
 
-from atribot.core.type.chat_message_type import File
+from atribot.core.type.chat_message_types import File
 
 
 def _normalize_file_input(file_input: File | str) -> str:
     """标准化文件输入，返回统一格式的源字符串。
     
     将不同类型的文件输入转换为统一的字符串格式，支持 File 对象、文件路径、
-    或已经标准化的URI（file://, http://, https://, base64://）。
+    或已经标准化的URI(file://, http://, https://, base64://）。
     
     Args:
         file_input: 文件输入，可以是 File 对象或字符串。
-            如果是字符串，可以是本地路径或已标准化的URI。
+            如果是字符串,可以是本地路径或已标准化的URI。
     
     Returns:
         标准化后的文件源字符串，格式为 file://path, http(s)://url 或 base64://data。
@@ -43,7 +43,7 @@ def _normalize_file_input(file_input: File | str) -> str:
 def _filename_from_source(source: str, default_name: str) -> str:
     """从文件源字符串中提取文件名。
     
-    根据不同的文件类型（本地、HTTP、HTTPS），从源字符串中解析出文件名。
+    根据不同的文件类型(本地、HTTP、HTTPS)从源字符串中解析出文件名。
     如果无法解析，则返回默认文件名。
     
     Args:
@@ -123,7 +123,7 @@ async def resolve_file_to_bytes(
 ) -> tuple[str, bytes]:
     """将文件输入解析为二进制数据和文件名。
     
-    支持多种文件输入类型：本地文件、HTTP/HTTPS URL、Base64编码数据。
+    支持多种文件输入类型:本地文件、HTTP/HTTPS URL、Base64编码数据。
     自动处理文件的标准化、下载和解码过程。
     
     Args:
@@ -131,10 +131,10 @@ async def resolve_file_to_bytes(
             支持的格式：
             - File 对象：从对象的 file 属性获取源
             - 本地路径：自动转换为 file:// 格式
-            - HTTP/HTTPS URL：直接下载
-            - Base64数据：格式为 base64://base64_encoded_data
+            - HTTP/HTTPS URL:直接下载
+            - Base64数据:格式为 base64://base64_encoded_data
         default_name: 当无法从源中提取文件名时的默认名称。
-        max_bytes: 最大允许的文件大小（字节），默认20MB。
+        max_bytes: 最大允许的文件大小(字节)默认20MB。
     
     Returns:
         包含文件名和二进制数据的元组 (filename, bytes_data)。
