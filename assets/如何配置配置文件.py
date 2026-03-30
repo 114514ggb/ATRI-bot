@@ -8,7 +8,7 @@
         "url":"127.0.0.1:8888", #连接端口在WebSocket_client和http的时候需要
         "host":"127.0.0.1", #作为服务端的时候开的端口
         "server_port":8888, #作为服务端的时候开的端口号
-        "admin_port":1314#Web管理面板
+        "admin_port":1314 #Web管理面板端口号
     },
     "root_user_id": 114514,#root用户的qq号，有执行命令的最高权限，不管在哪个群都会无视其他配置名单强制接受这个qq号的消息
     "account":{
@@ -39,7 +39,6 @@
         {
             "supplier":"deepseek",#配置的聊天模型来自的供应商
             "model_name":"deepseek-chat",#配置的聊天模型名称
-            "visual_sense":False,#模型是否有视觉，是否能接收图片
             "user_global_context":True #决定了上下文的存在在形式,是一个群共用一个上下文，还是每个user单独的上下文
         },
         "chat_parameter":{#聊天模型会使用的参数配置
@@ -53,6 +52,14 @@
         "detection_image":{#用于视觉辅助,给没有的视觉的模型提供文字描述使用的模型
             "supplier":"bigModel",
             "model_name":"GLM-4.1V-Thinking-Flash"
+        },
+        "detection_audio":{#给没有的输入音频的模型提供文字描述使用的模型
+            "supplier":"",
+            "model_name":""
+        },
+        "detection_video":{
+            "supplier":"",
+            "model_name":""
         },
         "memory":{#总结群聊天内容做为模型记忆的模型
             "summarize_model":{
@@ -160,11 +167,14 @@
             #如果有的api文档里有写的话使用curl里面的url地址
             "api_key":"sk-????",#你的密匙这个可以是一个list类型，那样的话就可以输入多个密匙成为一个号池
             "models":{
-                "deepseek-chat": {#模型名称(对应上面使用的"model_name")和对应的模型参数，参数目前就一个有没有视觉
-                    "visual_sense": False #模型是否有视觉，是否能接收图片
+                "deepseek-chat": {#模型名称(对应上面使用的"model_name")和对应的模型参数
+                    "visual_sense": False,  #是否支持输入视觉/图像
+                    "audio_sense": False,   #是否支持输入音频/语音
+                    "video_sense": False,   #是否支持输入视频
+                    "document_sense": False  #是否支持输入复杂文档(如PDF解析)
+                    #可以输入的多模态类型
                 },
-                "deepseek-reasoner": {
-                    "visual_sense": False
+                "deepseek-reasoner": {#可以不写代表默认不支持
                 }
             }
         },

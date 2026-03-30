@@ -258,7 +258,7 @@ ATRI-main/
 ├─docker-compose.yml            # Docker Compose 启动配置
 ├─README.md / README.en.md      # 中英文说明文档
 ├─requirements-*.txt            # 各平台依赖导出文件
-├─assets/                       # ⚙️ 配置文件、示例配置与 SQL 辅助脚本
+├─assets/                       # ⚙️ 配置文件、示例配置
 ├─atribot/                      # 核心代码
 │  ├─bot_framework.py           # Bot 初始化与整体装配入口
 │  ├─C/                         # C 扩展模块(没什么用，之前感觉py解析字符串太慢了整的,还需要编译真麻烦，现在感觉没必要)

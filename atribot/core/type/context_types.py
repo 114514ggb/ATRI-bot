@@ -57,15 +57,23 @@ class MessageBuilder:
         return self
 
     def add_video(self, url: str) -> "MessageBuilder":
-        """添加视频 URL（部分模型支持）"""
+        """添加视频 URL"""
         self._parts.append({
             "type": "video_url",
             "video_url": {"url": url}
         })
         return self
 
+    def add_video_base64(self, data: str, mime: str = "video/mp4") -> "MessageBuilder":
+        """添加 base64 视频"""
+        self._parts.append({
+            "type": "video_url",
+            "video_url": {"url": f"data:{mime};base64,{data}"}
+        })
+        return self
+
     def add_file(self, url: str, mime: str = "") -> "MessageBuilder":
-        """添加文件（如 PDF 等，部分模型支持）"""
+        """添加文件"""
         self._parts.append({
             "type": "file",
             "file": {"url": url, **({"mime_type": mime} if mime else {})}

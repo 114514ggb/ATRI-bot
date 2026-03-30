@@ -402,13 +402,13 @@ class LLMCoordinator():
     
     @staticmethod
     def format_mcp_result(result: CallToolResult) -> str:
-        """Formats the MCP tool execution result into a concise string.
+        """将 MCP 工具执行结果格式化为简洁的字符串
 
         Args:
-            result: The CallToolResult object containing execution status and content.
+            result:将 MCP 工具执行结果格式化为简洁的字符串
 
         Returns:
-            A string containing the formatted status and content.
+            包含格式化状态和内容的字符串
         """
         parts = [f"[{'ERROR' if result.isError else 'SUCCESS'}]"]
 

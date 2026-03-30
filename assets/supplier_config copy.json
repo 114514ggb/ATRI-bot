@@ -6,7 +6,10 @@
             "api_key":"sk-114514",
             "models":{
                 "deepseek-chat": {
-                    "visual_sense": false
+                    "visual_sense": false,
+                    "audio_sense": false,
+                    "video_sense": false,
+                    "document_sense": false
                 },
                 "deepseek-reasoner": {
                     "visual_sense": false

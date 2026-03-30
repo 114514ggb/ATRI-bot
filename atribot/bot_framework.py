@@ -25,6 +25,7 @@ from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 from atribot.LLMchat.MCP.model_tools import tool_calls
+from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
@@ -217,7 +218,10 @@ class BotFramework:
 
         #处理模型响应
         container.register("LLMSupervisor", LLMCoordinator())
-        
+
+        #多模态媒体转文本
+        container.register("MediaProcessor", MediaProcessor())
+
         #AIchat
         container.register("GroupChat", GroupChat())
 

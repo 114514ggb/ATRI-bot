@@ -135,10 +135,10 @@ CREATE TABLE IF NOT EXISTS atri_memory (
     user_id     BIGINT,
     group_id    BIGINT,             -- NULL=私聊或知识库, 其他=具体群
     event_time  BIGINT NOT NULL,    -- 记忆对应的事件时间,这个不一定和数据库时间一致,可能补充一个时间的记忆
-    --   user_id IS NULL  AND group_id IS NULL → 知识库
-    --   user_id NOT NULL AND group_id = NULL  → 私聊记忆
-    --   user_id NOT NULL AND group_id != 0    → 群聊中的用户记忆
-    --   user_id IS NULL  AND group_id != 0    → 群聊公共记忆/话题
+    --   user_id IS NULL  AND group_id IS NULL  → 知识库
+    --   user_id NOT NULL AND group_id IS NULL  → 私聊记忆
+    --   user_id NOT NULL AND group_id NOT NULL → 群聊中的用户记忆
+    --   user_id IS NULL  AND group_id NOT NULL → 群聊公共记忆/话题
     --   或许不严格按照这样也行,知识库绑定一个user或group,什么的?
     created_at  BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::bigint, -- 写入DB的时间,Unix时间戳(秒)
     event           TEXT,           -- 记忆的文本内容,应该长度大于2,这个就没必要在数据库层面限制了

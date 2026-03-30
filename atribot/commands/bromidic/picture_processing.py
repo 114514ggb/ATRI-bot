@@ -81,7 +81,7 @@ class pictureProcessing:
             height: 图片高度（像素）
             seed: 随机种子（可选）
             model: 生成模型，默认为 'gptimage'
-            image_url: 输入图片URL（用于图生图）
+            image_url: 输入图片URL(用于图生图)
             nologo: 是否禁用水印
             private: 是否私有模式
             enhance: 是否增强提示词

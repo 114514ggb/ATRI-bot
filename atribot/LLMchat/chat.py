@@ -7,7 +7,7 @@ from dataclasses import replace
 from logging import Logger
 from typing import Coroutine, Dict, List
 
-from atribot.common_utils import download_text, extract_json_from_text, url_to_base64
+from atribot.common_utils import download_text, extract_json_from_text, url_to_audio_base64, url_to_base64
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -16,7 +16,9 @@ from atribot.core.type.chat_message_types import (
     FileMessageSegment,
     FileSegment,
     ImageSegment,
+    RecordSegment,
     ReplySegment,
+    VideoSegment,
 )
 from atribot.core.type.context_types import Context, MessageBuilder
 from atribot.LLMchat.emoji_system import EmojiCore
@@ -27,10 +29,10 @@ from atribot.LLMchat.LLM_supervisor import (
     LLMSRequestFailed,
 )
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
+from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
-from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.skills.skills_manager import SkillsManager
 
@@ -72,11 +74,6 @@ class chat_basics(ABC):
         self.config = container.get("config")
         self.log: Logger = container.get("log")
         self.build_prompt = build_prompt()
-        
-        self.image_classifier_supplier:universal_ai_api = self.supplier.connections[
-            self.config.model.detection_image.supplier
-        ].connection_object
-        self.image_classifier_model:str = self.config.model.detection_image.model_name
 
     @abstractmethod
     async def step(self) -> None:
@@ -90,50 +87,28 @@ class chat_basics(ABC):
     async def send_reply_message_separator(self) -> None:
         """模型响应结束最终回复的阶段"""
 
-    async def image_processing(self, image_url: str) -> str:
-        """为不支持图片的model提供图片解析服务，支持多图片最大解析数量为5,
-
-        Args:
-            image_url:图像链接
-
-        Returns:
-            图片描述文本，如果没有图片则没有返回
-
-        Raises:
-            可能抛出网络请求或图片处理相关的异常
-        """
-        return_dict =await self.image_classifier_supplier.generate_text_lightweight(
-            model = self.image_classifier_model,
-            messages = [{
-                "role": "user",
-                "content": [
-                    {"type": "image_url", "image_url": {"url": image_url}},
-                    {"type": "text", "text": "请详细描述你看到的东西,上面是什么有什么在什么地方，如果上面有文字也要详细说清楚,如果有什么自己的理解可以说出来，如果上面是什么你认识的可以介绍一下"}
-                ]
-            }]
-        )
-        
-        try:
-            return return_dict['choices'][0]['message']['content']
-        except Exception: 
-            raise ValueError(f"识图出现错误:{return_dict}")
-
 class GroupChat(chat_basics):
     """处理群聊天"""
 
     def __init__(self):
         super().__init__()
-        self.model_api = self.supplier.connections[
+        model_supplier = self.supplier.connections[
             self.config.model.connect.supplier
-        ].connection_object
-        self.visual_sense = self.config.model.connect.visual_sense
+        ]
+        model_name = self.config.model.connect.model_name
+        
+        self.model_api = model_supplier.connection_object
+        self.visual_sense = model_supplier.model_dict[model_name].get("visual_sense", False)
+        self.audio_sense = model_supplier.model_dict[model_name].get("audio_sense", False)
+        self.video_sense = model_supplier.model_dict[model_name].get("video_sense", False)
         self.emoji_file_dict = self.emoji_core.emoji_file_dict
+        self.media_processor: MediaProcessor = container.get("MediaProcessor")
         self.api_order: list[dict[str, str]] = self.config.model.standby_model
         """备用api调用list"""
         
         self.template_request_simplify = GenerationRequestSimplify(
             model_api=self.model_api,
-            model=self.config.model.connect.model_name,
+            model=model_name,
             parameter=self.config.model.chat_parameter,
             messages=None
         )
@@ -175,6 +150,8 @@ class GroupChat(chat_basics):
             group_id=group_id,
             user_id=user_id,
             including_pictures=self.visual_sense,
+            including_audios=self.audio_sense,
+            including_videos=self.video_sense,
         )
         
         original_context:Context = await self.get_chat_context(
@@ -267,6 +244,8 @@ class GroupChat(chat_basics):
         group_id: int,
         user_id: int,
         including_pictures: bool,
+        including_audios: bool = False,
+        including_videos: bool = False,
     ) -> MessageBuilder:
         """构建提示结构
 
@@ -276,6 +255,8 @@ class GroupChat(chat_basics):
             group_id: 当前群组ID
             user_id: 当前用户ID
             including_pictures: 目标模型是否能够接收图像
+            including_audios: 目标模型是否能够接收音频
+            including_videos: 目标模型是否能够接收视频
 
         Returns:
             MessageBuilder: 包含组装好的提示负载的构建器
@@ -290,6 +271,8 @@ class GroupChat(chat_basics):
             message,
             message_builder,
             including_pictures,
+            including_audios,
+            including_videos,
         )
         message_builder.add_text(
             f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
@@ -312,6 +295,8 @@ class GroupChat(chat_basics):
         chat_message: ChatMessage,
         message_builder: MessageBuilder,
         including_pictures: bool,
+        including_audios: bool = False,
+        including_videos: bool = False,
     ) -> None:
         """为当前用户输入附加结构化的消息片段
 
@@ -319,6 +304,8 @@ class GroupChat(chat_basics):
             chat_message: 当前传入的聊天消息
             message_builder: 用于附加内容的提示构建器
             including_pictures: 目标模型是否能够接收图像
+            including_audios: 目标模型是否能够接收音频
+            including_videos: 目标模型是否能够接收视频
         """
         
         Segment = chat_message.segments[0]
@@ -344,9 +331,41 @@ class GroupChat(chat_basics):
         else:
             async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""
-                Image_description_text = await self.image_processing(message.url)
+                Image_description_text = await self.media_processor.image_to_text(message.url)
                 self.log.info(f"图像识别文本结果:{Image_description_text}")
                 message_builder.add_text(Image_description_text)
+
+        if including_audios:
+            async def dispose_audio(segment: RecordSegment) -> None:
+                """直接将音频以 base64 嵌入，下载失败时降级为文本识别"""
+                audio_url = segment.url or segment.file.file
+                try:
+                    b64, fmt = await url_to_audio_base64(audio_url, segment.file_name)
+                    message_builder.add_audio(b64, fmt)
+                except Exception as e:
+                    self.log.warning(f"音频下载失败，降级为文本识别: {e}")
+                    desc = await self.media_processor.audio_to_text(audio_url)
+                    message_builder.add_text(desc)
+        else:
+            async def dispose_audio(segment: RecordSegment) -> None:
+                """交给其他模型将音频转为文字"""
+                audio_url = segment.url or segment.file.file
+                desc = await self.media_processor.audio_to_text(audio_url)
+                self.log.info(f"音频识别文本结果:{desc}")
+                message_builder.add_text(desc)
+
+        if including_videos:
+            async def dispose_video(segment: VideoSegment) -> None:
+                """直接传入视频 URL 供模型理解"""
+                video_url = segment.url or segment.file.file
+                message_builder.add_video(video_url)
+        else:
+            async def dispose_video(segment: VideoSegment) -> None:
+                """交给其他模型将视频转为文字"""
+                video_url = segment.url or segment.file.file
+                desc = await self.media_processor.video_to_text(video_url)
+                self.log.info(f"视频识别文本结果:{desc}")
+                message_builder.add_text(desc)
 
         async def append_segments(segments) -> None:
             """用来统一处理对各种不同类型的消息段的加入"""
@@ -354,6 +373,12 @@ class GroupChat(chat_basics):
                 if isinstance(segment, FileMessageSegment):
                     if isinstance(segment, ImageSegment):
                         await dispose_img(segment)
+                        continue
+                    if isinstance(segment, RecordSegment):
+                        await dispose_audio(segment)
+                        continue
+                    if isinstance(segment, VideoSegment):
+                        await dispose_video(segment)
                         continue
                     if isinstance(segment, FileSegment):
                         if file_extension := segment.file_name.split('.')[-1].lower():
@@ -396,7 +421,7 @@ class GroupChat(chat_basics):
                 limit = 10
             )
         ] if len(chat_message.pure_text) >= 5 else False:#文本长度要大于一个值不然大概率没什么意义
-            message_builder.add_text(f"以下是可能相关的最近记忆片段：<recent_memory_snippet>{memory}</recent_memory_snippet>")
+            message_builder.add_text(f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>")
     
     async def reply_conduct(self, response_json:Dict, message:ChatMessage)->None:
         

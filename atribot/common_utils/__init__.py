@@ -2,6 +2,7 @@ from .async_exec import async_run_exec
 from .db_format import format_memory_records
 from .file.file_utils import download_binary, resolve_file_to_bytes
 from .file.image_utils import compress_image, url_to_base64, urls_list_to_base64
+from .file.media_utils import url_to_audio_base64, url_to_video_base64
 from .file.text_utils import download_text
 from .http_client import HTTPClient
 from .json_utils import extract_json_from_text
@@ -32,6 +33,8 @@ __all__ = [
     "parse_time_to_timestamp",
     "resolve_file_to_bytes",
     "search_music",
+    "url_to_audio_base64",
+    "url_to_video_base64",
     "timer",
     "url_to_base64",
     "urls_list_to_base64",

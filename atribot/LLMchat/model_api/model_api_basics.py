@@ -102,7 +102,7 @@ class model_api_basics(ABC):
     
     @abstractmethod
     async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
-        """向发起请求，获取json，参数自定,但是是以流式的方法处理数据，流式接受完成后返回总数据
+        """向发起请求,获取json,参数自定,但是是以流式的方法处理数据，流式接受完成后返回总数据
 
         Args:
             model (str): 模型名称
@@ -154,6 +154,76 @@ class model_api_basics(ABC):
             return data['choices'][0]['message']
         except EOFError:
             raise ValueError(data)
-    
+
+    async def generate_image(
+        self,
+        model: str,
+        prompt: str,
+        response_format: str = "b64_json",
+        n: int = 1,
+        size: str | None = None,
+        quality: str | None = None,
+        style: str | None = None,
+        extra_body: dict | None = None,
+        background: str | None = None,
+        output_format: str | None = None,
+        output_compression: int | None = None,
+        **kwargs,
+    ) -> list[str]:
+        """调用图像生成接口(open_ai兼容)，返回图片数据列表
+
+        Args:
+            model: 图像生成模型名称
+            prompt: 描述目标图像内容的文本提示词
+            response_format: 返回图片的格式，可选值为 b64_json 或 url,默认 b64_json
+            n: 本次请求生成的图片数量，默认为 1
+            size: 图片尺寸
+            quality: 图片质量
+            style: 图片风格
+            extra_body: 一些额外的参数
+            background: 图片背景
+            output_format: 输出图片格式
+                可选: "png" | "jpeg" | "webp"
+            output_compression: 输出图片压缩率 0-100(仅webp/jpeg 时有效）
+            **kwargs: 传递给底层 API 的其他额外参数
+
+        Returns:
+            长度为 n 的字符串列表。当 response_format="b64_json" 时，
+            列表元素为 Base64 编码的图片字符串；当 response_format="url"
+            时，列表元素为可直接访问的图片 URL
+
+        Raises:
+            ValueError: 当 API 返回错误或响应格式不符合预期时抛出
+        """
+        remainder: dict = {
+            "prompt": prompt,
+            "response_format": response_format,
+            "n": n,
+            **kwargs
+        }
+        if size is not None:
+            remainder["size"] = size
+        if quality is not None:
+            remainder["quality"] = quality
+        if style is not None:
+            remainder["style"] = style
+        if background is not None:
+            remainder["background"] = background
+        if extra_body is not None:
+            remainder["extra_body"] = extra_body
+        if output_format is not None:
+            remainder["output_format"] = output_format
+        if output_compression is not None:
+            remainder["output_compression"] = output_compression
+
+        data = await self.generate_json_ample(model, remainder=remainder)
+        try:
+            items = data["data"]
+            if response_format == "url":
+                return [item["url"] for item in items]
+            return [item["b64_json"] for item in items]
+        except (KeyError, TypeError):
+            raise ValueError(data)
+
     def __str__(self):
-        return f"url:{self.base_url},api_key:{self.base_url}"
+        return f"<model_api,url:{self.base_url}>"
