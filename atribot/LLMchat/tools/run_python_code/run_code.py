@@ -19,6 +19,18 @@ from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile
 sand_box:DockerSandbox = container.get("SandBox")
 
 
+def _group_dirs(group_id: int | None) -> tuple[str, str]:
+    """返回 (group_data_dir, shared_dir) 两个容器内绝对路径
+
+    group_data_dir 是该群的持久化数据目录;shared_dir 是所有群共享目录
+    执行结束后只清理 tmp/run_{uuid} 临时目录,data/ 目录永久保留
+    """
+    gid_str = str(group_id) if group_id is not None else "private"
+    group_data_dir = f"{sand_box.work_dir}/groups/{gid_str}/data"
+    shared_dir = f"{sand_box.work_dir}/shared"
+    return group_data_dir, shared_dir
+
+
 def _safe_filename(name: str) -> str:
     """提取安全的文件名。
 
@@ -266,12 +278,13 @@ async def run_python_code(
 
 async def run_python_code_with_segments(
     code: str,
+    group_id: int | None = None,
     file_segments: list[FileMessageSegment] | None = None,
     timeout: int = 30,
     max_file_size: int = 100 * 1024 * 1024,
     max_total_size: int = 200 * 1024 * 1024,
 ) -> ExecutionResult:
-    """在沙盒中执行 Python 代码（输入文件来自 FileMessageSegment）。
+    """在沙盒中执行 Python 代码
 
     约束：
     - 输入文件仅接受 `FileMessageSegment` 及其子类。
@@ -281,29 +294,34 @@ async def run_python_code_with_segments(
 
     Args:
         code: 要执行的 Python 代码字符串。
+        group_id: 群号,用于隔离持久化工作区目录,None / 私聊 使用 'private' 目录
         file_segments: 输入文件段列表。
         timeout: 执行超时时间（秒）。
         max_file_size: 单个文件大小限制。
         max_total_size: 生成文件总大小限制。
 
     Returns:
-        ExecutionResult: 包含标准输出、错误输出、退出码及生成文件的对象。
+        ExecutionResult: 包含标准输出、错误输出、退出码及生成文件的对象
 
     Raises:
-        ValueError: 输入文件配置错误（如缺少文件名或非 HTTPS 链接）。
+        ValueError: 输入文件配置错误（如缺少文件名或非 HTTPS 链接）
     """
     if not sand_box.is_running:
         await sand_box.start()
 
+    group_data_dir, shared_dir = _group_dirs(group_id)
+    gid_str = str(group_id) if group_id is not None else "private"
+
     run_id = uuid.uuid4().hex
-    run_dir = f"{sand_box.work_dir}/run_{run_id}"
+    group_tmp_base = f"{sand_box.work_dir}/groups/{gid_str}/tmp"
+    run_dir = f"{group_tmp_base}/run_{run_id}"
     script_name = "main.py"
     script_path = f"{run_dir}/{script_name}"
 
     ignored_names: set[str] = {script_name}
 
     try:
-        await sand_box.run_command(f"mkdir -p {run_dir}")
+        await sand_box.run_command(f"mkdir -p {group_data_dir} {shared_dir} {run_dir}")
 
         for segment in file_segments or []:
             if not segment.file_name:
@@ -320,8 +338,13 @@ async def run_python_code_with_segments(
         b64_code = base64.b64encode(code.encode("utf-8")).decode("utf-8")
         await sand_box.run_command(f"echo {b64_code} | base64 -d > {script_path}")
 
+        env_prefix = (
+            f"export GROUP_ID={gid_str} "
+            f"GROUP_WORKSPACE={group_data_dir} "
+            f"SHARED_DIR={shared_dir} && "
+        )
         exec_result = await sand_box.run_command(
-            f"cd {run_dir} && python3 -u {script_name}",
+            f"{env_prefix}cd {run_dir} && python3 -u {script_name}",
             timeout=timeout,
         )
 
@@ -340,5 +363,5 @@ async def run_python_code_with_segments(
         return exec_result
 
     finally:
-        if run_dir.startswith(sand_box.work_dir) and "run_" in run_dir:
+        if run_dir.startswith(group_tmp_base) and "run_" in run_dir:
             await sand_box.run_command(f"rm -rf {run_dir}", timeout=5)

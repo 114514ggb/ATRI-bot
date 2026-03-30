@@ -185,10 +185,117 @@ class DockerSandbox(SandBoxBase):
                 text=str(e)
             )
 
+    async def _ensure_tmux(self) -> bool:
+        """确保容器内已安装 tmux,若未安装则自动 apt-get install
+
+        Returns:
+            bool: 安装成功返回 True,失败返回 False
+        """
+        check = await self.run_command("which tmux", timeout=5)
+        if check.exit_code == 0:
+            return True
+        install = await self.run_command(
+            "apt-get update -qq && apt-get install -y -qq tmux", timeout=120
+        )
+        return install.exit_code == 0
+
+    async def session_start(self, session_name: str, command: str, timeout: int = 10) -> ExecutionResult:
+        """新建 tmux 会话并在其中运行命令
+
+        若同名会话已存在则先销毁。容器内若未安装 tmux 会自动安装
+
+        Args:
+            session_name: 会话名称，后续 send/read/kill 通过此名称引用
+            command: 要在会话中运行的命令（如 'python3'、'psql ...' 等）
+            timeout: 等待会话启动的秒数，默认 10
+
+        Returns:
+            ExecutionResult(text 为启动后的初始屏幕内容）
+        """
+        if not self.is_running or not self.container:
+            raise RuntimeError("Sandbox is not running")
+
+        if not await self._ensure_tmux():
+            return ExecutionResult(stdout="", stderr="tmux 安装失败", exit_code=1, text="tmux 安装失败")
+
+        # 若同名会话已存在则先清理
+        await self.run_command(
+            f"tmux kill-session -t {shlex.quote(session_name)} 2>/dev/null; true", timeout=5
+        )
+
+        result = await self.run_command(
+            f"tmux new-session -d -s {shlex.quote(session_name)} {shlex.quote(command)}",
+            timeout=timeout,
+        )
+        if result.exit_code != 0:
+            return result
+
+        # 等待程序启动并产生初始输出
+        await asyncio.sleep(1.0)
+        return await self.session_read(session_name)
+
+    async def session_send(self, session_name: str, input_text: str, wait: float = 0.5) -> ExecutionResult:
+        """向 tmux 会话发送一行输入（自动追加回车），并返回发送后的屏幕内容
+
+        Args:
+            session_name: 目标会话名称
+            input_text: 要发送的文本
+            wait: 发送后等待程序响应的秒数，默认 0.5
+
+        Returns:
+            ExecutionResult(text 为发送后抓取的屏幕快照）
+        """
+        if not self.is_running or not self.container:
+            raise RuntimeError("Sandbox is not running")
+
+        result = await self.run_command(
+            f"tmux send-keys -t {shlex.quote(session_name)} {shlex.quote(input_text)} Enter",
+            timeout=10,
+        )
+        if result.exit_code != 0:
+            return result
+
+        await asyncio.sleep(wait)
+        return await self.session_read(session_name)
+
+    async def session_read(self, session_name: str) -> ExecutionResult:
+        """抓取 tmux 会话当前的全部屏幕内容
+
+        Args:
+            session_name: 目标会话名称
+
+        Returns:
+            ExecutionResult(text 为当前屏幕文本）
+        """
+        if not self.is_running or not self.container:
+            raise RuntimeError("Sandbox is not running")
+
+        return await self.run_command(
+            f"tmux capture-pane -p -t {shlex.quote(session_name)}",
+            timeout=10,
+        )
+
+    async def session_kill(self, session_name: str) -> ExecutionResult:
+        """终止并删除一个 tmux 会话
+
+        Args:
+            session_name: 要终止的会话名称
+
+        Returns:
+            ExecutionResult
+        """
+        if not self.is_running or not self.container:
+            raise RuntimeError("Sandbox is not running")
+
+        return await self.run_command(
+            f"tmux kill-session -t {shlex.quote(session_name)}",
+            timeout=10,
+        )
+
     async def run_code(self, code: str, language: str = 'python', timeout: int = 30) -> ExecutionResult:
         """在沙盒中执行一次性代码，会执行清理
 
-        根据语言类型生成对应的文件并执行（但是目前环境只有py）
+        根据语言类型生成对应的文件并执行,但是目前环境应该只有py
 
         Args:
             code: 要执行的代码字符串。

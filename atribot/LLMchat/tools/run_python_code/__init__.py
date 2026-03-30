@@ -13,9 +13,18 @@ send_message:QQAPIClient = container.get("SendMessage")
 chat_manager: ChatManager = container.get("ChatManager")
 config:atriConfig = container.get("config")
 
+_MAX_OUTPUT_CHARS = 3000
+
 tool_json = {
     "name": "run_python_code",
-    "description": "在沙盒中执行Python代码,可传入输入文件并返回执行结果与新生成文件。可用库:numpy, pandas, matplotlib, seaborn, pillow, opencv-python-headless。图表如需显示中文,linux 系统中有安装 fonts-wqy-zenhei 字体,环境中还有ffmpeg",
+    "description": (
+        "在沙盒中执行Python代码,可传入输入文件并返回执行结果与新生成文件"
+        "可用库:numpy,pandas,matplotlib,seaborn,pillow,opencv-python-headless"
+        "图表如需显示中文,linux安装了fonts-wqy-zenhei字体,环境还有ffmpeg"
+        "每个群组持久化工作区可通过os.environ访问:"
+        "GROUP_WORKSPACE=本群持久目录, SHARED_DIR=共享目录, GROUP_ID=群号"
+        "生成文件直接写在脚本同级目录大小不超过 20MB 就会自动发送,跨次调用保留文件写入GROUP_WORKSPACE"
+    ),
     "properties": {
         "code": {
             "type": "string",
@@ -23,7 +32,7 @@ tool_json = {
         },
         "files": {
             "type": "array",
-            "description": "输入你在上下文中看到的文件名称列表，会自动把对应文件名的文件放在脚本同级目录",
+            "description": "你在上下文中看到的要临时使用文件名称列表，会自动把对应文件名的文件放在脚本同级目录,脚本运行完后删除",
             "items": {
                 "type": "string"
             }
@@ -56,12 +65,17 @@ async def main(code: str, message_data: ChatMessage, files: list[str] | None = N
     
     execution_result: ExecutionResult = await run_python_code_with_segments(
         code = code,
+        group_id = group_id,
         file_segments = file_segments,
     )
     
+    output_text = execution_result.text
+    if len(output_text) > _MAX_OUTPUT_CHARS:
+        output_text = f"[截取末尾{_MAX_OUTPUT_CHARS}字符]\n...{output_text[-_MAX_OUTPUT_CHARS:]}"
+
     await send_message.send_group_merge_text(
         group_id = group_id,
-        message = f"{code}\n\n执行的输出:\n{execution_result.text}",
+        message = f"{code}\n\n执行的输出:\n{output_text}",
         source = "执行的代码"
     )
 
@@ -75,7 +89,7 @@ async def main(code: str, message_data: ChatMessage, files: list[str] | None = N
                 url_img = "base64://"+file.to_base64(),
                 local_Path_type = False
             )
-            return f"代码执行结果是:{execution_result.text}\n并且已经发送代码生成图片:{filename}"
+            return f"代码执行结果是:{output_text}\n并且已经发送代码生成图片:{filename}"
         else:
             temp_dir = config.file_path.temp / f"run_python_code_{uuid4().hex}"
             temp_file_path = temp_dir / (filename or "output.bin")
@@ -91,6 +105,6 @@ async def main(code: str, message_data: ChatMessage, files: list[str] | None = N
                 )
             finally:
                 shutil.rmtree(temp_dir, ignore_errors=True)
-            return f"代码执行结果是:{execution_result.text}\n并且已经打包发送代码生成文件:{filename}"
+            return f"代码执行结果是:{output_text}\n并且已经打包发送代码生成文件:{filename}"
     
-    return f"代码执行结果是:{execution_result.text}"
+    return f"代码执行结果是:{output_text}"

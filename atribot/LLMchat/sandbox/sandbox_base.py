@@ -123,6 +123,58 @@ class SandBoxBase(ABC):
         """检查沙盒内文件是否存在"""
         pass
 
+    @abstractmethod
+    async def session_start(self, session_name: str, command: str, timeout: int = 10) -> ExecutionResult:
+        """新建 tmux 会话并在其中运行命令
+
+        Args:
+            session_name: 会话名称，后续 send/read/kill 通过此名称引用
+            command: 在会话中运行的命令
+            timeout: 等待会话启动的秒数，默认 10。
+
+        Returns:
+            ExecutionResult(text 为启动后的初始屏幕内
+        """
+        pass
+
+    @abstractmethod
+    async def session_send(self, session_name: str, input_text: str, wait: float = 0.5) -> ExecutionResult:
+        """向 tmux 会话发送一行输入（自动追加回车），并返回发送后的屏幕内容
+
+        Args:
+            session_name: 目标会话名称
+            input_text: 要发送的文本
+            wait: 发送后等待程序响应的秒数，默认 0.5
+
+        Returns:
+            ExecutionResult(text 为发送后抓取的屏幕快照）
+        """
+        pass
+
+    @abstractmethod
+    async def session_read(self, session_name: str) -> ExecutionResult:
+        """抓取 tmux 会话当前的全部屏幕内容
+
+        Args:
+            session_name: 目标会话名称
+
+        Returns:
+            ExecutionResult(text 为当前屏幕文本）
+        """
+        pass
+
+    @abstractmethod
+    async def session_kill(self, session_name: str) -> ExecutionResult:
+        """终止并删除一个 tmux 会话
+
+        Args:
+            session_name: 要终止的会话名称
+
+        Returns:
+            ExecutionResult
+        """
+        pass
+
     async def __aenter__(self):
         await self.start()
         return self

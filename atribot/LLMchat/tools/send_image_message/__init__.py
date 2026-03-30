@@ -6,11 +6,11 @@ send_message:QQAPIClient = container.get("SendMessage")
 
 tool_json = {
     "name": "send_image_message",
-    "description": "发送一个url图像,在需要发送图像的时候使用",
+    "description": "向群里发送一个url图像",
     "properties": {
         "url": {
             "type": "string",
-            "description": "图像的网络url链接",
+            "description": "url链接",
         }
     }
 }

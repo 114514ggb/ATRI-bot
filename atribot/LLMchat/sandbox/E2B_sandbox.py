@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import os
 import sys
@@ -9,7 +10,7 @@ from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile,
 try:
     from e2b_code_interpreter import AsyncSandbox
 except ImportError:
-    print("错误：e2b_code_interpreter 模块未安装")
+    print("错误:e2b_code_interpreter 模块未安装")
     print("请使用以下命令安装：")
     print("pip install e2b-code-interpreter")
     sys.exit(1)
@@ -25,6 +26,7 @@ class E2BSandbox(SandBoxBase):
         self._sandbox: Optional[AsyncSandbox] = None
         self._api_key = self.config.get("api_key", os.environ.get("E2B_API_KEY"))
         self._template = self.config.get("template", "code-interpreter-v1")
+        self._sessions: dict[str, dict] = {}  # session_name -> {process, buffer}
 
     async def start(self):
         """启动 E2B 沙盒实例"""
@@ -36,7 +38,9 @@ class E2BSandbox(SandBoxBase):
         self.is_running = True
 
     async def stop(self):
-        """关闭沙盒连接"""
+        """关闭沙盒连接，并清理所有活跃会话"""
+        for name in list(self._sessions.keys()):
+            await self.session_kill(name)
         if self._sandbox:
             await self._sandbox.close()
             self._sandbox = None
@@ -203,3 +207,106 @@ class E2BSandbox(SandBoxBase):
             await self.start()
             
         return await self._sandbox.files.exists(remote_path)
+
+    async def session_start(self, session_name: str, command: str, timeout: int = 10) -> ExecutionResult:
+        """新建一个后台进程会话并在其中运行命令。
+
+        E2B 不含 tmux，通过 commands.run(background=True) + 回调缓冲输出来模拟会话。
+        若同名会话已存在则先销毁。
+
+        Args:
+            session_name: 会话名称，后续 send/read/kill 通过此名称引用。
+            command: 要在会话中运行的命令（如 'python3'、'bash' 等）。
+            timeout: 等待会话启动的秒数，默认 10。
+
+        Returns:
+            ExecutionResult(text 为启动后的初始屏幕内容）
+        """
+        if not self._sandbox:
+            await self.start()
+
+        await self.session_kill(session_name)
+
+        buffer: list[str] = []
+
+        def on_stdout(output) -> None:
+            buffer.append(output.line)
+
+        def on_stderr(output) -> None:
+            buffer.append(output.line)
+
+        try:
+            process = await self._sandbox.commands.run(
+                command,
+                background=True,
+                on_stdout=on_stdout,
+                on_stderr=on_stderr,
+            )
+        except Exception as e:
+            return ExecutionResult(stdout="", stderr=str(e), exit_code=1, text=str(e))
+
+        self._sessions[session_name] = {"process": process, "buffer": buffer}
+        await asyncio.sleep(1.0)
+
+        text = "\n".join(buffer)
+        return ExecutionResult(stdout=text, stderr="", exit_code=0, text=text)
+
+    async def session_send(self, session_name: str, input_text: str, wait: float = 0.5) -> ExecutionResult:
+        """向会话进程发送一行输入（自动追加换行），并返回发送后的输出缓冲。
+
+        Args:
+            session_name: 目标会话名称。
+            input_text: 要发送的文本。
+            wait: 发送后等待程序响应的秒数，默认 0.5。
+
+        Returns:
+            ExecutionResult(text 为缓冲中的全部输出）
+        """
+        if session_name not in self._sessions:
+            msg = f"Session '{session_name}' not found"
+            return ExecutionResult(stdout="", stderr=msg, exit_code=1, text=msg)
+
+        session = self._sessions[session_name]
+        try:
+            await session["process"].send_stdin(f"{input_text}\n")
+        except Exception as e:
+            return ExecutionResult(stdout="", stderr=str(e), exit_code=1, text=str(e))
+
+        await asyncio.sleep(wait)
+        return await self.session_read(session_name)
+
+    async def session_read(self, session_name: str) -> ExecutionResult:
+        """返回会话进程当前的全部输出缓冲内容。
+
+        Args:
+            session_name: 目标会话名称。
+
+        Returns:
+            ExecutionResult(text 为当前缓冲文本）
+        """
+        if session_name not in self._sessions:
+            msg = f"Session '{session_name}' not found"
+            return ExecutionResult(stdout="", stderr=msg, exit_code=1, text=msg)
+
+        text = "\n".join(self._sessions[session_name]["buffer"])
+        return ExecutionResult(stdout=text, stderr="", exit_code=0, text=text)
+
+    async def session_kill(self, session_name: str) -> ExecutionResult:
+        """终止并删除一个会话进程。
+
+        Args:
+            session_name: 要终止的会话名称。
+
+        Returns:
+            ExecutionResult
+        """
+        if session_name not in self._sessions:
+            return ExecutionResult(stdout="", stderr="", exit_code=0, text="")
+
+        session = self._sessions.pop(session_name)
+        try:
+            await session["process"].kill()
+        except Exception:
+            pass
+
+        return ExecutionResult(stdout="", stderr="", exit_code=0, text="")
