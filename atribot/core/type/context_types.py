@@ -95,6 +95,12 @@ class MessageBuilder:
         self._parts.extend(other._parts[start:])
         return self
 
+    def build_content(self) -> str | list:
+        """仅返回 content,纯文本时为 str,多模态时为 list"""
+        if len(self._parts) == 1 and self._parts[0]["type"] == "text":
+            return self._parts[0]["text"]
+        return list(self._parts)
+
     def build(self) -> Dict[str, Any]:
         """构建消息 dict"""
         if len(self._parts) == 1 and self._parts[0]["type"] == "text":
@@ -254,13 +260,13 @@ class Context():
         """添加系统消息"""
         self.messages.append({"role": "system", "content": content})
 
-    def add_tool_message(self, naem: str, tool_call_id: str, content: str) -> None:
+    def add_tool_message(self, naem: str, tool_call_id: str, content: str | list) -> None:
         """添加工具消息"""
         self.messages.append({
             "role": "tool",
             "name": naem,
             "tool_call_id": tool_call_id,
-            "content": content
+            "content": content#纯文本(str)或多模态内容列表(list)
         })
 
     def clear(self) -> None:

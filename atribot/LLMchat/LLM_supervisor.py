@@ -3,12 +3,13 @@ from dataclasses import dataclass, field
 from logging import Logger
 from typing import Any, Dict, List
 
-from mcp.types import CallToolResult
+from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import ChatMessage
-from atribot.core.type.context_types import Context, ToolCallsStopIteration
+from atribot.core.type.context_types import Context, MessageBuilder, ToolCallsStopIteration
 from atribot.LLMchat.MCP.model_tools import tool_calls
+from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 
@@ -59,6 +60,10 @@ class GenerationRequest():
     """
     message_data: ChatMessage = None
     """触发此次请求的 ChatMessage,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
+    visual_sense: bool = False
+    """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
+    audio_sense: bool = False
+    """当前模型是否支持音频输入，工具返回音频时决定直接传递还是降级转文字"""
 
 @dataclass(slots=True)
 class GenerationRequestSimplify():
@@ -86,6 +91,10 @@ class GenerationRequestSimplify():
     """
     message_data: ChatMessage|None = None
     """触发此次请求的 ChatMessage,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
+    visual_sense: bool = False
+    """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
+    audio_sense: bool = False
+    """当前模型是否支持音频输入，工具返回音频时决定直接传递还是降级转文字"""
 
 class LLMSRequestFailed(Exception):
     """LLM请求失败异常
@@ -138,6 +147,7 @@ class LLMCoordinator():
         self.supplier:LLMConnectionManager = container.get("LLMSupplier")
         self.tool_management:tool_calls = container.get("ToolCalls")
         self.logger:Logger = container.get("log")
+        self._media_processor:MediaProcessor = container.get("MediaProcessor")
         
     async def step(self, request:GenerationRequest)->GenerationResponse:
         """对于GenerationRequest的主处理函数
@@ -317,7 +327,10 @@ class LLMCoordinator():
                     tool_input = function['arguments']
 
                     tool_output: CallToolResult | Any = await self.tool_management.calls(tool_name, tool_input, request.message_data)
-                    tool_output = self.format_mcp_result(tool_output) if isinstance(tool_output,CallToolResult) else str(tool_output)
+                    if isinstance(tool_output, CallToolResult):
+                        tool_output = await self._format_mcp_result_rich(tool_output, request.visual_sense, request.audio_sense)
+                    else:
+                        tool_output = str(tool_output)
                     
                 except ToolCallsStopIteration:
                     increase_context.add_tool_message(tool_name,tool_call['id'],tool_output)
@@ -332,10 +345,18 @@ class LLMCoordinator():
 
                 self.logger.debug(f"工具调用输出:{tool_output}")
                 
+                # 截断防止有的工具返回过长的结果
+                if isinstance(tool_output, str):
+                    tool_output = tool_output[:20000]
+                elif isinstance(tool_output, list):
+                    for part in tool_output:
+                        if part.get("type") == "text":
+                            part["text"] = part["text"][:20000]
+
                 increase_context.add_tool_message(
                     tool_name,
                     tool_call['id'],
-                    tool_output[:20000],#截断防止有的工具返回过长的结果
+                    tool_output,
                 )
               
             try:
@@ -400,12 +421,121 @@ class LLMCoordinator():
         return response
 
     
-    @staticmethod
-    def format_mcp_result(result: CallToolResult) -> str:
-        """将 MCP 工具执行结果格式化为简洁的字符串
+    async def _format_mcp_result_rich(
+        self,
+        result: CallToolResult,
+        visual_sense: bool,
+        audio_sense: bool = False,
+    ) -> str | list:
+        """将 MCP 工具执行结果格式化，支持全类型 ContentBlock 多模态处理
 
         Args:
-            result:将 MCP 工具执行结果格式化为简洁的字符串
+            result: MCP 工具返回值
+            visual_sense: 当前模型是否支持图像输入
+            audio_sense: 当前模型是否支持音频输入
+
+        Returns:
+            纯文本(str) 或 多模态内容列表(list)
+        """
+        builder = MessageBuilder("tool")
+        builder.add_text(f"[{'ERROR' if result.isError else 'SUCCESS'}]")
+
+        for block in result.content: 
+            if block.type == "text":#TextContent
+                builder.add_text(block.text)
+
+            elif block.type == "image":#ImageContent
+                await self._handle_image_block(block.data, block.mimeType, visual_sense, builder)
+
+            elif block.type == "audio":#AudioContent
+                await self._handle_audio_block(block.data, block.mimeType, audio_sense, builder)
+
+            elif block.type == "resource":  # EmbeddedResource
+                res = block.resource
+                uri = str(getattr(res, "uri", "unknown"))
+                mime = str(getattr(res, "mimeType", "") or "")
+                if isinstance(res, TextResourceContents) and res.text:
+                    header = f"[Resource: {uri}]" + (f" ({mime})" if mime else "")
+                    builder.add_text(f"{header}\n{res.text}")
+                else:
+                    # BlobResourceContents
+                    blob = str(getattr(res, "blob", "") or "") if isinstance(res, BlobResourceContents) else ""
+                    if not mime:
+                        mime = "application/octet-stream"
+                    if blob and mime.startswith("image/"):
+                        await self._handle_image_block(blob, mime, visual_sense, builder, label=f"Resource({uri})")
+                    elif blob and mime.startswith("audio/"):
+                        await self._handle_audio_block(blob, mime, audio_sense, builder, label=f"Resource({uri})")
+                    else:
+                        builder.add_text(f"[Resource: {uri} - {mime}]")
+
+            elif block.type == "resource_link":  # ResourceLink
+                uri = str(getattr(block, "uri", "unknown"))
+                name = str(getattr(block, "name", "") or "")
+                description = str(getattr(block, "description", "") or "")
+                mime = str(getattr(block, "mimeType", "") or "")
+                display = name or uri
+                lines = [f"[ResourceLink:{display}]"]
+                if name and uri != name:
+                    lines.append(f"URI:{uri}")
+                if description:
+                    lines.append(f"描述:{description}")
+                if mime:
+                    lines.append(f"类型:{mime}")
+                builder.add_text("\n".join(lines))
+
+        if result.structuredContent:
+            builder.add_text(str(result.structuredContent))
+
+        return builder.build_content()
+
+    async def _handle_image_block(
+        self,
+        data: str,
+        mime: str,
+        visual_sense: bool,
+        builder: MessageBuilder,
+        label: str = "",
+    ) -> None:
+        """处理一块图片数据:visual_sense 时直传，否则降级为文字描述"""
+        if visual_sense:
+            builder.add_image_base64(data, mime)
+        else:
+            tag = f"图片{f'({label})' if label else ''}"
+            try:
+                desc = await self._media_processor.image_to_text(f"data:{mime};base64,{data}")
+                builder.add_text(f"[{tag}描述: {desc}]")
+            except Exception as e:
+                self.logger.warning(f"工具返回{tag}降级描述失败: {e}")
+                builder.add_text(f"[{tag}: {mime}]")
+
+    async def _handle_audio_block(
+        self,
+        data: str,
+        mime: str,
+        audio_sense: bool,
+        builder: MessageBuilder,
+        label: str = "",
+    ) -> None:
+        """处理一块音频数据"""
+        if audio_sense:
+            fmt = mime.split("/")[-1] if "/" in mime else mime
+            builder.add_audio(data, fmt)
+        else:
+            tag = f"音频{f'({label})' if label else ''}"
+            try:
+                desc = await self._media_processor.audio_to_text(f"data:{mime};base64,{data}")
+                builder.add_text(f"[{tag}转文字:{desc}]")
+            except Exception as e:
+                self.logger.warning(f"工具返回{tag}降级转文字失败:{e}")
+                builder.add_text(f"[{tag}:{mime}]")
+
+    @staticmethod
+    def format_mcp_result(result: CallToolResult) -> str:
+        """将 MCP 工具执行结果格式化为纯文本字符串（文本降级版本）
+
+        Args:
+            result: MCP 工具执行结果
 
         Returns:
             包含格式化状态和内容的字符串
@@ -415,10 +545,10 @@ class LLMCoordinator():
         for block in result.content:
             if block.type == "text":
                 parts.append(block.text)
-                
-            elif block.type in ("image", "audio"):#其实这里支持的模型应该直接传入的，但是这里支持的模型不多后面再添加
+
+            elif block.type in ("image", "audio"):
                 parts.append(f"[{block.type.capitalize()}: {block.mimeType}]")
-                
+
             elif block.type == "resource":
                 res = block.resource
                 uri = getattr(res, "uri", "unknown")
@@ -427,7 +557,7 @@ class LLMCoordinator():
                 else:
                     mime = getattr(res, "mimeType", "application/octet-stream")
                     parts.append(f"[Resource: {uri} - {mime}]")
-                    
+
             elif block.type == "resource_link":
                 parts.append(f"[Link: {getattr(block, 'uri', 'unknown')}]")
 

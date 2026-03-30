@@ -92,17 +92,19 @@ class GroupChat(chat_basics):
 
     def __init__(self):
         super().__init__()
+        self.media_processor: MediaProcessor = container.get("MediaProcessor")
+        
         model_supplier = self.supplier.connections[
             self.config.model.connect.supplier
         ]
         model_name = self.config.model.connect.model_name
-        
         self.model_api = model_supplier.connection_object
-        self.visual_sense = model_supplier.model_dict[model_name].get("visual_sense", False)
-        self.audio_sense = model_supplier.model_dict[model_name].get("audio_sense", False)
-        self.video_sense = model_supplier.model_dict[model_name].get("video_sense", False)
+        model_information_dict = model_supplier.model_dict[model_name]
+        self.visual_sense = model_information_dict.get("visual_sense", False)
+        self.audio_sense = model_information_dict.get("audio_sense", False)
+        self.video_sense = model_information_dict.get("video_sense", False)
         self.emoji_file_dict = self.emoji_core.emoji_file_dict
-        self.media_processor: MediaProcessor = container.get("MediaProcessor")
+        
         self.api_order: list[dict[str, str]] = self.config.model.standby_model
         """备用api调用list"""
         
@@ -110,7 +112,9 @@ class GroupChat(chat_basics):
             model_api=self.model_api,
             model=model_name,
             parameter=self.config.model.chat_parameter,
-            messages=None
+            messages=None,
+            visual_sense=self.visual_sense,
+            audio_sense=self.audio_sense,
         )
         
         self.decision_function:Dict[str,Coroutine[Dict]] = {
@@ -509,19 +513,21 @@ class GroupChat(chat_basics):
             model_name = parameter["model_name"]
             self.log.info(f"正在使用备用api,来自{parameter}")
 
-            visual_sense:bool = self.supplier.get_model_information(
-                supplier, model_name
-            ).get("visual_sense",False)
+            model_info = self.supplier.get_model_information(supplier, model_name)
+            visual_sense: bool = model_info.get("visual_sense", False)
+            audio_sense: bool = model_info.get("audio_sense", False)
 
-            if visual_sense == self.visual_sense:
+            if visual_sense == self.visual_sense:#只考虑图像的情况
                 new_request = replace(
                     request,
                     model=model_name,
                     supplier_name=supplier,
+                    visual_sense=visual_sense,
+                    audio_sense=audio_sense,
                 )
             else:
                 if not opposite_structure_increment_messages:
-
+                    #没有缓存重新构建消息
                     message_builder = await self.prompt_structure(
                         message=message,
                         prompt=prompt,
@@ -536,7 +542,9 @@ class GroupChat(chat_basics):
                     request,
                     model=model_name,
                     supplier_name=supplier,
-                    increment_messages = opposite_structure_increment_messages
+                    increment_messages=opposite_structure_increment_messages,
+                    visual_sense=visual_sense,
+                    audio_sense=audio_sense,
                 )
 
             try:
