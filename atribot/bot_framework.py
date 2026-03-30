@@ -216,11 +216,11 @@ class BotFramework:
             tool_calls(self.config.file_path.tool_calls)
         )
 
-        #处理模型响应
-        container.register("LLMSupervisor", LLMCoordinator())
-
         #多模态媒体转文本
         container.register("MediaProcessor", MediaProcessor())
+
+        #处理模型响应
+        container.register("LLMSupervisor", LLMCoordinator())
 
         #AIchat
         container.register("GroupChat", GroupChat())
