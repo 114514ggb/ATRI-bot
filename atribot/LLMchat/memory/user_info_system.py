@@ -153,14 +153,14 @@ class UserSystem:
     async def get_user_info(self,user_id:int) -> Dict[str, Any]:
         """
         根据用户ID从数据库获取用户信息。
-        通过查询user_info表，检索指定用户的信息记录。
+        通过查询user_info表,检索指定用户的信息记录。
         如果用户不存在，将返回基础用户信息结构的副本。
         
         Args:
             user_id (int): 要查询的用户ID
             
         Returns:
-            Dict[str, Any]: 包含用户信息的字典，字段来自数据库的info列
+            Dict[str, Any]: 包含用户信息的字典,字段来自数据库的info列
             如果用户不存在，返回空
             
         Raises:
@@ -180,6 +180,11 @@ class UserSystem:
                     fetch_type = "one"
                 ):
                 return json.loads(data[0])
+        
+        await self.database.add_user(#没有先添加一个占位符
+            user_id=user_id,
+            nickname="NOT_SET"
+        )
         return self.base_json_data.copy()
             
                         

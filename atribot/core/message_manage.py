@@ -45,7 +45,7 @@ class message_router():
             return
 
         if chat_message.segments:
-            await self.store_data(chat_message) #存储群消息
+            asyncio.create_task(self.store_data(chat_message)) #存储群消息
             
 
     async def store_data(self, chat_message:ChatMessage)->None:

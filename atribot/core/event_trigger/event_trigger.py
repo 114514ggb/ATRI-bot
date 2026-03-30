@@ -171,11 +171,10 @@ class EventTrigger:
         if sub_type == "approve":
             await self.send_message.send_group_message(group_id, f"欢迎[CQ:at,qq={user_id}]加入群聊！")
             DatabaseBase: AsyncDatabaseBase = container.get("database")
-            async with DatabaseBase as db:
-                await db.add_user(
-                    user_id=user_id,
-                    nickname="NOT_SET"  # 以后发消息时会更新
-                )
+            await DatabaseBase.add_user(
+                user_id=user_id,
+                nickname="NOT_SET"  # 以后发消息时会更新
+            )
         elif sub_type == 'kick':
             await self.send_message.send_group_message(group_id, f"[CQ:at,qq={user_id}]({user_id})被[CQ:at,qq={data['operator_id']}]请出群聊！")
         elif sub_type == 'leave':
