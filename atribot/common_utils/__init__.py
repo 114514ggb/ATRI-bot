@@ -13,7 +13,7 @@ from .similarity import (
     jaro_winkler_similarity,
     levenshtein_distance,
 )
-from .timer import timer
+from .timer import poll_until_done, timer
 from .validation import is_qq
 
 __all__ = [
@@ -28,6 +28,7 @@ __all__ = [
     "format_memory_records",
     "HTTPClient",
     "is_qq",
+    "poll_until_done",
     "jaro_winkler_similarity",
     "levenshtein_distance",
     "parse_time_to_timestamp",

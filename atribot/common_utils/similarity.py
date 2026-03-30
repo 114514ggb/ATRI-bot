@@ -4,7 +4,7 @@ import numpy as np
 def levenshtein_distance(s1: str, s2: str) -> int:
     """计算两个字符串之间的Levenshtein编辑距离
     
-    使用空间优化的动态规划算法，计算将字符串s1转换为s2所需的最少
+    使用空间优化的动态规划算法,计算将字符串s1转换为s2所需的最少
     单字符编辑操作次数（插入、删除、替换）。
 
     Args:
