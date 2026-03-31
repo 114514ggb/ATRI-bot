@@ -11,7 +11,7 @@ from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import AtSegment, ChatMessage
 from atribot.core.type.chat_types import GroupContext
-from atribot.LLMchat.chat import GroupChat
+from atribot.LLMchat.chat import GroupChat, PrivateChat
 from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.memory.memory_system import memorySystem
 
@@ -24,7 +24,8 @@ class message_router():
         self.db:AsyncDatabaseBase = container.get("database")
         self.send_message:QQAPIClient = container.get("SendMessage")
         self.group_manage = group_manage()
-        self.group_set = set()
+        self.private_manage = private_manage()
+        self.group_set = set(None)
     
     async def main(self, data:dict):
         """主消息处理逻辑"""
@@ -41,12 +42,12 @@ class message_router():
         if chat_message.group_id:  #有群号就是群相关的直接简单分发处理了
             await self.group_manage.handle_message(chat_message, chat_message.group_id)
         else:
-            #私聊处理
-            return
+            #私聊相关处理
+            await self.private_manage.handle_message(chat_message)
 
         if chat_message.segments:
-            asyncio.create_task(self.store_data(chat_message)) #存储群消息
-            
+            asyncio.create_task(self.store_data(chat_message)) #存储消息
+        
 
     async def store_data(self, chat_message:ChatMessage)->None:
         """存储消息"""
@@ -72,7 +73,6 @@ class message_router():
         
         try:
             async with self.db as db:
-                db:AsyncDatabaseBase
                 await db.add_user(**users)
                 await db.add_message(**message)
                 
@@ -168,7 +168,7 @@ class group_manage(message_manage):
                 await self.command_system.dispatch_command(chat_message)
             except Exception as e:
                 self.error_occurred(e, "命令处理模块")
-                await self.send_message.send_group_message(
+                await self.send_message.send_group_mgs(
                     chat_message.group_id, 
                     f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"
                 )
@@ -181,7 +181,7 @@ class group_manage(message_manage):
                 await self.initiative_chat.decision(chat_message, group_context, at=True)
             except Exception as e:
                 self.error_occurred(e, "群聊聊天模块")
-                await self.send_message.send_group_message(
+                await self.send_message.send_group_mgs(
                     chat_message.group_id, 
                     f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}"
                 )
@@ -209,7 +209,49 @@ class group_manage(message_manage):
 
 class private_manage(message_manage):
     """私聊消息处理类"""
-    
+
     def __init__(self):
         super().__init__()
+        self.private_chat: PrivateChat = container.get("PrivateChat")
+
+    async def handle_message(self, chat_message: ChatMessage) -> None:
+        data = chat_message.primeval
+        user_id = chat_message.user_id
+
+        if data.get("message_sent_type") == "self":
+            return
+
+        return
+    
+        self.logger.debug(f"Received private message: {data}")
+        chat_message.update_llm_formatted_simplify_message()
+
+        has_permission = self.permissions_management.check_access(user_id)
+
+        # if chat_message.pure_text.startswith("/"):
+        #     if has_permission:
+        #         try:
+        #             await self.command_system.dispatch_command(chat_message)
+        #         except Exception as e:
+        #             self.error_occurred(e, "私聊命令处理模块")
+        #             await self.send_message.send_private_msg(
+        #                 user_id=user_id,
+        #                 message=f"ATRI用手挢了挢脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"
+        #             )
+        #     return
+
+        if has_permission:
+            try:
+                await self.private_chat.step(
+                    chat_message,
+                    "你正在和用户进行一对一私聊，请认真回复对方的消息"
+                )
+            except Exception as e:
+                self.error_occurred(e, "私聊聊天模块")
+                await self.send_message.send_private_msg(
+                    user_id=user_id,
+                    message=f"ATRI的聊天模块抛出了个错误!Type Error:\n{e}"
+                )
+        else:
+            self.logger.info(f"黑名单人员被拒绝私聊{user_id}!")
 

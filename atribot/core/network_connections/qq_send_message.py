@@ -81,7 +81,7 @@ class QQAPIClient():
         """WebSocket 发送策略"""
         message = {
             "action": url,
-                # 'access_token': self.access_token,
+            # 'access_token': self.access_token,
             "params": payload
         }
 
@@ -152,7 +152,7 @@ class QQAPIClient():
             echo=echo
         )
 
-    async def send_group_message(self,group_id: int, message:str|list):
+    async def send_group_mgs(self,group_id: int, message:str|list):
         """
             发送群聊文字消息\n
             message可以是str也可以是包含混合消息的list,str会解析CQ码
@@ -184,7 +184,7 @@ class QQAPIClient():
             }
         ]
         
-        await self.send_group_message(group_id, params)
+        await self.send_group_mgs(group_id, params)
 
         
     async def send_group_merge_text(
@@ -303,7 +303,7 @@ class QQAPIClient():
             }
         ]
         
-        await self.send_group_message(group_id, payload)
+        await self.send_group_mgs(group_id, payload)
         
     async def send_group_music(
             self,
@@ -329,9 +329,9 @@ class QQAPIClient():
         """
         
         if type != "custom" and not id:
-                    raise ValueError("当 type 不是 'custom' 时，id 必须提供")
+                    raise ValueError("当 type 不是 'custom' 时,id 必须提供")
         if type == "custom" and (not url or not image):
-            raise ValueError("当 type 是 'custom' 时，url 和 image 必须提供")
+            raise ValueError("当 type 是 'custom' 时,url 和 image 必须提供")
         
         data = {
             "type": type,
@@ -349,15 +349,15 @@ class QQAPIClient():
             }
         ]
         
-        await self.send_group_message(group_id,message)
+        await self.send_group_mgs(group_id,message)
         
     
     async def set_group_add_request(self,flag: str, approve: bool, reason: str = "不行哦!"):
         """
-            处理加群请求\n
+            处理加群请求
             Args:
-                flag: 请求id\n
-                approve: 是否同意\n
+                flag: 请求id
+                approve: 是否同意
                 reason: 拒绝理由(可选)
         """
         api_url = "set_group_add_request"
@@ -397,20 +397,20 @@ class QQAPIClient():
 
         return await self.async_send(api_url,payload,echo = True)
    
-    async def delete_msg(self,message_id:int|str,get_return:bool=False)->dict:
+    async def delete_msg(self, message_id: int | str, echo: bool = False) -> dict | None:
         """撤回消息
 
         Args:
             message_id (int | str): 消息ID
-            get_return (bool, optional): 是否返回执行结果. Defaults to False.
+            echo (bool, optional): 是否返回执行结果. Defaults to False.
 
         Returns:
-            dict: 返回结果详情
+            dict | None: echo 为 True 时返回执行结果
         """
         return await self.async_send(
             "delete_msg",
             {"message_id": message_id},
-            echo = get_return
+            echo=echo,
         )
 
     async def send_group_pictures(self,group_id,url_img = "img_ATRI.png",default = False, local_Path_type = True, get_return = False)->dict|None:
@@ -605,50 +605,98 @@ class QQAPIClient():
         return await self.async_send(url=url,payload=payload,echo=get_return)
 
 
-    async def Send_personal_message(self,qq_id, data,type):
-        """发送私聊消息"""
-        url = "send_private_msg"
-        payload = {
-            "user_id": qq_id,
-            "message": [
-                {
-                    "type": type,
-                    "data": data,
-                }
-            ],
+    async def send_private_msg(
+        self,
+        user_id: int,
+        message: str | list,
+        auto_escape: bool = False,
+        echo: bool = False,
+    ) -> dict | None:
+        """
+        发送私聊消息
+
+        Args:
+            user_id: 目标 QQ 号
+            message: 消息内容,str 会解析 CQ 码(auto_escape=False 时),list 为消息段数组
+            auto_escape: 为 True 时将 message 作为纯文本发送，不解析 CQ 码
+            echo: 是否等待并返回发送结果
+
+        Returns:
+            dict | None: echo 为 True 时返回发送结果
+        """
+        payload: dict = {
+            "user_id": user_id,
+            "message": message,
+        }
+        if auto_escape:
+            payload["auto_escape"] = True
+
+        return await self.async_send(url="send_private_msg", payload=payload, echo=echo)
+
+    async def send_personal_pictures(
+        self,
+        qq_id: int,
+        url_img: str = "img_ATRI.png",
+        default: bool = False,
+        local_Path_type: bool = False,
+        echo: bool = False,
+    ) -> dict | None:
+        """发送私聊图片，默认图片为 img_ATRI.png,可开启默认路径"""
+        if default:
+            url_img = str(self.File_root_directory.img / url_img)
+        file_url = f"file://{url_img}" if local_Path_type else url_img
+        message = [{"type": "image", "data": {"file": file_url}}]
+        return await self.send_private_msg(qq_id, message, echo=echo)
+
+    async def send_personal_audio(
+        self,
+        qq_id: int,
+        url_audio: str = "Atri my dear moments.mp3",
+        default: bool = False,
+        local_Path_type: bool = False,
+        echo: bool = False,
+    ) -> dict | None:
+        """发送私聊语音"""
+        if default:
+            url_audio = str(self.File_root_directory.audio / url_audio)
+        file_url = f"file://{url_audio}" if local_Path_type else url_audio
+        message = [{"type": "record", "data": {"file": file_url}}]
+        return await self.send_private_msg(qq_id, message, echo=echo)
+
+    async def send_personal_file(
+        self,
+        qq_id: int,
+        url_file: str = "ATRI的文件.txt",
+        name: str = None,
+        default: bool = False,
+        local_Path_type: bool = True,
+        echo: bool = False,
+    ) -> dict | None:
+        """发送私聊文件"""
+        if default:
+            raw_path = str(self.File_root_directory.file / url_file)
+        else:
+            raw_path = url_file
+
+        data_payload = {
+            "file": f"file://{raw_path}" if local_Path_type else raw_path
         }
 
-        await self.async_send(url=url,params=payload)
-        # self.send(url,payload)
+        if name:
+            data_payload["name"] = name
 
-    async def send_personal_text(self,qq_id,text):
-        """发送私聊文字消息"""
-        data = {"text":text}
-        await self.Send_personal_message(qq_id,data,"text")
-
-    async def send_personal_pictures(self,qq_id,url_img = "img_ATRI.png",default = False):
-        """发送私聊图片,默认图片为img_ATRI.png还有可开启默认路径"""
-
-        data = {"file": f"file://{self.File_root_directory.img / url_img}" if default else url_img}
-
-        await self.Send_personal_message(qq_id,data,"image")
-
-    async def send_personal_audio(self,qq_id,url_audio = "Atri my dear moments.mp3",default = False):
-        """发送私聊语音"""
-
-        data = {"file": f"file://{self.File_root_directory.audio / url_audio}" if default else url_audio}
-
-        await self.Send_personal_message(qq_id,data,"record")
+        message = [{"type": "file", "data": data_payload}]
+        return await self.send_private_msg(qq_id, message, echo=echo)
 
     def __getattr__(self, item):
         """
-        实现动态代理，将属性访问转换为API调用
+        实现动态代理,将属性访问转换为API调用
         
         Args:
-            item: 要访问的属性名，将用作API端点
+            item: 要访问的属性名,将用作API端点
             
         Returns:
-            Callable[..., CoroutineType[Any, Any, dict | None]]一个可调用函数，调用时将发送异步请求
+            Callable[..., CoroutineType[Any, Any, dict | None]]发送异步请求的函数
         """
         return lambda echo = False,**kwargs : self.async_send(
             url=item, 

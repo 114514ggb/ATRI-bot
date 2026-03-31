@@ -90,7 +90,7 @@ async def help_command(message_data: ChatMessage, list: bool = False):
             "3.会对群出现的一些词进行反应。\n"
             "4.会对交互数据进行存储，可能会对其用于分析，服务质量优化和功能迭代。\n"
         )
-        await send_message.send_group_message(message_data.group_id,basic_help)
+        await send_message.send_group_mgs(message_data.group_id,basic_help)
 
 
 
@@ -139,7 +139,7 @@ async def permission_command_handler(
     group_id = message_data.group_id
     operator_id = message_data.user_id
     async def reply_func(msg):
-        await send_message.send_group_message(group_id, msg)
+        await send_message.send_group_mgs(group_id, msg)
         
     if subcommand == "add":
         if not role or not user_id:
@@ -209,7 +209,7 @@ async def handle_status_command(message_data: ChatMessage, components: list):
     info_str = await SystemMonitor().view_list(components)
 
     if not info_str.strip():
-        await send_message.send_group_message(group_id, "ℹ️ 未生成任何信息，请检查您的输入参数。")
+        await send_message.send_group_mgs(group_id, "ℹ️ 未生成任何信息，请检查您的输入参数。")
         return
 
     await send_message.send_group_merge_text(
@@ -546,18 +546,18 @@ async def reload_commands_handler(message_data: ChatMessage) -> None:
     log = container.get("log")
     group_id = message_data.group_id
 
-    await send_message.send_group_message(group_id, "⏳ 正在重载全部命令模块...")
+    await send_message.send_group_mgs(group_id, "⏳ 正在重载全部命令模块...")
 
     try:
         loaded_count = loader.reload_commands()
-        await send_message.send_group_message(
+        await send_message.send_group_mgs(
             group_id,
             f"✅ 命令热重载完成，已加载 {loaded_count} 个命令包。"
         )
         log.info(f"命令热重载完成，操作者: {message_data.user_id}，加载包数: {loaded_count}")
     except Exception as e:
         log.exception(f"命令热重载失败: {e}")
-        await send_message.send_group_message(
+        await send_message.send_group_mgs(
             group_id,
             f"❌ 命令热重载失败：{e}"
         )

@@ -237,7 +237,7 @@ class memorySystem:
 
         return {}
     
-    async def query_user_recently_memory(self, text:str, limit:int = 5)->list[Record]:
+    async def query_recently_memory(self, text:str, limit:int = 5)->list[Record]:
         """简单根据文本向量查询数据库最相似消息,返回余弦距离<0.5,和最近30天内的消息
 
         Args:
@@ -250,7 +250,7 @@ class memorySystem:
         """
         if embeddin_list := await self.rag.calculate_embedding(text[:500]):
 
-            sql = """ 
+            sql = """
             SELECT
                 user_id,
                 group_id,
@@ -273,7 +273,46 @@ class memorySystem:
                 )
 
         return []
-    
+
+    async def query_user_recently_memory(self, user_id:int, text:str, limit:int = 5)->list[Record]:
+        """简单根据文本向量查询数据库user最相似消息,返回余弦距离<0.5,和最近30天内的消息
+
+        Args:
+
+            text (str): 要文本搜索的文本,太长会截取
+            limit (int): 返回最大数量
+
+        Returns:
+            list[Record]: 返回查询到的表行最多limit条,
+                每条包含: user_id, group_id, event_time, event, category, importance, credibility
+        """
+        if embeddin_list := await self.rag.calculate_embedding(text[:500]):
+
+            sql = """
+            SELECT
+                user_id,
+                group_id,
+                event_time,
+                event,
+                credibility,
+                (event_vector <=> $1::vector(1024)) AS distance
+            FROM atri_memory
+            WHERE (event_vector <=> $1::vector(1024)) <= 0.5
+            AND user_id = $2
+            AND event_time >= EXTRACT(EPOCH FROM (NOW() - INTERVAL '30 days'))::bigint
+            ORDER BY distance ASC
+            LIMIT $3
+            """
+
+            async with self.vector_store.vector_database as db:
+                return await db.execute_with_pool(
+                    query = sql,
+                    params = (str(embeddin_list[0]), user_id, limit),
+                    fetch_type = "all"
+                )
+
+        return []
+
     async def query_memories(
         self,
         query_text: str = None,

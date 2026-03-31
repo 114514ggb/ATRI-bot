@@ -9,7 +9,7 @@ from atribot.LLMchat.chat import GroupChat
 
 
 class initiativeChat:
-    """决定bot如何在合适的时机加入聊天"""
+    """决定bot如何在合适的时机加入群聊天"""
     
     def __init__(self):
         self.logger:Logger = container.get("log")
@@ -39,7 +39,7 @@ class initiativeChat:
             decision =  await self._execute_reply(
                 message, group_id, params,
                 log_msg=f"Bot was @ed by user {user_id}, preparing to respond.",
-                prompt="你现在被@到了，最好回复一下别人，除非你觉得不感兴趣或你在短时间连续发送了过多的消息或是面对多次重复或类似没有意义的输入,就选择静默不回复"
+                prompt="你现在被群里的人@到了，最好回复一下别人，除非你觉得不感兴趣或你在短时间连续发送了过多的消息或是面对多次重复或类似没有意义的输入,就选择静默不回复"
             )
             await group_context.LLM_chat_decision_parameters.update_trigger_user(user_id)
             return decision

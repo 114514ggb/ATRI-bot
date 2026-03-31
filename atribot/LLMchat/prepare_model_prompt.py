@@ -358,3 +358,83 @@ JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对
             "</output_requirement>"
             "</context>"  
         )
+
+    def decision_whether_private_responses(self, user_id: int, prompt: str, else_prompt: str) -> str:
+        """私聊用的主动思考决策的json提示词
+
+        Args:
+            user_id (int): 私聊对象的QQ号
+            prompt (str): 当前触发情况的提示
+            else_prompt (str): 其他在中间补充提示词
+
+        Returns:
+            str: prompt返回
+        """
+        return (
+            "<context>"
+            "<environment>"
+            f"你正在与用户进行一对一的私聊对话,对方的QQ号是:{user_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name}。"
+            "你输出的内容将直接作为私聊消息发送给对方。"
+            "用户的消息已被格式化,用户唯一标识:\"user_id\"用户自己定义账号名称:\"nick_name\"格式化后的用户输入:\"user_message\""
+            f"</environment>{else_prompt}"
+            f"<prompt>{prompt}</prompt>"
+            "<access_memory>有人问你记得什么事情或是问你某个人或事情的时候一定要使用查询记忆工具或网络搜索了解后再回答</access_memory>"
+            "<output_requirement>"
+            """
+**可用的decision**
+参数:speak
+功能描述:回复用户的私聊消息
+{
+    "decision":"speak",
+    "reason":"做出此决策的原因",
+    "content":"将解析发送给用户的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送,适当分段,可以在开头使用[CQ:reply,id=message_id]引用到对应的消息"
+}
+
+参数:silence
+功能描述:保持沉默,不进行任何操作,有时候user会分段打字什么的要是感觉别人话没说完就进行等待,或是你生气了不理他，请酌情选择
+{
+    "decision":"silence",
+    "reason":"做出此决策的原因"
+}
+
+参数:update
+功能描述:更新对话用户的<user_info>信息
+{
+    "decision":"update",
+    "reason":"做出此决策的原因",
+    "update_field":"这个必须是一个json对象,里面的key是需要更新的字段名,value是对应更新后的值,参考原有的user_info给出要更新的字段,不过200字"
+}
+
+规则:
+decision:string,多选一,必填
+reason:string,必填
+reply_message_id:integer,speak时选填
+content:list[str],speak时必填,其它决策禁止出现
+update_field:dict[str,any],update时必填,其它决策禁止出现
+
+**decision选择要求**
+1.思考每个可用decision是否符合当下情况
+2.如果有人对你进行攻击或情绪激动,请耐心回应,不要骂人
+
+输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON.
+JSON里要求是包含"actions"键及其对应的JSON列表,可以使用相同或不同decision的多个action。
+<example>
+<think>
+//让我来分析一下当前情况
+</think>
+```json
+{
+    "actions":[
+        {
+            "decision":"参数值:只能是update,silence,speak其中之一",
+            //要求参数
+        }
+    ]
+}
+```
+请根据情况灵活地进行工具调用完成任务,最后给出你的actions的JSON
+</example>
+"""
+            "</output_requirement>"
+            "</context>"
+        )

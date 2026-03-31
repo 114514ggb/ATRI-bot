@@ -20,7 +20,7 @@ from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
-from atribot.LLMchat.chat import GroupChat
+from atribot.LLMchat.chat import AgentChat, GroupChat, PrivateChat
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
@@ -224,6 +224,8 @@ class BotFramework:
 
         #AIchat
         container.register("GroupChat", GroupChat())
+        container.register("PrivateChat", PrivateChat())
+        container.register("AgentChat", AgentChat())
 
     async def _start_admin_panel(self) -> None:
         """在独立端口启动 Web 管理面板"""

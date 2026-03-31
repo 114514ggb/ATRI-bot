@@ -169,16 +169,16 @@ class EventTrigger:
         group_id = message.group_id
         
         if sub_type == "approve":
-            await self.send_message.send_group_message(group_id, f"欢迎[CQ:at,qq={user_id}]加入群聊！")
+            await self.send_message.send_group_mgs(group_id, f"欢迎[CQ:at,qq={user_id}]加入群聊！")
             DatabaseBase: AsyncDatabaseBase = container.get("database")
             await DatabaseBase.add_user(
                 user_id=user_id,
                 nickname="NOT_SET"  # 以后发消息时会更新
             )
         elif sub_type == 'kick':
-            await self.send_message.send_group_message(group_id, f"[CQ:at,qq={user_id}]({user_id})被[CQ:at,qq={data['operator_id']}]请出群聊！")
+            await self.send_message.send_group_mgs(group_id, f"[CQ:at,qq={user_id}]({user_id})被[CQ:at,qq={data['operator_id']}]请出群聊！")
         elif sub_type == 'leave':
-            await self.send_message.send_group_message(group_id, f"[CQ:at,qq={user_id}]({user_id})永久的离开了我们！希望以后安好~")
+            await self.send_message.send_group_mgs(group_id, f"[CQ:at,qq={user_id}]({user_id})永久的离开了我们！希望以后安好~")
         return True
             
     async def manage_add_group(self, message:ChatMessage, data: dict) -> bool:
@@ -196,7 +196,7 @@ class EventTrigger:
         if group_id in white_list_gropup and data['comment'] in white_list_gropup[group_id]:
             await self.send_message.set_group_add_request(data['flag'], True)
         else:
-            await self.send_message.send_group_message(group_id, f"有人申请加群了!\n验证信息:\n{data['comment']}")
+            await self.send_message.send_group_mgs(group_id, f"有人申请加群了!\n验证信息:\n{data['comment']}")
         return True
 
 
@@ -472,7 +472,7 @@ class EventTrigger:
         text = random.choice(reactivity_list)
         group_id = message.group_id
         
-        await self.send_message.send_group_message(group_id, text)
+        await self.send_message.send_group_mgs(group_id, text)
         await self.send_message.send_group_poke(group_id,data['user_id'])
         return True
 

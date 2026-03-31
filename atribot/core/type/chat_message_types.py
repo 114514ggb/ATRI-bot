@@ -544,10 +544,10 @@ class ChatMessage:
     
     self_id: int 
     """接收账号"""
-    user_id: int
+    user_id: int|None
     """发送的user"""
-    group_id: Optional[int]
-    """在的群号"""
+    group_id: int|None
+    """群号"""
     message_id: int
     """消息的唯一编码"""
     time: int 
@@ -675,8 +675,8 @@ class ChatMessage:
         """用于非聊天消息的初始化"""
         return cls(
             self_id=event.get('self_id', 0),
-            user_id=event.get('user_id', 0),
-            group_id=event.get('group_id', 0),
+            user_id=event.get('user_id', None),
+            group_id=event.get('group_id', None),
             message_id=event.get('message_id', 0),
             time=event.get('time', int(time.time())),
             primeval=event,
@@ -710,8 +710,23 @@ class ChatMessage:
             "</MESSAGE>"
         )
 
+    def format_for_llm_simplify(self) -> str:
+        """获取llm可读的字符串简化版"""
+        return (
+            "<MESSAGE>"
+            f"<time>{datetime.datetime.fromtimestamp(self.time).strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
+            f"<user_message>{self.user_cq_message[:2000]}</user_message>"
+            f"<message_id>{self.message_id}</message_id>"
+            "</MESSAGE>"
+        )
+        
     def update_llm_formatted_message(self):
+        """进行详细的格式化"""
         self.llm_formatted_message = self.format_for_llm()
+
+    def update_llm_formatted_simplify_message(self):
+        """简单的格式化消息"""
+        self.llm_formatted_message = self.format_for_llm_simplify()
 
     def __str__(self):
         return self.llm_formatted_message
