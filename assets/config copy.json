@@ -93,7 +93,7 @@
         "image":"atri-sandbox:latest"
     },
     "tool_presets": {
-        "chat_full": [
+        "group_chat": [
             "web_search", "web_extract",
             "memory_search", "memory_storage",
             "run_python_code",
@@ -101,12 +101,15 @@
             "load_skill_prompt", "get_user_info",
             "schedule_self_trigger"
         ],
-        "chat_lite": [
+        "private_chat": [
             "web_search", "memory_search",
             "load_skill_prompt", "get_user_info"
         ],
-        "tool_only": [
-            "run_python_code", "web_search", "web_extract"
+        "agency_Agent": [
+            "run_command",
+            "send_file","add_file",
+            "run_python_code", 
+            "web_search", "web_extract"
         ],
         "使用全部工具": null
     },

@@ -307,7 +307,7 @@ class GroupChat(chat_basics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.mcp_tool.get_func_desc_openai_style(preset=None),
+            tool_json=self.mcp_tool.get_func_desc_openai_style(preset="group_chat"),
             message_data=message
         )
         
@@ -790,7 +790,7 @@ class PrivateChat(chat_basics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.mcp_tool.get_func_desc_openai_style(preset=None),
+            tool_json=self.mcp_tool.get_func_desc_openai_style(preset="private_chat"),
             message_data=message,
         )
 
@@ -1059,7 +1059,7 @@ class AgentChat(chat_basics):
         try:
             response = await self.model_api_supervisor.run(request)
             result = "".join(response.reply_text).strip()
-            self.log.info(f"[AgentChat][{uid}] 完成，结果长度:{len(result)}")
+            self.log.info(f"[AgentChat][{uid}] 完成，结果:{result}")
             return result
         except Exception as e:
             self.log.exception(f"[AgentChat][{uid}] 执行任务时出错:{e}")

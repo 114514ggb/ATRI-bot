@@ -25,7 +25,7 @@ class message_router():
         self.send_message:QQAPIClient = container.get("SendMessage")
         self.group_manage = group_manage()
         self.private_manage = private_manage()
-        self.group_set = set(None)
+        self.group_set = {None}
     
     async def main(self, data:dict):
         """主消息处理逻辑"""

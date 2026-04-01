@@ -222,7 +222,12 @@ class Context():
         """添加用户消息"""
         self.messages.append({"role": "user", "content": content})
 
-    def add_assistant_message(self, content: str | None, reasoning_content: str | None = None) -> None:
+    def add_assistant_message(
+        self, 
+        content: str | None, 
+        reasoning_content: str | None = None,
+        extra_content: dict | None = None #对谷歌的兼容字段
+    ) -> None:
         """添加助手消息"""
         assistant_message = {
             "role": "assistant",
@@ -231,6 +236,9 @@ class Context():
 
         if reasoning_content:
             assistant_message["reasoning_content"] = reasoning_content
+
+        if extra_content:
+            assistant_message["extra_content"] = extra_content
 
         self.messages.append(assistant_message)
 

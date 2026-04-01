@@ -120,7 +120,7 @@
         "image":"atri-sandbox:latest"#启动的镜像名称
     },
     "tool_presets": {#各个聊天模块所使用的工具列表,可以配置列表是空代表没有工具,配置为空值代表使用全部工具
-        "chat_full": [
+        "group_chat": [#群聊使用的
             "web_search", "web_extract",
             "memory_search", "memory_storage",
             "run_python_code",
@@ -128,12 +128,15 @@
             "load_skill_prompt", "get_user_info",
             "schedule_self_trigger"
         ],
-        "chat_lite": [
+        "private_chat": [#私聊使用的
             "web_search", "memory_search",
             "load_skill_prompt", "get_user_info"
         ],
-        "tool_only": [
-            "run_python_code", "web_search", "web_extract"
+        "agency_Agent": [#子agent使用的
+            "run_command",
+            "send_file","add_file",
+            "run_python_code", 
+            "web_search", "web_extract"
         ],
         "使用全部工具": None
     },

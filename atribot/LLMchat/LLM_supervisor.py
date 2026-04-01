@@ -280,8 +280,14 @@ class LLMCoordinator():
                 increase_context = increase_context,
                 model_api = model_api
             )
-
-        increase_context.messages.append(assistant_message)
+            
+        # increase_context.messages.append(assistant_message)
+        increase_context.add_assistant_message(
+            content = assistant_message.get("content",""),
+            reasoning_content = assistant_message.get("reasoning_content"),
+            extra_content = assistant_message.get("extra_content")
+         )
+        
         return self._update_response(
             GenerationResponse(
                 messages = increase_context.messages,
@@ -381,7 +387,8 @@ class LLMCoordinator():
             else:
                 increase_context.add_assistant_message(
                     content = content,
-                    reasoning_content = assistant_message.get("reasoning_content")
+                    reasoning_content = assistant_message.get("reasoning_content"),
+                    extra_content = assistant_message.get("extra_content")
                 )
                 break
         
