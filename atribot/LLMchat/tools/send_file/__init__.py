@@ -2,10 +2,11 @@ import asyncio
 import base64
 import io
 import shlex
-import shutil
-import tarfile
-from uuid import uuid4
 
+# import shutil
+import tarfile
+
+# from uuid import uuid4
 from atribot.core.atri_config import atriConfig
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -20,7 +21,7 @@ _IMAGE_EXTS = {"png", "jpg", "jpeg", "gif"}
 
 tool_json = {
     "name": "send_file",
-    "description": "将沙盒容器内的文件发送到群聊",
+    "description": "将沙盒容器内的文件发送到user",
     "properties": {
         "path": {
             "type": "string",
@@ -72,17 +73,25 @@ async def main(path: str, message_data: ChatMessage) -> str:
         )
         return f"已发送图片:{filename}"
     else:
-        temp_dir = config.file_path.temp / f"send_file_{uuid4().hex}"
-        temp_path = temp_dir / filename
-        temp_path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path.write_bytes(content)
-        try:
-            await send_message.send_group_file(
-                group_id=group_id,
-                url_file=str(temp_path),
-                local_Path_type=True,
-                echo=True,
-            )
-        finally:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+        # temp_dir = config.file_path.temp / f"send_file_{uuid4().hex}"
+        # temp_path = temp_dir / filename
+        # temp_path.parent.mkdir(parents=True, exist_ok=True)
+        # temp_path.write_bytes(content)
+        # try:
+        #     await send_message.send_group_file(
+        #         group_id=group_id,
+        #         url_file=str(temp_path),
+        #         local_Path_type=True,
+        #         echo=True,
+        #     )
+        # finally:
+        #     shutil.rmtree(temp_dir, ignore_errors=True)
+        
+        await send_message.send_group_file(
+            group_id = group_id,
+            url_file = f"base64://{base64.b64encode(content).decode()}",
+            name = filename,
+            local_Path_type = False,
+        )
+        
         return f"已发送文件: {filename}"

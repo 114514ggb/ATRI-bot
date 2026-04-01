@@ -1,6 +1,3 @@
-import shutil
-from uuid import uuid4
-
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
@@ -22,7 +19,7 @@ tool_json = {
         "可用库:numpy,pandas,matplotlib,seaborn,pillow,opencv-python-headless"
         "图表如需显示中文,linux安装了fonts-wqy-zenhei字体,环境还有ffmpeg"
         "每个群组持久化工作区可通过os.environ访问:"
-        "GROUP_WORKSPACE=本群持久目录, SHARED_DIR=共享目录, GROUP_ID=群号"
+        "GROUP_WORKSPACE=本群持久目录, SHARED_DIR=共享目录"
         "生成文件直接写在脚本同级目录大小不超过 20MB 就会自动发送,跨次调用保留文件写入GROUP_WORKSPACE"
     ),
     "properties": {
@@ -86,25 +83,18 @@ async def main(code: str, message_data: ChatMessage, files: list[str] | None = N
         if (filename.rsplit('.', 1)[-1].lower() if '.' in filename else '') in {'png', 'jpg', 'jpeg', 'gif'}:
             await send_message.send_group_pictures(
                 group_id = group_id,
-                url_img = "base64://"+file.to_base64(),
+                url_img = "base64://" + file.to_base64(),
                 local_Path_type = False
             )
             return f"代码执行结果是:{output_text}\n并且已经发送代码生成图片:{filename}"
         else:
-            temp_dir = config.file_path.temp / f"run_python_code_{uuid4().hex}"
-            temp_file_path = temp_dir / (filename or "output.bin")
-            temp_file_path.parent.mkdir(parents=True, exist_ok=True) 
-            temp_file_path.write_bytes(file.content)
+            await send_message.send_group_file(
+                group_id = group_id,
+                url_file = "base64://" + file.to_base64(),
+                name = file.path,
+                local_Path_type = False,
+            )
 
-            try:
-                await send_message.send_group_file(
-                    group_id = group_id,
-                    url_file = str(temp_file_path),
-                    local_Path_type = True,
-                    echo = True
-                )
-            finally:
-                shutil.rmtree(temp_dir, ignore_errors=True)
             return f"代码执行结果是:{output_text}\n并且已经打包发送代码生成文件:{filename}"
     
     return f"代码执行结果是:{output_text}"

@@ -25,11 +25,11 @@ tool_json = {
         },
         "path": {
             "type": "string",
-            "description": "工作目录（容器内绝对路径）。不填时默认使用当前群的持久化目录 /workspace/groups/<群号>/data",
+            "description": "工作目录（容器内绝对路径）不填时默认使用当前群的持久化目录 /workspace/groups/<群号>/data",
         },
         "timeout": {
             "type": "integer",
-            "description": "命令超时时间（秒），默认 30,最大 300。下载、编译等耗时操作应适当增大",
+            "description": "命令超时时间（秒），默认 30,最大 300下载、编译等耗时操作应适当增大",
             "default": 30,
             "minimum": 1,
             "maximum": 300,

@@ -476,7 +476,7 @@ class GroupChat(chat_basics):
             async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""
                 Image_description_text = await self.media_processor.image_to_text(message.url)
-                self.log.info(f"图像识别文本结果:{Image_description_text}")
+                self.log.info(f"[CQ:image,summary:{Image_description_text}]")
                 message_builder.add_text(Image_description_text)
 
         if including_audios:
@@ -495,7 +495,7 @@ class GroupChat(chat_basics):
                 """交给其他模型将音频转为文字"""
                 audio_url = segment.url or segment.file.file
                 desc = await self.media_processor.audio_to_text(audio_url)
-                self.log.info(f"音频识别文本结果:{desc}")
+                self.log.info(f"[CQ:record,summary:{desc}]")
                 message_builder.add_text(desc)
 
         if including_videos:
@@ -508,7 +508,7 @@ class GroupChat(chat_basics):
                 """交给其他模型将视频转为文字"""
                 video_url = segment.url or segment.file.file
                 desc = await self.media_processor.video_to_text(video_url)
-                self.log.info(f"视频识别文本结果:{desc}")
+                self.log.info(f"[CQ:video,summary:{desc}]")
                 message_builder.add_text(desc)
 
         async def append_segments(segments) -> None:
