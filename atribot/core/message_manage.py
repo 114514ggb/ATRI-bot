@@ -205,7 +205,6 @@ class group_manage(message_manage):
         except Exception as e:
             self.error_occurred(e, "记忆总结模块")
                         
-        
 
 class private_manage(message_manage):
     """私聊消息处理类"""
