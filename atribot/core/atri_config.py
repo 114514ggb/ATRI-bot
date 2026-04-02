@@ -170,27 +170,53 @@ class FilePathConfig:
         """
         file_path_config = dict(data)
 
-        document_raw = file_path_config.get("document_root")
-        if document_raw and Path(document_raw).is_absolute():
-            document_root = Path(document_raw).resolve()
+        resolve_paths: bool = file_path_config.get("resolve_paths", True)
+        create_dirs: bool = file_path_config.get("create_dirs", True)
+
+        if resolve_paths:
+            def to_absolute(base: Path, target: str) -> Path:
+                path = Path(target)
+                if not path.is_absolute():
+                    path = base / path
+                return path.resolve()
         else:
-            document_root = cls._to_absolute(
-                project_root, 
-                document_raw if document_raw else "document"
-            )
+            def to_absolute(base: Path, target: str) -> Path:
+                path = Path(target)
+                if not path.is_absolute():
+                    path = base / path
+                return path
+
+        if create_dirs:
+            def normalize(path: Path, *, expect_file: bool = False) -> Path:
+                target_directory = path.parent if expect_file else path
+                try:
+                    target_directory.mkdir(parents=True, exist_ok=True)
+                except OSError:
+                    pass
+                return path
+        else:
+            def normalize(path: Path, *, expect_file: bool = False) -> Path:
+                return path
+
+        document_raw = file_path_config.get("document_root")
+        document_root = Path(document_raw) if document_raw else to_absolute(project_root, "document")
+        
+        if emoji_raw := file_path_config.get("emoji"):
+            emoji_path = Path(emoji_raw)
+        else:
+            emoji_path = project_root / "document/img/emojis"
 
         root_relative: Dict[str, str] = {
             "commands": "atribot/commands",
             "chat_manager": "atribot/LLMchat/character_setting",
             "supplier_config_path": "assets/supplier_config.json",
-            "tool_calls":"atribot/LLMchat/tools",
+            "tool_calls": "atribot/LLMchat/tools",
             "mcp_config": "atribot/LLMchat/MCP/mcp_server.json",
             "agent_skills": "atribot/LLMchat/skills/agent_skills",
         }
         root_relative.update(file_path_config.get("relative_to_root", {}))
 
         document_relative: Dict[str, str] = {
-            "emoji": "img/emojis",
             "audio": "audio",
             "file": "file",
             "img": "img",
@@ -199,30 +225,28 @@ class FilePathConfig:
         }
         document_relative.update(file_path_config.get("relative_to_document", {}))
 
-        file_keys = {"supplier_config_path", "mcp_config"}
-
         resolved_root = {
-            name: cls._normalize(
-                cls._to_absolute(project_root, relative_path),
-                expect_file=name in file_keys,
+            name: normalize(
+                to_absolute(project_root, relative_path),
+                expect_file=name in {"supplier_config_path", "mcp_config"},
             )
             for name, relative_path in root_relative.items()
         }
         resolved_document = {
-            name: cls._normalize(cls._to_absolute(document_root, relative_path))
+            name: normalize(to_absolute(document_root, relative_path))
             for name, relative_path in document_relative.items()
         }
 
         return cls(
-            project_root=cls._normalize(project_root),
-            document_root=cls._normalize(document_root),
+            project_root=normalize(project_root),
+            document_root=normalize(document_root),
             commands=resolved_root.get("commands", Path()),
             chat_manager=resolved_root.get("chat_manager", Path()),
             supplier_config_path=resolved_root.get("supplier_config_path", Path()),
             mcp_config=resolved_root.get("mcp_config", Path()),
             agent_skills=resolved_root.get("agent_skills", Path()),
             tool_calls=resolved_root.get("tool_calls", Path()),
-            emoji=resolved_document.get("emoji", Path()),
+            emoji=normalize(emoji_path),
             audio=resolved_document.get("audio", Path()),
             file=resolved_document.get("file", Path()),
             img=resolved_document.get("img", Path()),

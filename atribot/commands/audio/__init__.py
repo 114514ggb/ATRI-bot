@@ -27,7 +27,7 @@ song_manager:song = song()
 )
 @cmd_system.argument(
     name="target_text",
-    description="需要合成的混合文本，支持中日英韩（目前不要输入韩文）",
+    description="需要合成的混合文本,支持中日英韩（目前不要输入韩文）",
     required=True,
     metavar="TEXT",
     multiple=True
@@ -36,7 +36,7 @@ song_manager:song = song()
     name="emotion",
     short="e",
     long="emotion",
-    description="音频的情感，可选值：高兴, 机械, 平静",
+    description="音频的情感,可选值：高兴, 机械, 平静",
     default="高兴",
     choices=["高兴", "机械", "平静"],
     metavar="EMOTION"
@@ -45,7 +45,7 @@ song_manager:song = song()
     name="speed",
     short="s",
     long="speed",
-    description="语速，取值范围0.6~1.65",
+    description="语速,取值范围0.6~1.65",
     default=1.0,
     type=float,
     metavar="SPEED"
@@ -55,9 +55,9 @@ async def tts_synthesis(message_data: ChatMessage, target_text:list[str], emotio
         
     Args:
         message_data(dict): 每个命令固定传递
-        target_text (str): 需要合成的文本,支持中日英韩，但是目前不要输入韩文
+        target_text (str): 需要合成的文本,支持中日英韩,但是目前不要输入韩文
         emotion (str): 音频的情感,枚举值：高兴,机械,平静
-        speed (float): 语速，取值范围0.6~1.65,默认1
+        speed (float): 语速,取值范围0.6~1.65,默认1
     """
     tts_main = TTSService()
     audio_path:Path = await tts_main.get_tts_path(
@@ -67,7 +67,7 @@ async def tts_synthesis(message_data: ChatMessage, target_text:list[str], emotio
     )
     await send_message.send_group_audio(
         group_id = message_data.group_id,
-        url_audio = str(audio_path),
+        url_audio = audio_path.as_posix(),
     )
     
     
@@ -89,7 +89,7 @@ async def tts_synthesis(message_data: ChatMessage, target_text:list[str], emotio
 )
 @cmd_system.flag('list', short='l', description='查看当前可用的歌曲列表')
 @cmd_system.flag('refresh', short='r', description='刷新本地歌曲列表')
-@cmd_system.flag('file', short='f', description='以文件形式发送歌曲，而不是语音')
+@cmd_system.flag('file', short='f', description='以文件形式发送歌曲,而不是语音')
 @cmd_system.argument(
     'song_name_parts',
     description='要点播的歌曲名称',
@@ -145,12 +145,12 @@ async def handle_song_command(
         if file:
             await send_message.send_group_file(
                 group_id, 
-                str(config.file_path.audio / "sing" / song_path)
+                (config.file_path.audio / "sing" / song_path).as_posix()
             )
         else:
             await send_message.send_group_audio(
                 group_id, 
-                str(config.file_path.audio / "sing" / song_path)
+                (config.file_path.audio / "sing" / song_path).as_posix()
             )
     else:
         similar_songs = song_manager.find_similar_songs(song_name)
@@ -158,5 +158,5 @@ async def handle_song_command(
             suggestions = "\n".join([f"  - {song_manager._remove_extension(s)}" for s in similar_songs])
             response = f"😥 未找到歌曲: '{song_name}'\n🤔 您是不是想找：\n{suggestions}"
         else:
-            response = f"😥 未找到歌曲: '{song_name}'，并且曲库中没有任何相似的歌曲。"
+            response = f"😥 未找到歌曲: '{song_name}',并且曲库中没有任何相似的歌曲。"
         await send_message.send_group_mgs(group_id, response)

@@ -16,7 +16,10 @@
         "name":"ATRI-bot" #bot的账号名称
     },
     "file_path":{#没事的话可以不配置目录,使用默认的即可,注意如果没有对应目录的话会自动创建
-        "document_root":None, #项目的资源根目录，如表情包、音频等目录的配置位置,如果为空就是默认在根目录下的/document文件夹下,有需要的人可以换个位置但是不建议
+        "resolve_paths": False,#是否强制将相对路径转为绝对路径
+        "create_dirs": False,#是否目录创建,确保目录存在
+        "document_root": None,#项目的资源根目录，如表情包、音频等目录的配置位置,如果为空就是默认在根目录下的/document文件夹下,有需要的人可以换个位置但是不建议
+        "emoji": None,#表情目录的绝对路径,为空的话默认是 项目的根目录/document/img/emojis
         "relative_to_root":{#根目录在main.py脚本的位置会自动获取
             "commands":"atribot/commands", #加载提供系统使用命令的目录
             "chat_manager":"atribot/LLMchat/character_setting", #角色设定所在的目录
@@ -26,7 +29,6 @@
             "agent_skills":"atribot/LLMchat/skills/agent_skills" #读取skills的目录
         },
         "relative_to_document":{#相对于 document_root 的目录
-            "emoji":"img/emojis", #表情包目录
             "audio":"audio", #音频目录
             "file":"file", #文件目录
             "img":"img", #图片目录
@@ -64,8 +66,7 @@
         "memory":{#总结群聊天内容做为模型记忆的模型
             "summarize_model":{
                 "supplier":"zaxprisのapi",
-                "model_name":"GeminiCLI/gemini-2.5-flash-search",
-                "visual_sense":True
+                "model_name":"GeminiCLI/gemini-2.5-flash-search"
             }
         },
         "standby_model":[#当主聊天模型尝试失败后会使用的其他供应商或其他的模型,但是备用模型会使用的model参数是一个默认的通用参数硬编码在里面
@@ -171,13 +172,13 @@
             "api_key":"sk-????",#你的密匙这个可以是一个list类型，那样的话就可以输入多个密匙成为一个号池
             "models":{
                 "deepseek-chat": {#模型名称(对应上面使用的"model_name")和对应的模型参数
+                    #可以输入的多模态类型
                     "visual_sense": False,  #是否支持输入视觉/图像
                     "audio_sense": False,   #是否支持输入音频/语音
                     "video_sense": False,   #是否支持输入视频
                     "document_sense": False  #是否支持输入复杂文档(如PDF解析)
-                    #可以输入的多模态类型
                 },
-                "deepseek-reasoner": {#可以不写代表默认不支持
+                "deepseek-reasoner": {#可以不写代表默认都不支持
                 }
             }
         },

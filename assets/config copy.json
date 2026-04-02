@@ -14,7 +14,10 @@
         "name":"ATRI-bot"
     },
     "file_path":{
-        "document_root":null,
+        "resolve_paths": false,
+        "create_dirs": false,
+        "document_root": null,
+        "emoji": null,
         "relative_to_root":{
             "commands":"atribot/commands",
             "chat_manager":"atribot/LLMchat/character_setting",
@@ -24,7 +27,6 @@
             "agent_skills":"atribot/LLMchat/skills/agent_skills"
         },
         "relative_to_document":{
-            "emoji":"img/emojis",
             "audio":"audio",
             "file":"file",
             "img":"img",
@@ -53,8 +55,7 @@
         "memory":{
             "summarize_model":{
                 "supplier":"",
-                "model_name":"",
-                "visual_sense":true
+                "model_name":""
             }
         },
         "standby_model":[

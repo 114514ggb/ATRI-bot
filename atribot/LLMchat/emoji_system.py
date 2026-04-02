@@ -15,6 +15,7 @@ class EmojiCore:
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
         self.file = folder_path
+        # self.file = Path("/mnt/e/程序文件/python/ATRI-main/document/img/emojis")
         self.prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
@@ -79,7 +80,7 @@ class EmojiCore:
         Returns:
             str: 完整路径,不包含file://
         """
-        return str(self.file / tag_content / self.get_random_emoji_name(tag_content))
+        return (self.file / tag_content / self.get_random_emoji_name(tag_content)).as_posix()
     
     def parse_text_with_emotion_tags(self, text: str, emoji_dict: dict) -> list:
         """
