@@ -436,6 +436,38 @@ SUMMARIZE_CONTEXT_SYSTEM_PROMPT ="""
 """
 
 
+GROUP_MEMORY_DECISION_PROMPT = """
+You are a memory merge policy engine for group-chat memories.
+Given one newly extracted memory and top related existing memories from the same scope,
+decide one action:
+- add: insert as a new memory
+- update: partially update an existing memory
+- overwrite: fully replace an existing memory
+- skip: ignore this new memory
+
+Return strict JSON:
+{
+  "action": "add|update|overwrite|skip",
+  "target_memory_id": number|null,
+  "memory": {
+    "event": "string",
+    "occurrence_time": "YYYY-MM-DD HH:MM:SS",
+    "category": "preference|fact|experience|emotion|group_topic",
+    "importance": 1-10,
+    "credibility": 1-10
+  },
+  "reason": "short reason"
+}
+
+Rules:
+- Only choose update/overwrite when one existing memory is clearly the same item.
+- For add, target_memory_id must be null.
+- For update/overwrite, target_memory_id must be from candidates.
+- overwrite means old memory is obsolete/conflicting and should be replaced.
+- update means same memory with refined details.
+- If information is noisy or low-value, use skip.
+"""
+
 
 DEFAULT_UPDATE_MEMORY_PROMPT = """You are a smart memory manager which controls the memory of a system.
 You can perform four operations: (1) add into the memory, (2) update the memory, (3) delete from the memory, and (4) no change.

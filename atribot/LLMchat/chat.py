@@ -476,8 +476,8 @@ class GroupChat(chat_basics):
             async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""
                 Image_description_text = await self.media_processor.image_to_text(message.url)
-                self.log.info(f"[CQ:image,summary:{Image_description_text}]")
-                message_builder.add_text(Image_description_text)
+                self.log.info(f"输入图片描述:{Image_description_text}]")
+                message_builder.add_text(f"[CQ:image,summary:{Image_description_text}]")
 
         if including_audios:
             async def dispose_audio(segment: RecordSegment) -> None:
@@ -489,14 +489,14 @@ class GroupChat(chat_basics):
                 except Exception as e:
                     self.log.warning(f"音频下载失败，降级为文本识别: {e}")
                     desc = await self.media_processor.audio_to_text(audio_url)
-                    message_builder.add_text(desc)
+                    message_builder.add_text(f"[CQ:record,summary:{desc}]")
         else:
             async def dispose_audio(segment: RecordSegment) -> None:
                 """交给其他模型将音频转为文字"""
                 audio_url = segment.url or segment.file.file
                 desc = await self.media_processor.audio_to_text(audio_url)
-                self.log.info(f"[CQ:record,summary:{desc}]")
-                message_builder.add_text(desc)
+                self.log.info(f"音频识别:{desc}]")
+                message_builder.add_text(f"[CQ:record,summary:{desc}]")
 
         if including_videos:
             async def dispose_video(segment: VideoSegment) -> None:
@@ -508,8 +508,8 @@ class GroupChat(chat_basics):
                 """交给其他模型将视频转为文字"""
                 video_url = segment.url or segment.file.file
                 desc = await self.media_processor.video_to_text(video_url)
-                self.log.info(f"[CQ:video,summary:{desc}]")
-                message_builder.add_text(desc)
+                self.log.info(f"视频识别结果:{desc}")
+                message_builder.add_text(f"[CQ:video,summary:{desc}]")
 
         async def append_segments(segments) -> None:
             """用来统一处理对各种不同类型的消息段的加入"""

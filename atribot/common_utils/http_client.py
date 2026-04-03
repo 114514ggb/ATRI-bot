@@ -14,6 +14,7 @@ import asyncio
 from typing import Any
 
 import aiohttp
+from aiohttp.resolver import AsyncResolver
 
 _DEFAULT_HEADERS: dict[str, str] = {
     "User-Agent": "QQ/9.9.27-45758 CFNetwork/1220.1 Darwin/20.3.0",
@@ -34,7 +35,13 @@ class HTTPClient:
     """
 
     def __init__(self) -> None:
-        connector = aiohttp.TCPConnector(limit=100, keepalive_timeout=30)
+        connector = aiohttp.TCPConnector(
+            limit=100, 
+            keepalive_timeout=30,
+            resolver=AsyncResolver(
+                nameservers=['8.8.8.8', '8.8.4.4', '114.114.114.114'] #DNS相关
+            )
+        )
         self._session = aiohttp.ClientSession(
             connector=connector,
             headers=_DEFAULT_HEADERS,

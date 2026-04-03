@@ -12,6 +12,7 @@ from atribot.core.service_container import container
 from atribot.core.type.context_types import Context
 from atribot.LLMchat.memory.prompts import (
     FACT_RETRIEVAL_PROMPT,
+    # GROUP_MEMORY_DECISION_PROMPT,
     PURE_GROUP_FACT_RETRIEVAL_PROMPT,
     SUMMARIZE_CONTEXT_SYSTEM_PROMPT,
 )
@@ -156,7 +157,7 @@ class memorySystem:
               }
             }
         """
-        if return_json := await self.request_return_json_content(message, PURE_GROUP_FACT_RETRIEVAL_PROMPT+f"详细记录bot账号<user_id>{bot_id}</user_id>相关的,但是不要记录bot的"):
+        if return_json := await self.request_return_json_content(message, PURE_GROUP_FACT_RETRIEVAL_PROMPT+f"\n请详细记录bot账号<user_id>{bot_id}</user_id>相关的,但是不要记录bot的"):
             return return_json
         else:
             return {}

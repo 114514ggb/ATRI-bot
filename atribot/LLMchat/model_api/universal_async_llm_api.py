@@ -3,6 +3,7 @@ import json
 from typing import AsyncGenerator, Dict, List
 
 import aiohttp
+from aiohttp.resolver import AsyncResolver
 
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.LLMchat.model_api.stream_processor import StreamProcessor
@@ -45,7 +46,6 @@ class universal_ai_api(model_api_basics,StreamProcessor):
         """
         异步初始化方法
         """
-        from aiohttp.resolver import AsyncResolver
         if self.client is None:
             self.client = aiohttp.ClientSession(
             connector=aiohttp.TCPConnector(

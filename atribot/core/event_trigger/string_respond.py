@@ -25,7 +25,7 @@ class string_response:
     def __init__(self):
         self.send_message:QQAPIClient = container.get("SendMessage")
         config:atriConfig = container.get("config")
-        self.url_prefi:str = f"file://{config.file_path.document_root / "img"}"
+        self.url_prefi:str = f"file://{config.file_path.img.as_posix()}"
         self.context_management: ChatManager = container.get("ChatManager")
         self._build_automaton()
     
