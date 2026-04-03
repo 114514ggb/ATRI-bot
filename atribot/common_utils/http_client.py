@@ -56,16 +56,16 @@ class HTTPClient:
     async def get_bytes(
         self,
         url: str,
-        max_bytes: int = 20 * 1024 * 1024,
+        max_bytes: int | None = None,
         *,
         headers: dict[str, str] | None = None,
         timeout: aiohttp.ClientTimeout | None = None,
     ) -> bytes:
-        """GET 请求，读取响应体为 bytes支持大小上限
+        """GET 请求，读取响应体为 bytes,支持大小上限
 
         Args:
             url: 目标 URL。
-            max_bytes: 最大允许读取的字节数，默认 20MB。
+            max_bytes: 最大允许读取的字节数,None 表示不限制。
             headers: 可选的请求头，会与 Session 默认 headers 合并。
             timeout: 可选的超时配置，覆盖 Session 默认超时。
 
@@ -79,13 +79,15 @@ class HTTPClient:
             async with self._session.get(url, headers=headers, timeout=timeout) as resp:
                 if not (200 <= resp.status < 300):
                     raise ValueError(f"下载失败，状态码: {resp.status}")
+                if max_bytes is None:
+                    return await resp.read()
                 data = await resp.content.read(max_bytes + 1)
                 if len(data) > max_bytes:
                     raise ValueError(f"下载文件超过大小限制 ({max_bytes} bytes)")
                 return data
         except (aiohttp.ClientError, asyncio.TimeoutError) as error:
             raise ValueError(f"请求失败: {error}") from error
-
+        
     async def post_form(
         self,
         url: str,

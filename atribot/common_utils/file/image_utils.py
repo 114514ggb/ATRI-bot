@@ -5,6 +5,7 @@ import io
 import aiohttp
 from PIL import Image
 
+from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
 
 
@@ -133,10 +134,10 @@ async def urls_list_to_base64(
 async def url_to_base64(
     url: str,
     prefix: str = "data:image/jpeg;base64,",
-    max_size_kb: int | None = 1024,
+    max_size_kb: int | None = None,
 ) -> str:
     """
-    下载单张图片并压缩，返回对应的base64字符串
+    下载单张图片并压缩,返回对应的base64字符串
     
     使用 aiohttp 实现图片下载，下载后的图片会根据指定的体积限制进行压缩。
     
@@ -147,7 +148,7 @@ async def url_to_base64(
                     默认值为 1024KB (1MB)
     
     Returns:
-        str: 图片的base64字符串。如果下载失败，返回空字符串。
+        str: 图片的base64字符串。如果下载失败,返回空字符串。
     
     Examples:
         >>> url = 'https://example.com/image.jpg'
@@ -160,9 +161,10 @@ async def url_to_base64(
         失败时返回空字符串。
     """
     try:
-        http = container.get("HTTPClient")
+        http:HTTPClient = container.get("HTTPClient")
         content = await http.get_bytes(
             url,
+            max_bytes=max_size_kb * 1024 if max_size_kb else None,
             headers={"Accept": "image/*;q=0.8"},
         )
         if not content:

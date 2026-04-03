@@ -141,7 +141,7 @@ class chat_basics(ABC):
             async def dispose_img(message: ImageSegment):
                 Image_description_text = await self.media_processor.image_to_text(message.url)
                 self.log.info(f"图像识别文本结果:{Image_description_text}")
-                message_builder.add_text(Image_description_text)
+                message_builder.add_text(f"[CQ:image,summary:{Image_description_text}]")
 
         if including_audios:
             async def dispose_audio(segment: RecordSegment) -> None:
@@ -152,13 +152,14 @@ class chat_basics(ABC):
                 except Exception as e:
                     self.log.warning(f"音频下载失败，降级为文本识别: {e}")
                     desc = await self.media_processor.audio_to_text(audio_url)
-                    message_builder.add_text(desc)
+                    self.log.info(f"音频识别文本结果:{desc}")
+                    message_builder.add_text(f"[CQ:record,summary:{desc}]")
         else:
             async def dispose_audio(segment: RecordSegment) -> None:
                 audio_url = segment.url or segment.file.file
                 desc = await self.media_processor.audio_to_text(audio_url)
                 self.log.info(f"音频识别文本结果:{desc}")
-                message_builder.add_text(desc)
+                message_builder.add_text(f"[CQ:record,summary:{desc}]")
 
         if including_videos:
             async def dispose_video(segment: VideoSegment) -> None:
@@ -169,7 +170,7 @@ class chat_basics(ABC):
                 video_url = segment.url or segment.file.file
                 desc = await self.media_processor.video_to_text(video_url)
                 self.log.info(f"视频识别文本结果:{desc}")
-                message_builder.add_text(desc)
+                message_builder.add_text(f"[CQ:video,summary:{desc}]")
 
         async def append_segments(segments) -> None:
             for segment in segments:
@@ -468,7 +469,7 @@ class GroupChat(chat_basics):
         if including_pictures:
             async def dispose_img(message:ImageSegment):
                 """给自己解析图像"""
-                if img := await url_to_base64(message.url,""):
+                if img := await url_to_base64(message.url, ""):
                     message_builder.add_image_base64(img,"image/jpeg")
                 else:
                     message_builder.add_text("[CQ:image,summary=图片出现问题]")

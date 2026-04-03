@@ -24,6 +24,7 @@ from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 class memorySystem:
     """管理记忆类"""
+    
     def __init__(self):
         self.logger:Logger = container.get("log")
         self.api_supplier:LLMConnectionManager = container.get("LLMSupplier")
