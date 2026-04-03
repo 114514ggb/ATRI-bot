@@ -4,6 +4,7 @@ from itertools import cycle
 from typing import AsyncGenerator, Dict, List
 
 import aiohttp
+from aiohttp.resolver import AsyncResolver
 
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 
@@ -64,7 +65,10 @@ class ai_api_account_pool(universal_ai_api):
                     limit_per_host=5,           # 单主机保持连接数
                     force_close=False,          # 允许keepalive
                     enable_cleanup_closed=True, # 自动清理关闭连接
-                    keepalive_timeout=20        # keepalive超时
+                    keepalive_timeout=20,        # keepalive超时
+                    resolver=AsyncResolver(
+                        nameservers=['8.8.8.8', '8.8.4.4', '114.114.114.114'] #DNS相关
+                    )
                 ),
                 timeout=aiohttp.ClientTimeout(total=180, connect=20), # 细分连接超时和总超时
                 headers={
