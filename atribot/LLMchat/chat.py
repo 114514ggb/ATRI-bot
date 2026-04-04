@@ -472,7 +472,7 @@ class GroupChat(chat_basics):
                 if img := await url_to_base64(message.url, ""):
                     message_builder.add_image_base64(img,"image/jpeg")
                 else:
-                    message_builder.add_text("[CQ:image,summary=图片出现问题]")
+                    message_builder.add_text("[CQ:image,summary=图片下载出现问题]")
         else:
             async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""

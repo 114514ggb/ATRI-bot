@@ -131,7 +131,7 @@ class ContextLifecycleManager:
                 )
             return True
         except Exception as e:
-            self.logger.error(f"保存用户 {user_id} 上下文失败: {e}")
+            self.logger.error(f"保存用户 {user_id} 上下文失败: {e}", exc_info=True)
             return False
     
     async def get_user_context(self, user_id: int) -> Optional[list[dict[str, Any]]]:

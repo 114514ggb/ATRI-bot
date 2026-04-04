@@ -48,8 +48,7 @@ async def url_to_audio_base64(
     """
     http: HTTPClient = container.get("HTTPClient")
     data = await http.get_bytes(url, max_bytes)
-    fmt = _detect_audio_format(url, file_name)
-    return base64.b64encode(data).decode(), fmt
+    return base64.b64encode(data).decode(), _detect_audio_format(url, file_name)
 
 
 _VIDEO_MIME_MAP: dict[str, str] = {

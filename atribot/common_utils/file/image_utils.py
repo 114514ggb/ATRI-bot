@@ -134,7 +134,7 @@ async def urls_list_to_base64(
 async def url_to_base64(
     url: str,
     prefix: str = "data:image/jpeg;base64,",
-    max_size_kb: int | None = None,
+    max_size_kb: int | None = 1024,
 ) -> str:
     """
     下载单张图片并压缩,返回对应的base64字符串
@@ -162,16 +162,28 @@ async def url_to_base64(
     """
     try:
         http:HTTPClient = container.get("HTTPClient")
-        content = await http.get_bytes(
-            url,
-            max_bytes=max_size_kb * 1024 if max_size_kb else None,
-            headers={"Accept": "image/*;q=0.8"},
-        )
-        if not content:
-            return ""
-        if max_size_kb is not None:
-            content = await asyncio.to_thread(compress_image, content, max_size_kb)
-        return f"{prefix}{base64.b64encode(content).decode('utf-8')}"
+        async with http.session.get(
+            url=url,
+            headers={
+                "User-Agent": "QQ/9.9.21-39038 CFNetwork/1220.1 Darwin/20.3.0",
+                "Accept": "image/*;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            }
+        ) as resp:
+            if resp.status != 200:
+                return ""
+
+            content = await resp.read()
+            if len(content) == 0:
+                return ""
+
+            if max_size_kb is not None:
+                content = await asyncio.to_thread(compress_image, content, max_size_kb)
+
+            return f"{prefix}{base64.b64encode(content).decode('utf-8')}"
     except Exception as error:
         print(f"下载失败 {url}: {error}")
         return ""

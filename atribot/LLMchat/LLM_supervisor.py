@@ -346,7 +346,7 @@ class LLMCoordinator():
                     
                 except Exception as e:
                     text = f"调用工具发生错误。\nErrors:{e}"
-                    self.logger.error(text)
+                    self.logger.error(text,exc_info=True)
                     tool_output = text
 
                 self.logger.debug(f"工具调用输出:{tool_output}")

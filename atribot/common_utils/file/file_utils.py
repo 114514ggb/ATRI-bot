@@ -79,7 +79,7 @@ async def download_binary(url: str, max_bytes: int = 20 * 1024 * 1024) -> bytes:
     
     Args:
         url: 文件下载地址。
-        max_bytes: 最大允许下载的字节数，默认20MB。
+        max_bytes: 最大允许下载的字节数,默认20MB。
     
     Returns:
         下载的二进制数据。
