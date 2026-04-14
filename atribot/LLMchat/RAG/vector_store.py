@@ -42,6 +42,16 @@ class VectorStoreBasics(ABC):
         """查询的方法"""
         pass
 
+    @abstractmethod
+    async def update_memory(self):
+        """更新单条记忆"""
+        pass
+
+    @abstractmethod
+    async def batch_update_memories(self):
+        """批量更新记忆"""
+        pass
+
 
 class MemoryVectorStore(VectorStoreBasics):
     """向量数据库面向记忆的接口"""
@@ -191,6 +201,91 @@ class MemoryVectorStore(VectorStoreBasics):
         """
         async with self.vector_database as db:
             await db.execute_with_pool(sql, (memory_ids,))
+
+    async def update_memory(
+        self,
+        memory_id: int,
+        *,
+        event_time: int | None = None,
+        event: str | None = None,
+        event_vector: List[float] | str | None = None,
+        category: MemoryCategory | None = None,
+        importance: int | None = None,
+        credibility: int | None = None,
+    ) -> bool:
+        """更新单条记忆内容
+
+        仅更新传入的字段；未传入字段保持原值不变
+
+        Args:
+            memory_id:   目标记忆 ID
+            event_time:  可选,事件时间戳(秒)
+            event:       可选,记忆文本
+            event_vector: 可选,1024 维语义向量
+            category:    可选,记忆类型
+            importance:  可选,重要度 1~10
+            credibility: 可选,可信度 1~10
+
+        Returns:
+            是否更新成功(找到对应 memory_id 并更新)
+        """
+        sql = """
+            UPDATE atri_memory
+            SET
+                event_time = COALESCE($2, event_time),
+                event = COALESCE($3, event),
+                event_vector = COALESCE($4::vector(1024), event_vector),
+                category = COALESCE($5::memory_category, category),
+                importance = COALESCE($6, importance),
+                credibility = COALESCE($7, credibility)
+            WHERE memory_id = $1
+            RETURNING memory_id
+        """
+
+        vector_value = str(event_vector) if event_vector is not None else None
+        async with self.vector_database as db:
+            row = await db.execute_with_pool(
+                sql,
+                (memory_id, event_time, event, vector_value, category, importance, credibility),
+                fetch_type="one",
+            )
+        return row is not None
+
+    async def batch_update_memories(self, args_list: List[tuple]) -> None:
+        """批量更新记忆内容
+
+        每条 tuple 格式：
+            (memory_id, event_time, event, event_vector, category, importance, credibility)
+
+        其中除 memory_id 外其余字段均可为 None,为 None 时不更新该字段
+
+        Args:
+            args_list: 批量更新参数列表
+        """
+        if not args_list:
+            return
+
+        sql = """
+            UPDATE atri_memory
+            SET
+                event_time = COALESCE($2, event_time),
+                event = COALESCE($3, event),
+                event_vector = COALESCE($4::vector(1024), event_vector),
+                category = COALESCE($5::memory_category, category),
+                importance = COALESCE($6, importance),
+                credibility = COALESCE($7, credibility)
+            WHERE memory_id = $1
+        """
+
+        normalized_args: List[tuple] = []
+        for memory_id, event_time, event, event_vector, category, importance, credibility in args_list:
+            vector_value = str(event_vector) if event_vector is not None else None
+            normalized_args.append(
+                (memory_id, event_time, event, vector_value, category, importance, credibility)
+            )
+
+        async with self.vector_database as db:
+            await db.executemany_with_pool(sql, normalized_args)
 
 
     async def query_memories(

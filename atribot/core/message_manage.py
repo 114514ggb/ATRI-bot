@@ -66,7 +66,7 @@ class message_router():
         
         try:
             users = {"user_id":chat_message.user_id,"nickname":data['sender']['nickname']}
-            message ={"message_id":data["message_id"],"content":chat_message.user_cq_message,"timestamp":data["time"],"group_id":group_id,"user_id":chat_message.user_id}
+            message ={"message_id":chat_message.message_id,"content":chat_message.user_cq_message,"timestamp":data["time"],"group_id":group_id,"user_id":chat_message.user_id}
         except Exception as e:
             self.logger.warning(f"获取db存储参数失败:{e}")
             return
@@ -132,12 +132,14 @@ class group_manage(message_manage):
         group_context: GroupContext = await self.chat_manager.get_group_context(group_id)
         group_context.time_window.add()
 
+        chat_message.update_llm_formatted_message()
+
         if data.get("message_sent_type") == "self":
+            self.logger.debug(f"收到自己的群消息:{data}")
             asyncio.create_task(self._process_memory_summary(chat_message, group_id))
             return
 
         self.logger.debug(f"Received group message: {data}")
-        chat_message.update_llm_formatted_message()
 
         has_permission = self.permissions_management.check_access(user_id)
 

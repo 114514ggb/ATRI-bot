@@ -293,12 +293,11 @@ class build_prompt:
             """
 **可用的decision**
 参数:speak
-功能描述:在群里发送消息,可以在其中添加[CQ:at,qq=user_id]@某人
+功能描述:在群里发送消息,可以在其中添加[CQ:at,qq=user_id]@某人,可以在开头使用[CQ:reply,id=message_id]引用到对应的消息
 {
     "decision":"speak",
-    "reply_message_id":"可选,引用看到的消息id",
     "reason":"做出此决策的原因",
-    "content":"将解析发送给群内的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送到群聊中,除非太长"
+    "content":"将解析发送给群内的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送到群聊中,除非太长,不要尝试一次回复多个人的消息"
 }
 
 参数:silence
@@ -309,7 +308,7 @@ class build_prompt:
 }
 
 参数:update
-功能描述:更新的用户的<user_info>信息,在上下文中观察到的多个user都可以更新。
+功能描述:更新的用户的<user_info>信息,在上下文中观察到的多个user都可以更新
 {
     "decision":"update",
     "reason":"做出此决策的原因",
@@ -320,7 +319,6 @@ class build_prompt:
 规则:
 decision:string,多选一,必填
 reason:string,必填 
-reply_message_id:integer,speak时选填
 content:list[str],speak 时必填；其它决策禁止出现
 user_id:integer,update时选填
 update_field:dict[str,any],update时必填,其它决策禁止出现
@@ -332,7 +330,7 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 4.如果有人对你感到厌烦，请减少回复
 5.如果有人对你进行攻击，或者情绪激动，请无视或劝阻，不要骂人
 
-输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON.
+输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON
 JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。
 <example>
 <think>

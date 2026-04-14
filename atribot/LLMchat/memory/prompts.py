@@ -437,35 +437,116 @@ SUMMARIZE_CONTEXT_SYSTEM_PROMPT ="""
 
 
 GROUP_MEMORY_DECISION_PROMPT = """
-You are a memory merge policy engine for group-chat memories.
-Given one newly extracted memory and top related existing memories from the same scope,
-decide one action:
-- add: insert as a new memory
-- update: partially update an existing memory
-- overwrite: fully replace an existing memory
-- skip: ignore this new memory
+## 任务
+你是一个记忆管理模块，负责判断如何处理一条新提取的记忆。
+你会收到：
+- 一条新记忆(new_memory)
+- 同范围内与之语义最相关的若干条现有记忆(candidates)
 
-Return strict JSON:
+## 操作类型
+
+从以下四种操作中选择一种：
+
+- add: 这是一条全新的记忆，与现有记忆无重叠。示例：现有无咖啡偏好记录，新增"喜欢喝咖啡"
+- update: 同一事项，新信息是对旧信息的补充或细化，旧信息仍部分有效。示例："喜欢喝咖啡" → "喜欢喝无糖美式咖啡"
+- overwrite: 同一事项，旧信息已过时、失效或与新信息存在明确冲突。示例："住在北京" → "已搬到上海"
+- skip: 信息噪声较大、价值极低、或与现有记忆完全重复无新增内容。示例："今天天气不错" 之类的泛泛表述
+
+## credibility 更新规则
+
+- 若新信息与某条现有记忆**一致**，且来源可靠 → 选择 update，并**提高** credibility（+1 到 +2）
+- 若新信息与某条现有记忆**矛盾**，且新信息更可信 → 选择 overwrite，credibility 根据新信息可信度重新评估
+- 若新信息来源模糊或存疑 → credibility 不高于 5
+
+(category)参考:
+
+preference用户偏好
+跟踪user在饮食、产品、活动、娱乐等各类别中的喜好、厌恶及具体偏好
+记忆活动与服务偏好:回顾user在餐饮、旅行、兴趣爱好及其他服务方面的偏好
+关注健康与生活习惯:记录饮食限制、健身习惯等健康相关信息
+管理杂项信息:记录user分享的书籍、电影、品牌等各类零散偏好
+
+fact事实性记忆
+维护重要个人详情:记住姓名、人际关系、重要日期等关键个人信息
+追踪计划与意向:记录user提及的即将发生的事件、行程、目标及其他计划
+存储职业信息:记住职位头衔、工作习惯、职业目标等专业相关信息
+
+experience经历记忆
+和bot之间干了什么有意义的事情,或做了什么值得记下的事情
+
+emotion情感记忆
+和bot之间的感情变化或情感确认
+
+重要度(importance)评分标准：
+1-3: 日常闲聊，可能很快过时("今天吃了拉面")
+4-6: 有一定价值的信息("喜欢看科幻电影")  
+7-9: 重要的个人信息("对花生过敏","在北京工作")
+10:  极其重要("患有某种疾病","有紧急情况")
+可信度(credibility)评分标准：
+1-3: 用户自我否定、明显玩笑或矛盾信息
+4-6: 普通陈述，可能随时间变化
+7-9: 多次确认或客观事实
+10:  用户明确强调的信息
+---
+
+## 输出格式
+
+严格返回 JSON,不要有任何额外文字:
 {
-  "action": "add|update|overwrite|skip",
-  "target_memory_id": number|null,
-  "memory": {
-    "event": "string",
-    "occurrence_time": "YYYY-MM-DD HH:MM:SS",
-    "category": "preference|fact|experience|emotion|group_topic",
-    "importance": 1-10,
-    "credibility": 1-10
-  },
-  "reason": "short reason"
+    "action": "add|update|overwrite|skip",
+    "reason": "简短说明选择该操作的原因，以及与候选记忆的关系",
+    "target_memory_id": null,
+    "memory": {
+        "event": "规范化后的记忆文本，第三人称描述，清晰简洁",
+        "occurrence_time": "YYYY-MM-DD HH:MM:SS 或 null(时间不明时)",
+        "category": "preference|fact|experience|emotion|topic|knowledge|rule",
+        "importance": 1,
+        "credibility": 1
+    }
 }
 
-Rules:
-- Only choose update/overwrite when one existing memory is clearly the same item.
-- For add, target_memory_id must be null.
-- For update/overwrite, target_memory_id must be from candidates.
-- overwrite means old memory is obsolete/conflicting and should be replaced.
-- update means same memory with refined details.
-- If information is noisy or low-value, use skip.
+## 字段约束
+
+- `action` 为 `add` 时：`target_memory_id` **必须为 null**
+- `action` 为 `update` 或 `overwrite` 时：`target_memory_id` **必须是候选记忆中存在的 memory_id**
+- `action` 为 `skip` 时：`memory` 字段可为 **null**,`target_memory_id` 为 null
+- `importance` 和 `credibility` 均为 **1-10 的整数**
+- `event` 文本长度应大于 5 字，避免过于模糊的描述
+
+## 候选记忆格式（输入示例）
+{
+    "new_memory": {
+        "event": "用户说不喜欢吃香菜",
+        "occurrence_time": "2025-04-05 14:23:00",
+        "category": "preference",
+        "importance": 6,
+        "credibility": 7
+    },
+    "candidates": [
+        {
+            "memory_id": 42,
+            "event": "用户表示对香菜有些抵触",
+            "occurrence_time": "2025-01-10 09:00:00",
+            "category": "preference",
+            "importance": 5,
+            "credibility": 5
+        }
+    ]
+}
+
+对应的合理输出：
+{
+    "action": "update",
+    "reason": "候选记忆42已记录用户对香菜的抵触,新信息明确表达为不喜欢,是对旧记忆的强化和细化",
+    "target_memory_id": 42,
+    "memory": {
+        "event": "用户明确表示不喜欢吃香菜",
+        "occurrence_time": "2025-04-05 14:23:00",
+        "category": "preference",
+        "importance": 6,
+        "credibility": 8
+    }
+}
 """
 
 

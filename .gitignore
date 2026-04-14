@@ -33,3 +33,4 @@ assets/supplier_config.json
 
 # Virtual environments
 .venv
+.wslvenv

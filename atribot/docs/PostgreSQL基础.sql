@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS atri_memory (
     --   user_id NOT NULL AND group_id IS NULL  → 私聊记忆
     --   user_id NOT NULL AND group_id NOT NULL → 群聊中的用户记忆
     --   user_id IS NULL  AND group_id NOT NULL → 群聊公共记忆/话题
-    --   或许不严格按照这样也行,知识库绑定一个user或group,什么的?
+    --   不严格按照这样也行,知识库绑定一个user或group
     created_at  BIGINT NOT NULL DEFAULT EXTRACT(EPOCH FROM CURRENT_TIMESTAMP)::bigint, -- 写入DB的时间,Unix时间戳(秒)
     event           TEXT,           -- 记忆的文本内容,应该长度大于2,这个就没必要在数据库层面限制了
     event_vector    VECTOR(1024),   -- 语义向量
@@ -153,9 +153,6 @@ CREATE TABLE IF NOT EXISTS atri_memory (
     access_count    INT NOT NULL DEFAULT 0,          -- 被检索命中的次数
     last_accessed   BIGINT,                          -- 最后一次被检索的时间,Unix时间戳(秒)
     CONSTRAINT uq_user_event_hash UNIQUE (user_id, event),--同一用户不允许记忆的文本重复
-    CONSTRAINT chk_quality_both_set CHECK (
-        (importance IS NOT NULL AND credibility IS NOT NULL)
-    ),
     FOREIGN KEY (user_id) REFERENCES users(user_id)
         ON DELETE CASCADE ON UPDATE CASCADE,
     FOREIGN KEY (group_id) REFERENCES user_group(group_id)

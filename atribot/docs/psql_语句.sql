@@ -120,7 +120,10 @@ FROM pg_tables
 WHERE schemaname NOT IN ('pg_catalog', 'information_schema')
 ORDER BY pg_total_relation_size(schemaname || '.' || tablename) DESC;
 
-
+UPDATE chat_context
+SET context_data = '[]',
+    total_tokens = 0
+WHERE last_updated >= CURRENT_TIMESTAMP - INTERVAL '5 days';
 
 SELECT 
     u.nickname,
