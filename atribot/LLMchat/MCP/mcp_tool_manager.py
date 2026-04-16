@@ -104,12 +104,12 @@ class MCPClient:
         """连接到 MCP 服务器
 
         如果 `url` 参数存在：
-            1. 当 transport 指定为 `streamable_http` 时，使用 Streamable HTTP 连接方式。
-            1. 当 transport 指定为 `sse` 时，使用 SSE 连接方式。
-            2. 如果没有指定，默认使用 SSE 的方式连接到 MCP 服务。
+            1. 当 transport 指定为 `streamable_http` 时，使用 Streamable HTTP 连接方式
+            1. 当 transport 指定为 `sse` 时，使用 SSE 连接方式
+            2. 如果没有指定，默认使用 SSE 的方式连接到 MCP 服务
 
         Args:
-            mcp_server_config (dict): 服务器配置json.
+            mcp_server_config (dict): 服务器配置json
         """
         cfg = mcp_server_config.copy()
         if "mcpServers" in cfg and len(cfg["mcpServers"]) > 0:
@@ -246,7 +246,7 @@ class FuncCall:
 
     def remove_func(self, name: str) -> None:
         """
-        删除一个函数调用工具。
+        删除一个函数调用工具
         """
         for i, f in enumerate(self.func_list):
             if f.name == name:
@@ -261,21 +261,21 @@ class FuncCall:
         return None
 
     def register_preset(self, preset_name: str, tool_names: List[str]) -> None:
-        """注册一个工具预设组。
+        """注册一个工具预设组
 
         Args:
-            preset_name: 预设名称。
-            tool_names: 该预设包含的工具名称列表。
+            preset_name: 预设名称
+            tool_names: 该预设包含的工具名称列表
         """
         self.presets[preset_name] = list(tool_names)
         self.logger.info(f"注册工具预设 '{preset_name}': {tool_names}")
 
     def remove_preset(self, preset_name: str) -> None:
-        """删除一个工具预设组。"""
+        """删除一个工具预设组"""
         self.presets.pop(preset_name, None)
 
     def load_presets_from_config(self, presets_config: Dict[str, List[str]]) -> None:
-        """从配置字典批量加载预设组。
+        """从配置字典批量加载预设组
 
         Args:
             presets_config: 格式为 {"preset_name": ["tool1", "tool2", ...], ...}
@@ -475,12 +475,12 @@ class FuncCall:
         preset: str | None = None,
     ) -> list:
         """
-        获得 OpenAI API 风格的已经激活的工具描述。
+        获得 OpenAI API 风格的工具描述
 
         Args:
-            omit_empty_parameter_field: 为 True 时，若工具无参数则省略 parameters 字段。
-            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具。
-            preset: 预设组名称，优先于 names 预设不存在时返回空列表。
+            omit_empty_parameter_field: 为 True 时，若工具无参数则省略 parameters 字段
+            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具
+            preset: 预设组名称，优先于 names 预设不存在时返回空列表
         """
         names = self._resolve_names(names, preset)
         _l = []
@@ -511,11 +511,11 @@ class FuncCall:
         preset: str | None = None,
     ) -> list:
         """
-        获得 Anthropic API 风格的已经激活的工具描述。
+        获得 Anthropic API 风格的工具描述
 
         Args:
-            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具。
-            preset: 预设组名称,优先于names预设不存在时返回空列表。
+            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具
+            preset: 预设组名称,优先于names预设不存在时返回空列表
         """
         names = self._resolve_names(names, preset)
         tools = []
@@ -545,11 +545,11 @@ class FuncCall:
         preset: str | None = None,
     ) -> dict:
         """
-        获得 Google GenAI API 风格的已经激活的工具描述。
+        获得 Google GenAI API 风格的工具描述
 
         Args:
-            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具。
-            preset: 预设组名称，优先于 names 预设不存在时返回空字典。
+            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具
+            preset: 预设组名称，优先于 names 预设不存在时返回空字典
         """
         names = self._resolve_names(names, preset)
 

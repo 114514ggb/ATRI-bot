@@ -411,6 +411,9 @@ class GroupChat(chat_basics):
         group_history = await self.chat_manager.get_group_messages_str(group_id)
 
         message_builder.add_text(
+            self.skills.prompt #skills的提示词
+        )
+        message_builder.add_text(
             f"<group_history>{group_history[:10000]}</group_history>"
         )
         await self.append_message_segments_prompt(
@@ -427,10 +430,7 @@ class GroupChat(chat_basics):
             self.build_prompt.decision_whether_responses(
                 group_id=group_id,
                 prompt=prompt,
-                else_prompt=(
-                    self.emoji_core.prompt + #表情包的提示词
-                    self.skills.prompt #skills的提示词
-                )
+                else_prompt=self.emoji_core.prompt#表情包的提示词
             )
         )
 
