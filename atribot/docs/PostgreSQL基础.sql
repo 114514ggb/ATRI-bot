@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS users (
 -- 群组表
 CREATE TABLE IF NOT EXISTS user_group (
     group_id BIGINT NOT NULL PRIMARY KEY,
-    group_name VARCHAR(45) NOT NULL
+    group_name VARCHAR(96) NOT NULL
 );
 
 

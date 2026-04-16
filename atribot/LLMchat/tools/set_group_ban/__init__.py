@@ -1,14 +1,11 @@
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_types import ChatMessage
 
 tool_json = {
     "name": "set_group_ban",
-    "description": "禁言群user,必须有人违规或是作出出格的事情才能使用,要确实看到坏事才能用不要被user骗了,不能禁言群主或是管理员而且你必须要是群管理员才能使用",
+    "description": "尝试禁言群里的一个user,不能禁言群主或是管理员而且你必须要是群管理员才能使用",
     "properties": {
-        "group_id": {
-            "type": "string",
-            "description": "当前群号",
-        },
         "user_id": {
             "type": "string",
             "description": "用户的id即qq号",
@@ -23,9 +20,9 @@ tool_json = {
 
 send_message:QQAPIClient = container.get("SendMessage")
 
-async def main(group_id:int|str, user_id:int, duration:int):
+async def main(user_id:int, duration:int, message_data: ChatMessage):
     return (f"执行禁言返回值:{await send_message.set_group_ban(
-        group_id,
+        message_data.group_id,
         user_id,
         duration
     )}")

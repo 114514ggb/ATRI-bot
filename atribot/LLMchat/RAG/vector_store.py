@@ -52,6 +52,16 @@ class VectorStoreBasics(ABC):
         """批量更新记忆"""
         pass
 
+    @abstractmethod
+    async def delete_memory(self):
+        """删除单条记忆"""
+        pass
+
+    @abstractmethod
+    async def batch_delete_memories(self):
+        """批量删除记忆"""
+        pass
+
 
 class MemoryVectorStore(VectorStoreBasics):
     """向量数据库面向记忆的接口"""
@@ -286,6 +296,45 @@ class MemoryVectorStore(VectorStoreBasics):
 
         async with self.vector_database as db:
             await db.executemany_with_pool(sql, normalized_args)
+
+    async def delete_memory(self, memory_id: int) -> bool:
+        """删除单条记忆
+
+        Args:
+            memory_id: 要删除的记忆 ID
+
+        Returns:
+            是否删除成功(找到对应 memory_id 并删除)
+        """
+        sql = """
+            DELETE FROM atri_memory
+            WHERE memory_id = $1
+            RETURNING memory_id
+        """
+        async with self.vector_database as db:
+            row = await db.execute_with_pool(sql, (memory_id,), fetch_type="one")
+        return row is not None
+
+    async def batch_delete_memories(self, memory_ids: List[int]) -> int:
+        """批量删除记忆
+
+        Args:
+            memory_ids: 要删除的记忆 ID 列表
+            
+        Returns:
+            int: 成功删除的记录数量
+        """
+        if not memory_ids:
+            return 0
+            
+        sql = """
+            DELETE FROM atri_memory
+            WHERE memory_id = ANY($1::bigint[])
+            RETURNING memory_id
+        """
+        async with self.vector_database as db:
+            rows = await db.execute_with_pool(sql, (memory_ids,), fetch_type="all")
+        return len(rows) if rows else 0
 
 
     async def query_memories(

@@ -98,7 +98,9 @@
             "web_search", "web_extract",
             "memory_search", "memory_storage",
             "run_python_code",
-            "send_image_message", "send_speech_message",
+            "run_command",
+            "send_file","add_file",
+            "send_image_message",
             "load_skill_prompt", "get_user_info",
             "schedule_self_trigger"
         ],

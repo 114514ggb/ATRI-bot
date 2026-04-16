@@ -38,7 +38,7 @@ tool_json = {
         },
         "note": {
             "type": "string",
-            "description": "留给未来的自己的一句话，触发时这段话会作为提示输入给自己",
+            "description": "送给你未来的话，描述要要执行事情的情况",
         },
     },
 }
@@ -59,6 +59,7 @@ async def _trigger_self(group_id: int, note: str) -> None:
         message_id=0,
         time=int(time.time()),
         raw_message=note,
+        user_cq_message = '',
         primeval={},
         llm_formatted_message=note,
         pure_text=note,
@@ -73,7 +74,7 @@ async def _trigger_self(group_id: int, note: str) -> None:
 
     prompt = (
         "这是你之前给自己设置的定时提醒，以下内容是那时的你留给现在的你的话，"
-        "请基于这条提醒进行思考，决定是否发言或者执行某些操作："
+        "请基于这条提醒进行思考，决定是否发言或者执行某些操作"
     )
 
     log.info(f"定时自触发触发：群 {group_id}，备注：{note!r}")

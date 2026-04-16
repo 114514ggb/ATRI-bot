@@ -454,8 +454,8 @@ GROUP_MEMORY_DECISION_PROMPT = """
 
 ## credibility 更新规则
 
-- 若新信息与某条现有记忆**一致**，且来源可靠 → 选择 update，并**提高** credibility（+1 到 +2）
-- 若新信息与某条现有记忆**矛盾**，且新信息更可信 → 选择 overwrite，credibility 根据新信息可信度重新评估
+- 若新信息与某条现有记忆**一致**，且来源可靠 → 选择 update,并**提高** credibility
+- 若新信息与某条现有记忆**矛盾**，且新信息更可信 → 选择 overwrite,credibility 根据新信息可信度重新评估
 - 若新信息来源模糊或存疑 → credibility 不高于 5
 
 (category)参考:

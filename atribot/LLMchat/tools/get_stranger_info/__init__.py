@@ -25,7 +25,7 @@ async def main(qq_id):
 
 
 def parse_qq_profile(json_data:dict)->dict:
-    """解析QQ用户资料JSON数据，返回人类可读的格式
+    """解析QQ用户资料JSON数据,返回人类可读的格式
 
     Args:
         json_data (dict): 包含用户资料的JSON对象

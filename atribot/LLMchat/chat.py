@@ -16,6 +16,7 @@ from atribot.core.type.chat_message_types import (
     FileMessageSegment,
     FileSegment,
     ImageSegment,
+    MessageSegment,
     RecordSegment,
     ReplySegment,
     VideoSegment,
@@ -172,7 +173,7 @@ class chat_basics(ABC):
                 self.log.info(f"视频识别文本结果:{desc}")
                 message_builder.add_text(f"[CQ:video,summary:{desc}]")
 
-        async def append_segments(segments) -> None:
+        async def append_segments(segments:List[MessageSegment]) -> None:
             for segment in segments:
                 if isinstance(segment, FileMessageSegment):
                     if isinstance(segment, ImageSegment):

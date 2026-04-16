@@ -26,7 +26,7 @@ CREATE TYPE memory_category AS ENUM (
 
 CREATE TABLE user_group (
     group_id BIGINT NOT NULL PRIMARY KEY,
-    group_name VARCHAR(45) NOT NULL
+    group_name VARCHAR(96) NOT NULL
 );
 
 CREATE TABLE users (

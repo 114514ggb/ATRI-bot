@@ -199,7 +199,7 @@ class group_manage(message_manage):
                 async with group_context.summarizing() as ctx:
                     if ctx is not None:
                         self.logger.info(f"开始总结 {group_id} 群消息!")
-                        await self.memory_system.extract_stored_group_message(
+                        await self.memory_system.extract_stored_group_message_advanced(
                             messages_str=messages,
                             bot_id=chat_message.self_id,
                             group_id=group_id

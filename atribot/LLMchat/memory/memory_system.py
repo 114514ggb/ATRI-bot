@@ -12,7 +12,7 @@ from atribot.core.service_container import container
 from atribot.core.type.context_types import Context
 from atribot.LLMchat.memory.prompts import (
     FACT_RETRIEVAL_PROMPT,
-    # GROUP_MEMORY_DECISION_PROMPT,
+    GROUP_MEMORY_DECISION_PROMPT,
     PURE_GROUP_FACT_RETRIEVAL_PROMPT,
     SUMMARIZE_CONTEXT_SYSTEM_PROMPT,
 )
@@ -111,6 +111,214 @@ class memorySystem:
 
         if args_list:
             await self.vector_store.batch_add_memories(args_list)
+
+    async def extract_stored_group_message_advanced(self, messages_str:str, bot_id:int|str, group_id:int|str)->None:
+        """对于群聊,从提取总结到存入向量数据库全流程(高级版本：带有回忆过滤和更新合并机制)
+
+        Args:
+            messages_str (str): 上下文消息,的字符串
+            group_id (int | str): 群号
+            bot_id (int|str): 总结排除在外的bot的qq号
+        """
+        result:Dict = await self.extract_and_summarize_group_facts(messages_str, bot_id)
+        
+        self.logger.info(f"群消息总结信息:{result}")
+        if not result:
+            return
+
+        items_to_evaluate = []
+        
+        memories: List[Dict] = result.get("memories", [])
+        for user_memory_dict in memories:
+            for uid_str, fact_list in user_memory_dict.items():
+                for item in fact_list:
+                    item:dict
+                    event_text = item.get("event","")
+                    if len(event_text) <= 2:
+                        continue
+                    try:
+                        timestamp = int(datetime.strptime(item.get("occurrence_time", ""), "%Y-%m-%d %H:%M:%S").timestamp())
+                    except (ValueError, TypeError):
+                        timestamp = int(datetime.now().timestamp())
+                        
+                    items_to_evaluate.append({
+                        "user_id": int(uid_str),
+                        "group_id": int(group_id),
+                        "timestamp": timestamp,
+                        "event": event_text,
+                        "category": item.get("category", "fact"),
+                        "importance": int(item.get("importance", 5)),
+                        "credibility": int(item.get("credibility", 5)),
+                        "occurrence_time": item.get("occurrence_time") or datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+                    })
+
+        group_topic: Dict = result.get("group_topic", {})
+        if group_topic and group_topic.get("event"):
+            topic_text = group_topic["event"]
+            if len(topic_text) > 2:
+                try:
+                    timestamp = int(datetime.strptime(group_topic.get("occurrence_time"), "%Y-%m-%d %H:%M:%S").timestamp())
+                except (ValueError, TypeError):
+                    timestamp = int(datetime.now().timestamp())
+                items_to_evaluate.append({
+                    "user_id": None,
+                    "group_id": int(group_id),
+                    "timestamp": timestamp,
+                    "event": topic_text,
+                    "category": group_topic.get("category", "group_topic"),
+                    "importance": int(group_topic.get("importance", 5)),
+                    "credibility": int(group_topic.get("credibility", 5)),
+                    "occurrence_time": group_topic.get("occurrence_time") or datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+                })
+
+        if not items_to_evaluate:
+            return
+
+        async def evaluate_item(item):
+    
+            candidates = []
+            
+            for r in await self.hybrid_recall(
+                query_text=item["event"],
+                limit=5,
+                group_id=item["group_id"],
+                user_id=item["user_id"],
+                category=item["category"] if item["category"] == "group_topic" else None,
+                vector_distance_threshold=0.5
+            ):
+                if item["user_id"] is not None and r.get("user_id") != item["user_id"]:
+                    continue
+                candidates.append({
+                    "memory_id": r["memory_id"],
+                    "event": r["event"],
+                    "occurrence_time": datetime.fromtimestamp(r["event_time"]).strftime("%Y-%m-%d %H:%M:%S"),
+                    "category": r["category"],
+                    "importance": r["importance"],
+                    "credibility": r["credibility"]
+                })
+            
+            if not candidates:
+                return {
+                    "action": "add",
+                    "original_item": item,
+                    "target_memory_id": None,
+                    "memory": {
+                        "event": item["event"],
+                        "occurrence_time": item["occurrence_time"],
+                        "category": item["category"],
+                        "importance": item["importance"],
+                        "credibility": item["credibility"]
+                    }
+                }
+            
+            prompt_input = {
+                "new_memory": {
+                    "event": item["event"],
+                    "occurrence_time": item["occurrence_time"],
+                    "category": item["category"],
+                    "importance": item["importance"],
+                    "credibility": item["credibility"]
+                },
+                "candidates": candidates
+            }
+            
+            decision = await self.request_return_json_content(
+                message=prompt_input,
+                play_role=GROUP_MEMORY_DECISION_PROMPT
+            )
+            
+            self.logger.info(f"群消息总结,后决策json:{decision}")
+            
+            action = decision.get("action", "add")
+            if action not in ["add", "update", "overwrite", "skip"]:
+                action = "add"
+                
+            return {
+                "action": action,
+                "original_item": item,
+                "target_memory_id": decision.get("target_memory_id"),
+                "memory": decision.get("memory", {})
+            }
+
+        evaluations = await asyncio.gather(*(evaluate_item(item) for item in items_to_evaluate))
+
+        text_to_embed = []
+        for ev in evaluations:
+            if ev["action"] in ["add", "update", "overwrite"]:
+                memory_dict:dict = ev.get("memory") or {}
+                if event_text := memory_dict.get("event", ev["original_item"]["event"]):
+                    text_to_embed.append(event_text)
+
+        if not text_to_embed:
+            return
+
+        emb_iter = iter(await self.rag.calculate_embedding(text_to_embed))
+
+        add_args_list = []
+        update_args_list = []
+
+        for ev in evaluations:
+            action = ev["action"]
+            if action == "skip":
+                continue
+                
+            orig = ev["original_item"]
+            memory_dict = ev.get("memory") or {}
+            event_text = memory_dict.get("event", orig["event"])
+            if not event_text:
+                continue
+                
+            emb = next(emb_iter)
+            
+            try:
+                occurrence_time_str = memory_dict.get("occurrence_time") or orig["occurrence_time"]
+                timestamp = int(datetime.strptime(occurrence_time_str, "%Y-%m-%d %H:%M:%S").timestamp())
+            except (Exception):
+                timestamp = orig["timestamp"]
+                
+            category = memory_dict.get("category", orig["category"])
+            importance = int(memory_dict.get("importance", orig["importance"]))
+            credibility = int(memory_dict.get("credibility", orig["credibility"]))
+            
+            if action == "add":
+                add_args_list.append((
+                    orig["user_id"],
+                    orig["group_id"],
+                    timestamp,
+                    event_text,
+                    str(emb),
+                    category,
+                    importance,
+                    credibility
+                ))
+            elif action in ["update", "overwrite"]:
+                target_memory_id = ev.get("target_memory_id")
+                if target_memory_id is not None:
+                    update_args_list.append((
+                        target_memory_id,
+                        timestamp,
+                        event_text,
+                        str(emb),
+                        category,
+                        importance,
+                        credibility
+                    ))
+                else:
+                    add_args_list.append((
+                        orig["user_id"],
+                        orig["group_id"],
+                        timestamp,
+                        event_text,
+                        str(emb),
+                        category,
+                        importance,
+                        credibility
+                    ))
+
+        if add_args_list:
+            await self.vector_store.batch_add_memories(add_args_list)
+        if update_args_list:
+            await self.vector_store.batch_update_memories(update_args_list)
                      
         
     async def extract_and_summarize_facts(self, message:str)->List[str|None]:

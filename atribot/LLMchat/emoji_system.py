@@ -15,7 +15,6 @@ class EmojiCore:
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
         self.file = folder_path
-        # self.file = Path("/mnt/e/程序文件/python/ATRI-main/document/img/emojis")
         self.prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
