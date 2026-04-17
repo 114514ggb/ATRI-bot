@@ -193,7 +193,8 @@ class MCPClient:
 
 
 class FuncCall:
-    """用于管理MCP工具函数调用"""
+    """用于管理MCP工具和函数工具"""
+    
     def __init__(self, mcp_path:str|Path = "") -> None:
         self.logger:Logger = container.get("log")
         """日志配置"""
@@ -207,9 +208,7 @@ class FuncCall:
         """MCP客户端"""
         self.mcp_path:str|Path= mcp_path 
         """MCP配置文件路径"""
-        self.presets: Dict[str, List[str]] = {}
-        """工具预设组字典，格式为 {preset_name: [tool_name, ...]}"""
-
+        
     def empty(self) -> bool:
         """返回是否存在调用的函数"""
         return len(self.func_list) == 0
@@ -259,52 +258,6 @@ class FuncCall:
             if f.name == name:
                 return f
         return None
-
-    def register_preset(self, preset_name: str, tool_names: List[str]) -> None:
-        """注册一个工具预设组
-
-        Args:
-            preset_name: 预设名称
-            tool_names: 该预设包含的工具名称列表
-        """
-        self.presets[preset_name] = list(tool_names)
-        self.logger.info(f"注册工具预设 '{preset_name}': {tool_names}")
-
-    def remove_preset(self, preset_name: str) -> None:
-        """删除一个工具预设组"""
-        self.presets.pop(preset_name, None)
-
-    def load_presets_from_config(self, presets_config: Dict[str, List[str]]) -> None:
-        """从配置字典批量加载预设组
-
-        Args:
-            presets_config: 格式为 {"preset_name": ["tool1", "tool2", ...], ...}
-        """
-        for name, tools in presets_config.items():
-            if not isinstance(tools, list):
-                self.logger.warning(f"工具预设 '{name}' 的内容不是列表，将被跳过")
-                continue
-            self.register_preset(name, tools)
-        self.logger.info(f"工具预设共加载 {len(self.presets)} 个")
-
-    def _resolve_names(
-        self,
-        names: List[str] | None,
-        preset: str | None,
-    ) -> List[str] | None:
-        """解析工具名称列表:preset 优先于 names
-
-        Returns:
-            工具名称列表，或 None(返回所有已激活工具)
-        """
-        if preset is not None:
-            if resolved := self.presets.get(preset):
-                return resolved
-            else:
-                self.logger.warning(f"工具预设 '{preset}' 不存在，将返回空工具列表")
-                return []
-            
-        return names
 
     async def _init_mcp_clients(self) -> None:
         """读取 mcp_server.json 文件，初始化 MCP 服务列表。文件格式如下：
@@ -471,24 +424,17 @@ class FuncCall:
     def get_func_desc_openai_style(
         self,
         omit_empty_parameter_field: bool = False,
-        names: List[str] | None = None,
-        preset: str | None = None,
     ) -> list:
         """
-        获得 OpenAI API 风格的工具描述
+        获得 OpenAI API 风格的已激活工具描述
 
         Args:
             omit_empty_parameter_field: 为 True 时，若工具无参数则省略 parameters 字段
-            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具
-            preset: 预设组名称，优先于 names 预设不存在时返回空列表
         """
-        names = self._resolve_names(names, preset)
         _l = []
         # 处理所有工具（包括本地和MCP工具）
         for f in self.func_list:
             if not f.active:
-                continue
-            if names is not None and f.name not in names:
                 continue
             func_ = {
                 "type": "function",
@@ -505,24 +451,13 @@ class FuncCall:
             _l.append(func_)
         return _l
 
-    def get_func_desc_anthropic_style(
-        self,
-        names: List[str] | None = None,
-        preset: str | None = None,
-    ) -> list:
+    def get_func_desc_anthropic_style(self) -> list:
         """
-        获得 Anthropic API 风格的工具描述
-
-        Args:
-            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具
-            preset: 预设组名称,优先于names预设不存在时返回空列表
+        获得 Anthropic API 风格的已激活工具描述
         """
-        names = self._resolve_names(names, preset)
         tools = []
         for f in self.func_list:
             if not f.active:
-                continue
-            if names is not None and f.name not in names:
                 continue
 
             # Convert internal format to Anthropic style
@@ -539,19 +474,10 @@ class FuncCall:
             tools.append(tool)
         return tools
 
-    def get_func_desc_google_genai_style(
-        self,
-        names: List[str] | None = None,
-        preset: str | None = None,
-    ) -> dict:
+    def get_func_desc_google_genai_style(self) -> dict:
         """
-        获得 Google GenAI API 风格的工具描述
-
-        Args:
-            names: 要筛选的工具名称列表；为 None 时返回所有已激活工具
-            preset: 预设组名称，优先于 names 预设不存在时返回空字典
+        获得 Google GenAI API 风格的已激活工具描述
         """
-        names = self._resolve_names(names, preset)
 
         # Gemini API 支持的数据类型和格式
         supported_types = {
@@ -624,7 +550,7 @@ class FuncCall:
                 **({"parameters": convert_schema(f.parameters)}),
             }
             for f in self.func_list
-            if f.active and (names is None or f.name in names)
+            if f.active
         ]
 
         declarations = {}

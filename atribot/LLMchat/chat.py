@@ -30,6 +30,7 @@ from atribot.LLMchat.LLM_supervisor import (
     LLMSRequestFailed,
 )
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
+from atribot.LLMchat.MCP.model_tools import tool_calls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
@@ -73,6 +74,7 @@ class chat_basics(ABC):
         self.user_system: UserSystem = container.get("UserSystem")
         self.emoji_core: EmojiCore = container.get("EmojiCore")
         self.mcp_tool: FuncCall = container.get("MCP")
+        self.tool_calls:tool_calls = container.get("ToolCalls")
         self.config = container.get("config")
         self.log: Logger = container.get("log")
         self.build_prompt = build_prompt()
@@ -309,7 +311,7 @@ class GroupChat(chat_basics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.mcp_tool.get_func_desc_openai_style(preset="group_chat"),
+            tool_json=self.tool_calls.get_func_desc_openai_style(preset="group_chat"),
             message_data=message
         )
         
@@ -792,7 +794,7 @@ class PrivateChat(chat_basics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.mcp_tool.get_func_desc_openai_style(preset="private_chat"),
+            tool_json=self.tool_calls.get_func_desc_openai_style(preset="private_chat"),
             message_data=message,
         )
 
@@ -1041,9 +1043,9 @@ class AgentChat(chat_basics):
         )
 
         effective_tools = (
-            self.mcp_tool.get_func_desc_openai_style(preset="agency_Agent")
+            self.tool_calls.get_func_desc_openai_style(preset="agency_Agent")
             if tools is None
-            else self.mcp_tool.get_func_desc_openai_style(names=tools)
+            else self.tool_calls.get_func_desc_openai_style(names=tools)
         )
 
         request = GenerationRequestSimplify(

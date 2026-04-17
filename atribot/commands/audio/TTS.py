@@ -48,7 +48,7 @@ class TTSService:
         Args:
             text (str): 需要合成的文本,支持中日英韩，但是目前不要输入韩文
             emotion (str): 音频的情感,枚举值：高兴,机械,平静
-            speed (float): 语速，取值范围0.6~1.65,默认1
+            speed (float): 语速,取值范围0.6~1.65,默认1
             
         Raises:
             ValueError: 抛出包含错误信息的json
