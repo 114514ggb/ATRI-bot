@@ -438,7 +438,7 @@ SUMMARIZE_CONTEXT_SYSTEM_PROMPT ="""
 
 GROUP_MEMORY_DECISION_PROMPT = """
 ## 任务
-你是一个记忆管理模块，负责判断如何处理一条新提取的记忆。
+你是一个记忆管理模块，负责判断如何处理一条新提取的记忆
 你会收到：
 - 一条新记忆(new_memory)
 - 同范围内与之语义最相关的若干条现有记忆(candidates)
@@ -477,6 +477,8 @@ experience经历记忆
 emotion情感记忆
 和bot之间的感情变化或情感确认
 
+group_topic:群聊的话题
+
 重要度(importance)评分标准：
 1-3: 日常闲聊，可能很快过时("今天吃了拉面")
 4-6: 有一定价值的信息("喜欢看科幻电影")  
@@ -499,7 +501,7 @@ emotion情感记忆
     "memory": {
         "event": "规范化后的记忆文本，第三人称描述，清晰简洁",
         "occurrence_time": "YYYY-MM-DD HH:MM:SS 或 null(时间不明时)",
-        "category": "preference|fact|experience|emotion|topic|knowledge|rule",
+        "category": "preference|fact|experience|emotion|group_topic",
         "importance": 1,
         "credibility": 1
     }
