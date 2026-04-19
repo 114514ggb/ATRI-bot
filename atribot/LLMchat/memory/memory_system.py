@@ -37,6 +37,41 @@ class memorySystem:
         self.rag = RAGManager()
         self.vector_store = self.rag.vector_store
         
+
+    async def cleanup_expired_memories(self):
+        """简单清理太久前记忆"""
+        sql = """
+            DELETE FROM atri_memory
+            WHERE memory_id IN (
+                SELECT memory_id FROM atri_memory
+                WHERE (
+                    (last_accessed < EXTRACT(EPOCH FROM NOW() - INTERVAL '90 days')::bigint
+                    OR last_accessed IS NULL)
+                    AND importance < 5
+                    AND created_at < EXTRACT(EPOCH FROM NOW() - INTERVAL '90 days')::bigint
+                )
+                OR (
+                    category = 'group_topic'
+                    AND event_time < EXTRACT(EPOCH FROM NOW() - INTERVAL '30 days')::bigint
+                )
+            )
+        """
+        async with self.vector_store.vector_database as db:
+            await db.execute_with_pool(
+                query = sql
+            )
+
+
+    async def consolidate_memories(self, memories, threshold=0.90):
+        """整理记忆
+        按 user_id + category 分组
+        组内做向量相似度聚类（余弦相似度超过某个阈值，比如0.92）
+        聚类内保留 importance 最高的，或者送去LLM合并成一条
+        """
+        
+        pass
+            
+            
     async def extract_stored_message(self, messages:List[Dict[str,str]], user_id:int|str)->None:
         """对个人聊天,从提取到存入向量数据库全流程
 
@@ -114,6 +149,8 @@ class memorySystem:
 
     async def extract_stored_group_message_advanced(self, messages_str:str, bot_id:int|str, group_id:int|str)->None:
         """对于群聊,从提取总结到存入向量数据库全流程(高级版本：带有回忆过滤和更新合并机制)
+        但是并发可能会带来一些问题,后面是记忆是改动是批量插入的，查找的记忆中不包含并发中的改动，可能会相互依赖导致更新成问题？
+        虽然但是，这个应该是最快的了，批量加并发了
 
         Args:
             messages_str (str): 上下文消息,的字符串
@@ -165,7 +202,7 @@ class memorySystem:
                     "group_id": int(group_id),
                     "timestamp": timestamp,
                     "event": topic_text,
-                    "category": group_topic.get("category", "group_topic"),
+                    "category": "group_topic",
                     "importance": int(group_topic.get("importance", 5)),
                     "credibility": int(group_topic.get("credibility", 5)),
                     "occurrence_time": group_topic.get("occurrence_time") or datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
@@ -174,73 +211,82 @@ class memorySystem:
         if not items_to_evaluate:
             return
 
-        async def evaluate_item(item):
-    
-            candidates = []
-            
-            for r in await self.hybrid_recall(
-                query_text=item["event"],
-                limit=5,
-                group_id=item["group_id"],
-                user_id=item["user_id"],
-                category=item["category"] if item["category"] == "group_topic" else None,
-                vector_distance_threshold=0.5
-            ):
-                if item["user_id"] is not None and r.get("user_id") != item["user_id"]:
-                    continue
-                candidates.append({
-                    "memory_id": r["memory_id"],
-                    "event": r["event"],
-                    "occurrence_time": datetime.fromtimestamp(r["event_time"]).strftime("%Y-%m-%d %H:%M:%S"),
-                    "category": r["category"],
-                    "importance": r["importance"],
-                    "credibility": r["credibility"]
-                })
-            
-            if not candidates:
-                return {
-                    "action": "add",
-                    "original_item": item,
-                    "target_memory_id": None,
-                    "memory": {
+        semaphore = asyncio.Semaphore(2)
+
+        async def evaluate_item_with_semaphore(item):
+            async with semaphore:
+                
+                candidates = []
+                
+                if item["category"] == "group_topic":
+                    category = "group_topic"
+                    group_id = item["group_id"]
+                    user_id = None
+                else:
+                    category = None
+                    group_id = None
+                    user_id = item["user_id"]
+                
+                for r in await self.hybrid_recall(
+                    query_text=item["event"],
+                    limit=5,
+                    group_id=group_id,
+                    user_id=user_id,
+                    category=category
+                ):
+                    candidates.append({
+                        "memory_id": r["memory_id"],
+                        "event": r["event"],
+                        "occurrence_time": datetime.fromtimestamp(r["event_time"]).strftime("%Y-%m-%d %H:%M:%S"),
+                        "category": r["category"],
+                        "importance": r["importance"],
+                        "credibility": r["credibility"]
+                    })
+                
+                if not candidates:
+                    return {
+                        "action": "add",
+                        "original_item": item,
+                        "target_memory_id": None,
+                        "memory": {
+                            "event": item["event"],
+                            "occurrence_time": item["occurrence_time"],
+                            "category": item["category"],
+                            "importance": item["importance"],
+                            "credibility": item["credibility"]
+                        }
+                    }
+                
+                prompt_input = {
+                    "new_memory": {
                         "event": item["event"],
                         "occurrence_time": item["occurrence_time"],
                         "category": item["category"],
                         "importance": item["importance"],
                         "credibility": item["credibility"]
-                    }
+                    },
+                    "candidates": candidates
                 }
-            
-            prompt_input = {
-                "new_memory": {
-                    "event": item["event"],
-                    "occurrence_time": item["occurrence_time"],
-                    "category": item["category"],
-                    "importance": item["importance"],
-                    "credibility": item["credibility"]
-                },
-                "candidates": candidates
-            }
-            
-            decision = await self.request_return_json_content(
-                message=prompt_input,
-                play_role=GROUP_MEMORY_DECISION_PROMPT
-            )
-            
-            self.logger.info(f"群消息总结,后决策json:{decision}")
-            
-            action = decision.get("action", "add")
-            if action not in ["add", "update", "overwrite", "skip"]:
-                action = "add"
                 
-            return {
-                "action": action,
-                "original_item": item,
-                "target_memory_id": decision.get("target_memory_id"),
-                "memory": decision.get("memory", {})
-            }
+                decision = await self.request_return_json_content(
+                    message=prompt_input,
+                    play_role=GROUP_MEMORY_DECISION_PROMPT
+                )
+                
+                self.logger.info(f"群消息总结,后决策json:{decision}")
+                
+                action = decision.get("action", "add")
+                if action not in ["add", "update", "overwrite", "skip"]:
+                    action = "add"
+                    
+                return {
+                    "action": action,
+                    "original_item": item,
+                    "target_memory_id": decision.get("target_memory_id"),
+                    "memory": decision.get("memory", {})
+                }
 
-        evaluations = await asyncio.gather(*(evaluate_item(item) for item in items_to_evaluate))
+        evaluations = await asyncio.gather(*(evaluate_item_with_semaphore(item) for item in items_to_evaluate))
 
         text_to_embed = []
         for ev in evaluations:
@@ -314,6 +360,8 @@ class memorySystem:
                         importance,
                         credibility
                     ))
+
+        #这里目前有个冲突问题，同一批item可能决策出对同一条旧记忆进行操作，然后后执行的会留下结果前面的被覆盖，应该不是什么问题
 
         if add_args_list:
             await self.vector_store.batch_add_memories(add_args_list)
@@ -608,7 +656,7 @@ class memorySystem:
         """根据向量和全文进行混合召回,融合时间衰减评分最后返回记忆list
 
         用一条带 CTE 的 SQL 完成两路召回 → ROW_NUMBER() 排名 → RRF 计分 →
-        FULL OUTER JOIN 合并 → 叠加 importance/access_count/时间衰减 附加分 → 排序截断,
+        FULL OUTER JOIN 合并 → 叠加 importance/access_count/时间衰减 附加分 → 排序截断
 
         SQL 结构(CTE 链):
             vec_ranked   — 向量路按距离升序,取 vector_candidates 候选,附带行号
@@ -616,7 +664,7 @@ class memorySystem:
             merged       — FULL OUTER JOIN,COALESCE 取非 NULL 的基础字段
             scored       — 计算 hybrid_score:
                              $vector_weight  / (rrf_k + vec_rank)   向量 RRF 贡献,无命中则 0
-                           + $fulltext_weight / (rrf_k + ft_rank)    全文 RRF 贡献,无命中则 0
+                           + $fulltext_weight / (rrf_k + ft_rank)   全文 RRF 贡献,无命中则 0
                            + $importance_weight * (importance / 10.0)
                            + $access_weight    * ln(1 + access_count)
                            + $time_decay_weight * EXP(-λ * age_days)  时间衰减贡献

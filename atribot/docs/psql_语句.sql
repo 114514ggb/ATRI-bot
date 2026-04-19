@@ -144,6 +144,6 @@ WHERE group_id IS NOT NULL
    OR user_id IS NOT NULL;
 
 VACUUM FULL atri_memory;
--- 如果不想锁表，可以使用:
+-- 不锁表
 VACUUM ANALYZE atri_memory;
 
