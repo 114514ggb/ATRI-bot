@@ -2,7 +2,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from contextvars import ContextVar
 from logging import Logger
-from typing import Any, Optional, Tuple
+from typing import Any, Literal, Optional, Tuple
 
 from aiomysql import Pool
 
@@ -46,7 +46,7 @@ class AsyncDatabaseBase(ABC):
         self, 
         query: str,
         params: Tuple = None, 
-        fetch_type: str = None
+        fetch_type: Literal["one","all"] | None = None
     ) -> Any:
         """使用连接池执行SQL,会自动获取浮标"""
         pass
@@ -56,7 +56,7 @@ class AsyncDatabaseBase(ABC):
         self, 
         query: str,
         params: Tuple = None, 
-        fetch_type: str = None
+        fetch_type: Literal["one","all"] | None = None
     ) -> Any:
         """使用连接池执行SQL,需要手动获取浮标,用于多条语句的情况下"""
         pass

@@ -25,6 +25,7 @@ def extract_json_from_text(text: str) -> dict[str, Any] | str:
     #     return json.loads(text)
     # except json.JSONDecodeError:
     #     pass  
+    #因为大概率过不了直接用re正则匹配了
     
     extracted_str = None
 

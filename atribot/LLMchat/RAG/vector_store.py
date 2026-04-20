@@ -252,11 +252,10 @@ class MemoryVectorStore(VectorStoreBasics):
             RETURNING memory_id
         """
 
-        vector_value = str(event_vector) if event_vector is not None else None
         async with self.vector_database as db:
             row = await db.execute_with_pool(
                 sql,
-                (memory_id, event_time, event, vector_value, category, importance, credibility),
+                (memory_id, event_time, event, str(event_vector) if event_vector is not None else None, category, importance, credibility),
                 fetch_type="one",
             )
         return row is not None

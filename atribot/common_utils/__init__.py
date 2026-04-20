@@ -1,4 +1,5 @@
 from .async_exec import async_run_exec
+from .cluster_utils import ClusterUtils
 from .db_format import format_memory_records
 from .file.file_utils import download_binary, resolve_file_to_bytes
 from .file.image_utils import compress_image, url_to_base64, urls_list_to_base64
@@ -18,6 +19,7 @@ from .validation import is_qq
 
 __all__ = [
     "async_run_exec",
+    "ClusterUtils",
     "calculate_similarity",
     "compress_image",
     "construction_message_dict",

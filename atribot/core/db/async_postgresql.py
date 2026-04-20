@@ -1,6 +1,6 @@
 import asyncio
 from contextvars import ContextVar, Token
-from typing import List, Optional, Tuple
+from typing import List, Literal, Optional, Tuple, overload
 
 import asyncpg
 from asyncpg import Record
@@ -106,14 +106,37 @@ class AsyncPostgreSQL(AsyncDatabaseBase):
         if conn is None:
             raise RuntimeError("未在异步上下文管理器中使用数据库连接")
         return conn
-    
+
+    @overload
+    async def _execute_with_pool(
+        self,
+        query: str,
+        params: Optional[Tuple],
+        fetch_type: Literal["one"]
+    ) -> Optional[Record]: ...
+
+    @overload
+    async def _execute_with_pool(
+        self,
+        query: str,
+        params: Optional[Tuple],
+        fetch_type: Literal["all"]
+    ) -> tuple[Record]: ...
+
+    @overload
+    async def _execute_with_pool(
+        self,
+        query: str,
+        params: Optional[Tuple],
+        fetch_type: None
+    ) -> None: ...
+
     async def _execute_with_pool(
         self,
         query: str,
         params: Tuple = None,
-        fetch_type: str = None
-    ) -> list[Record] | Record | None:
-        """使用连接池执行SQL,自动借用临时连接"""
+        fetch_type: Literal["one","all"] | None = None
+    ) -> tuple[Record] | Record | None:
 
         conn = self._context_conn.get()
         temp_conn = None
@@ -141,14 +164,37 @@ class AsyncPostgreSQL(AsyncDatabaseBase):
         finally:
             if temp_conn:
                 await self._pool.release(temp_conn)
-                
+
+    @overload
     async def execute_with_pool(
         self,
         query: str,
-        params: Tuple = None,
-        fetch_type: str = None
-    ) -> list[Record] | Record | None:
-        """使用连接池执行SQL,需要提前在上下文中获取连接"""
+        params: Optional[Tuple],
+        fetch_type: Literal["one"]
+    ) -> Optional[Record]: ...
+
+    @overload
+    async def execute_with_pool(
+        self,
+        query: str,
+        params: Optional[Tuple],
+        fetch_type: Literal["all"]
+    ) -> tuple[Record]: ...
+
+    @overload
+    async def execute_with_pool(
+        self,
+        query: str,
+        params: Optional[Tuple],
+        fetch_type: None
+    ) -> None: ...
+
+    async def execute_with_pool(
+        self,
+        query: str,
+        params: Optional[Tuple] = None,
+        fetch_type: Literal["one","all"] | None = None
+    ) -> tuple[Record] | Record | None:
 
         conn = self._context_conn.get()
 
@@ -161,7 +207,7 @@ class AsyncPostgreSQL(AsyncDatabaseBase):
                 return await conn.fetch(query, *args)
             else:
                 await conn.execute(query, *args)
-                return True
+                return
 
         except (UniqueViolationError, ForeignKeyViolationError) as e:
             self.log.error(f"数据库约束冲突: {e}")

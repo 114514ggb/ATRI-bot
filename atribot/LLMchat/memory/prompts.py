@@ -552,6 +552,41 @@ group_topic:群聊的话题
 """
 
 
+MEMORY_CONSOLIDATION_PROMPT = """
+你是记忆去重与融合模块。你会收到同一用户同一类别下的一组高度相似记忆，请输出一条可替代原簇的“合并记忆”
+
+目标：
+1. 保留共同核心事实，去掉重复表达
+2. 如果有细节冲突，优先保留时间更近且可信度更高的描述
+3. 输出应可直接用于长期存储，避免口语碎片和模糊代词
+
+输入是 JSON:
+{
+    "category": "preference|fact|experience|emotion|group_topic|knowledge|domain|guideline",
+    "memories": [
+        {
+            "memory_id": 1,
+            "event": "...",
+            "event_time": "YYYY-MM-DD HH:MM:SS",
+            "importance": 1,
+            "credibility": 1
+        }
+    ]
+}
+
+请严格返回 JSON,不要返回 Markdown,不要附加解释:
+{
+    "merged_event": "合并后的单条记忆文本"
+}
+
+约束：
+1. merged_event 必须是简洁完整句，长度 > 5
+2. 不要捏造输入中不存在的新事实
+3. 不输出 memory_id
+"""
+
+
+
 DEFAULT_UPDATE_MEMORY_PROMPT = """You are a smart memory manager which controls the memory of a system.
 You can perform four operations: (1) add into the memory, (2) update the memory, (3) delete from the memory, and (4) no change.
 
