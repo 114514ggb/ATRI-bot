@@ -17,10 +17,12 @@ class MemoryRetriever:
         self.vector_store = rag.vector_store
 
     async def query_similarity_edges_grouped(
-        self, start_time: int, threshold: float, min_cluster_size: int
+        self, 
+        start_time: int, 
+        threshold: float, 
+        min_cluster_size: int
     ) -> Dict[Tuple[int, str], List[Tuple[int, int]]]:
         """按(user_id, category)分组查询两两相似边"""
-        distance_threshold = 1.0 - max(0.0, min(1.0, threshold))
         sql = """
             WITH candidates AS (
                 SELECT
@@ -58,14 +60,13 @@ class MemoryRetriever:
         """
         async with self.vector_store.vector_database as db:
             rows = await db.execute_with_pool(
-                sql, (start_time, distance_threshold, min_cluster_size), fetch_type="all"
+                sql, (start_time, threshold, min_cluster_size), fetch_type="all"
             )
 
         grouped_edges: Dict[Tuple[int, str], List[Tuple[int, int]]] = {}
         for row in rows or []:
-            key = (int(row["user_id"]), row["category"])
-            grouped_edges.setdefault(key, []).append(
-                (int(row["memory_id_a"]), int(row["memory_id_b"]))
+            grouped_edges.setdefault((row["user_id"], row["category"]), []).append(
+                (row["memory_id_a"], row["memory_id_b"])
             )
         return grouped_edges
    

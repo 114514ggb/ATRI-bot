@@ -162,7 +162,7 @@ class TimeTriggerSupervisor:
             remarks (str, optional): 任务备注信息，用于日志或调试默认为空字符串
 
         Returns:
-            int: 实际使用的 task_id（可用于后续取消任务）
+            int: 实际使用的 task_id(可用于后续取消任务)
 
         Raises:
             ValueError: 如果提供的 `cron_expression` 格式无效

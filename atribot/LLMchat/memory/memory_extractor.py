@@ -12,6 +12,7 @@ from atribot.LLMchat.memory.memory_retriever import MemoryRetriever
 from atribot.LLMchat.memory.prompts import (
     FACT_RETRIEVAL_PROMPT,
     GROUP_MEMORY_DECISION_PROMPT,
+    MEMORY_CONSOLIDATION_PROMPT,
     PURE_GROUP_FACT_RETRIEVAL_PROMPT,
     SUMMARIZE_CONTEXT_SYSTEM_PROMPT,
 )
@@ -29,6 +30,7 @@ class MemoryExtractor:
         self.rag = rag
         self.vector_store = rag.vector_store
         self.retriever = retriever
+        
         
     async def extract_stored_message(self, messages:List[Dict[str,str]], user_id:int|str)->None:
         """对个人聊天,从提取到存入向量数据库全流程
@@ -393,6 +395,31 @@ class MemoryExtractor:
             return return_json.get("summarize","")
         else:
             return ""
+
+    async def merge_cluster_event_with_llm(self, category: str, cluster_rows: List[dict]) -> str | None:
+        """交给llm来合并相似的语句"""
+
+        payload = {
+            "category": category,
+            "memories": [
+                {
+                    "memory_id": row["memory_id"],
+                    "event": row["event"],
+                    "event_time": datetime.fromtimestamp(row["event_time"]).strftime("%Y-%m-%d %H:%M:%S"),
+                    "importance": row["importance"],
+                    "credibility": row["credibility"],
+                }
+                for row in cluster_rows
+            ],
+        }
+        result = await self.request_return_json_content(
+            message=payload,
+            play_role=MEMORY_CONSOLIDATION_PROMPT,
+        )
+        merged_event = result.get("merged_event") if isinstance(result, dict) else None
+        if isinstance(merged_event, str) and len(merged_event.strip()) > 2:
+            return merged_event.strip()
+        return None
 
     async def request_return_json_content(self, message:str, play_role:str)->Dict:
         """发起请求获取json

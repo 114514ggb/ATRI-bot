@@ -1,13 +1,13 @@
+import asyncio
 import time
-from datetime import datetime
 from logging import Logger
 from typing import Dict, List, Optional, Tuple
 
 from atribot.common_utils import ClusterUtils
 from atribot.core.service_container import container
+from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.LLMchat.memory.memory_extractor import MemoryExtractor
 from atribot.LLMchat.memory.memory_retriever import MemoryRetriever
-from atribot.LLMchat.memory.prompts import MEMORY_CONSOLIDATION_PROMPT
 from atribot.LLMchat.RAG.rag import RAGManager
 
 
@@ -24,10 +24,27 @@ class MemoryConsolidator:
         extractor: Optional[MemoryExtractor] = None,
     ):
         self.logger: Logger = container.get("log")
+        self.time_trigger: TimeTriggerSupervisor = container.get("TimeTriggerSupervisor")
         self.rag = rag
         self.vector_store = rag.vector_store
         self.retriever = retriever
         self.extractor = extractor
+        self.time_trigger.add_task(
+            task_id=1201,
+            func=self.scheduled_memory_maintenance,
+            trigger_delta=86400,
+            interval=86400,
+            timeout=600.0,
+            remarks="记忆系统24小时维护",
+        )
+
+    async def scheduled_memory_maintenance(self) -> None:
+        """统一触发记忆维护"""
+        self.logger.info("开始执行定时记忆维护任务")
+        await self.cleanup_expired_memories()
+        await self.consolidate_memories()
+        self.logger.info("定时记忆维护任务执行完成")
+
 
     async def cleanup_expired_memories(self):
         """简单清理太久前记忆,只是简单条件删除过久的没什么意义的记忆"""
@@ -51,35 +68,10 @@ class MemoryConsolidator:
             await db.execute_with_pool(
                 query = sql
             )
-    async def _merge_cluster_event_with_llm(self, category: str, cluster_rows: List[dict]) -> str | None:
-        if self.extractor is None:
-            return None
-
-        payload = {
-            "category": category,
-            "memories": [
-                {
-                    "memory_id": row["memory_id"],
-                    "event": row["event"],
-                    "event_time": datetime.fromtimestamp(row["event_time"]).strftime("%Y-%m-%d %H:%M:%S"),
-                    "importance": row["importance"],
-                    "credibility": row["credibility"],
-                }
-                for row in cluster_rows
-            ],
-        }
-        result = await self.extractor.request_return_json_content(
-            message=payload,
-            play_role=MEMORY_CONSOLIDATION_PROMPT,
-        )
-        merged_event = result.get("merged_event") if isinstance(result, dict) else None
-        if isinstance(merged_event, str) and len(merged_event.strip()) > 2:
-            return merged_event.strip()
-        return None
 
     async def consolidate_memories(
         self,
-        threshold: float = 0.92,
+        threshold: float = 0.2,
         recent_days: int = 7,
         use_llm_merge: bool = False,
         min_cluster_size: int = 2,
@@ -87,11 +79,11 @@ class MemoryConsolidator:
         """按组对近期记忆做语义相似整理与去重。
 
         仅整理 `user_id` 非空的记忆，按 `(user_id, category)` 分组。在每个分组内，先基于向量相似度
-        构建聚类，再对每个簇保留一条主记忆并删除冗余记忆；必要时可通过 LLM 合并文本，
-        同时回写更高的质量分数。
+        构建聚类，再对每个簇保留一条主记忆并删除冗余记忆；必要时可通过 LLM 合并文本
+        同时回写更高的质量分数
 
         Args:
-            threshold: 余弦相似度阈值，取值范围为 [0, 1]
+            threshold: 最高的余弦距离阈值，取值范围为 [0, 2]
             recent_days: 候选记忆的时间窗口（天）
             use_llm_merge: 是否使用 LLM 将同簇记忆合并为一条文本
             min_cluster_size: 分组/簇参与整理所需的最小记忆条数
@@ -153,7 +145,7 @@ class MemoryConsolidator:
 
         groups: Dict[Tuple[int, str], List[dict]] = {}
         for row in rows:
-            key = (int(row["user_id"]), row["category"])
+            key = (row["user_id"], row["category"])
             groups.setdefault(key, []).append(row)
 
         total_clusters = 0
@@ -163,11 +155,13 @@ class MemoryConsolidator:
             start_time, threshold, min_cluster_size
         )
 
+        semaphore = asyncio.Semaphore(2)
+        
         for (user_id, category), group_rows in groups.items():
             if len(group_rows) < min_cluster_size:
                 continue
 
-            memory_id_to_row = {int(row["memory_id"]): row for row in group_rows}
+            memory_id_to_row = {row["memory_id"]: row for row in group_rows}
             memory_ids = list(memory_id_to_row.keys())
             if len(memory_ids) < min_cluster_size:
                 continue
@@ -197,7 +191,8 @@ class MemoryConsolidator:
                 merged_event = None
                 if use_llm_merge and len(cluster_rows) > 1:
                     try:
-                        merged_event = await self._merge_cluster_event_with_llm(category, cluster_rows)
+                        async with semaphore:
+                            merged_event = await self.extractor.merge_cluster_event_with_llm(category, cluster_rows)
                     except Exception as e:
                         self.logger.error(f"LLM合并失败,回退保留原文本: {e}")
 
@@ -205,21 +200,20 @@ class MemoryConsolidator:
                 if not final_event:
                     final_event = keeper["event"]
 
-                final_importance = max(int(r.get("importance", 5)) for r in cluster_rows)
-                final_credibility = max(int(r.get("credibility", 5)) for r in cluster_rows)
-                final_event_time = max(int(r.get("event_time", 0)) for r in cluster_rows)
+                final_importance = max(r.get("importance", 5) for r in cluster_rows)
+                final_credibility = max(r.get("credibility", 5) for r in cluster_rows)
+                final_event_time = max(r.get("event_time", 0) for r in cluster_rows)
 
                 if redundant_ids:
                     deleted_num = await self.vector_store.batch_delete_memories(redundant_ids)
                     deleted_count += deleted_num
 
-                need_update = (
-                    final_event != keeper["event"]
-                    or final_importance != keeper["importance"]
-                    or final_credibility != keeper["credibility"]
-                    or final_event_time != keeper["event_time"]
-                )
-                if not need_update:
+                if (
+                    final_event == keeper["event"]
+                    or final_importance == keeper["importance"]
+                    or final_credibility == keeper["credibility"]
+                    or final_event_time == keeper["event_time"]
+                ):
                     continue
 
                 try:

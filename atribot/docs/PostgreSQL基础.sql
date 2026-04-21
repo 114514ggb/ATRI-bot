@@ -10,7 +10,7 @@
 --pgvector支持的距离函数如下:
 -- <-> - L2 distance(欧几里得距离)
 -- <#> - (negative) inner product
--- <=> - cosine distance(余弦)
+-- <=> - cosine distance(余弦距离)
 -- <+> - L1 distance (added in 0.7.0)
 -- <~> - Hamming distance (binary vectors, added in 0.7.0)
 -- <%> - Jaccard distance (binary vectors, added in 0.7.0)
