@@ -10,8 +10,8 @@ from atribot.LLMchat.chat import GroupChat
 tool_json = {
     "name": "schedule_self_trigger",
     "description": (
-        "定时自触发工具。可以在相对延迟或指定的目标日期时间后触发自己，并为届时的自己留下一句话（备注）"
-        "触发时会以那句话作为输入启动一次新的群聊思考流程，就像是未来的自己收到了一条提醒消息"
+        "定时自触发工具。可以在相对延迟或指定的目标日期时间后触发自己，并为届时的自己留下任务介绍"
+        "触发时会以那句话作为输入启动一次新的群聊思考流程"
     ),
     "properties": {
         "target_datetime": {
@@ -38,7 +38,7 @@ tool_json = {
         },
         "note": {
             "type": "string",
-            "description": "送给你未来的话，描述要要执行事情的情况",
+            "description": "详细描述要要执行事情的情况",
         },
     },
 }
@@ -112,7 +112,7 @@ async def main(
         func=_trigger_self,
         trigger_delta=total_seconds,
         timeout=120.0,
-        kwargs={"group_id": int(group_id), "note": str(note)},
+        kwargs={"group_id": group_id, "note": note},
         remarks=f"自触发 群{group_id}",
     )
 

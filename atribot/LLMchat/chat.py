@@ -124,13 +124,13 @@ class chat_basics(ABC):
         """为当前用户输入附加结构化的消息片段"""
         Segment = chat_message.segments[0]
         quote_message = None
-        data = chat_message.primeval
         message_builder.add_text(
             f"最新用户消息:\n<MESSAGE>"
-            f"<user_id>{data['user_id']}</user_id>"
-            f"<nick_name>{data['sender']['nickname']}</nick_name>"
+            f"<user_id>{chat_message.user_id}</user_id>"
+            f"<nick_name>{chat_message.sender_info['nickname']}</nick_name>"
+            f"<group_role>{chat_message.sender_info['role']}</group_role>"
             f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-            f"<message_id>{data['message_id']}</message_id>"
+            f"<message_id>{chat_message.message_id}</message_id>"
             "<user_message>"
         )
 
@@ -458,14 +458,14 @@ class GroupChat(chat_basics):
         
         Segment = chat_message.segments[0]
         quote_message = None
-        data = chat_message.primeval
+
         message_builder.add_text(
             f"最新用户消息:\n<MESSAGE>"
-            f"<user_id>{data['user_id']}</user_id>"
-            f"<nick_name>{data['sender']['nickname']}</nick_name>"
-            f"<group_role>{data['sender']['role']}</group_role>"
+            f"<user_id>{chat_message.user_id}</user_id>"
+            f"<nick_name>{chat_message.sender_info['nickname']}</nick_name>"
+            f"<group_role>{chat_message.sender_info['role']}</group_role>"
             f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-            f"<message_id>{data['message_id']}</message_id>"
+            f"<message_id>{chat_message.message_id}</message_id>"
             "<user_message>"
         )
         
