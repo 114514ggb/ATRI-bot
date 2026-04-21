@@ -198,7 +198,7 @@ async def permission_command_handler(
     description='要查看的系统组件',
     required=True,
     multiple=True,
-    choices=['all', 'sys', 'cpu', 'mem', 'disk', 'mcp', 'model']
+    choices=['all', 'sys', 'cpu', 'mem', 'disk', 'mcp', 'model', 'db', 'scheduler', 'services', 'sandbox', 'llm', 'chat']
 )
 async def handle_status_command(message_data: ChatMessage, components: list):
     """
