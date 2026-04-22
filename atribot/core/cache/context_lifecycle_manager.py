@@ -71,7 +71,7 @@ class ContextLifecycleManager:
             management_context_dict.pop(k, None)
     
     async def backup_data(self, management_context_dict: dict[int, ContextContainer], is_user_context: bool = True) -> dict[int, bool]:
-        """对现有的上下文进行批量存储（只保存，不删除）
+        """对现有的上下文进行批量存储（只保存备份，不删除类里面的缓存）
 
         Args:
             management_context_dict (dict[int,ContextContainer]): 管理上下文的字典

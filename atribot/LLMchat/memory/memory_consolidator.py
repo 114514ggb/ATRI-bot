@@ -30,7 +30,7 @@ class MemoryConsolidator:
         self.retriever = retriever
         self.extractor = extractor
         self.time_trigger.add_task(
-            task_id=1201,
+            task_id=1101,
             func=self.scheduled_memory_maintenance,
             trigger_delta=86400,
             interval=86400,
@@ -42,7 +42,7 @@ class MemoryConsolidator:
         """统一触发记忆维护"""
         self.logger.info("开始执行定时记忆维护任务")
         await self.cleanup_expired_memories()
-        await self.consolidate_memories()
+        await self.consolidate_memories(use_llm_merge=True)
         self.logger.info("定时记忆维护任务执行完成")
 
 
@@ -71,7 +71,7 @@ class MemoryConsolidator:
 
     async def consolidate_memories(
         self,
-        threshold: float = 0.2,
+        threshold: float = 0.1,
         recent_days: int = 7,
         use_llm_merge: bool = False,
         min_cluster_size: int = 2,

@@ -51,19 +51,22 @@ class ChatManager:
             task_id = 1001,
             func = self.groom_context_storage,
             trigger_delta = archival_after,
-            interval = archival_after
+            interval = archival_after,
+            remarks = "定期归档不活跃项目"
         )
         self.time_trigger.add_task(
             task_id = 1002,
             func = self.context_storage,
             trigger_delta = 480,
-            interval = 480
+            interval = 480,
+            remarks = "缓存全部上下文"
         )
         
         self._load_character_settings()
     
     async def groom_context_storage(self):
         """整理上下文存储：归档不活跃项目"""
+        self.logger.info("正在对上下文进行检测归档!")
         await self.lifecycle_manager.conduct_data_persistence(
             management_context_dict = self.group_dict,
             is_user_context = False
@@ -74,6 +77,7 @@ class ChatManager:
 
     async def context_storage(self):
         """整理上下文存储：全部存储"""
+        self.logger.info("正在对上下文进行批量备份!")
         await self.lifecycle_manager.backup_data(
             management_context_dict = self.group_dict,
             is_user_context = False
