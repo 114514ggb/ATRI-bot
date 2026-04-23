@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATRI Web 管理面板</title>
+    <link rel="stylesheet" href="/admin/static/style.css">
+    <!-- Using Apple system fonts as fallback -->
+    <style>
+        @font-face {
+            font-family: 'SF Pro Display';
+            font-weight: 400;
+            src: local('System Font');
+        }
+    </style>
+</head>
+<body>
+    <div id="login-overlay" class="overlay active">
+        <div class="login-card">
+            <h2>ATRI 管理后台</h2>
+            <p class="caption">需要进行身份验证</p>
+            <div class="input-group">
+                <input type="password" id="access-token" class="apple-input" placeholder="输入访问令牌 (Access Token)" />
+            </div>
+            <button id="login-btn" class="btn btn-primary w-full">验证身份</button>
+            <p id="login-error" class="error-text" style="display: none;">无效的令牌</p>
+        </div>
+    </div>
+
+    <div id="app" style="display: none;">
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>ATRI</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" data-view="dashboard">仪表盘</li>
+                <li class="nav-item" data-view="groups">群组列表</li>
+                <li class="nav-item" data-view="users">用户列表</li>
+                <li class="nav-item" data-view="messages">消息记录</li>
+                <li class="nav-item" data-view="memory">系统记忆</li>
+                <li class="nav-item" data-view="commands">命令列表</li>
+                <li class="nav-item" data-view="config">配置文件</li>
+                <li class="nav-item" data-view="supplier">模型配置</li>
+                <li class="nav-item" data-view="send-msg">发送消息</li>
+            </ul>
+        </nav>
+        <main class="main-content">
+            <header class="topbar">
+                <h1 id="view-title">仪表盘</h1>
+                <div class="status-indicator">
+                    <span class="dot online" id="topbar-dot"></span>
+                    <span id="topbar-status">已连接</span>
+                    <button id="btn-logout" class="btn btn-secondary" style="margin-left: 10px;">退出</button>
+                </div>
+            </header>
+            
+            <div class="view-container">
+                <!-- Dashboard View -->
+                <div id="view-dashboard" class="view active">
+                    <div class="stats-grid" id="dashboard-stats">
+                        <!-- Stats cards will be injected here -->
+                    </div>
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>系统运行状态</h3>
+                        </div>
+                        <div class="card-body" id="dashboard-status">
+                            <!-- System status will be injected here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Groups View -->
+                <div id="view-groups" class="view">
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="apple-table">
+                                <thead>
+                                    <tr>
+                                        <th>群组 ID</th>
+                                        <th>群组名称</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="groups-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="groups-pagination"></div>
+                    </div>
+                </div>
+
+                <!-- Users View -->
+                <div id="view-users" class="view">
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="apple-table">
+                                <thead>
+                                    <tr>
+                                        <th>用户 ID</th>
+                                        <th>昵称</th>
+                                        <th>权限级别</th>
+                                        <th>最近更新</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="users-pagination"></div>
+                    </div>
+                </div>
+
+                <!-- Messages View -->
+                <div id="view-messages" class="view">
+                    <div class="filter-bar">
+                        <input type="number" id="filter-msg-group" placeholder="筛选 群组 ID" class="apple-input">
+                        <input type="number" id="filter-msg-user" placeholder="筛选 用户 ID" class="apple-input">
+                        <button id="btn-filter-msg" class="btn btn-secondary">筛选当前项</button>
+                    </div>
+                    <div class="card mt-4">
+                        <div class="table-responsive">
+                            <table class="apple-table">
+                                <thead>
+                                    <tr>
+                                        <th>时间戳</th>
+                                        <th>群组 ID</th>
+                                        <th>发信人</th>
+                                        <th>消息内容</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="messages-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="messages-pagination"></div>
+                    </div>
+                </div>
+
+                <!-- Memory View -->
+                <div id="view-memory" class="view">
+                    <div class="filter-bar">
+                        <input type="text" id="filter-mem-cat" placeholder="键入记忆 分类" class="apple-input">
+                        <input type="number" id="filter-mem-user" placeholder="键入记忆 用户 ID" class="apple-input">
+                        <button id="btn-filter-mem" class="btn btn-secondary">执行筛选</button>
+                    </div>
+                    <div class="card mt-4">
+                        <div class="table-responsive">
+                            <table class="apple-table">
+                                <thead>
+                                    <tr>
+                                        <th>时间</th>
+                                        <th>类别</th>
+                                        <th>所属用户 ID</th>
+                                        <th>记忆事件明细</th>
+                                        <th>权重</th>
+                                        <th>可信度</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="memory-table-body"></tbody>
+                            </table>
+                        </div>
+                        <div class="pagination" id="memory-pagination"></div>
+                    </div>
+                </div>
+
+                <!-- Commands View -->
+                <div id="view-commands" class="view">
+                    <div class="grid-list" id="commands-list">
+                        <!-- Command cards injected here -->
+                    </div>
+                </div>
+
+                <!-- Config View -->
+                <div id="view-config" class="view">
+                    <div class="card">
+                        <div class="card-header flex-between">
+                            <h3>系统底层主配置 JSON</h3>
+                            <button id="btn-save-config" class="btn btn-primary">保存修改</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="caption mb-2" id="config-path"></p>
+                            <textarea id="config-editor" class="apple-textarea code-bg"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supplier View -->
+                <div id="view-supplier" class="view">
+                    <div class="card">
+                        <div class="card-header flex-between">
+                            <h3>LLM 供应商模型配置 JSON</h3>
+                            <button id="btn-save-supplier" class="btn btn-primary">保存修改</button>
+                        </div>
+                        <div class="card-body">
+                            <p class="caption mb-2" id="supplier-path"></p>
+                            <textarea id="supplier-editor" class="apple-textarea code-bg"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Send Message View -->
+                <div id="view-send-msg" class="view">
+                    <div class="card max-w-lg">
+                        <div class="card-header">
+                            <h3>构造发送消息测试</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="input-group mb-3">
+                                <label>目标群组编号 ID</label>
+                                <input type="number" id="send-group-id" class="apple-input" placeholder="例如：123456789">
+                            </div>
+                            <div class="input-group mb-4">
+                                <label>需要发送的内容</label>
+                                <textarea id="send-msg-content" class="apple-textarea" rows="4" placeholder="在此输入需要主动发送的信息文本...(JSON/string)支持解析cq码"></textarea>
+                            </div>
+                            <button id="btn-send-msg" class="btn btn-primary w-full">确认发信</button>
+                            <p id="send-msg-result" class="mt-3 caption text-center"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/admin/static/script.js"></script>
+</body>
+</html>
