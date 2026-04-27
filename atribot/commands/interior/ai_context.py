@@ -144,7 +144,7 @@ class AIContextCommands:
     async def _handle_set_role(self, group_id: str, role_name: str, user_id:int):
         """处理角色切换"""
         if not role_name:
-            await self.send_message.send_group_mgs(
+            await self.send_message.send_group_msg(
                 group_id, 
                 "❌ 错误：切换角色需要指定角色名称\n"
                 "用法：/chat role <角色名>\n"
@@ -156,7 +156,7 @@ class AIContextCommands:
         
         # 检查角色是否存在
         if role_name not in self.context_management.play_role_list:
-            await self.send_message.send_group_mgs(
+            await self.send_message.send_group_msg(
                 group_id, 
                 f"❌ 错误：角色 '{role_name}' 不存在\n"
                 f"使用 /chat list 查看完整列表"
@@ -165,7 +165,7 @@ class AIContextCommands:
         
         await self.context_management.set_group_role(group_id, role_name)
         
-        await self.send_message.send_group_mgs(
+        await self.send_message.send_group_msg(
             group_id, 
             f"✅ 已将当前群角色切换为：{role_name}\n"
             f"上下文已重置，开始新的对话。"
@@ -176,7 +176,7 @@ class AIContextCommands:
     async def _handle_set_role_user(self, group_id: str, role_name: str, user_id:int):
         """处理角色切换,全局上下文版本"""
         if not role_name:
-            await self.send_message.send_group_mgs(
+            await self.send_message.send_group_msg(
                 group_id, 
                 "❌ 错误：切换角色需要指定角色名称\n"
                 "用法：/chat role <角色名>\n"
@@ -186,7 +186,7 @@ class AIContextCommands:
         
         # 检查角色是否存在
         if role_name not in self.context_management.play_role_list:
-            await self.send_message.send_group_mgs(
+            await self.send_message.send_group_msg(
                 group_id, 
                 f"❌ 错误：角色 '{role_name}' 不存在\n"
                 f"使用 /chat list 查看完整列表"
@@ -195,7 +195,7 @@ class AIContextCommands:
         
         await self.context_management.set_private_role(user_id, role_name)
         
-        await self.send_message.send_group_mgs(
+        await self.send_message.send_group_msg(
             group_id, 
             f"✅ 已将{user_id}上下文角色切换为：{role_name}\n"
             f"上下文已重置，开始新的对话。"
@@ -218,7 +218,7 @@ class AIContextCommands:
         else:
             message += "角色提示词：无"
         
-        await self.send_message.send_group_mgs(group_id, message)
+        await self.send_message.send_group_msg(group_id, message)
 
     async def _handle_current_role_user_(self, group_id: int, target:str, user_id:int):
         """处理查看当前角色_user"""
@@ -241,7 +241,7 @@ class AIContextCommands:
         else:
             message += "角色提示词：无"
         
-        await self.send_message.send_group_mgs(group_id, message)
+        await self.send_message.send_group_msg(group_id, message)
     
     async def _handle_list_roles(self, group_id: str, detail: bool = False):
         """处理列出角色"""
@@ -309,12 +309,12 @@ class AIContextCommands:
             if not added_roles and not removed_roles and old_count == new_count:
                 message += "\n📝 角色数量未变化，可能更新了角色内容"
             
-            await self.send_message.send_group_mgs(group_id, message)
+            await self.send_message.send_group_msg(group_id, message)
             self.log.info(f"用户在群 {group_id} 执行了角色配置重载")
             
         except Exception as e:
             error_message = f"❌ 角色配置重载失败：{str(e)}"
-            await self.send_message.send_group_mgs(group_id, error_message)
+            await self.send_message.send_group_msg(group_id, error_message)
             self.log.error(f"角色配置重载失败：{e}")
     
     async def _handle_reset_context(self, group_id: int, target:str, user_id:int):
@@ -330,7 +330,7 @@ class AIContextCommands:
         await self.context_management.reset_group_chat(group_id)
         message = "✅ 已重置当前群的对话上下文\n可以开始新的对话了！"
         
-        await self.send_message.send_group_mgs(group_id, message)
+        await self.send_message.send_group_msg(group_id, message)
     
     async def _handle_reset_context_user_(self, group_id: int, target:str, user_id:int):
         """处理重置上下文,user版本"""
@@ -345,7 +345,7 @@ class AIContextCommands:
         await self.context_management.reset_private_chat(user_id)
         message = f"已重置当前{user_id}的对话上下文！"
             
-        await self.send_message.send_group_mgs(group_id, message)
+        await self.send_message.send_group_msg(group_id, message)
     
     async def _handle_context_info(self, group_id: int, target:str, user_id:int):
         """处理查看上下文信息"""
@@ -497,8 +497,10 @@ class AIContextCommands:
         group_context =await self.context_management.get_group_context(group_id)
         group_context.initiative_chat = group_context.initiative_chat ^ True
         
-        await self.send_message.send_group_mgs(
+        await self.send_message.send_group_msg(
             current_group_id, 
             f"群聊{group_id},主动聊天切换为{group_context.initiative_chat }"
         )
     
+AIContextCommands()
+

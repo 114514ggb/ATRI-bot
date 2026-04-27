@@ -170,7 +170,7 @@ class group_manage(message_manage):
                 await self.command_system.dispatch_command(chat_message)
             except Exception as e:
                 self.error_occurred(e, "命令处理模块")
-                await self.send_message.send_group_mgs(
+                await self.send_message.send_group_msg(
                     chat_message.group_id, 
                     f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"
                 )
@@ -183,7 +183,7 @@ class group_manage(message_manage):
                 await self.initiative_chat.decision(chat_message, group_context, at=True)
             except Exception as e:
                 self.error_occurred(e, "群聊聊天模块")
-                await self.send_message.send_group_mgs(
+                await self.send_message.send_group_msg(
                     chat_message.group_id, 
                     f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}"
                 )

@@ -60,7 +60,7 @@ MAX_SINGLE_MESSAGE_LENGTH = 5  # 分条发送长度阈值
 LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
 STRING_LENGTH_LIMIT = 120 #字符串长度限制
 
-class chat_basics(ABC):
+class ChatBasics(ABC):
     """聊天基类"""
 
     def __init__(self):
@@ -233,7 +233,7 @@ class chat_basics(ABC):
             )
 
 
-class GroupChat(chat_basics):
+class GroupChat(ChatBasics):
     """处理群聊天"""
 
     def __init__(self):
@@ -722,7 +722,7 @@ class GroupChat(chat_basics):
                 self.emoji_file_dict,
                 reply_id = message_id 
             ):
-                await self.send_message.send_group_mgs(
+                await self.send_message.send_group_msg(
                     group_id,
                     message,
                 )
@@ -732,7 +732,7 @@ class GroupChat(chat_basics):
         else:
             # 合并发送完
             
-            await self.send_message.send_group_mgs(
+            await self.send_message.send_group_msg(
                 group_id,
                 self.emoji_core.parse_text_to_cqcode_with_emotion(
                     text  = "\n".join(chat_text_list),
@@ -743,7 +743,7 @@ class GroupChat(chat_basics):
             return
 
 
-class PrivateChat(chat_basics):
+class PrivateChat(ChatBasics):
     """处理私聊天"""
 
     def __init__(self):
@@ -989,82 +989,3 @@ class PrivateChat(chat_basics):
 
         self.log.error(f"[{uid}]私聊所有备用api出现错误!")
         raise ValueError(f"[{uid}]私聊所有备用api出现错误!")
-
-
-class AgentChat(chat_basics):
-    """隔离上下文的任务代理，适合一次性信息收集和处理的小型任务"""
-
-    def __init__(self):
-        super().__init__()
-
-        model_supplier = self.supplier.connections[
-            self.config.model.connect.supplier
-        ]
-        self._model_name = self.config.model.connect.model_name
-        self._model_api = model_supplier.connection_object
-        model_info = model_supplier.model_dict[self._model_name]
-        self._visual_sense = model_info.get("visual_sense", False)
-        self._audio_sense = model_info.get("audio_sense", False)
-        self._chat_parameter = self.config.model.chat_parameter
-
-    async def step(self) -> None:
-        """不适用于 AgentChat,请使用 run() 方法"""
-        raise NotImplementedError("AgentChat 请使用 run() 方法")
-
-    async def prompt_structure(self) -> None:
-        raise NotImplementedError
-
-    async def send_reply_message_separator(self) -> None:
-        raise NotImplementedError
-
-    async def run(
-        self,
-        task: str,
-        message_data: ChatMessage | None = None,
-        tools: List[str] | None = None,
-        system_prompt: str | None = None,
-    ) -> str:
-        """执行一次独立的代理任务，拥有隔离上下文和独立工具调用。
-
-        Args:
-            task: 任务描述或用户指令
-            message_data: 触发来源消息（工具调用注入用），可为 None
-            tools: 可用工具列表,None 表示使用默认配置[] 表示不使用任何工具
-            system_prompt: 系统提示词,None 时使用默认代理提示
-
-        Returns:
-            str: 任务执行结果文本，执行失败时返回空字符串
-        """
-        uid = uuid.uuid4().hex
-        self.log.info(f"[AgentChat][{uid}] 任务: {task[:120]}")
-
-        play_role = system_prompt or (
-            "你是一个高效的信息处理代理,你需要完成指定的任务，必要时调用工具收集信息，最终输出清晰精炼的结果"
-        )
-
-        effective_tools = (
-            self.tool_calls.get_func_desc_openai_style(preset="agency_Agent")
-            if tools is None
-            else self.tool_calls.get_func_desc_openai_style(names=tools)
-        )
-
-        request = GenerationRequestSimplify(
-            model=self._model_name,
-            model_api=self._model_api,
-            messages=[{"role": "system", "content": play_role}],
-            increment_messages=[{"role": "user", "content": task}],
-            tool_json=effective_tools,
-            parameter=self._chat_parameter,
-            message_data=message_data,
-            visual_sense=self._visual_sense,
-            audio_sense=self._audio_sense,
-        )
-
-        try:
-            response = await self.model_api_supervisor.run(request)
-            result = "".join(response.reply_text).strip()
-            self.log.info(f"[AgentChat][{uid}] 完成，结果:{result}")
-            return result
-        except Exception as e:
-            self.log.exception(f"[AgentChat][{uid}] 执行任务时出错:{e}")
-            return ""

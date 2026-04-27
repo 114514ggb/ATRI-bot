@@ -44,13 +44,13 @@ class string_response:
         
         async def send(send_type, document):
             if send_type is ResponseType.TEXT:
-                await self.send_message.send_group_mgs(group_id, document)
+                await self.send_message.send_group_msg(group_id, document)
             elif send_type is ResponseType.IMAGE:
                 await self.send_message.send_group_pictures(group_id, document, True)
             elif send_type is ResponseType.AUDIO:
                 await self.send_message.send_group_audio(group_id, document, True)
             elif send_type is ResponseType.MIXTURE:
-                await self.send_message.send_group_mgs(group_id, construction_message_dict(document,self.url_prefi))
+                await self.send_message.send_group_msg(group_id, construction_message_dict(document,self.url_prefi))
         
         if time.time() - (await self.context_management.get_group_context(group_id)).last_msg_at < 5:
             #如果间隔太短不处理

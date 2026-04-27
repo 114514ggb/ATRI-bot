@@ -152,7 +152,7 @@ class QQAPIClient():
             echo=echo
         )
 
-    async def send_group_mgs(self,group_id: int, message:str|list):
+    async def send_group_msg(self,group_id: int, message:str|list):
         """
             发送群聊文字消息\n
             message可以是str也可以是包含混合消息的list,str会解析CQ码
@@ -184,7 +184,7 @@ class QQAPIClient():
             }
         ]
         
-        await self.send_group_mgs(group_id, params)
+        await self.send_group_msg(group_id, params)
 
         
     async def send_group_merge_text(
@@ -303,7 +303,7 @@ class QQAPIClient():
             }
         ]
         
-        await self.send_group_mgs(group_id, payload)
+        await self.send_group_msg(group_id, payload)
         
     async def send_group_music(
             self,
@@ -349,7 +349,7 @@ class QQAPIClient():
             }
         ]
         
-        await self.send_group_mgs(group_id,message)
+        await self.send_group_msg(group_id,message)
         
     
     async def set_group_add_request(self,flag: str, approve: bool, reason: str = "不行哦!"):

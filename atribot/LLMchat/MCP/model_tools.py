@@ -1,3 +1,4 @@
+import asyncio
 import importlib.util
 import json
 import os
@@ -23,6 +24,8 @@ class tool_calls:
         
         self.presets: Dict[str, List[str]] = {}
         """工具预设列表"""
+        self._preset_lock = asyncio.Lock()
+        
         self._openai_cache: tuple[list, list] | None = None
         self._anthropic_cache: list | None = None
         self._google_cache: dict | None = None
@@ -58,6 +61,51 @@ class tool_calls:
                 continue
             self.register_preset(name, tools)
         self.logger.info(f"工具预设共加载 {len(self.presets)} 个")
+
+    async def modify_preset_tools(self, preset_name: str, op: str, tools: List[str]) -> None:
+        """修改工具预设内的工具 (增/删)，并利用全局锁保证安全同步和持久化
+
+        Args:
+            preset_name (str): 预设组名称 (不可新建)
+            op (str): 'add' 添加工具(自动去重), 'remove' 移除工具
+            tools (List[str]): 要操作的工具列表
+
+        Raises:
+            ValueError: 预设名称不存在、操作类型不支持，或配置文件中找不到预设信息时抛出
+        """
+        async with self._preset_lock:
+            if preset_name not in self.presets:
+                raise ValueError(f"预设 '{preset_name}' 不存在，禁止非法创建预设")
+            
+            current_tools = self.presets[preset_name].copy()
+            if op == "add":
+                for t in tools:
+                    if t not in current_tools:
+                        current_tools.append(t)
+            elif op == "remove":
+                for t in tools:
+                    if t in current_tools:
+                        current_tools.remove(t)
+            else:
+                raise ValueError(f"不支持的操作类型: {op}")
+            
+            config_path = container.get("config").config_file_path
+            with open(config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            if "tool_presets" not in data or preset_name not in data["tool_presets"]:
+                raise ValueError(f"config.json 中找不到预设 '{preset_name}'")
+            
+            data["tool_presets"][preset_name] = current_tools
+            
+            # 持久化
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
+            
+            # 同步缓存
+            self.presets[preset_name] = current_tools
+            self.build_tool_description_cache()
+            self.logger.info(f"预设 '{preset_name}' 成功执行 {op} 操作，当前包含: {current_tools}")
 
     def _resolve_names(
         self,

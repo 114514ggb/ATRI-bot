@@ -85,7 +85,10 @@ class command_loader:
                         loaded_count += 1
                         self.logger.info(f"成功加载命令模块: {item.name}")
                     except Exception as e:
-                        self.logger.error(f"加载命令模块 {item.name} 失败: {e}")
+                        hint = ""
+                        if isinstance(e, ModuleNotFoundError):
+                            hint = "；提示: 请检查该命令包的 __init__.py 是否存在，以及模块内是否使用了绝对导入"
+                        self.logger.exception(f"加载命令模块 {item.name} 失败: {e}{hint}")
         
         self.logger.info(f"命令加载完成，共加载 {loaded_count} 个模块")
         return loaded_count
@@ -105,18 +108,27 @@ class command_loader:
                 parent_module = importlib.util.module_from_spec(
                     importlib.util.spec_from_loader(parent_name, loader=None)
                 )
+                parent_module.__path__ = [str(self._resolve_parent_package_path(package_path, parent_parts, i))]
                 sys.modules[parent_name] = parent_module
         
-        for py_file in package_path.glob("*.py"):
+        init_file = package_path / "__init__.py"
+        if init_file.exists() and package_name not in sys.modules:
+            self._load_module_from_path(init_file, package_name)
+
+        for py_file in sorted(package_path.glob("*.py")):
             if py_file.name == "__init__.py":
-                module_name = package_name
-                file_path = py_file
-            else:
-                module_name = f"{package_name}.{py_file.stem}"
-                file_path = py_file
-            
+                continue
+
+            module_name = f"{package_name}.{py_file.stem}"
             if module_name not in sys.modules:
-                self._load_module_from_path(file_path, module_name)
+                self._load_module_from_path(py_file, module_name)
+
+    def _resolve_parent_package_path(self, package_path: Path, parent_parts: list[str], level: int) -> Path:
+        """根据当前包路径推断父包的文件系统路径。"""
+        resolved = package_path
+        for _ in range(max(len(parent_parts) - level - 1, 0)):
+            resolved = package_path.parent
+        return resolved
 
 
     def _load_module_from_path(self, file_path: Path, module_name: str):

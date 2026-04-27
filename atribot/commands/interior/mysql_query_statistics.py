@@ -34,7 +34,7 @@ class UserActivityAnalyzer:
             raise ValueError("请输入正确的QQ号")
             
         if not await self._process_user_data(user_id, group_id):
-            await self.send_message.send_group_mgs(group_id, f"数据库中未找到qq:{user_id}")
+            await self.send_message.send_group_msg(group_id, f"数据库中未找到qq:{user_id}")
     
     async def _process_user_data(self, user_id: str, group_id: int) -> bool:
         """
@@ -110,7 +110,7 @@ WHERE user_id = $1
 
         trend = self._evaluate_trend(int(number_days), int(week_daye), int(month_daye))
 
-        await self.send_message.send_group_mgs(
+        await self.send_message.send_group_msg(
             group_id,
             f"✨ QQ用户活跃报告 ✨\n"
             f"----------------------------------------\n"
