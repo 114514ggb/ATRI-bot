@@ -15,7 +15,7 @@ tool_json = {
     "description": (
         "在沙盒中执行中执行Shell命令,环境是Python3.12-slim预装ffmpeg"
         "拥有独立的持久化工作区：/workspace/groups/<群号>/data "
-        "输出超过限制时仅返回末尾部分"
+        "输出超过限制时仅返回末尾部分,"
         "返回值包含退出码，可据此判断命令是否执行成功"
     ),
     "properties": {

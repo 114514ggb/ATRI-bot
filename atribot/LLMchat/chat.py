@@ -91,6 +91,15 @@ class ChatBasics(ABC):
     async def send_reply_message_separator(self) -> None:
         """模型响应结束最终回复的阶段"""
 
+    @abstractmethod
+    async def trigger_internal_thought(
+        self,
+        custom_prompt: str,
+        user_id: int | None = None,
+        group_id: int | None = None,
+    ) -> None:
+        """系统内部触发思考的入口"""
+
     async def update_conduct(self, response_json: Dict, message: ChatMessage) -> None:
         """更新用户信息（通用）"""
         self.log.info(f"LLM决定更新用户信息理由:{response_json.get('reason')}")
@@ -384,6 +393,119 @@ class GroupChat(ChatBasics):
                     self.log.info(f"[{uid}]聊天上下文总结{user_id}消息为none")
             except Exception as e:
                 self.log.exception(f"[{uid}]聊天上下文信息总结出现了错误:{e}")
+
+    async def trigger_internal_thought(
+        self,
+        custom_prompt: str,
+        group_id: int,
+        user_id: int | None = None,
+    ) -> None:
+        """系统内部触发思考的入口"""
+
+        uid: str = uuid.uuid4().hex
+        self.log.info(f"[{uid}]群LLM事件通知触发处理")
+
+        message = ChatMessage(
+            user_id = user_id,
+            group_id = group_id
+        )
+
+        message_builder = MessageBuilder()
+        group_history = await self.chat_manager.get_group_messages_str(group_id)
+
+        message_builder.add_text(
+            self.skills.prompt #skills的提示词
+        )
+        message_builder.add_text(
+            f"<group_history>{group_history[:10000]}</group_history>"
+        )
+
+        prompt =(
+            f"{custom_prompt}\n触发定时消息用户:<user_id>{user_id}</user_id>"
+            (f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>" if user_id else "")
+        )
+        
+        message_builder.add_text(
+            self.build_prompt.decision_whether_responses(
+                group_id=group_id,
+                prompt=prompt,
+                else_prompt=self.emoji_core.prompt
+            )
+        )
+
+        if user_id:
+            #如果一个user触发了定时，那么应该在他的上下文消息里
+            original_context = await self.get_chat_context(
+                group_id = group_id,
+                user_id = user_id
+            )
+        else:
+            original_context = self.chat_manager.get_group_context(group_id)
+            
+        request: GenerationRequestSimplify = replace(
+            self.template_request_simplify,
+            increment_messages=[message_builder.build()],
+            messages=original_context.get_messages(),
+            tool_json=self.tool_calls.get_func_desc_openai_style(preset="group_chat"),
+            message_data=message
+        )
+        
+        response = await self._request_model_with_fallback_(
+            request = request, 
+            message = message,
+            prompt = prompt, 
+            uid = uid
+        )
+
+        self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
+        
+        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
+            
+            if isinstance(response_json, dict):
+                
+                for response_json in response_json.get("actions",[]):
+                    
+                    response_json:dict[str,str|int]
+                    if decision := response_json.get("decision"):
+                        
+                        if fun := self.decision_function.get(decision):
+                            
+                            await fun(response_json, message)
+                            
+                        else:
+                            self.log.error(f"[{uid}]无效decision:{response_json}")
+                        
+                    else:
+                        self.log.error(f"[{uid}]返回json错误:{response_json}")
+            else:
+                self.log.error(f"返回json解析不正确:{type(response_json)}")
+
+        original_context.add_user_message(prompt)
+        original_context.extend(
+            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+        )
+        
+        if response.reasoning_content:
+            self.log.info(f"[{uid}]推理内容:\n{"".join(response.reasoning_content)}")
+        
+        self.log.info(f"[{uid}]结束json处理!")
+        
+        if total_tokens := response.metadata.get("total_tokens"):
+            original_context.total_tokens = total_tokens#更新tiken计数
+        
+        if truncated_context := original_context.record_validity_check():
+            try:
+                if summarize_context := await self.memory_system.summarize_context(str(truncated_context)):
+                    original_context.messages.insert(
+                        0,
+                        {"role": "assistant", "content":  summarize_context[:3000]}#简单做一个限制让这个不要太长
+                    )
+                    self.log.info(f"[{uid}]聊天上下文总结完成{user_id}消息:{summarize_context}")
+                else:
+                    self.log.info(f"[{uid}]聊天上下文总结{user_id}消息为none")
+            except Exception as e:
+                self.log.exception(f"[{uid}]聊天上下文信息总结出现了错误:{e}")
+
     
     async def prompt_structure(
         self,
@@ -850,6 +972,15 @@ class PrivateChat(ChatBasics):
                     self.log.info(f"[{uid}]私聊上下文总结为none user:{user_id}")
             except Exception as e:
                 self.log.exception(f"[{uid}]私聊上下文信息总结出现了错误:{e}")
+
+    async def trigger_internal_thought(
+        self,
+        custom_prompt: str,
+        user_id: int,
+        group_id: int | None = None,
+    ) -> None:
+        """系统内部触发思考的入口"""
+        raise ValueError("未实现~")
 
     async def prompt_structure(
         self,

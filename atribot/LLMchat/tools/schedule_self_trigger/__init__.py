@@ -1,16 +1,15 @@
-import time
 from datetime import datetime
 from typing import Optional
 
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
-from atribot.core.type.chat_message_types import ChatMessage, TextSegment
+from atribot.core.type.chat_message_types import ChatMessage
 from atribot.LLMchat.chat import GroupChat
 
 tool_json = {
     "name": "schedule_self_trigger",
     "description": (
-        "定时自触发工具。可以在相对延迟或指定的目标日期时间后触发自己，并为届时的自己留下任务介绍"
+        "定时自触发工具。可以在相对延迟或指定的目标日期时间后触发自己，并为届时的自己留下任务介绍，"
         "触发时会以那句话作为输入启动一次新的群聊思考流程"
     ),
     "properties": {
@@ -44,45 +43,13 @@ tool_json = {
 }
 
 
-async def _trigger_self(group_id: int, note: str) -> None:
-    """定时触发时执行的协程，构造一条合成消息并调用 GroupChat.step()"""
-    config = container.get("config")
-    group_chat:GroupChat = container.get("GroupChat")
-    log = container.get("log")
-
-    bot_id: int = config.account.id
-
-    synthetic_message = ChatMessage(
-        self_id=bot_id,
-        user_id=bot_id,
+async def _trigger_self(group_id: int,user_id:int, note: str) -> None:
+    """定时触发时执行的协程"""
+    group_chat: GroupChat = container.get("GroupChat")
+    await group_chat.trigger_internal_thought(
+        user_id=user_id,
         group_id=group_id,
-        message_id=0,
-        time=int(time.time()),
-        raw_message=note,
-        user_cq_message = '',
-        primeval={},
-        llm_formatted_message=note,
-        pure_text=note,
-        segments=[TextSegment(note)],
-        sender_info={
-            "user_id": bot_id,
-            "nickname": config.account.name,
-            "card": "",
-            "role": "member",
-        },
-    )
-
-    prompt = (
-        "这是你之前给自己设置的定时提醒，以下内容是那时的你留给现在的你的话，"
-        "请基于这条提醒进行思考，决定是否发言或者执行某些操作"
-    )
-
-    log.info(f"定时自触发触发：群 {group_id}，备注：{note!r}")
-
-    await group_chat.step(
-        message=synthetic_message,
-        prompt=prompt,
-        group_id=group_id,
+        custom_prompt=note,
     )
 
 
@@ -112,7 +79,7 @@ async def main(
         func=_trigger_self,
         trigger_delta=total_seconds,
         timeout=120.0,
-        kwargs={"group_id": group_id, "note": note},
+        kwargs={"group_id": group_id, "user_id":message_data.user_id , "note": note},
         remarks=f"自触发 群{group_id}",
     )
 
