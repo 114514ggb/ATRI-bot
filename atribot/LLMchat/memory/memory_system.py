@@ -33,7 +33,13 @@ class memorySystem:
 
         self.retriever = MemoryRetriever(self.rag)
         """记忆检索器"""
-        self.extractor = MemoryExtractor(self.supplier, self.model, self.rag, self.retriever)
+        self.extractor = MemoryExtractor(
+            supplier = self.supplier, 
+            model_name = self.model, 
+            rag = self.rag, 
+            retriever = self.retriever,
+            request_concurrency_limit = 4
+        )
         """记忆提取与总结器"""
         self.consolidator = MemoryConsolidator(
             rag=self.rag,

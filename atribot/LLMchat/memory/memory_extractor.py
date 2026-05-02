@@ -23,13 +23,21 @@ from atribot.LLMchat.RAG.rag import RAGManager
 class MemoryExtractor:
     """记忆提取与总结器:对对话文本进行提炼、结构化和记忆归并决策"""
 
-    def __init__(self, supplier: universal_ai_api, model_name: str, rag: RAGManager, retriever: MemoryRetriever):
+    def __init__(
+        self,
+        supplier: universal_ai_api,
+        model_name: str,
+        rag: RAGManager,
+        retriever: MemoryRetriever,
+        request_concurrency_limit: int = 4,
+    ):
         self.logger: Logger = container.get("log")
         self.supplier = supplier
         self.model = model_name
         self.rag = rag
         self.vector_store = rag.vector_store
         self.retriever = retriever
+        self.request_semaphore = asyncio.Semaphore(request_concurrency_limit)
         
         
     async def extract_stored_message(self, messages:List[Dict[str,str]], user_id:int|str)->None:
@@ -449,7 +457,10 @@ class MemoryExtractor:
         
         for i in range(5):
             try:
-                assistant_content:str = (await self.supplier.generate_json_ample(self.model, parameters))['choices'][0]['message'].get('content')
+                async with self.request_semaphore:
+                    assistant_content:str = (
+                        await self.supplier.generate_json_ample(self.model, parameters)
+                    )['choices'][0]['message'].get('content')
             except Exception as e:
                 self.logger.error(f"第{i}次总结请求出错:{e}")
                 await asyncio.sleep(1)
