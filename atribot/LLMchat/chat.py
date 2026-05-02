@@ -380,6 +380,8 @@ class GroupChat(ChatBasics):
         
         if total_tokens := response.metadata.get("total_tokens"):
             original_context.total_tokens = total_tokens#更新tiken计数
+        else:
+            original_context.total_tokens = original_context.count_estimate_tokens()
         
         if truncated_context := original_context.record_validity_check():
             try:
@@ -492,7 +494,9 @@ class GroupChat(ChatBasics):
         
         if total_tokens := response.metadata.get("total_tokens"):
             original_context.total_tokens = total_tokens#更新tiken计数
-        
+        else:
+            original_context.total_tokens = original_context.count_estimate_tokens()
+            
         if truncated_context := original_context.record_validity_check():
             try:
                 if summarize_context := await self.memory_system.summarize_context(str(truncated_context)):
@@ -959,6 +963,8 @@ class PrivateChat(ChatBasics):
 
         if total_tokens := response.metadata.get("total_tokens"):
             original_context.total_tokens = total_tokens
+        else:
+            original_context.total_tokens = original_context.count_estimate_tokens()
 
         if truncated_context := original_context.record_validity_check():
             try:

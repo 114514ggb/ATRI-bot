@@ -123,6 +123,8 @@ class MessageBuilder:
     def system(cls) -> "MessageBuilder":
         return cls("system")
 
+IMAGE_TOKEN_ESTIMATE = 765
+AUDIO_TOKEN_ESTIMATE = 500
 
 @dataclass(slots=True)
 class Context():
@@ -292,7 +294,8 @@ class Context():
             list: 被截取掉的消息列表,如果有的话
         """
 
-        if sum(1 for msg in self.messages if msg["role"] == "user") > self.user_max_record or self.total_tokens > self.user_max_token:
+        if sum(1 for msg in self.messages if msg["role"] == "user") > self.user_max_record \
+        or self.total_tokens > self.user_max_token:
             # 先截取到总长度为 user_max_record
             kept_messages = self.messages[-self.user_max_record:]
 
@@ -319,24 +322,18 @@ class Context():
 
         return None
 
-    def _estimate_string_tokens(self, text: str) -> float:
+    def _estimate_tokens(self, text: str) -> int:
         """
-        辅助方法：估算纯文本的 Token 数
-        利用 UTF-8 字节长度快速区分 ASCII (英文/数字) 和 非ASCII (中文)
+        估算纯文本的 Token 数
+        中文字符权值 0.6,其余 0.3
         """
         if not text:
             return 0
+        chinese_count = len([c for c in text if "\u4e00" <= c <= "\u9fff"])
+        other_count = len(text) - chinese_count
+        return int(chinese_count * 0.6 + other_count * 0.3)
 
-        length = len(text)
-        # ASCII占1byte，常用汉字占3bytes
-        # 通过字节差值估算非ASCII字符数量
-
-        non_ascii_count = (len(text.encode('utf-8')) - length) // 2
-        ascii_count = length - non_ascii_count
-
-        return (ascii_count * 0.25) + (non_ascii_count * 0.7)
-
-    def get_context_forecast_token(self) -> int:
+    def count_estimate_tokens(self) -> int:
         """
         获取上下文 Token 估算值 (保守估计，区分中英文)
         """
@@ -349,17 +346,19 @@ class Context():
             content = msg.get("content")
             if content:
                 if isinstance(content, str):
-                    total_tokens += self._estimate_string_tokens(content)
+                    total_tokens += self._estimate_tokens(content)
                 elif isinstance(content, list):
                     for item in content:
                         item: Dict
                         if item.get("type") == "text":
-                            total_tokens += self._estimate_string_tokens(item.get("text", ""))
+                            total_tokens += self._estimate_tokens(item.get("text", ""))
                         elif item.get("type") == "image_url":
-                            total_tokens += 1000
+                            total_tokens += IMAGE_TOKEN_ESTIMATE
+                        elif item.get("type") == "input_audio":
+                            total_tokens += AUDIO_TOKEN_ESTIMATE
 
             if "tool_calls" in msg and msg["tool_calls"]:
-                total_tokens += self._estimate_string_tokens(str(msg["tool_calls"]))
+                total_tokens += self._estimate_tokens(str(msg["tool_calls"]))
 
         return int(total_tokens)
 
@@ -492,28 +491,31 @@ class ContextDeque:
             "content": content
         })
 
-    def _estimate_string_tokens(self, text: str) -> float:
+    def _estimate_tokens(self, text: str) -> int:
         if not text:
             return 0
-        length = len(text)
-        non_ascii_count = (len(text.encode('utf-8')) - length) // 2
-        ascii_count = length - non_ascii_count
-        return (ascii_count * 0.25) + (non_ascii_count * 0.7)
+        chinese_count = len([c for c in text if "\u4e00" <= c <= "\u9fff"])
+        other_count = len(text) - chinese_count
+        return int(chinese_count * 0.6 + other_count * 0.3)
 
-    def get_context_forecast_token(self) -> int:
+    def count_estimate_tokens(self) -> int:
         total_tokens = 0
+        
         for msg in self.messages:
             total_tokens += 5
-            content = msg.get("content")
-            if content:
+            if content := msg.get("content"):
                 if isinstance(content, str):
-                    total_tokens += self._estimate_string_tokens(content)
+                    total_tokens += self._estimate_tokens(content)
                 elif isinstance(content, list):
                     for item in content:
                         if item.get("type") == "text":
-                            total_tokens += self._estimate_string_tokens(item.get("text", ""))
+                            total_tokens += self._estimate_tokens(item.get("text", ""))
                         elif item.get("type") == "image_url":
-                            total_tokens += 1000
+                            total_tokens += IMAGE_TOKEN_ESTIMATE
+                        elif item.get("type") == "input_audio":
+                            total_tokens += AUDIO_TOKEN_ESTIMATE
+                            
             if "tool_calls" in msg and msg["tool_calls"]:
-                total_tokens += self._estimate_string_tokens(str(msg["tool_calls"]))
-        return int(total_tokens)
+                total_tokens += self._estimate_tokens(str(msg["tool_calls"]))
+                
+        return total_tokens
