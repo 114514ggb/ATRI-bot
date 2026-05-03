@@ -1,4 +1,5 @@
 import random
+import re
 from enum import Enum
 from logging import Logger
 from typing import Callable, Dict, List, Optional, Tuple
@@ -192,11 +193,18 @@ class EventTrigger:
         }
         """白名单群key:群号 value:请求加群的验证信息"""
         group_id = message.group_id
+        comment = data.get('comment', '')
         
-        if group_id in white_list_gropup and data['comment'] in white_list_gropup[group_id]:
+        # 拦截包含特定关键词的申请自动拒绝
+        if match:= re.search(r"学习|交流|同意", comment):
+            await self.send_message.set_group_add_request(data['flag'], False)
+            await self.send_message.send_group_msg(group_id, f"已自动拒绝可疑加群请求！匹配到关键词：{match.group()}\n验证信息:\n{comment}")
+            return True
+        
+        if group_id in white_list_gropup and comment in white_list_gropup[group_id]:
             await self.send_message.set_group_add_request(data['flag'], True)
         else:
-            await self.send_message.send_group_msg(group_id, f"有人申请加群了!\n验证信息:\n{data['comment']}")
+            await self.send_message.send_group_msg(group_id, f"有人申请加群了!\n验证信息:\n{comment}")
         return True
 
 
