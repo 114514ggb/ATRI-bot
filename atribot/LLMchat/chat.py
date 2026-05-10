@@ -56,9 +56,9 @@ IMAGE_EXTENSIONS = {
 
 
 MESSAGE_DELAY = 1.5  # 多条消息间隔时间
-MAX_SINGLE_MESSAGE_LENGTH = 5  # 分条发送长度阈值
+MAX_SINGLE_MESSAGE_LENGTH = 4  # 分条发送长度阈值
 LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
-STRING_LENGTH_LIMIT = 120 #字符串长度限制
+STRING_LENGTH_LIMIT = 500 #字符串长度限制
 
 class ChatBasics(ABC):
     """聊天基类"""
