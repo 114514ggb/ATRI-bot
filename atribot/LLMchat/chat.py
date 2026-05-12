@@ -37,6 +37,7 @@ from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.skills.skills_manager import SkillsManager
+from atribot.LLMchat.token_manage import TokenManager
 
 TEXT_EXTENSIONS = {
     # 纯文本
@@ -67,7 +68,8 @@ class ChatBasics(ABC):
         self.model_api_supervisor: LLMCoordinator = container.get("LLMSupervisor")
         self.media_processor: MediaProcessor = container.get("MediaProcessor")
         self.supplier: LLMConnectionManager = container.get("LLMSupplier")
-        self.memory_system: memorySystem = container.get("memorySystem")       
+        self.memory_system: memorySystem = container.get("memorySystem")   
+        self.token_manager:TokenManager = container.get("TokenManager")    
         self.send_message: QQAPIClient = container.get("SendMessage")
         self.chat_manager: ChatManager = container.get("ChatManager")
         self.skills:SkillsManager = container.get("SkillsManager")
@@ -380,6 +382,17 @@ class GroupChat(ChatBasics):
         
         if total_tokens := response.metadata.get("total_tokens"):
             original_context.total_tokens = total_tokens#更新tiken计数
+            try:
+                await self.token_manager.record_token_usage(
+                    user_id=message.user_id,
+                    group_id=message.group_id,
+                    prompt_tokens=response.metadata.get("prompt_tokens", 0),
+                    completion_tokens=response.metadata.get("completion_tokens", 0),
+                    total_tokens=total_tokens,
+                    model_name=response.model
+                )
+            except Exception as e:
+                self.log.error(f"[{uid}]记录token使用失败: {e}")
         else:
             original_context.total_tokens = original_context.count_estimate_tokens()
         
@@ -494,6 +507,17 @@ class GroupChat(ChatBasics):
         
         if total_tokens := response.metadata.get("total_tokens"):
             original_context.total_tokens = total_tokens#更新tiken计数
+            try:
+                await self.token_manager.record_token_usage(
+                    user_id=message.user_id,
+                    group_id=message.group_id,
+                    prompt_tokens=response.metadata.get("prompt_tokens", 0),
+                    completion_tokens=response.metadata.get("completion_tokens", 0),
+                    total_tokens=total_tokens,
+                    model_name=response.model
+                )
+            except Exception as e:
+                self.log.error(f"[{uid}]记录token使用失败: {e}")
         else:
             original_context.total_tokens = original_context.count_estimate_tokens()
             
@@ -963,6 +987,17 @@ class PrivateChat(ChatBasics):
 
         if total_tokens := response.metadata.get("total_tokens"):
             original_context.total_tokens = total_tokens
+            try:
+                await self.token_manager.record_token_usage(
+                    user_id=message.user_id,
+                    group_id=message.group_id,
+                    prompt_tokens=response.metadata.get("prompt_tokens", 0),
+                    completion_tokens=response.metadata.get("completion_tokens", 0),
+                    total_tokens=total_tokens,
+                    model_name=response.model
+                )
+            except Exception as e:
+                self.log.error(f"[{uid}]记录token使用失败: {e}")
         else:
             original_context.total_tokens = original_context.count_estimate_tokens()
 

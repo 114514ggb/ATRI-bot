@@ -17,7 +17,9 @@ from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 @dataclass(slots=True)
 class GenerationResponse():
     """响应后再更新状态"""
-    
+
+    model: str
+    """响应模型名称"""
     messages: List[Dict[str, Any]] = field(default_factory=list)
     """新增上下文"""
     reply_text: List[str] = field(default_factory=list)
@@ -25,7 +27,16 @@ class GenerationResponse():
     reasoning_content: List[str] = field(default_factory=list)
     """未合并的推理模型的思考过程"""
     metadata: Dict[str, Any] = field(default_factory=dict)
-    """可选的额外数据"""
+    """可选的额外数据,如果有值可能包含:
+        {
+            'prompt_tokens': 358,
+            'completion_tokens': 78,
+            'total_tokens': 436,
+            'prompt_tokens_details': {'cached_tokens': 320},
+            'prompt_cache_hit_tokens': 320,
+            'prompt_cache_miss_tokens': 38
+        }
+    """
     
     
 @dataclass(slots=True)
@@ -290,6 +301,7 @@ class LLMCoordinator():
         
         return self._update_response(
             GenerationResponse(
+                model = request.model,
                 messages = increase_context.messages,
                 metadata = api_reply.get("usage", {})
             ),
@@ -319,7 +331,7 @@ class LLMCoordinator():
         """
         self.logger.debug("模型进入工具调用!")
         
-        response = request.generation_response or GenerationResponse()
+        response = request.generation_response or GenerationResponse(model = request.model)
         
         for _ in range(10):#防止无限循环调用
             

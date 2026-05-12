@@ -180,6 +180,24 @@ CREATE TABLE IF NOT EXISTS chat_context (
         ON DELETE CASCADE ON UPDATE CASCADE  
 );
 
+-- ============================================================================
+-- token 消耗统计表
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS token_statistics (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT,
+    group_id BIGINT,
+    model VARCHAR(255),
+    prompt_tokens INT DEFAULT 0,
+    completion_tokens INT DEFAULT 0,
+    total_tokens INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES user_group(group_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 /* ==========================================================================
    4. 索引定义 (Indexes)
    ========================================================================== */
@@ -225,7 +243,10 @@ CREATE INDEX IF NOT EXISTS idx_chat_context_user_id
 CREATE INDEX IF NOT EXISTS idx_chat_context_group_id 
     ON chat_context(group_id) 
     WHERE group_id IS NOT NULL;
-    
+ 
+CREATE INDEX IF NOT EXISTS idx_token_statistics_user_id ON token_statistics(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_token_statistics_group_id ON token_statistics(group_id) WHERE group_id IS NOT NULL;
+
 /* ==========================================================================
    5. 触发器定义 (Triggers)
    ========================================================================== */

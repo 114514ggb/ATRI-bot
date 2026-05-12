@@ -77,7 +77,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     # proxy='http://127.0.0.1:7890' # 代理
                 ) as response:
                     try:
-                        # self.log.debug(await response.text()) # 调试用
+                        self.log.debug(await response.text()) # 调试用
                         response_json: Dict = await response.json()
                     except aiohttp.ContentTypeError:
                         # 处理返回头不是 application/json 但内容是 json 的情况

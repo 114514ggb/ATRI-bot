@@ -117,6 +117,21 @@ CREATE TABLE chat_context (
         ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+CREATE TABLE token_statistics (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT,
+    group_id BIGINT,
+    model VARCHAR(255),
+    prompt_tokens INT DEFAULT 0,
+    completion_tokens INT DEFAULT 0,
+    total_tokens INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES user_group(group_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE atri_memory (
     memory_id BIGSERIAL PRIMARY KEY,
     user_id BIGINT,
@@ -144,6 +159,8 @@ CREATE INDEX idx_message_user_time ON message(user_id, time DESC);
 CREATE INDEX idx_atri_memory_user_time ON atri_memory (user_id, event_time);
 CREATE INDEX IF NOT EXISTS idx_chat_context_user_id ON chat_context(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_chat_context_group_id ON chat_context(group_id) WHERE group_id IS NOT NULL;
+CREATE INDEX idx_token_statistics_user_id ON token_statistics(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_token_statistics_group_id ON token_statistics(group_id) WHERE group_id IS NOT NULL;
 CREATE INDEX idx_atri_memory_vector
 ON atri_memory
 USING hnsw (event_vector vector_cosine_ops)
@@ -211,4 +228,5 @@ ALTER TABLE permissions OWNER TO ${ATRI_DB_APP_USER};
 ALTER TABLE message OWNER TO ${ATRI_DB_APP_USER};
 ALTER TABLE atri_memory OWNER TO ${ATRI_DB_APP_USER};
 ALTER TABLE chat_context OWNER TO ${ATRI_DB_APP_USER};
+ALTER TABLE token_statistics OWNER TO ${ATRI_DB_APP_USER};
 EOSQL

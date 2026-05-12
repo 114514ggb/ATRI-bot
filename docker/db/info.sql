@@ -109,6 +109,24 @@ CREATE TABLE chat_context (
         ON DELETE CASCADE ON UPDATE CASCADE
 );
 
+CREATE TABLE token_statistics (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT,
+    group_id BIGINT,
+    model VARCHAR(255),
+    prompt_tokens INT DEFAULT 0,
+    completion_tokens INT DEFAULT 0,
+    total_tokens INT DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id)
+        ON DELETE CASCADE ON UPDATE CASCADE,
+    FOREIGN KEY (group_id) REFERENCES user_group(group_id)
+        ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE INDEX idx_token_statistics_user_id ON token_statistics(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_token_statistics_group_id ON token_statistics(group_id) WHERE group_id IS NOT NULL;
+
 CREATE INDEX idx_message_user_time ON message(user_id, time DESC);
 CREATE INDEX idx_atri_memory_user_time ON atri_memory (user_id, event_time);
 CREATE INDEX idx_atri_memory_vector
@@ -162,16 +180,16 @@ COMMENT ON TABLE user_info IS '用户画像表';
 COMMENT ON TABLE permissions IS '权限控制表';
 COMMENT ON TABLE message IS '接收过的聊天记录消息表';
 COMMENT ON TABLE chat_context IS '聊天的上下文缓存表';
-COMMENT ON TABLE atri_memory IS '记忆表：存储用户记忆、群聊话题及知识库条目,支持向量检索与全文检索';
+COMMENT ON TABLE atri_memory IS '记忆表：存储用户记忆、群聊话题及知识库条目，支持向量检索与全文检索';
 
 COMMENT ON COLUMN atri_memory.user_id IS 'NULL=知识库条目；有值=用户相关记忆';
 COMMENT ON COLUMN atri_memory.group_id IS 'NULL=私聊或知识库；正整数=群聊ID';
-COMMENT ON COLUMN atri_memory.event_time IS '记忆对应的事件发生时间,Unix时间戳,秒';
-COMMENT ON COLUMN atri_memory.created_at IS '记忆写入数据库的时间,Unix时间戳,秒';
-COMMENT ON COLUMN atri_memory.last_accessed IS '最后一次被检索命中的时间,Unix时间戳,秒';
-COMMENT ON COLUMN atri_memory.importance IS '重要度1~10';
-COMMENT ON COLUMN atri_memory.credibility IS '可信度1~10';
-COMMENT ON COLUMN atri_memory.access_count IS '检索命中次数';
+COMMENT ON COLUMN atri_memory.event_time IS '记忆对应的事件发生时间，Unix时间戳（秒）';
+COMMENT ON COLUMN atri_memory.created_at IS '记忆写入数据库的时间，Unix时间戳（秒）';
+COMMENT ON COLUMN atri_memory.last_accessed IS '最后一次被检索命中的时间，Unix时间戳（秒）';
+COMMENT ON COLUMN atri_memory.importance IS '重要度1~10：1~3日常闲聊；4~6有价值信息；7~9重要个人信息；10极其重要';
+COMMENT ON COLUMN atri_memory.credibility IS '可信度1~10：取代source字段，综合表达信息的可靠程度';
+COMMENT ON COLUMN atri_memory.access_count IS '检索命中次数，高频记忆可在排序时获得额外加权';
 
 ALTER TABLE user_group OWNER TO atri;
 ALTER TABLE users OWNER TO atri;
@@ -180,3 +198,4 @@ ALTER TABLE permissions OWNER TO atri;
 ALTER TABLE message OWNER TO atri;
 ALTER TABLE atri_memory OWNER TO atri;
 ALTER TABLE chat_context OWNER TO atri;
+ALTER TABLE token_statistics OWNER TO atri;

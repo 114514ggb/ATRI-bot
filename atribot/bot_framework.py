@@ -32,6 +32,7 @@ from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 from atribot.LLMchat.skills.skills_manager import SkillsManager
+from atribot.LLMchat.token_manage import TokenManager
 
 
 class BotFramework:
@@ -95,6 +96,12 @@ class BotFramework:
             "database",
             database,
             cleanup=database.close_pool
+        )
+        
+        #token统计的
+        container.register(
+            "TokenManager",
+            TokenManager()
         )
         
         #模型供应商

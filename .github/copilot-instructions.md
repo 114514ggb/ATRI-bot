@@ -34,7 +34,7 @@
 ## 消息类型系统
 
 ### ChatMessage 对象
-处理函数的**第一个参数固定为** `message_data: ChatMessage`（`atribot/core/type/chat_message_type.py`）：
+处理函数的**第一个参数固定为** `message_data: ChatMessage`（`atribot/core/type/chat_message_types.py`）：
 ```python
 @dataclass
 class ChatMessage:
@@ -94,7 +94,7 @@ msg = (MessageBuilder()
 
 ```python
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_type import ChatMessage
+from atribot.core.type.chat_message_types import ChatMessage
 
 cmd_system = container.get("CommandSystem")
 send_message = container.get("SendMessage")
