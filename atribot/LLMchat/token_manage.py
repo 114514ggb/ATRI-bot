@@ -24,13 +24,14 @@ class TokenManager:
     ) -> bool:
         """记录 Token 使用量统计"""
         try:
-            await self.db.execute_with_pool(
-                """
-                INSERT INTO token_statistics (user_id, group_id, model, prompt_tokens, completion_tokens, total_tokens)
-                VALUES ($1, $2, $3, $4, $5, $6)
-                """,
-                (user_id, group_id, model_name, prompt_tokens, completion_tokens, total_tokens)
-            )
+            async with self.db as db:
+                await db.execute_with_pool(
+                    """
+                    INSERT INTO token_statistics (user_id, group_id, model, prompt_tokens, completion_tokens, total_tokens)
+                    VALUES ($1, $2, $3, $4, $5, $6)
+                    """,
+                    (user_id, group_id, model_name, prompt_tokens, completion_tokens, total_tokens)
+                )
             return True
         except Exception as e:
             self.log.error(f"记录 token 消耗统计失败: {e}\n{traceback.format_exc()}")
@@ -47,8 +48,8 @@ class TokenManager:
             if group_id is not None:
                 params.append(group_id)
                 query += f" AND group_id = ${len(params)}"
-                
-            row = await self.db.execute_with_pool(query, tuple(params), fetch_type="one")
+            async with self.db as db:    
+                row = await db.execute_with_pool(query, tuple(params), fetch_type="one")
             
             return {
                 "prompt_tokens": row["prompt_tokens"] if row and row["prompt_tokens"] else 0,
@@ -100,7 +101,8 @@ class TokenManager:
             
             query += " GROUP BY DATE(created_at) ORDER BY DATE(created_at) ASC"
             
-            rows = await self.db.execute_with_pool(query, tuple(params), fetch_type="all")
+            async with self.db as db:
+                rows = await db.execute_with_pool(query, tuple(params), fetch_type="all")
             return rows if rows else []
         except Exception as e:
             self.log.error(f"获取按日 token 消耗明细失败: {e}\n{traceback.format_exc()}")
@@ -123,8 +125,8 @@ class TokenManager:
                 query += f" AND group_id = ${len(params)}"
             
             query += " GROUP BY model ORDER BY SUM(total_tokens) DESC"
-            
-            rows = await self.db.execute_with_pool(query, tuple(params), fetch_type="all")
+            async with self.db as db:
+                rows = await db.execute_with_pool(query, tuple(params), fetch_type="all")
             return rows if rows else []
         except Exception as e:
             self.log.error(f"获取按模型 token 消耗明细失败: {e}\n{traceback.format_exc()}")
