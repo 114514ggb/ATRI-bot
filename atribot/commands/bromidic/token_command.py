@@ -1,4 +1,5 @@
 import traceback
+from logging import Logger
 
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
@@ -8,7 +9,7 @@ from atribot.LLMchat.token_manage import TokenManager
 
 cmd_system: CommandSystem = container.get("CommandSystem")
 send_message: QQAPIClient = container.get("SendMessage")
-log = container.get("log")
+log:Logger = container.get("log")
 token_manager:TokenManager = container.get("TokenManager")
 
 
@@ -68,9 +69,11 @@ async def main(message_data: ChatMessage, group: int | None, user: int | None) -
             reply += "[近7天模型消耗分布]\n- 无记录"
 
         if message_data.group_id:
-            await send_message.send_group_msg(message_data.group_id, reply)
+            await send_message.send_group_merge_forward(
+                message_data.group_id,
+                reply,
+                source= "查询token统计"
+            )
 
     except Exception as e:
         log.error(f"查询Token消耗失败: {e}\n{traceback.format_exc()}")
-        if message_data.group_id:
-            await send_message.send_group_msg(message_data.group_id, "查询Token时遇到了一点小问题")

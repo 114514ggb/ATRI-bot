@@ -71,8 +71,9 @@ class TokenManager:
             if group_id is not None:
                 params.append(group_id)
                 query += f" AND group_id = ${len(params)}"
-                
-            row = await self.db.execute_with_pool(query, tuple(params), fetch_type="one")
+
+            async with self.db as db:
+                row = await db.execute_with_pool(query, tuple(params), fetch_type="one")
             
             return {
                 "prompt_tokens": row["prompt_tokens"] if row and row["prompt_tokens"] else 0,

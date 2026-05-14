@@ -1,4 +1,4 @@
-import asyncio
+# import asyncio
 import re
 
 from bilibili_api import Credential, video
@@ -500,5 +500,5 @@ async def main() -> None:
     
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+# if __name__ == "__main__":
+#     asyncio.run(main())
