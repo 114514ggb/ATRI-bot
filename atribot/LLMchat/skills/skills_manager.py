@@ -24,9 +24,9 @@ class SkillsManager:
         self.log.info("正在初始化SkillsManager!")
         self.skills_dict = {}
         self.prompt = ""
-        self.initialize(skill_dir)
+        self.initialize_skills(skill_dir)
 
-    def initialize(self, skill_dir: str):
+    def initialize_skills(self, skill_dir: str):
         """加载一个目录下的skills
         
         流程:

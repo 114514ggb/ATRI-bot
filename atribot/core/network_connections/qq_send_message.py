@@ -93,7 +93,7 @@ class QQAPIClient():
             return None
             
         except Exception as e:
-            self.logger.error("WC发送请求失败:", e)
+            self.logger.error("WC发送请求失败: %s", e)
     
     async def async_send(self, url, payload, echo = False)->dict|None:
         """通用的发送异步请求,返回json"""
@@ -698,6 +698,8 @@ class QQAPIClient():
         Returns:
             Callable[..., CoroutineType[Any, Any, dict | None]]发送异步请求的函数
         """
+        if item in ["cleanup", "initialize"] or item.startswith("_"):
+            raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
         return lambda echo = False,**kwargs : self.async_send(
             url=item, 
             payload={k: v for k, v in kwargs.items() if v is not None},

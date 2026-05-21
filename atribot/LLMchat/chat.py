@@ -8,9 +8,9 @@ from logging import Logger
 from typing import Coroutine, Dict, List
 
 from atribot.common_utils import download_text, extract_json_from_text, url_to_audio_base64, url_to_base64
+from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import (
     ChatMessage,
     FileMessageSegment,
@@ -64,21 +64,37 @@ STRING_LENGTH_LIMIT = 500 #字符串长度限制
 class ChatBasics(ABC):
     """聊天基类"""
 
-    def __init__(self):
-        self.model_api_supervisor: LLMCoordinator = container.get("LLMSupervisor")
-        self.media_processor: MediaProcessor = container.get("MediaProcessor")
-        self.supplier: LLMConnectionManager = container.get("LLMSupplier")
-        self.memory_system: memorySystem = container.get("memorySystem")   
-        self.token_manager:TokenManager = container.get("TokenManager")    
-        self.send_message: QQAPIClient = container.get("SendMessage")
-        self.chat_manager: ChatManager = container.get("ChatManager")
-        self.skills:SkillsManager = container.get("SkillsManager")
-        self.user_system: UserSystem = container.get("UserSystem")
-        self.emoji_core: EmojiCore = container.get("EmojiCore")
-        self.mcp_tool: FuncCall = container.get("MCP")
-        self.tool_calls:tool_calls = container.get("ToolCalls")
-        self.config = container.get("config")
-        self.log: Logger = container.get("log")
+    def __init__(
+        self,
+        llm_supervisor: LLMCoordinator,
+        media_processor: MediaProcessor,
+        llm_supplier: LLMConnectionManager,
+        memory_system: memorySystem,
+        token_manager: TokenManager,
+        send_message: QQAPIClient,
+        chat_manager: ChatManager,
+        skills_manager: SkillsManager,
+        user_system: UserSystem,
+        emoji_core: EmojiCore,
+        mcp: FuncCall,
+        tool_calls_mgr: tool_calls,
+        config: atriConfig,
+        log: Logger,
+    ):
+        self.model_api_supervisor: LLMCoordinator = llm_supervisor
+        self.media_processor: MediaProcessor = media_processor
+        self.supplier: LLMConnectionManager = llm_supplier
+        self.memory_system: memorySystem = memory_system
+        self.token_manager: TokenManager = token_manager
+        self.send_message: QQAPIClient = send_message
+        self.chat_manager: ChatManager = chat_manager
+        self.skills: SkillsManager = skills_manager
+        self.user_system: UserSystem = user_system
+        self.emoji_core: EmojiCore = emoji_core
+        self.mcp_tool: FuncCall = mcp
+        self.tool_calls: tool_calls = tool_calls_mgr
+        self.config: atriConfig = config
+        self.log: Logger = log
         self.build_prompt = build_prompt()
 
     @abstractmethod
@@ -247,8 +263,39 @@ class ChatBasics(ABC):
 class GroupChat(ChatBasics):
     """处理群聊天"""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+        llm_supervisor: LLMCoordinator,
+        media_processor: MediaProcessor,
+        llm_supplier: LLMConnectionManager,
+        memory_system: memorySystem,
+        token_manager: TokenManager,
+        send_message: QQAPIClient,
+        chat_manager: ChatManager,
+        skills_manager: SkillsManager,
+        user_system: UserSystem,
+        emoji_core: EmojiCore,
+        mcp: FuncCall,
+        tool_calls_mgr: tool_calls,
+        config: atriConfig,
+        log: Logger,
+    ):
+        super().__init__(
+            llm_supervisor=llm_supervisor,
+            media_processor=media_processor,
+            llm_supplier=llm_supplier,
+            memory_system=memory_system,
+            token_manager=token_manager,
+            send_message=send_message,
+            chat_manager=chat_manager,
+            skills_manager=skills_manager,
+            user_system=user_system,
+            emoji_core=emoji_core,
+            mcp=mcp,
+            tool_calls_mgr=tool_calls_mgr,
+            config=config,
+            log=log,
+        )
         model_supplier = self.supplier.connections[
             self.config.model.connect.supplier
         ]
@@ -896,8 +943,39 @@ class GroupChat(ChatBasics):
 class PrivateChat(ChatBasics):
     """处理私聊天"""
 
-    def __init__(self):
-        super().__init__()
+    def __init__(
+        self,
+        llm_supervisor: LLMCoordinator,
+        media_processor: MediaProcessor,
+        llm_supplier: LLMConnectionManager,
+        memory_system: memorySystem,
+        token_manager: TokenManager,
+        send_message: QQAPIClient,
+        chat_manager: ChatManager,
+        skills_manager: SkillsManager,
+        user_system: UserSystem,
+        emoji_core: EmojiCore,
+        mcp: FuncCall,
+        tool_calls_mgr: tool_calls,
+        config: atriConfig,
+        log: Logger,
+    ):
+        super().__init__(
+            llm_supervisor=llm_supervisor,
+            media_processor=media_processor,
+            llm_supplier=llm_supplier,
+            memory_system=memory_system,
+            token_manager=token_manager,
+            send_message=send_message,
+            chat_manager=chat_manager,
+            skills_manager=skills_manager,
+            user_system=user_system,
+            emoji_core=emoji_core,
+            mcp=mcp,
+            tool_calls_mgr=tool_calls_mgr,
+            config=config,
+            log=log,
+        )
 
         model_supplier = self.supplier.connections[
             self.config.model.connect.supplier

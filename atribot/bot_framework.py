@@ -59,119 +59,82 @@ class BotFramework:
     
     async def initialize(self):
         """初始化"""
-        #配置参数
         self.config = atriConfig()
-        container.register("config",self.config)
+        container.register("config", self.config)
+        container.register_class(atriConfig)
+        container.register_class(HTTPClient)
+        container.register_class(TimeTriggerSupervisor)
+        container.register_class(TokenManager)
+        container.register_class(memorySystem)
+        container.register_class(UserSystem)
+        container.register_class(EventTrigger)
+        container.register_class(CommandSystem)
+        container.register_class(MediaProcessor)
+        container.register_class(LLMCoordinator)
+        container.register_class(GroupChat)
+        container.register_class(PrivateChat)
 
-        #统一HTTP客户端
-        http_client = HTTPClient()
-        container.register("HTTPClient", http_client, cleanup=http_client.close)
+        async def db_factory(config: atriConfig) -> AsyncPostgreSQL:
+            return await AsyncPostgreSQL.create(
+                host=config.database.host, 
+                user=config.database.user,
+                port=config.database.port,
+                password=config.database.password
+            )
+        container.register_factory(AsyncPostgreSQL, db_factory, name="database")
 
-        # 时间触发器,后面服务会依赖就只能放最前面了
-        TriggerSupervisor = TimeTriggerSupervisor()
-        container.register(
-            "TimeTriggerSupervisor",
-            TriggerSupervisor,
-            cleanup=TriggerSupervisor.stop
-        )
-        
-        #MCP
-        mcp_server = FuncCall(self.config.file_path.mcp_config)
-        self.create_background_task(mcp_server.mcp_service_selector())#放到后台不等待
-        mcp_server.mcp_service_queue.put_nowait({"type": "init"})#初始化
-        container.register(
-            "MCP",
-            mcp_server,
-            cleanup=mcp_server.terminate
-        )
-        
-        #数据库
-        database = await AsyncPostgreSQL.create(
-            host = self.config.database.host, 
-            user = self.config.database.user,
-            port = self.config.database.port,
-            password = self.config.database.password
-        )
-        container.register(
-            "database",
-            database,
-            cleanup=database.close_pool
-        )
-        
-        #token统计的
-        container.register(
-            "TokenManager",
-            TokenManager()
-        )
-        
-        #模型供应商
-        LLMSupplier = LLMConnectionManager()
-        await LLMSupplier.initialize_connections(self.config.file_path.supplier_config_path)
-        container.register(
-            "LLMSupplier",
-            LLMSupplier,
-            cleanup=LLMSupplier.close
-        )
-        
-        #Skills的管理
-        container.register(
-            "SkillsManager",
-            SkillsManager(skill_dir=self.config.file_path.agent_skills)
-        )
-        
-        #ai使用的沙盒
-        try:
-            sand_box:SandBoxBase = DockerSandbox(
-                config = self.config.sand_box
-            )
-            await sand_box.start()
-            container.register(
-                "SandBox",
-                sand_box,
-                cleanup=sand_box.stop
-            )
-        except Exception as e:
-            self.logger.exception(f"LLM使用的使用的沙盒初始化失败{e}")
-        
-        #向量数据库实现的记忆系统
-        container.register(
-            "memorySystem",    
-            memorySystem()
-        )
-        
-        #用户信息系统
-        container.register(
-            "UserSystem",    
-            UserSystem()
-        )
-        
-        #群类管理什么的
-        container.register(
-            "ChatManager",
-            ChatManager(
-                default_play_role = self.config.ai_chat.playRole,
-                group_messages_max_limit = self.config.ai_chat.group_max_record,
-                private_messages_max_limit = self.config.ai_chat.private_max_record,
-                group_LLM_max_limit = self.config.ai_chat.ai_max_record,
-                character_folder = self.config.file_path.chat_manager,
-                initiative_white_list = self.config.group_initiative_chat_white_list,
-                information_extraction = self.config.group_information_extraction,
-            )
-        )
-        
-        container.register(
-            "EmojiCore",
-            EmojiCore(folder_path = self.config.file_path.emoji)
-        )
+        def mcp_factory(config: atriConfig) -> FuncCall:
+            mcp_server = FuncCall(config.file_path.mcp_config)
+            self.create_background_task(mcp_server.mcp_service_selector())
+            mcp_server.mcp_service_queue.put_nowait({"type": "init"})
+            return mcp_server
+        container.register_factory(FuncCall, mcp_factory, name="MCP")
 
-        #权限
-        container.register(
-            "PermissionsManagement",
-            await PermissionsManagement.create()
-        )
-        
-        #启动时间触发器的主循环
-        await TriggerSupervisor.start()
+        async def llm_factory(config: atriConfig) -> LLMConnectionManager:
+            llm = LLMConnectionManager()
+            await llm.initialize_connections(config.file_path.supplier_config_path)
+            return llm
+        container.register_factory(LLMConnectionManager, llm_factory, name="LLMSupplier")
+
+        def skills_factory(config: atriConfig) -> SkillsManager:
+            return SkillsManager(skill_dir=config.file_path.agent_skills)
+        container.register_factory(SkillsManager, skills_factory)
+
+        def emoji_factory(config: atriConfig) -> EmojiCore:
+            return EmojiCore(folder_path=config.file_path.emoji)
+        container.register_factory(EmojiCore, emoji_factory)
+
+        def chat_factory(config: atriConfig, time_trigger: TimeTriggerSupervisor, log: Logger) -> ChatManager:
+            return ChatManager(
+                log=log,
+                time_trigger=time_trigger,
+                default_play_role=config.ai_chat.playRole,
+                group_messages_max_limit=config.ai_chat.group_max_record,
+                private_messages_max_limit=config.ai_chat.private_max_record,
+                group_LLM_max_limit=config.ai_chat.ai_max_record,
+                character_folder=config.file_path.chat_manager,
+                initiative_white_list=config.group_initiative_chat_white_list,
+                information_extraction=config.group_information_extraction,
+            )
+        container.register_factory(ChatManager, chat_factory)
+
+        async def perm_factory() -> PermissionsManagement:
+            return await PermissionsManagement.create()
+        container.register_factory(PermissionsManagement, perm_factory)
+
+        def send_message_factory(config: atriConfig) -> QQAPIClient:
+            return QQAPIClient(
+                token=config.network.access_token,
+                http_base_url=config.network.url,
+                connection_type=config.network.connection_type,
+            )
+        container.register_factory(QQAPIClient, send_message_factory, name="SendMessage")
+
+        def tool_calls_factory(config: atriConfig) -> tool_calls:
+            tool_calls_instance = tool_calls(config.file_path.tool_calls)
+            tool_calls_instance.load_presets_from_config(config.tool_presets)
+            return tool_calls_instance
+        container.register_factory(tool_calls, tool_calls_factory, name="ToolCalls")
 
         server_type: str = self.config.network.connection_type
         if server_type == "WebSocket_server":
@@ -190,49 +153,37 @@ class BotFramework:
         elif server_type != "http":
             raise ValueError(f"不支持的连接类型: {server_type}")
 
-        self._init_messaging_services()
+        # ai使用的沙盒 (可选)
+        try:
+            sand_box:SandBoxBase = DockerSandbox(config=self.config.sand_box)
+            await sand_box.start()
+            container.register("SandBox", sand_box, cleanup=sand_box.stop)
+        except Exception as e:
+            self.logger.exception(f"LLM使用的沙盒初始化失败{e}")
 
-        #管理面板
+        resolve_targets = [
+            HTTPClient, TimeTriggerSupervisor, FuncCall, AsyncPostgreSQL,
+            TokenManager, LLMConnectionManager, SkillsManager, memorySystem,
+            UserSystem, ChatManager, EmojiCore, PermissionsManagement,
+            QQAPIClient, EventTrigger, CommandSystem, tool_calls,
+            MediaProcessor, LLMCoordinator, GroupChat, PrivateChat
+        ]
+        
+        for tgt in resolve_targets:
+            await container.resolve(tgt)
+            
+        # 指令加载器
+        container.register("CommandLoader", command_loader(self.config.file_path.commands))
+
+        #后置激活项
+        trigger = container.get_by_type(TimeTriggerSupervisor)
+        await trigger.start()
+
+        # 管理面板
         self.create_background_task(self._start_admin_panel())
 
         await self._start_network(server_type)
 
-    def _init_messaging_services(self) -> None:
-        """发送消息以及相关的依赖"""
-        container.register(
-            "SendMessage", 
-            QQAPIClient(
-            token=self.config.network.access_token,
-            http_base_url=self.config.network.url,
-            connection_type=self.config.network.connection_type,)
-        )
-
-        #消息分发处理
-        container.register("EventTrigger", EventTrigger())
-
-        #指令
-        container.register("CommandSystem", CommandSystem())
-        
-        #指令加载器,必须在后面
-        container.register("CommandLoader", command_loader(self.config.file_path.commands))
-
-        #LLM使用的tool
-        tool_calls_instance = tool_calls(self.config.file_path.tool_calls)
-        tool_calls_instance.load_presets_from_config(self.config.tool_presets)
-        container.register(
-            "ToolCalls",
-            tool_calls_instance
-        )
-
-        #多模态媒体转文本
-        container.register("MediaProcessor", MediaProcessor())
-
-        #处理模型响应
-        container.register("LLMSupervisor", LLMCoordinator())
-
-        #AIchat
-        container.register("GroupChat", GroupChat())
-        container.register("PrivateChat", PrivateChat())
 
     async def _start_admin_panel(self) -> None:
         """在独立端口启动 Web 管理面板"""

@@ -2,7 +2,6 @@ from logging import Logger
 from typing import Dict, List
 
 from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
-from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.core.type.chat_message_types import ChatMessage
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition, PrivateContext
@@ -14,6 +13,8 @@ class ChatManager:
     
     def __init__(
         self,
+        log: Logger,
+        time_trigger: TimeTriggerSupervisor,
         default_play_role: str = "none",
         group_messages_max_limit: int = 20,
         private_messages_max_limit: int = 20,
@@ -23,8 +24,8 @@ class ChatManager:
         information_extraction: List = None,
         archival_after: float = 1800.0
     ):
-        self.logger: Logger = container.get("log")
-        self.time_trigger: TimeTriggerSupervisor = container.get("TimeTriggerSupervisor")
+        self.logger = log
+        self.time_trigger = time_trigger
         self.group_dict: Dict[int, GroupContext] = {}
         """存储群组上下文实例"""
         self.private_dict:Dict[int, PrivateContext] = {}

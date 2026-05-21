@@ -3,7 +3,9 @@ from typing import Dict, List, Optional
 
 from asyncpg import Record
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
+from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.LLMchat.memory.memory_consolidator import MemoryConsolidator
 from atribot.LLMchat.memory.memory_extractor import MemoryExtractor
 from atribot.LLMchat.memory.memory_retriever import MemoryRetriever
@@ -16,10 +18,10 @@ from atribot.LLMchat.RAG.vector_store import MemoryCategory
 class memorySystem:
     """记忆系统门面类"""
 
-    def __init__(self):
+    def __init__(self, config: atriConfig, api_supplier: LLMConnectionManager, time_trigger: TimeTriggerSupervisor):
         self.logger: Logger = container.get("log")
-        self.api_supplier: LLMConnectionManager = container.get("LLMSupplier")
-        self.config = container.get("config")
+        self.api_supplier: LLMConnectionManager = api_supplier
+        self.config = config
         self.model = self.config.model.memory.summarize_model.model_name
         self.supplier: universal_ai_api = (
             self.api_supplier.get_filtration_connection(
@@ -44,6 +46,7 @@ class memorySystem:
         self.consolidator = MemoryConsolidator(
             rag=self.rag,
             retriever=self.retriever,
+            time_trigger=time_trigger,
             extractor=self.extractor,
         )
         """记忆整理"""

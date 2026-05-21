@@ -21,10 +21,11 @@ class MemoryConsolidator:
         self,
         rag: RAGManager,
         retriever: MemoryRetriever,
+        time_trigger: TimeTriggerSupervisor,
         extractor: Optional[MemoryExtractor] = None,
     ):
         self.logger: Logger = container.get("log")
-        self.time_trigger: TimeTriggerSupervisor = container.get("TimeTriggerSupervisor")
+        self.time_trigger: TimeTriggerSupervisor = time_trigger
         self.rag = rag
         self.vector_store = rag.vector_store
         self.retriever = retriever

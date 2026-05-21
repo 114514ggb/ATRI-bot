@@ -33,7 +33,7 @@ class ColoredFormatter(logging.Formatter):
 class Logger:
     def __init__(self, name='atri-bot', log_level=logging.DEBUG):
 
-        self.logger = logging.getLogger(name)
+        self.logger: logging.Logger = logging.getLogger(name)
         self.logger.setLevel(log_level)
         
         if not self.logger.handlers:
