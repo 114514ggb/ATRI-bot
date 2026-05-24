@@ -37,6 +37,56 @@ from atribot.LLMchat.token_manage import TokenManager
 
 class BotFramework:
     """主初始化类"""
+
+    _SERVICE_CLASSES = (
+        atriConfig,
+        HTTPClient,
+        TimeTriggerSupervisor,
+        TokenManager,
+        memorySystem,
+        UserSystem,
+        EventTrigger,
+        CommandSystem,
+        MediaProcessor,
+        LLMCoordinator,
+        GroupChat,
+        PrivateChat,
+        SkillsManager,
+        EmojiCore,
+        ChatManager,
+        PermissionsManagement,
+    )
+
+    _NAMED_SERVICE_CLASSES = (
+        (AsyncPostgreSQL, "database"),
+        (FuncCall, "MCP"),
+        (LLMConnectionManager, "LLMSupplier"),
+        (QQAPIClient, "SendMessage"),
+        (tool_calls, "ToolCalls"),
+    )
+
+    _RESOLVE_TARGETS = (
+        HTTPClient,
+        TimeTriggerSupervisor,
+        FuncCall,
+        AsyncPostgreSQL,
+        TokenManager,
+        LLMConnectionManager,
+        SkillsManager,
+        memorySystem,
+        UserSystem,
+        ChatManager,
+        EmojiCore,
+        PermissionsManagement,
+        QQAPIClient,
+        EventTrigger,
+        CommandSystem,
+        tool_calls,
+        MediaProcessor,
+        LLMCoordinator,
+        GroupChat,
+        PrivateChat,
+    )
     
     def __init__(self):
         self.logger: Logger = container.get("log")
@@ -61,29 +111,28 @@ class BotFramework:
         """初始化"""
         self.config = atriConfig()
         container.register("config", self.config)
-        container.register_class(atriConfig)
-        container.register_class(HTTPClient)
-        container.register_class(TimeTriggerSupervisor)
-        container.register_class(TokenManager)
-        container.register_class(memorySystem)
-        container.register_class(UserSystem)
-        container.register_class(EventTrigger)
-        container.register_class(CommandSystem)
-        container.register_class(MediaProcessor)
-        container.register_class(LLMCoordinator)
-        container.register_class(GroupChat)
-        container.register_class(PrivateChat)
-        container.register_class(SkillsManager)
-        container.register_class(EmojiCore)
-        container.register_class(ChatManager)
-        container.register_class(PermissionsManagement)
-        container.register_class(AsyncPostgreSQL, name="database")
-        container.register_class(FuncCall, name="MCP")
-        container.register_class(LLMConnectionManager, name="LLMSupplier")
-        container.register_class(QQAPIClient, name="SendMessage")
-        container.register_class(tool_calls, name="ToolCalls")
-        
+
+        self._register_services()
+
         server_type: str = self.config.network.connection_type
+        self._register_network(server_type)
+
+        await self._start_sandbox()
+        await self._resolve_services()
+        await self._start_runtime_services()
+
+        await self._start_network(server_type)
+
+    def _register_services(self) -> None:
+        """注册可由容器解析的服务类型"""
+        for service_cls in self._SERVICE_CLASSES:
+            container.register_class(service_cls)
+
+        for service_cls, service_name in self._NAMED_SERVICE_CLASSES:
+            container.register_class(service_cls, name=service_name)
+
+    def _register_network(self, server_type: str) -> None:
+        """按连接类型注册网络连接实例"""
         if server_type == "WebSocket_server":
             ws = WebSocketServer(
                 host=self.config.network.host,
@@ -100,37 +149,28 @@ class BotFramework:
         elif server_type != "http":
             raise ValueError(f"不支持的连接类型: {server_type}")
 
-        # ai使用的沙盒 (可选)
+    async def _start_sandbox(self) -> None:
+        """启动 LLM 可选沙盒"""
         try:
-            sand_box:SandBoxBase = DockerSandbox(config=self.config.sand_box)
+            sand_box: SandBoxBase = DockerSandbox(config=self.config.sand_box)
             await sand_box.start()
             container.register("SandBox", sand_box, cleanup=sand_box.stop)
         except Exception as e:
             self.logger.exception(f"LLM使用的沙盒初始化失败{e}")
 
-        resolve_targets = [
-            HTTPClient, TimeTriggerSupervisor, FuncCall, AsyncPostgreSQL,
-            TokenManager, LLMConnectionManager, SkillsManager, memorySystem,
-            UserSystem, ChatManager, EmojiCore, PermissionsManagement,
-            QQAPIClient, EventTrigger, CommandSystem, tool_calls,
-            MediaProcessor, LLMCoordinator, GroupChat, PrivateChat
-        ]
-        
-        for tgt in resolve_targets:
+    async def _resolve_services(self) -> None:
+        """提前解析启动阶段需要的服务实例"""
+        for tgt in self._RESOLVE_TARGETS:
             await container.resolve(tgt)
-            
-        # 指令加载器
+        
         container.register("CommandLoader", command_loader(self.config.file_path.commands))
 
-        #后置激活项
+    async def _start_runtime_services(self) -> None:
+        """启动依赖容器完成后的运行期服务"""
         trigger = container.get_by_type(TimeTriggerSupervisor)
         await trigger.start()
 
-        # 管理面板
-        self.create_background_task(self._start_admin_panel())
-
-        await self._start_network(server_type)
-
+        self.create_background_task(self._start_admin_panel(), name="BotFramework.admin_panel")
 
     async def _start_admin_panel(self) -> None:
         """在独立端口启动 Web 管理面板"""
@@ -161,7 +201,7 @@ class BotFramework:
         if server_type == "WebSocket_server":
             ws: WebSocketServer = container.get("WebSocket")
             ws.add_listener(message_router().main)
-            ws_task = self.create_background_task(ws.start())
+            ws_task = self.create_background_task(ws.start(), name="BotFramework.websocket_server")
             await ws.wait_for_connection()
             await ws_task
 
@@ -177,7 +217,7 @@ class BotFramework:
             @app.post("/")
             async def handle_http_event(data: Dict[str, Any]):
                 """处理HTTP事件"""
-                asyncio.create_task(_message_router.main(data))
+                self.create_background_task(_message_router.main(data), name="BotFramework.http_event")
                 return {"status": "OK", "code": 200}
 
             uvicorn_app = uvicorn.Config(
@@ -191,12 +231,21 @@ class BotFramework:
         else:
             raise ValueError(f"启动连接的时候接收了错误的连接类型:{server_type}")
 
-    def create_background_task(self, coro: Awaitable[Any]) -> asyncio.Task[Any]:
+    def create_background_task(self, coro: Awaitable[Any], *, name: str | None = None) -> asyncio.Task[Any]:
         """创建受控后台任务"""
-        task = asyncio.create_task(coro)
+        task = asyncio.create_task(coro, name=name)
         self._background_tasks.add(task)
-        task.add_done_callback(self._background_tasks.discard)
+        task.add_done_callback(self._handle_background_task_done)
         return task
+
+    def _handle_background_task_done(self, task: asyncio.Task[Any]) -> None:
+        """清理后台任务引用并记录异常"""
+        self._background_tasks.discard(task)
+        if task.cancelled():
+            return
+
+        if exc := task.exception():
+            self.logger.exception("后台任务异常退出: %s", task.get_name(), exc_info=exc)
 
     async def graceful_shutdown(self) -> None:
         """等待关闭流程执行完成"""
@@ -221,14 +270,20 @@ class BotFramework:
 
         self.logger.info("正在清理回收资源~")
 
+        await self._cancel_background_tasks()
         await container.shutdown()
 
-        if self._background_tasks:
-            for task in list(self._background_tasks):
-                if not task.done():
-                    task.cancel()
-
-            await asyncio.gather(*self._background_tasks, return_exceptions=True)
-
-        self._background_tasks.clear()
         self._is_shutdown = True
+
+    async def _cancel_background_tasks(self) -> None:
+        """取消并等待所有受控后台任务"""
+        if not self._background_tasks:
+            return
+
+        tasks = list(self._background_tasks)
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+
+        await asyncio.gather(*tasks, return_exceptions=True)
+        self._background_tasks.clear()
