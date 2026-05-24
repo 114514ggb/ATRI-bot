@@ -14,12 +14,17 @@ T = TypeVar("T")
 class ServiceBase:
     """服务基类，不强制继承"""
 
+    @classmethod
+    def factory(cls, **kwargs: Any) -> Any:
+        """默认工厂，子类可重写以转换容器依赖到 __init__ 参数"""
+        return cls(**kwargs)
+
     async def initialize(self) -> None:
-        """异步初始化逻辑"""
+        """初始化"""
         pass
 
     async def cleanup(self) -> None:
-        """异步回收逻辑"""
+        """回收"""
         pass
 
 
@@ -241,39 +246,40 @@ class DIContainer:
         try:
             factory = self._factories.get(cls)
             if factory is None:
-                if inspect.isclass(cls):
-                    factory = cls
-                else:
+                if not inspect.isclass(cls):
                     raise ValueError(f"未找到 {cls} 的工厂函数，且它不是一个类")
+                factory = cls
+
+            if inspect.isclass(factory) and issubclass(factory, ServiceBase):
+                overridden_factory = self._extract_overridden_method(
+                    factory, "factory", ServiceBase.factory
+                )
+                if overridden_factory is not None:
+                    factory = overridden_factory
 
             kwargs = await self._resolve_kwargs(factory, cls)
-
             instance = factory(**kwargs)
             if isawaitable(instance):
                 instance = await instance
 
-            # 判断是否继承了 ServiceBase，进而决定是否需要排除基类的空实现
-            cleanup = None
+            cleanup: Optional[Callable] = None
             if isinstance(instance, ServiceBase):
-                
-                init_func = self._extract_method(
-                    instance, 
-                    "initialize", 
-                    base_method = ServiceBase.initialize
+                init_func = self._extract_overridden_method(
+                    instance, "initialize", ServiceBase.initialize
                 )
                 if init_func is not None:
-                    res = init_func()
-                    if isawaitable(res):
-                        await res
-                        
-                cleanup = self._extract_method(instance, "cleanup", ServiceBase.cleanup)
-            
-            self.register(
-                self._type_map.get(cls, self._make_key(cls)), 
-                instance, 
-                cleanup=cleanup
-            )
-            
+                    init_kwargs = await self._resolve_kwargs(init_func, type(instance))
+                    result = init_func(**init_kwargs)
+                    if isawaitable(result):
+                        await result
+
+                cleanup = self._extract_overridden_method(
+                    instance, "cleanup", ServiceBase.cleanup
+                )
+
+            name = self._type_map.get(cls, self._make_key(cls))
+            self.register(name, instance, cleanup=cleanup)
+
             return instance
         finally:
             self._resolving_local.reset(token)
@@ -294,37 +300,67 @@ class DIContainer:
         Returns:
             dict[str, Any]: 包含已解析参数的字典
         """
-        sig: inspect.Signature = inspect.signature(factory)
+        func = factory.__init__ if inspect.isclass(factory) else factory
 
+        sig = inspect.signature(func)
         try:
-            if inspect.isfunction(factory) or inspect.ismethod(factory):
-                hints = get_type_hints(factory)
-            else:
-                hints = get_type_hints(getattr(factory, "__init__", factory))
+            hints = get_type_hints(func)
         except NameError as e:
             raise TypeError(
-                f"解析 {owner_cls} 的类型注解失败（可能存在未导入的 forward reference): {e}"
+                f"解析 {owner_cls} 的类型注解失败(可能存在未导入的 forward reference): {e}"
             ) from e
 
         kwargs: dict[str, Any] = {}
         for param_name, param in sig.parameters.items():
+            if param.kind in (
+                inspect.Parameter.VAR_POSITIONAL,
+                inspect.Parameter.VAR_KEYWORD,
+            ):
+                continue
             if param_name in ("self", "cls"):
                 continue
 
+            has_default = param.default is not inspect.Parameter.empty
             param_type = hints.get(param_name)
-            if param_type is None and param.annotation is not inspect.Parameter.empty:
-                param_type = param.annotation
 
             if param_type is None or param_type is inspect.Parameter.empty:
-                if param.default is not inspect.Parameter.empty:
-                    continue  # 有默认值，跳过
+                if has_default:
+                    continue
                 raise ValueError(
-                    f"无法解析 {owner_cls.__name__}.{param_name}：缺少类型注解"
+                    f"无法解析 {owner_cls.__name__}.{param_name}：缺少类型注解且无默认值"
                 )
 
-            kwargs[param_name] = await self.resolve(param_type)
+            try:
+                kwargs[param_name] = await self.resolve(param_type)
+            except (ValueError, RecursionError):
+                if has_default:
+                    continue  # 容器无法提供，保留默认值
+                raise ValueError(
+                    f"无法解析 {owner_cls.__name__}.{param_name}:"
+                    f"类型 {param_type} 未注册且无默认值"
+                ) from None
 
         return kwargs
+
+    @staticmethod
+    def _extract_overridden_method(
+        target: Any,
+        method_name: str,
+        base_method: Optional[Any] = None,
+    ) -> Optional[Callable]:
+        """
+        提取已被重写的方法。若与基类实现相同（未覆写），返回 None
+        target 可以是类或实例
+        """
+        method = getattr(target, method_name, None)
+        if method is None or not (callable(method) or inspect.isroutine(method)):
+            return None
+        if base_method is not None:
+            method_func = getattr(method, "__func__", method)
+            base_func = getattr(base_method, "__func__", base_method)
+            if method_func is base_func:
+                return None
+        return method
 
     @staticmethod
     def _extract_method(

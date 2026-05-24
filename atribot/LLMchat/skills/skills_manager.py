@@ -3,14 +3,15 @@ from logging import Logger
 from pathlib import Path
 from typing import Optional
 
-from atribot.core.service_container import container
+from atribot.core.atri_config import atriConfig
+from atribot.core.service_container import ServiceBase, container
 
 from .models import SkillProperties
 from .parser import find_skill_md
 from .validator import load_validated_properties
 
 
-class SkillsManager:
+class SkillsManager(ServiceBase):
     """用于管理和加载 Agent 技能"""
     
     prompt: str
@@ -25,6 +26,10 @@ class SkillsManager:
         self.skills_dict = {}
         self.prompt = ""
         self.initialize_skills(skill_dir)
+
+    @classmethod
+    def factory(cls, config: atriConfig) -> "SkillsManager":
+        return cls(skill_dir=config.file_path.agent_skills)
 
     def initialize_skills(self, skill_dir: str):
         """加载一个目录下的skills

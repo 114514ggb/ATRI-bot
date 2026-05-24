@@ -1,16 +1,37 @@
 from logging import Logger
 from typing import Dict, List
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
+from atribot.core.service_container import ServiceBase
 from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.core.type.chat_message_types import ChatMessage
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition, PrivateContext
 from atribot.core.type.context_types import Context
 
 
-class ChatManager:
+class ChatManager(ServiceBase):
     """管理聊天实例类（异步安全）"""
     
+    @classmethod
+    def factory(
+        cls,
+        config: atriConfig,
+        time_trigger: TimeTriggerSupervisor,
+        log: Logger,
+    ) -> "ChatManager":
+        return cls(
+            log=log,
+            time_trigger=time_trigger,
+            default_play_role=config.ai_chat.playRole,
+            group_messages_max_limit=config.ai_chat.group_max_record,
+            private_messages_max_limit=config.ai_chat.private_max_record,
+            group_LLM_max_limit=config.ai_chat.ai_max_record,
+            character_folder=config.file_path.chat_manager,
+            initiative_white_list=config.group_initiative_chat_white_list,
+            information_extraction=config.group_information_extraction,
+        )
+
     def __init__(
         self,
         log: Logger,

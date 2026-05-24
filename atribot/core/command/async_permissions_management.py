@@ -3,10 +3,10 @@ from typing import Set
 
 from atribot.common_utils import is_qq
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
-from atribot.core.service_container import container
+from atribot.core.service_container import ServiceBase, container
 
 
-class PermissionsManagement:
+class PermissionsManagement(ServiceBase):
     """
     异步权限管理类
     """
@@ -39,11 +39,15 @@ class PermissionsManagement:
     async def create(cls):
         """
         异步创建并初始化权限管理实例。
-        这是推荐的实例化方式，因为它会从数据库同步初始权限。
+        这是推荐的实例化方式，因为它会从数据库同步初始化权限。
         """
         instance = cls()
         await instance.sync_from_db()
         return instance
+
+    @classmethod
+    async def factory(cls) -> "PermissionsManagement":
+        return await cls.create()
 
     def _get_user_permission_level(self, user_id: int) -> int:
         """内部辅助方法：获取用户的权限等级"""

@@ -5,7 +5,7 @@ import inspect
 import json
 import os
 import textwrap
-from contextlib import AsyncExitStack
+from contextlib import AsyncExitStack, suppress
 from dataclasses import dataclass
 from datetime import timedelta
 from logging import Logger
@@ -18,7 +18,8 @@ from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
-from atribot.core.service_container import container
+from atribot.core.atri_config import atriConfig
+from atribot.core.service_container import ServiceBase, container
 
 DEFAULT_MCP_CONFIG = {"mcpServers": {}}
 
@@ -192,10 +193,10 @@ class MCPClient:
         await self.exit_stack.aclose()
 
 
-class FuncCall:
+class FuncCall(ServiceBase):
     """用于管理MCP工具和函数工具"""
     
-    def __init__(self, mcp_path:str|Path = "") -> None:
+    def __init__(self, mcp_path: str | Path = "") -> None:
         self.logger:Logger = container.get("log")
         """日志配置"""
         self.func_list: List[FuncTool] = []
@@ -206,8 +207,26 @@ class FuncCall:
         """用于外部控制 MCP 服务的启停"""
         self.mcp_client_event: Dict[str, asyncio.Event] = {}
         """MCP客户端"""
-        self.mcp_path:str|Path= mcp_path 
+        self.mcp_path: str | Path = mcp_path
         """MCP配置文件路径"""
+        self._mcp_service_task: asyncio.Task | None = None
+        """MCP 服务控制后台任务"""
+
+    @classmethod
+    def factory(cls, config: atriConfig) -> "FuncCall":
+        instance = cls(config.file_path.mcp_config)
+        instance._mcp_service_task = asyncio.create_task(instance.mcp_service_selector())
+        instance.mcp_service_queue.put_nowait({"type": "init"})
+        return instance
+
+    async def cleanup(self) -> None:
+        self.mcp_service_queue.put_nowait({"type": "terminate"})
+        await asyncio.sleep(0)
+        if self._mcp_service_task is not None:
+            self._mcp_service_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._mcp_service_task
+        self._mcp_service_task = None
         
     def empty(self) -> bool:
         """返回是否存在调用的函数"""

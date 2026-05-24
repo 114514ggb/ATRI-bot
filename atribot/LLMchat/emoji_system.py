@@ -4,21 +4,27 @@ import re
 from pathlib import Path
 from typing import Match
 
+from atribot.core.atri_config import atriConfig
+from atribot.core.service_container import ServiceBase
 from atribot.core.type.chat_message_types import File, GroupMessage
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 
 
-class EmojiCore:
+class EmojiCore(ServiceBase):
     """管理表情包"""
     
-    def __init__(self,folder_path:Path = ""):
+    def __init__(self, folder_path: Path = ""):
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
         self.file = folder_path
         self.prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
-    
+
+    @classmethod
+    def factory(cls, config: atriConfig) -> "EmojiCore":
+        return cls(folder_path=config.file_path.emoji)
+
     def init_emoji_catalogue(self,folder_path:str)->None:
         """
         把指定目录下的表情文件索引写入表情目录字典

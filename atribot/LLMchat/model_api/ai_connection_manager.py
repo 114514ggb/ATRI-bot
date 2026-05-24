@@ -2,6 +2,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Dict
 
+from atribot.core.atri_config import atriConfig
+from atribot.core.service_container import ServiceBase
 from atribot.LLMchat.model_api.llm_api_account_pool import ai_api_account_pool
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
@@ -43,13 +45,22 @@ class ai_api_connection:
         if self.model_parameter is not None:
             self.connection_object.update_parameters(self.model_parameter)
     
-class LLMConnectionManager:
+class LLMConnectionManager(ServiceBase):
     """ai供应商的api连接管理类"""
     
     def __init__(self):
         self.connections:Dict[str,ai_api_connection] = {}
         """管理维护的供应商字典"""
-    
+
+    @classmethod
+    async def factory(cls, config: atriConfig) -> "LLMConnectionManager":
+        instance = cls()
+        await instance.initialize_connections(config.file_path.supplier_config_path)
+        return instance
+
+    async def cleanup(self) -> None:
+        await self.close()
+
     async def initialize_connections(self, path: str) -> None:
         """读取文件然后初始化连接
 

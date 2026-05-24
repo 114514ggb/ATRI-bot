@@ -8,17 +8,24 @@ from typing import Any, Dict, List
 
 from mcp.types import CallToolResult
 
-from atribot.core.service_container import container
+from atribot.core.atri_config import atriConfig
+from atribot.core.service_container import ServiceBase, container
 from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
 
 
-class tool_calls:
+class tool_calls(ServiceBase):
     """
     用于工具调用
     """
     _registry: list[tuple[dict, Any]] = []
 
-    def __init__(self, tool_path:Path):
+    @classmethod
+    def factory(cls, config: atriConfig) -> "tool_calls":
+        instance = cls(config.file_path.tool_calls)
+        instance.load_presets_from_config(config.tool_presets)
+        return instance
+
+    def __init__(self, tool_path: Path):
         self.logger:Logger = container.get("log")
         self.mcp_tool:FuncCall = container.get("MCP")
         

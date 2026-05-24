@@ -6,10 +6,12 @@ import asyncpg
 from asyncpg import Record
 from asyncpg.exceptions import ForeignKeyViolationError, UniqueViolationError
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
+from atribot.core.service_container import ServiceBase
 
 
-class AsyncPostgreSQL(AsyncDatabaseBase):
+class AsyncPostgreSQL(AsyncDatabaseBase, ServiceBase):
     """PostgreSQL异步数据库实现"""
 
     _pool: Optional[asyncpg.Pool] = None
@@ -19,6 +21,18 @@ class AsyncPostgreSQL(AsyncDatabaseBase):
 
     def __init__(self):
         super().__init__()
+
+    @classmethod
+    async def factory(cls, config: atriConfig) -> "AsyncPostgreSQL":
+        return await cls.create(
+            host=config.database.host,
+            user=config.database.user,
+            port=config.database.port,
+            password=config.database.password,
+        )
+        
+    async def cleanup(self) -> None:
+        await self.close_pool()
     
     @classmethod
     async def create(

@@ -3,10 +3,10 @@ from typing import Optional
 
 import aiohttp
 
-from atribot.core.atri_config import FilePathConfig
+from atribot.core.atri_config import FilePathConfig, atriConfig
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
-from atribot.core.service_container import container
+from atribot.core.service_container import ServiceBase, container
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 
 # import asyncio
@@ -20,7 +20,7 @@ from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, S
 
 
 
-class QQAPIClient():
+class QQAPIClient(ServiceBase):
     """qq接口有关的请求发送器"""
     _instance = None
     
@@ -62,7 +62,20 @@ class QQAPIClient():
             self.connection_type = connection_type # 连接类型
             self.logger.info(f"当前连接类型为{connection_type}\n")
             self._initialized = True
-    
+
+    @classmethod
+    def factory(cls, config: atriConfig) -> "QQAPIClient":
+        return cls(
+            token=config.network.access_token,
+            http_base_url=config.network.url,
+            connection_type=config.network.connection_type,
+        )
+        
+    async def cleanup(self) -> None:
+        client = getattr(self, "client", None)
+        if isinstance(client, aiohttp.ClientSession) and not client.closed:
+            await client.close()
+
     async def _send_http_strategy(self, url: str, payload: dict, echo: bool = False) -> Optional[dict]:
         """HTTP 发送策略"""
         try:

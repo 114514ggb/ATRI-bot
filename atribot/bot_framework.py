@@ -73,69 +73,16 @@ class BotFramework:
         container.register_class(LLMCoordinator)
         container.register_class(GroupChat)
         container.register_class(PrivateChat)
-
-        async def db_factory(config: atriConfig) -> AsyncPostgreSQL:
-            return await AsyncPostgreSQL.create(
-                host=config.database.host, 
-                user=config.database.user,
-                port=config.database.port,
-                password=config.database.password
-            )
-        container.register_factory(AsyncPostgreSQL, db_factory, name="database")
-
-        def mcp_factory(config: atriConfig) -> FuncCall:
-            mcp_server = FuncCall(config.file_path.mcp_config)
-            self.create_background_task(mcp_server.mcp_service_selector())
-            mcp_server.mcp_service_queue.put_nowait({"type": "init"})
-            return mcp_server
-        container.register_factory(FuncCall, mcp_factory, name="MCP")
-
-        async def llm_factory(config: atriConfig) -> LLMConnectionManager:
-            llm = LLMConnectionManager()
-            await llm.initialize_connections(config.file_path.supplier_config_path)
-            return llm
-        container.register_factory(LLMConnectionManager, llm_factory, name="LLMSupplier")
-
-        def skills_factory(config: atriConfig) -> SkillsManager:
-            return SkillsManager(skill_dir=config.file_path.agent_skills)
-        container.register_factory(SkillsManager, skills_factory)
-
-        def emoji_factory(config: atriConfig) -> EmojiCore:
-            return EmojiCore(folder_path=config.file_path.emoji)
-        container.register_factory(EmojiCore, emoji_factory)
-
-        def chat_factory(config: atriConfig, time_trigger: TimeTriggerSupervisor, log: Logger) -> ChatManager:
-            return ChatManager(
-                log=log,
-                time_trigger=time_trigger,
-                default_play_role=config.ai_chat.playRole,
-                group_messages_max_limit=config.ai_chat.group_max_record,
-                private_messages_max_limit=config.ai_chat.private_max_record,
-                group_LLM_max_limit=config.ai_chat.ai_max_record,
-                character_folder=config.file_path.chat_manager,
-                initiative_white_list=config.group_initiative_chat_white_list,
-                information_extraction=config.group_information_extraction,
-            )
-        container.register_factory(ChatManager, chat_factory)
-
-        async def perm_factory() -> PermissionsManagement:
-            return await PermissionsManagement.create()
-        container.register_factory(PermissionsManagement, perm_factory)
-
-        def send_message_factory(config: atriConfig) -> QQAPIClient:
-            return QQAPIClient(
-                token=config.network.access_token,
-                http_base_url=config.network.url,
-                connection_type=config.network.connection_type,
-            )
-        container.register_factory(QQAPIClient, send_message_factory, name="SendMessage")
-
-        def tool_calls_factory(config: atriConfig) -> tool_calls:
-            tool_calls_instance = tool_calls(config.file_path.tool_calls)
-            tool_calls_instance.load_presets_from_config(config.tool_presets)
-            return tool_calls_instance
-        container.register_factory(tool_calls, tool_calls_factory, name="ToolCalls")
-
+        container.register_class(SkillsManager)
+        container.register_class(EmojiCore)
+        container.register_class(ChatManager)
+        container.register_class(PermissionsManagement)
+        container.register_class(AsyncPostgreSQL, name="database")
+        container.register_class(FuncCall, name="MCP")
+        container.register_class(LLMConnectionManager, name="LLMSupplier")
+        container.register_class(QQAPIClient, name="SendMessage")
+        container.register_class(tool_calls, name="ToolCalls")
+        
         server_type: str = self.config.network.connection_type
         if server_type == "WebSocket_server":
             ws = WebSocketServer(
