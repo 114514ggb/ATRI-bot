@@ -32,3 +32,9 @@ jobs:
 
       - name: Compile Python sources
         run: python -m compileall main.py atribot
+
+      - name: Install Project and Test Dependencies
+        run: python -m pip install . pytest pytest-asyncio
+        
+      - name: Run Pytest
+        run: python -m pytest tests/
