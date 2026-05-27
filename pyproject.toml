@@ -37,6 +37,10 @@ extend-exclude = [
 select = ["E", "F", "I"]
 ignore = ["E501", "E701"]
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
 [tool.uv.workspace]
 members = [
     "abandoned/MCP_test/mcp-client",

@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  lint-and-compile:
+  lint-build-test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -23,18 +23,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+          cache: 'pip'
 
-      - name: Install Ruff
-        run: python -m pip install --upgrade pip ruff
+      - name: Install Project and Test Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . pytest pytest-asyncio ruff
 
       - name: Run Ruff
         run: ruff check .
 
       - name: Compile Python sources
-        run: python -m compileall main.py atribot
-
-      - name: Install Project and Test Dependencies
-        run: python -m pip install . pytest pytest-asyncio
+        run: python -m compileall main.py atribot tests
         
       - name: Run Pytest
-        run: python -m pytest tests/
+        run: python -m pytest
