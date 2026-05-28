@@ -1,5 +1,6 @@
 import asyncio
 import heapq
+import inspect
 from dataclasses import dataclass, field
 from datetime import datetime
 from logging import Logger
@@ -421,7 +422,7 @@ class TimeTriggerSupervisor:
             task (TimedTask): 要执行的任务对象
         """
         try:
-            if asyncio.iscoroutinefunction(task.func):
+            if inspect.iscoroutinefunction(task.func):
                 execution = task.func(**task.kwargs)
             else:
                 execution = asyncio.to_thread(task.func, **task.kwargs)
@@ -435,7 +436,7 @@ class TimeTriggerSupervisor:
             self.logger.warning(
                 f"任务 {task.task_id} 执行超时，限制 {task.timeout:.2f}s{remarks}"
             )
-            if not asyncio.iscoroutinefunction(task.func):
+            if not inspect.iscoroutinefunction(task.func):
                 self.logger.warning(f"任务 {task.task_id} 为同步任务，线程池中的实际执行可能仍会继续")
         except asyncio.CancelledError:
             self.logger.info(f"任务 {task.task_id} 在关闭过程中被取消")

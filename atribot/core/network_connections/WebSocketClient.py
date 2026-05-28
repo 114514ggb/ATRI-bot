@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 import json
 import sys
 import uuid
@@ -204,10 +205,10 @@ class WebSocketClient:
     async def _safe_callback(self, callback: Callable, data: Dict) -> None:
         """安全执行回调函数"""
         try:
-            # if asyncio.iscoroutinefunction(callback):
+            if inspect.iscoroutinefunction(callback):
                 await callback(data)
-            # else:
-            #     await asyncio.get_event_loop().run_in_executor(None, callback, data)
+            else:
+                await asyncio.to_thread(callback, data)
         except Exception as e:
             import traceback
 
