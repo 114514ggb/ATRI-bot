@@ -3,6 +3,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, Iterable, List
 
+from atribot.common_utils.message_utils import count_estimate_tokens
+
 
 class ToolCallsStopIteration(Exception):
     """结束工具调用异常"""
@@ -122,9 +124,7 @@ class MessageBuilder:
     @classmethod
     def system(cls) -> "MessageBuilder":
         return cls("system")
-
-IMAGE_TOKEN_ESTIMATE = 765
-AUDIO_TOKEN_ESTIMATE = 500
+    
 
 @dataclass(slots=True)
 class Context():
@@ -322,45 +322,11 @@ class Context():
 
         return None
 
-    def _estimate_tokens(self, text: str) -> int:
-        """
-        估算纯文本的 Token 数
-        中文字符权值 0.6,其余 0.3
-        """
-        if not text:
-            return 0
-        chinese_count = len([c for c in text if "\u4e00" <= c <= "\u9fff"])
-        other_count = len(text) - chinese_count
-        return int(chinese_count * 0.6 + other_count * 0.3)
-
     def count_estimate_tokens(self) -> int:
         """
         获取上下文 Token 估算值 (保守估计，区分中英文)
         """
-        total_tokens = 0
-        messages = self.get_messages()
-
-        for msg in messages:
-            total_tokens += 5
-
-            content = msg.get("content")
-            if content:
-                if isinstance(content, str):
-                    total_tokens += self._estimate_tokens(content)
-                elif isinstance(content, list):
-                    for item in content:
-                        item: Dict
-                        if item.get("type") == "text":
-                            total_tokens += self._estimate_tokens(item.get("text", ""))
-                        elif item.get("type") == "image_url":
-                            total_tokens += IMAGE_TOKEN_ESTIMATE
-                        elif item.get("type") == "input_audio":
-                            total_tokens += AUDIO_TOKEN_ESTIMATE
-
-            if "tool_calls" in msg and msg["tool_calls"]:
-                total_tokens += self._estimate_tokens(str(msg["tool_calls"]))
-
-        return int(total_tokens)
+        return count_estimate_tokens(self.get_messages())
 
 
 @dataclass(slots=True)
@@ -491,31 +457,5 @@ class ContextDeque:
             "content": content
         })
 
-    def _estimate_tokens(self, text: str) -> int:
-        if not text:
-            return 0
-        chinese_count = len([c for c in text if "\u4e00" <= c <= "\u9fff"])
-        other_count = len(text) - chinese_count
-        return int(chinese_count * 0.6 + other_count * 0.3)
-
     def count_estimate_tokens(self) -> int:
-        total_tokens = 0
-        
-        for msg in self.messages:
-            total_tokens += 5
-            if content := msg.get("content"):
-                if isinstance(content, str):
-                    total_tokens += self._estimate_tokens(content)
-                elif isinstance(content, list):
-                    for item in content:
-                        if item.get("type") == "text":
-                            total_tokens += self._estimate_tokens(item.get("text", ""))
-                        elif item.get("type") == "image_url":
-                            total_tokens += IMAGE_TOKEN_ESTIMATE
-                        elif item.get("type") == "input_audio":
-                            total_tokens += AUDIO_TOKEN_ESTIMATE
-                            
-            if "tool_calls" in msg and msg["tool_calls"]:
-                total_tokens += self._estimate_tokens(str(msg["tool_calls"]))
-                
-        return total_tokens
+        return count_estimate_tokens(list(self.messages))

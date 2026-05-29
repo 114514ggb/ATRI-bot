@@ -107,3 +107,44 @@ def parse_time_to_timestamp(time_str: str, is_end_time: bool = False) -> int | N
         except ValueError:
             continue
     return None
+
+IMAGE_TOKEN_ESTIMATE = 765
+AUDIO_TOKEN_ESTIMATE = 500
+
+def estimate_tokens(text: str) -> int:
+    """
+    估算纯文本的 Token 数
+    中文字符权值 0.6,其余 0.3
+    """
+    if not text:
+        return 0
+    chinese_count = len([c for c in text if "\u4e00" <= c <= "\u9fff"])
+    other_count = len(text) - chinese_count
+    return int(chinese_count * 0.6 + other_count * 0.3)
+
+def count_estimate_tokens(messages: list[dict]) -> int:
+    """
+    获取上下文 Token 估算值 (保守估计，区分中英文)
+    """
+    total_tokens = 0
+
+    for msg in messages:
+        total_tokens += 5
+
+        content = msg.get("content")
+        if content:
+            if isinstance(content, str):
+                total_tokens += estimate_tokens(content)
+            elif isinstance(content, list):
+                for item in content:
+                    if item.get("type") == "text":
+                        total_tokens += estimate_tokens(item.get("text", ""))
+                    elif item.get("type") == "image_url":
+                        total_tokens += IMAGE_TOKEN_ESTIMATE
+                    elif item.get("type") == "input_audio":
+                        total_tokens += AUDIO_TOKEN_ESTIMATE
+
+        if "tool_calls" in msg and msg["tool_calls"]:
+            total_tokens += estimate_tokens(str(msg["tool_calls"]))
+
+    return int(total_tokens)

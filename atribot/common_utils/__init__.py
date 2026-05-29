@@ -6,7 +6,13 @@ from .file.media_utils import url_to_audio_base64, url_to_video_base64
 from .file.text_utils import download_text
 from .http_client import HTTPClient
 from .json_utils import extract_json_from_text
-from .message_utils import construction_message_dict, format_duration, parse_time_to_timestamp
+from .message_utils import (
+    construction_message_dict,
+    count_estimate_tokens,
+    estimate_tokens,
+    format_duration,
+    parse_time_to_timestamp,
+)
 from .music import search_music
 from .similarity import (
     calculate_similarity,
@@ -23,6 +29,7 @@ __all__ = [
     "construction_message_dict",
     "download_binary",
     "download_text",
+    "estimate_tokens",
     "extract_json_from_text",
     "format_duration",
     "format_memory_records",
@@ -34,6 +41,7 @@ __all__ = [
     "parse_time_to_timestamp",
     "resolve_file_to_bytes",
     "search_music",
+    "count_estimate_tokens",
     "url_to_audio_base64",
     "url_to_video_base64",
     "timer",

@@ -3,7 +3,7 @@ name = "atri-bot"
 version = "1.2.4"
 description = "一个叫ATRI的qq机器人"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "aiohttp[speedups]>=3.13.3",
     "mcp>=1.26.0",
@@ -27,7 +27,7 @@ dependencies = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+target-version = "py314"
 extend-exclude = [
     "document",
     "test.py"

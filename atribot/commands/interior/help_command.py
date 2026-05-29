@@ -14,7 +14,8 @@ send_message: QQAPIClient = container.get("SendMessage")
     examples=[
         "/help",
         "/help -l",
-        "/help --list"
+        "/help --list",
+        "/help <命令名>"
     ],
     authority_level=0
 )
@@ -24,13 +25,20 @@ send_message: QQAPIClient = container.get("SendMessage")
     long="--list",
     description="显示支持的所有命令"
 )
-async def help_command(message_data: ChatMessage, list: bool = False):
+@cmd_system.argument(
+    name="command_name",
+    description="要查看帮助的特定命令名",
+    required=False,
+    type=str
+)
+async def help_command(message_data: ChatMessage, command_name: str = None, list: bool = False):
     """
     显示帮助信息
     
     参数:
         message_data: 固定参数
-        full: 是否显示完整帮助(FLAG参数)
+        command_name: 要查看的特定命令
+        list: 是否显示完整帮助(FLAG参数)
     """
     if list:
         help_text = cmd_system.get_help_text()
@@ -38,6 +46,13 @@ async def help_command(message_data: ChatMessage, list: bool = False):
             group_id=message_data.group_id,
             message=help_text,
             source="命令list"
+        )
+    elif command_name:
+        help_text = cmd_system.get_help_text(command_name)
+        await send_message.send_group_merge_text(
+            group_id=message_data.group_id,
+            message=help_text,
+            source=f"命令{command_name}帮助"
         )
     else:
         basic_help = (
