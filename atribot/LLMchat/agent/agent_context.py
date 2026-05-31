@@ -242,35 +242,6 @@ class OpenAITextSegment(BaseMessageSegment):
 
 
 @dataclass(slots=True)
-class OpenAIThinkSegment(BaseMessageSegment):
-    """思考消息段
-
-    Attributes:
-        text: 思考内容
-    """
-
-    text: str
-    """思考内容"""
-
-    def __init__(self, text: str):
-        """初始化思考消息段
-
-        Args:
-            text: 思考内容
-        """
-        BaseMessageSegment.__init__(self, "think")
-        self.text = text
-
-    def to_dict(self) -> dict[str, Any]:
-        """转换为 think content part
-
-        Returns:
-            think 消息段字典
-        """
-        return {"type": self.type, "think": self.text}
-
-
-@dataclass(slots=True)
 class OpenAIImageUrlSegment(BaseMessageSegment):
     """OpenAI image_url 消息段
 
@@ -288,7 +259,7 @@ class OpenAIImageUrlSegment(BaseMessageSegment):
         """初始化图片 URL 消息段
 
         Args:
-            url: 图片 URL
+            url: 图片 URL,或带有data:image/jpeg;base64,的开头的base64编码
             detail: 可选的图片细节级别
         """
         BaseMessageSegment.__init__(self, "image_url")
@@ -531,8 +502,6 @@ class OpenAIMessage(BaseAgentMessage):
         segment_type = data.get("type")
         if segment_type == "text":
             return OpenAITextSegment(data.get("text", ""))
-        if segment_type == "think":
-            return OpenAIThinkSegment(data.get("think", data.get("text", "")))
         if segment_type == "image_url":
             image_url = data.get("image_url", {})
             if isinstance(image_url, str):
@@ -563,17 +532,6 @@ class OpenAIMessage(BaseAgentMessage):
             当前消息对象，便于链式调用
         """
         return self.add_segment(OpenAITextSegment(text))
-
-    def add_think(self, text: str) -> OpenAIMessage:
-        """追加思考消息段
-
-        Args:
-            text: 思考内容
-
-        Returns:
-            当前消息对象，便于链式调用
-        """
-        return self.add_segment(OpenAIThinkSegment(text))
 
     def add_image_url(self, url: str, detail: str | None = None) -> OpenAIMessage:
         """追加图片 URL 消息段
@@ -785,7 +743,6 @@ class OpenAIAgentContext(BaseAgentContext):
 AgentContext = OpenAIAgentContext
 AgentMessage = OpenAIMessage
 TextSegment = OpenAITextSegment
-ThinkSegment = OpenAIThinkSegment
 ImageUrlSegment = OpenAIImageUrlSegment
 AudioUrlSegment = OpenAIAudioUrlSegment
 InputAudioSegment = OpenAIInputAudioSegment
@@ -806,13 +763,10 @@ __all__ = [
     "OpenAIAudioUrlSegment",
     "OpenAIImageUrlSegment",
     "OpenAIInputAudioSegment",
-    OpenAIMessage,
     "OpenAIRawSegment",
     "OpenAITextSegment",
-    "OpenAIThinkSegment",
     "OpenAIVideoUrlSegment",
     "RawSegment",
     "TextSegment",
-    "ThinkSegment",
     "VideoUrlSegment",
 ]
