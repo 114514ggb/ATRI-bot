@@ -56,7 +56,9 @@ class AgentContext(BaseContext):
     """最大允许的上下文 Token 长度"""
 
     play_role: str = ""
-    """模型人物提示词 (System Content)"""
+    """对话开头模型人物提示词(System Content)
+    对话中固定不变的部分
+    """
 
     total_tokens: int = 0
     """当前上下文已占用的 Token 数量"""
@@ -109,19 +111,15 @@ class AgentContext(BaseContext):
         """清空上下文"""
         self._messages.clear()
 
-    def to_openai_list(self, inject_text: str = "") -> List[Dict[str, Any]]:
+    def to_openai_list(self) -> List[Dict[str, Any]]:
         """获取结构化并序列化的 OpenAI Context 列表格式
-
-        Args:
-            inject_text (str): 追加到系统提示中的文本
 
         Returns:
             List[Dict[str, Any]]: OpenAI 格式的消息列表
         """
-        system_content = "\n\n".join(filter(None, [self.play_role, inject_text]))
         res = []
-        if system_content:
-            res.append(SystemMessage(content=system_content).to_openai_dict())
+        if self.play_role:
+            res.append(SystemMessage(content=self.play_role).to_openai_dict())
         
         for msg in self._messages:
             res.append(msg.to_openai_dict())
