@@ -1,8 +1,8 @@
 from abc import ABC
-from typing import Any, Dict
+from typing import TYPE_CHECKING, Any, Dict
 
-from atribot.LLMchat.agent.agent_data import AgentData
-
+if TYPE_CHECKING:
+    from atribot.LLMchat.agent.agent_data import AgentData
 
 class BaseAgentHooks(ABC):
     """Agent 执行周期的生命钩子抽象基类"""

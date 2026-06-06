@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional
 
 
@@ -168,7 +168,7 @@ class AssistantMessage(BaseMessage):
 @dataclass(slots=True)
 class ToolMessage(BaseMessage):
     """工具消息实体"""
-    tool_call_id: str
+    tool_call_id: str = field(kw_only=True) 
     name: str = ""
     role: Literal["tool"] = "tool"
     content: str | List[MessageSegment] = ""

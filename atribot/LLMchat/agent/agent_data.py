@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List
 
 from atribot.LLMchat.agent.context import AgentContext
-from atribot.LLMchat.agent.hooks import BaseAgentHooks
+
+if TYPE_CHECKING:
+    from atribot.LLMchat.agent.hooks import BaseAgentHooks
 
 
 @dataclass

@@ -1,4 +1,5 @@
 import asyncio
+from abc import ABC, abstractmethod
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, Iterable, List, Optional, Union
@@ -15,17 +16,18 @@ from atribot.LLMchat.agent.message import (
 
 
 @dataclass(slots=True)
-class BaseContext:
+class BaseContext(ABC):
     """对话上下文基类"""
     
     @property
+    @abstractmethod
     def messages(self) -> Iterable[BaseMessage]:
         """上下文消息集合
 
         Returns:
             Iterable[BaseMessage]: 消息集合
         """
-        raise NotImplementedError
+        ...
     
     def to_openai_list(self) -> List[Dict[str, Any]]:
         """转换为 OpenAI 兼容的上下文列表

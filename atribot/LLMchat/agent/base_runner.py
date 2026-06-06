@@ -44,6 +44,7 @@ class BaseAgentRunner(ABC):
         """执行单一推进步骤"""
         ...
 
+    @abstractmethod
     async def run(self, max_turns: int = 10) -> AsyncGenerator[Any, None]:
         """完整运行 Agent 逻辑直到任务完结或受阻"""
         ...
