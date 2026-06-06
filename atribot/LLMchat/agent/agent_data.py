@@ -13,7 +13,7 @@ class AgentData:
 
     Attributes:
         context (AgentContext): Agent 的对话上下文
-        model_name (str): 驱动此 Agent 的模型名称（如 "glm-4", "gpt-4o"）
+        model_name (str): 驱动此 Agent 的模型名称
         supplier (str): 提供大模型的服务商名称，用于请求路由
         tools (List[str]): 提供给 Agent 调用的工具名称列表
         kwargs (Dict[str, Any]): 额外运行时控制参数
