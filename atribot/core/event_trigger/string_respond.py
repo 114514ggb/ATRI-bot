@@ -299,7 +299,7 @@ class string_response:
         "杂鱼": [["img",["ATRI_杂鱼.jpg","ATRI_杂鱼1.jpg"]]],
         "蚌埠": [["text",["难蚌"]],["img",["ATRI_流汗.jpg","ATRI_扣脸.gif"]]],
         "星期四":[["img",["ATRI_V我50.jpg"]]],
-        "鬼": [["img",["ATRI_当鬼.gif","ATRI_鬼脸.gif"]]],
+        # "鬼": [["img",["ATRI_当鬼.gif","ATRI_鬼脸.gif"]]],
         "不信": [["img",["ATRI_不相信你的鬼话.jpg"]]],
         "猫咪": [["img",["ATRI_猫咪爪子.gif"]]],
         "失败": [["img",["ATRI_加载失败.jpg"]]],
