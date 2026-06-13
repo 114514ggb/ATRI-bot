@@ -5,6 +5,10 @@ from dataclasses import dataclass, field
 from typing import Any, Deque, Dict, Iterable, List, Optional, Union
 
 from atribot.common_utils.message_utils import count_estimate_tokens
+from atribot.LLMchat.agent.context.compression import (
+    BaseCompressionStrategy,
+    DefaultCompressionStrategy,
+)
 from atribot.LLMchat.agent.message import (
     AssistantMessage,
     BaseMessage,
@@ -48,9 +52,6 @@ class AgentContext(BaseContext):
     user_max_record: int = -1
     """消息总的长度限制（-1 表示不限制）"""
 
-    compression_threshold: float = 0.6
-    """压缩阈值百分比"""
-
     max_output_tokens: int = 32768
     """模型输出的最大 Token 长度"""
 
@@ -68,11 +69,18 @@ class AgentContext(BaseContext):
     async_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """异步锁"""
 
+    compression_strategies: List[BaseCompressionStrategy] = field(
+        default_factory=lambda: [DefaultCompressionStrategy()]
+    )
+    """压缩策略链（责任链模式），按顺序遍历，首个命中即停止"""
+
     def __post_init__(self):
         if self._messages is None:
             self._messages = deque()
         elif isinstance(self._messages, list):
             self._messages = deque(self._messages)
+        if self.compression_strategies is None:
+            self.compression_strategies = [DefaultCompressionStrategy()]
 
     @property
     def messages(self) -> Deque[BaseMessage]:
@@ -180,41 +188,24 @@ class AgentContext(BaseContext):
 
     def record_validity_check(self, current_tokens: Optional[int] = None) -> Optional[List[BaseMessage]]:
         """
-        针对消息条数和 Token 数量进行验证与压缩。
-        当超过限制或达到压缩阈值时，自动截断前半部分消息（约占总数的一半），并确保剩余部分首条消息为 UserMessage。
+        遍历压缩策略链，对上下文进行验证与压缩
 
         Args:
-            current_tokens (Optional[int]): 当前上下文 Token 长度，若未指定则通过估算自动获取。
+            current_tokens (Optional[int]): 当前上下文 Token 长度，若未指定则通过估算自动获取
 
         Returns:
-            Optional[List[BaseMessage]]: 被移除的消息列表。若未触发压缩则返回 None。
+            Optional[List[BaseMessage]]: 被移除的消息列表。若未触发压缩则返回 None
         """
         if current_tokens is not None:
             self.total_tokens = current_tokens
         else:
             self.total_tokens = self.count_estimate_tokens()
 
-        trigger_by_count = (self.user_max_record != -1 and len(self._messages) > self.user_max_record)
-        trigger_by_tokens = (self.total_tokens > (self.max_context_tokens * self.compression_threshold))
+        for strategy in self.compression_strategies:
+            if strategy.should_compress(self):
+                return strategy.compress(self)
 
-        if not trigger_by_count and not trigger_by_tokens:
-            return None
-
-        removed_messages: List[BaseMessage] = []
-
-        discard_count = len(self._messages) // 2
-
-        for _ in range(discard_count):
-            if self._messages:
-                removed_messages.append(self._messages.popleft())
-
-        # 确保截断后的首条消息为 UserMessage，不满足则继续向后弹出
-        while self._messages and not isinstance(self._messages[0], UserMessage):
-            removed_messages.append(self._messages.popleft())
-
-        self.total_tokens = self.count_estimate_tokens()
-
-        return removed_messages if removed_messages else None
+        return None
 
     def is_dangerous(self) -> bool:
         """

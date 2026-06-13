@@ -1,7 +1,7 @@
 """Agent 运行时产出的事件 / 响应类型体系
 
 定义了 Agent Runner 在 step() / run() 过程中通过 AsyncGenerator
-产出的所有事件类型，覆盖流式增量、语义级事件、汇总结果和错误。
+产出的所有事件类型，覆盖流式增量、语义级事件、汇总结果和错误
 
 流式模式(AgentData.kwargs["stream"] = True):
     step()  → TextDelta* → [ToolCallStart → ToolCallResult]* → StepSummary
@@ -34,19 +34,25 @@ if TYPE_CHECKING:
 class AgentEventType(Enum):
     """Agent 事件类型枚举"""
 
-    # ── 流式中间事件 ──
-    TEXT_DELTA = auto()          # 文本增量（逐 token）
-    REASONING_DELTA = auto()      # 思考过程增量
-    TOOL_CALL_START = auto()      # 工具调用开始
-    TOOL_CALL_RESULT = auto()     # 工具调用结果
-    AGENT_STATUS = auto()         # Agent 状态变更
+    #流式中间事件
+    TEXT_DELTA = auto()
+    """文本增量"""
+    REASONING_DELTA = auto()
+    """思考过程增量"""     
+    TOOL_CALL_START = auto()
+    """工具调用开始"""
+    TOOL_CALL_RESULT = auto()
+    """工具调用结果"""
+    AGENT_STATUS = auto()         
+    """Agent 状态变更"""
 
-    # ── 汇总事件 ──
-    STEP_SUMMARY = auto()         # 单步汇总
-    RUN_SUMMARY = auto()          # 多步最终汇总
+    #汇总事件
+    STEP_SUMMARY = auto()
+    """单步汇总"""
+    RUN_SUMMARY = auto()
+    """多步最终汇总"""
 
-    # ── 错误 ──
-    ERROR = auto()                # 出错
+    ERROR = auto()
 
 
 @dataclass(slots=True)
@@ -54,7 +60,7 @@ class AgentEvent(ABC):
     """所有 Agent 运行时事件的抽象基类
 
     每个子类都携带 event_type 用于快速判别事件类别，
-    并提供 to_dict() 用于序列化 / 日志记录。
+    并提供 to_dict() 用于序列化 / 日志记录
     """
 
     event_type: AgentEventType = field(init=False)
@@ -69,7 +75,7 @@ class AgentEvent(ABC):
 class AgentStreamChunk(AgentEvent, ABC):
     """流式中间事件的抽象基类
 
-    所有流式事件在 stream=True 时产出,stream=False 时被 _yield_stream 抑制。
+    所有流式事件在 stream=True 时产出
     """
 
     def __init_subclass__(cls, **kwargs):
@@ -82,8 +88,8 @@ class TextDeltaChunk(AgentStreamChunk):
     """文本增量 — 逐 token 产出的内容片段
 
     Attributes:
-        delta: 本次增量文本（通常 1~若干 token）
-        step_index: 当前步序号（多步模式下标识所属步骤）
+        delta: 本次增量文本(通常 1~若干 token)
+        step_index: 当前步序号(多步模式下标识所属步骤)
     """
 
     delta: str
@@ -126,7 +132,7 @@ class ToolCallStartChunk(AgentStreamChunk):
     Attributes:
         tool_name: 工具名称
         tool_call_id: 工具调用唯一 ID
-        arguments: 已解析的参数快照（可选，流式场景下可能不完整）
+        arguments: 已解析的参数快照(可选，流式场景下可能不完整)
         step_index: 当前步序号
     """
 
@@ -153,7 +159,7 @@ class ToolCallResultChunk(AgentStreamChunk):
     Attributes:
         tool_name: 工具名称
         tool_call_id: 工具调用唯一 ID
-        result: 工具返回结果（文本或结构化数据）
+        result: 工具返回结果(文本或结构化数据)
         is_error: 工具执行过程中是否出错
         step_index: 当前步序号
     """
@@ -170,7 +176,7 @@ class ToolCallResultChunk(AgentStreamChunk):
             "event_type": self.event_type.name,
             "tool_name": self.tool_name,
             "tool_call_id": self.tool_call_id,
-            "result": str(self.result)[:2000],  # 截断防止日志爆炸
+            "result": str(self.result)[:2000],
             "is_error": self.is_error,
             "step_index": self.step_index,
         }
@@ -184,7 +190,7 @@ class AgentStatusChunk(AgentStreamChunk):
     "正在规划...", "正在搜索...", "正在反思..."
 
     Attributes:
-        status: 状态标识（如 "planning", "acting", "reflecting"）
+        status: 状态标识(如 "planning", "acting", "reflecting")
         message: 人类可读的状态描述
         step_index: 当前步序号
     """
@@ -209,8 +215,8 @@ class AgentStatusChunk(AgentStreamChunk):
 class AgentSummary(AgentEvent, ABC):
     """汇总事件的抽象基类
 
-    所有汇总事件是 Runner 产出的最终（或阶段性最终）结果，
-    包含完整的回复内容、用量信息等。
+    所有汇总事件是 Runner 产出的最终(或阶段性最终)结果，
+    包含完整的回复内容、用量信息等
     """
 
 
@@ -220,11 +226,11 @@ class StepSummary(AgentSummary):
 
     Attributes:
         content: 本步完整回复文本
-        reasoning_content: 完整思考过程（推理模型）
+        reasoning_content: 完整思考过程(推理模型)
         tool_calls: 本步中调用的工具及结果列表
         usage: token 用量信息
-        finish_reason: 结束原因（"stop", "tool_calls", "length" 等）
-        step_index: 步序号（单步模式固定为 0)
+        finish_reason: 结束原因("stop", "tool_calls", "length" 等)
+        step_index: 步序号(单步模式固定为 0)
         is_final: 是否是多步运行的最终步
         metadata: 额外的元数据
     """
@@ -269,9 +275,9 @@ class RunSummary(AgentSummary):
 
     Attributes:
         steps: 所有步骤的 StepSummary 列表
-        total_content: 合并后的完整回复文本（所有步骤 content 拼接）
+        total_content: 合并后的完整回复文本(所有步骤 content 拼接)
         total_reasoning: 合并后的完整思考过程
-        total_usage: 总计 token 用量（prompt_tokens / completion_tokens / total_tokens）
+        total_usage: 总计 token 用量(prompt_tokens / completion_tokens / total_tokens)
         finish_reason: 最终结束原因
                         - "completed": 正常完成
                         - "max_turns": 达到最大轮次
@@ -295,7 +301,7 @@ class RunSummary(AgentSummary):
 
     @property
     def last_step(self) -> Optional[StepSummary]:
-        """最后一步的汇总（便捷访问）"""
+        """最后一步的汇总(便捷访问)"""
         return self.steps[-1] if self.steps else None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -318,7 +324,7 @@ class AgentError(AgentSummary):
     Attributes:
         error_message: 错误描述
         exception_type: 异常类型名
-        partial_summary: 出错前已产出的部分结果（StepSummary 或 RunSummary）
+        partial_summary: 出错前已产出的部分结果(StepSummary 或 RunSummary)
         step_index: 错误发生在第几步
     """
 
@@ -445,9 +451,6 @@ def agent_error(
     )
 
 
-# ---------------------------------------------------------------------------
-# 桥接：GenerationResponse → Agent 事件
-# ---------------------------------------------------------------------------
 
 def generation_response_to_step_summary(
     gen: GenerationResponse,
@@ -457,7 +460,7 @@ def generation_response_to_step_summary(
     """将 LLMCoordinator 的 GenerationResponse 转换为 Agent StepSummary
 
     用于在 Agent Runner 内部调用 LLMCoordinator.step() / run() 后，
-    桥接 LLM 层的返回值到 Agent 事件体系。
+    桥接 LLM 层的返回值到 Agent 事件体系
 
     Args:
         gen: LLM 层返回的 GenerationResponse
@@ -511,9 +514,6 @@ def generation_response_to_step_summary(
     )
 
 
-# ---------------------------------------------------------------------------
-# 公开 API 汇总
-# ---------------------------------------------------------------------------
 
 __all__ = [
     # 枚举

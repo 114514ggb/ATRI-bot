@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, AsyncGenerator
 from atribot.LLMchat.agent.agent_data import AgentData
 
 if TYPE_CHECKING:
-    from atribot.LLMchat.agent.runners.response import AgentEvent, AgentStreamChunk
+    from atribot.LLMchat.agent.runners.response import AgentEvent
 
 
 class AgentState(Enum):
@@ -22,7 +22,7 @@ class BaseAgentRunner(ABC):
     Attributes:
         agent_data (AgentData): 运行器绑定的状态载体
         state (AgentState): 当前 Agent 的运行状态
-        stream (bool): 是否输出流式中间事件（从 agent_data.kwargs 读取）
+        stream (bool): 是否输出流式中间事件
     """
 
     def __init__(self, agent_data: AgentData):
@@ -51,45 +51,26 @@ class BaseAgentRunner(ABC):
         """
         self.state = new_state
 
-    async def _yield_stream(self, event: "AgentStreamChunk") -> AsyncGenerator["AgentEvent", None]:
-        """流式事件产出辅助方法
-
-        如果 stream=True 则 yield 传入的事件；否则静默丢弃。
-        具体 Runner 子类在生成流式事件时统一使用此方法：
-
-            async for e in self._yield_stream(chunk):
-                yield e
-
-        Args:
-            event: 待产出的流式中间事件
-
-        Yields:
-            AgentEvent: 仅在 stream 开启时产出
-        """
-        if self.stream:
-            yield event
 
     @abstractmethod
-    async def step(self) -> AsyncGenerator["AgentEvent", None]:
+    async def step(self) -> AsyncGenerator[AgentEvent, None]:
         """执行单一推进步骤
 
-        单次 LLM 交互（内部可能包含工具调用循环）。
+        单次 LLM 交互（内部可能包含工具调用循环）
 
         Yields:
-            AgentEvent: stream=True 时依次产出流式中间事件，最后产出 StepSummary；
+            AgentEvent: stream=True 时依次产出流式中间事件，最后产出 StepSummary
                         stream=False 时仅产出 StepSummary
         """
         ...
 
     @abstractmethod
-    async def run(self, max_turns: int = 10) -> AsyncGenerator["AgentEvent", None]:
+    async def run(self, max_turns: int = 20) -> AsyncGenerator[AgentEvent, None]:
         """完整运行 Agent 逻辑直到任务完结或受阻
 
-        多轮 Agent 循环（规划 → 行动 → 观察 → 反思）。
-
         Yields:
-            AgentEvent: stream=True 时每步产出流式中间事件 + StepSummary，
-                        最后产出 RunSummary；
+            AgentEvent: stream=True 时每步产出流式中间事件 + StepSummary
+                        最后产出 RunSummary
                         stream=False 时仅产出 RunSummary
         """
         ...
