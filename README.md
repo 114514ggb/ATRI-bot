@@ -17,11 +17,12 @@
 > — *𝓐𝓣𝓡𝓘 -𝓜𝔂 𝓓𝓮𝓪𝓻 𝓜𝓸𝓶𝓮𝓷𝓽𝓼-*
 >
 项目Logo由[吖密](https://space.bilibili.com/1196260828)绘制  
-[![Python](https://img.shields.io/badge/Python-3.13-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.14-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg)](https://www.docker.com/)
 [![NapCat](https://img.shields.io/badge/Backend-NapCat-green.svg)](https://github.com/NapNeko/NapCatQQ)
-[![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](./LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Version](https://img.shields.io/badge/version-1.2.4-orange.svg)](./pyproject.toml)
 
 </div>
 
@@ -35,12 +36,14 @@
   - [🧠 深度 LLM 聊天集成](#-深度-llm-聊天集成)
   - [💻 类 Unix 命令系统](#-类-unix-命令系统)
   - [🛠️ 其他实用功能](#-其他实用功能)
+  - [🖥️ Web 管理面板](#-web-管理面板)
 - [🚀 快速开始 (How to Run)](#-快速开始-how-to-run)
   - [1. 前端连接 (NapCat)](#1-前端连接-napcat)
   - [2. 数据库配置 (PostgreSQL)](#2-数据库配置-postgresql)
   - [3. 模型与环境配置](#3-模型与环境配置)
   - [4. 启动项目](#4-启动项目)
-  - [5. 使用 Docker 启动](#5-使用-docker-启动)
+  - [5. 运行测试](#5-运行测试)
+  - [6. 使用 Docker 启动](#6-使用-docker-启动)
 - [📂 项目结构](#-项目结构)
 - [🏗️ 架构设计](#-架构设计)
   - [整体消息流](#整体消息流)
@@ -107,6 +110,21 @@
 - **戳一戳互动**：被戳时不只会响应，还会「戳回去」。
 - **稳健架构基础**：数据库连接池 + 消息队列，从容应对并发压力。
 
+### 🖥️ Web 管理面板
+
+项目内置了一个轻量级的 Web 管理面板（基于 FastAPI），启动后在浏览器访问：
+
+```
+http://127.0.0.1:1314/admin/
+```
+
+- **认证方式**：使用 `access_token`（与 NapCat 连接 Token 相同）作为 Bearer Token 登录。
+- **运行状态**：查看 Bot 账号、当前模型、在线时长、沙盒/MCP 状态等。
+- **数据统计**：群组数、用户数、消息数、记忆条目数一目了然。
+- **群组管理**：分页浏览已接入的群组列表，支持检索。
+
+> 面板默认只监听 `127.0.0.1`，安全起见请勿直接暴露到公网。端口可通过 `config.json` 中的 `network.admin_port` 自定义。
+
 ---
 
 ## 🚀 快速开始 (How to Run)
@@ -124,12 +142,13 @@
     - 必须安装 `pgvector`（向量检索）[pgvector 项目地址](https://github.com/pgvector/pgvector)
     - 必须安装 `pgroonga`（全文检索）[PGroonga 文档](https://pgroonga.github.io/)
 3.  **数据库初始化**：
-    项目提供了初始化 SQL 文件：`assets/PostgreSQL基础.sql`（开发版）和 `docker/db/info.sql`（Docker 初始化版）。
+    项目提供了初始化 SQL 文件，推荐使用 `docker/db/info.sql`（含完整表结构与扩展配置）。
+    也可参考 `assets/PostgreSQL基础.sql`（开发版）。
     进入数据库（Linux 示例）：
     ```bash
     sudo -u postgres psql
     ```
-    然后按顺序执行对应 SQL 文件创建表结构。
+    然后按顺序执行 SQL 文件创建表结构。
 
 ### 3. 模型与环境配置
 
@@ -170,8 +189,8 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
-1.  将 `config copy.json` 重命名为 `config.json` 并配置(记得查看"如何配置配置文件.py")。
-2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置,支持任意opneAI兼容的）。
+1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.py`）。其中 `model.chat_parameter.thinking_level` 控制深度思考模式 (`minimal`/`low`/`medium`/`high`)，支持思维的模型可用此参数调节推理深度。
+2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
     ```bash
     cp "assets/config copy.json" assets/config.json
     cp "assets/supplier_config copy.json" assets/supplier_config.json
@@ -183,7 +202,7 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 
 ### 4. 启动项目
-项目依赖 **Python 3.13** 环境，推荐使用 `uv` 管理依赖。
+项目依赖 **Python 3.14** 环境，推荐使用 `uv` 管理依赖。
 
 **使用 uv (推荐):**
 ```bash
@@ -216,6 +235,22 @@ cp .env.docker.example .env
 ```
 > **注意**：请检查 `.env` 文件中的端口与 Token 设置，确保与 NapCat 配置一致。
 
+**环境变量说明**（`.env.docker.example`）：
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `ATRI_DB_SUPERUSER_PASSWORD` | PostgreSQL 超级用户密码 | `180710` |
+| `ATRI_DB_NAME` | 应用数据库名称 | `atri` |
+| `ATRI_DB_APP_USER` | 应用数据库用户 | `atri` |
+| `ATRI_DB_APP_PASSWORD` | 应用数据库密码 | `180710` |
+| `ATRI_DB_PORT_FORWARD` | 宿主机映射端口 | `5432` |
+| `ATRI_BOT_PORT` | Bot WebSocket 服务端口 | `8888` |
+| `ATRI_ACCESS_TOKEN` | NapCat 连接验证 Token | `ATRI114514` |
+| `ATRI_CONNECTION_TYPE` | 连接类型（WebSocket_server/client） | `WebSocket_server` |
+| `ATRI_NAPCAT_URL` | NapCat WebSocket 地址（客户端模式） | `host.docker.internal:3001` |
+| `ATRI_SANDBOX_IMAGE` | AI 沙盒使用的 Docker 镜像 | `python:3.13-slim` |
+| `TZ` | 容器时区 | `Asia/Shanghai` |
+
 然后直接启动：
 ```bash
 docker compose up -d --build
@@ -247,6 +282,7 @@ docker compose exec db psql -U postgres -d postgres
 - 容器启动时会基于 `assets/config.json` 生成一份运行时配置，不会覆盖你原本的本地配置。
 - 默认把宿主机的 `assets/`、`document/`、`log/`、`temp/` 挂进容器，便于直接改配置和保留运行数据。
 - 内置 AI 沙盒默认只做镜像名覆盖；如果你还想让容器内再调用 Docker 沙盒，需要额外挂载 Docker Socket。
+- **Web 管理面板**：启动后可通过 `http://宿主机IP:1314/admin/` 访问，使用 `.env` 中配置的 `ATRI_ACCESS_TOKEN` 作为 Bearer Token 登录。
 
 ---
 ## 📂 项目结构
@@ -256,11 +292,14 @@ ATRI-main/
 ├─main.py                       # 项目入口
 ├─pyproject.toml                # Python 项目依赖与构建配置
 ├─docker-compose.yml            # Docker Compose 启动配置
+├─.env.docker.example           # Docker 环境变量示例
 ├─README.md / README.en.md      # 中英文说明文档
 ├─requirements-*.txt            # 各平台依赖导出文件
+├─tests/                        # 🧪 单元测试与集成测试
 ├─assets/                       # ⚙️ 配置文件、示例配置
 ├─atribot/                      # 核心代码
 │  ├─bot_framework.py           # Bot 初始化与整体装配入口
+│  ├─C/                         # C 扩展模块（Levenshtein 算法等）
 │  ├─commands/                  # 💻 群聊命令实现
 │  │  ├─audio/                  # 音频与 TTS 相关命令
 │  │  ├─bromidic/               # 图片 / B 站等杂项功能命令
@@ -276,28 +315,31 @@ ATRI-main/
 │  │  ├─network_connections/    # WebSocket 与消息收发
 │  │  └─type/                   # 核心类型定义
 │  ├─docs/                      # 开发过程中的文档与笔记
-│  └─LLMchat/                   # 🧠 LLM 聊天与 Agent 能力
-│     ├─character_setting/      # 人设预设
-│     ├─discard_tools/          # 已废弃的工具
-│     ├─MCP/                    # MCP 协议工具与配置
-│     ├─memory/                 # 记忆系统
-│     ├─model_api/              # 模型供应商接口
-│     ├─RAG/                    # 检索增强生成逻辑
-│     ├─sandbox/                # 沙盒
-│     ├─skills/                 # skills 提示词相关模块
-│     └─tools/                  # 函数调用工具集
+│  ├─LLMchat/                   # 🧠 LLM 聊天与 Agent 能力
+│  │  ├─character_setting/      # 人设预设
+│  │  ├─discard_tools/          # 已废弃的工具
+│  │  ├─MCP/                    # MCP 协议工具与配置
+│  │  ├─memory/                 # 记忆系统
+│  │  ├─model_api/              # 模型供应商接口
+│  │  ├─RAG/                    # 检索增强生成逻辑
+│  │  ├─sandbox/                # 沙盒
+│  │  ├─skills/                 # skills 提示词相关模块
+│  │  └─tools/                  # 函数调用工具集
+│  └─web_panel/                 # 🖥️ Web 管理面板
 ├─docker/                       # 🐳 Docker 相关资源
 │  ├─db/                        # 数据库初始化脚本与镜像文件
 │  └─python/                    # Python 容器环境相关资源
 ├─document/                     # 🎨 运行时资源目录
-   ├─audio/                     # 音频素材
-   ├─file/                      # 通用文本 / 文件资源
-   ├─img/                       # 图片资源
-   │  ├─ATRI_qrcode/            # 二维码资源
-   │  ├─emojis/                 # 表情包目录
-   │  └─tmp/                    # 临时图片目录
-   ├─video/                     # 视频资源
-   └──temp/                     # 临时运行文件
+│  ├─audio/                     # 音频素材
+│  ├─file/                      # 通用文本 / 文件资源
+│  ├─img/                       # 图片资源
+│  │  ├─ATRI_qrcode/            # 二维码资源
+│  │  ├─emojis/                 # 表情包目录
+│  │  └─tmp/                    # 临时图片目录
+│  ├─video/                     # 视频资源
+│  └─temp/                      # 临时运行文件
+├─privacy/                      # 开发笔记与隐私文件
+└─log/                          # 运行时日志
 ```
 
 ---
@@ -449,7 +491,7 @@ memorySystem.extract_stored_group_message()
 
 ## 📄 开源协议
 
-本项目遵循 **GNU General Public License v3.0 (GPLv3)** 协议。
+本项目遵循 **MIT License** 协议。
 详情请参阅 [LICENSE](./LICENSE) 文件。
 
 ---

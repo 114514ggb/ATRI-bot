@@ -26,7 +26,7 @@ class BaseCompressionStrategy(ABC):
             context: 待检查的 Agent 对话上下文
 
         Returns:
-            True 表示需要压缩，False 表示跳过
+            True 表示需要压缩,False 表示跳过
         """
         ...
 
@@ -34,8 +34,8 @@ class BaseCompressionStrategy(ABC):
     def compress(self, context: AgentContext) -> Optional[List[BaseMessage]]:
         """对上下文执行压缩操作
 
-        该方法会直接修改传入的 context（如弹出消息、更新 token 计数等）。
-
+        该方法会直接修改传入的 context
+        
         Args:
             context: 待压缩的 Agent 对话上下文
 
