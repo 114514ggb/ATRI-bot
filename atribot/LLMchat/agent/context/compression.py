@@ -67,7 +67,7 @@ class DefaultCompressionStrategy(BaseCompressionStrategy):
         )
         trigger_by_tokens = (
             context.total_tokens
-            > (context.max_context_tokens * 0.6)
+            > (context.max_context_tokens * 0.8)
         )
         return trigger_by_count or trigger_by_tokens
 

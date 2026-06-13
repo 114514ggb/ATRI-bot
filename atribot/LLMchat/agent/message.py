@@ -19,9 +19,13 @@ class MessageSegment(ABC):
 class TextSegment(MessageSegment):
     """纯文本消息段"""
     text: str
-    
+    _cached_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        self._cached_dict = {"type": "text", "text": self.text}
+
     def to_dict(self) -> Dict[str, Any]:
-        return {"type": "text", "text": self.text}
+        return self._cached_dict
 
 
 @dataclass(slots=True)
@@ -29,12 +33,16 @@ class ImageURLSegment(MessageSegment):
     """图片 URL 消息段"""
     url: str
     detail: str = "auto"
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "type": "image_url", 
+    _cached_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        self._cached_dict = {
+            "type": "image_url",
             "image_url": {"url": self.url, "detail": self.detail}
         }
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self._cached_dict
 
 
 @dataclass(slots=True)
@@ -43,15 +51,19 @@ class ImageBase64Segment(MessageSegment):
     data: str
     mime: str = "image/png"
     detail: str = "auto"
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "type": "image_url", 
+    _cached_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        self._cached_dict = {
+            "type": "image_url",
             "image_url": {
-                "url": f"data:{self.mime};base64,{self.data}", 
+                "url": f"data:{self.mime};base64,{self.data}",
                 "detail": self.detail
             }
         }
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self._cached_dict
 
 
 @dataclass(slots=True)
@@ -59,21 +71,29 @@ class AudioSegment(MessageSegment):
     """音频输入消息段"""
     data: str
     fmt: str = "wav"
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "type": "input_audio", 
+    _cached_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        self._cached_dict = {
+            "type": "input_audio",
             "input_audio": {"data": self.data, "format": self.fmt}
         }
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self._cached_dict
 
 
 @dataclass(slots=True)
 class VideoURLSegment(MessageSegment):
     """视频 URL 消息段"""
     url: str
-    
+    _cached_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        self._cached_dict = {"type": "video_url", "video_url": {"url": self.url}}
+
     def to_dict(self) -> Dict[str, Any]:
-        return {"type": "video_url", "video_url": {"url": self.url}}
+        return self._cached_dict
 
 
 @dataclass(slots=True)
@@ -81,12 +101,16 @@ class VideoBase64Segment(MessageSegment):
     """视频 Base64 消息段"""
     data: str
     mime: str = "video/mp4"
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "type": "video_url", 
+    _cached_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        self._cached_dict = {
+            "type": "video_url",
             "video_url": {"url": f"data:{self.mime};base64,{self.data}"}
         }
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self._cached_dict
 
 
 @dataclass(slots=True)
@@ -94,12 +118,16 @@ class FileSegment(MessageSegment):
     """文件消息段"""
     url: str
     mime: str = ""
-    
-    def to_dict(self) -> Dict[str, Any]:
-        res = {"type": "file", "file": {"url": self.url}}
+    _cached_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        res: Dict[str, Any] = {"type": "file", "file": {"url": self.url}}
         if self.mime:
             res["file"]["mime_type"] = self.mime
-        return res
+        self._cached_dict = res
+
+    def to_dict(self) -> Dict[str, Any]:
+        return self._cached_dict
 
 
 @dataclass(slots=True)
@@ -122,9 +150,13 @@ class SystemMessage(BaseMessage):
     """系统消息实体"""
     role: Literal["system"] = "system"
     content: str = ""
-    
+    _cached_openai_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
+        self._cached_openai_dict = {"role": self.role, "content": self.content}
+
     def to_openai_dict(self) -> Dict[str, Any]:
-        return {"role": self.role, "content": self.content}
+        return self._cached_openai_dict
 
 
 @dataclass(slots=True)
@@ -132,15 +164,19 @@ class UserMessage(BaseMessage):
     """用户消息实体"""
     role: Literal["user"] = "user"
     content: str | List[MessageSegment] = ""
-    
-    def to_openai_dict(self) -> Dict[str, Any]:
+    _cached_openai_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
         if isinstance(self.content, str):
-            return {"role": self.role, "content": self.content}
+            self._cached_openai_dict = {"role": self.role, "content": self.content}
         else:
-            return {
-                "role": self.role, 
+            self._cached_openai_dict = {
+                "role": self.role,
                 "content": [seg.to_dict() for seg in self.content]
             }
+
+    def to_openai_dict(self) -> Dict[str, Any]:
+        return self._cached_openai_dict
 
 
 @dataclass(slots=True)
@@ -151,8 +187,9 @@ class AssistantMessage(BaseMessage):
     reasoning_content: Optional[str] = None
     extra_content: Optional[Dict[str, Any]] = None
     tool_calls: Optional[List[Dict[str, Any]]] = None
-    
-    def to_openai_dict(self) -> Dict[str, Any]:
+    _cached_openai_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
         res: Dict[str, Any] = {"role": self.role}
         if self.content is not None:
             res["content"] = self.content
@@ -162,7 +199,10 @@ class AssistantMessage(BaseMessage):
             res["extra_content"] = self.extra_content
         if self.tool_calls is not None:
             res["tool_calls"] = self.tool_calls
-        return res
+        self._cached_openai_dict = res
+
+    def to_openai_dict(self) -> Dict[str, Any]:
+        return self._cached_openai_dict
 
 
 @dataclass(slots=True)
@@ -172,18 +212,20 @@ class ToolMessage(BaseMessage):
     name: str = ""
     role: Literal["tool"] = "tool"
     content: str | List[MessageSegment] = ""
-    
-    def to_openai_dict(self) -> Dict[str, Any]:
+    _cached_openai_dict: Dict[str, Any] = field(init=False)
+
+    def __post_init__(self):
         res: Dict[str, Any] = {
             "role": self.role,
             "tool_call_id": self.tool_call_id,
         }
         if self.name:
             res["name"] = self.name
-            
         if isinstance(self.content, str):
             res["content"] = self.content
         else:
             res["content"] = [seg.to_dict() for seg in self.content]
-            
-        return res
+        self._cached_openai_dict = res
+
+    def to_openai_dict(self) -> Dict[str, Any]:
+        return self._cached_openai_dict
