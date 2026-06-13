@@ -157,8 +157,8 @@ CREATE TABLE atri_memory (
 
 CREATE INDEX idx_message_user_time ON message(user_id, time DESC);
 CREATE INDEX idx_atri_memory_user_time ON atri_memory (user_id, event_time);
-CREATE INDEX IF NOT EXISTS idx_chat_context_user_id ON chat_context(user_id) WHERE user_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_chat_context_group_id ON chat_context(group_id) WHERE group_id IS NOT NULL;
+CREATE INDEX idx_chat_context_user_id ON chat_context(user_id) WHERE user_id IS NOT NULL;
+CREATE INDEX idx_chat_context_group_id ON chat_context(group_id) WHERE group_id IS NOT NULL;
 CREATE INDEX idx_token_statistics_user_id ON token_statistics(user_id) WHERE user_id IS NOT NULL;
 CREATE INDEX idx_token_statistics_group_id ON token_statistics(group_id) WHERE group_id IS NOT NULL;
 CREATE INDEX idx_atri_memory_vector

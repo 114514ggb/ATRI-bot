@@ -2,7 +2,7 @@ services:
   db:
     build:
       context: .
-      dockerfile: docker/db/dockerfile
+      dockerfile: docker/db/Dockerfile
     container_name: atri-db
     restart: unless-stopped
     environment:
@@ -47,7 +47,7 @@ services:
       ATRI_NETWORK_SERVER_PORT: 8888
       ATRI_NETWORK_URL: ${ATRI_NAPCAT_URL:-host.docker.internal:3001}
       ATRI_NETWORK_ACCESS_TOKEN: ${ATRI_ACCESS_TOKEN:-ATRI114514}
-      ATRI_SANDBOX_IMAGE: ${ATRI_SANDBOX_IMAGE:-python:3.13-slim}
+      ATRI_SANDBOX_IMAGE: ${ATRI_SANDBOX_IMAGE:-python:3.14-slim}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

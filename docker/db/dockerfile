@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --fix-missing \
     postgresql-server-dev-18 \
     postgresql-18-pgdg-pgroonga \
     && cd /tmp \
-    && git clone --branch v0.8.1 https://github.com/pgvector/pgvector.git \
+    && git clone --branch v0.8.2 https://github.com/pgvector/pgvector.git \
     && cd pgvector \
     && make \
     && make install \
