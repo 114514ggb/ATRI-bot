@@ -212,9 +212,18 @@ class EventTrigger:
                     if re.search(pattern, answer, re.IGNORECASE):
                         await self.send_message.set_group_add_request(data['flag'], True)
                         return True
+                    
+            if qq_level := (await self.send_message.get_stranger_info(message.user_id)).get("qqLevel",0):
+                if qq_level < 10:
+                    await self.send_message.set_group_add_request(data['flag'], False)
+                    await self.send_message.send_group_msg(
+                        group_id,
+                        f"已自动拒绝可疑加群请求！等级过低{qq_level}级\n验证信息:\n{comment}"
+                    )
+                    return True
 
         await self.send_message.send_group_msg(
-            group_id, f"有人申请加群了!\n{comment}"
+            group_id, f"有人申请加群了!\n[CQ:at,qq={message.user_id}]({message.user_id})\n{comment}"
         )
         return True        
 
