@@ -218,7 +218,7 @@ class EventTrigger:
                     await self.send_message.set_group_add_request(data['flag'], False)
                     await self.send_message.send_group_msg(
                         group_id,
-                        f"已自动拒绝可疑加群请求！等级过低{qq_level}级\n验证信息:\n{comment}"
+                        f"已自动拒绝可疑加群请求！等级过低:{qq_level}级\n验证信息:\n{comment or "None"}"
                     )
                     return True
 
