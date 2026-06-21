@@ -1,26 +1,28 @@
-from abc import ABC, abstractmethod
+from __future__ import annotations
+
+import inspect
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any, Awaitable
 
 import mcp
 from mcp.types import CallToolResult
 
 from atribot.core.type.chat_message_types import ChatMessage
-from atribot.LLMchat.MCP.mcp_tool_manager import MCPClient
+
+if TYPE_CHECKING:
+    from atribot.LLMchat.MCP.mcp_tool_manager import MCPClient
 
 
-class FunctionTool(ABC):
-    """工具基类,所有本地工具和 MCP 工具都应继承此类
-
-    定义了工具的通用字段和执行接口子类必须实现 :meth:`execute` 方法
+class FunctionTool:
+    """工具基类 —— 定义所有工具的公共属性
 
     Attributes:
-        name (str): 工具名称,全局唯一标识
-        description (str): 工具功能描述,供 LLM 理解工具用途
-        parameters (dict): 工具参数 JSON Schema,默认为空的 object 类型
-        concurrent (bool): 是否允许并发执行为 ``False`` 时调用方应串行化调用
-        background (bool): 是否为后台任务为 ``True`` 时调用方不需要等待结果
-        active (bool): 是否启用为 ``False`` 时工具已注册但不可用
+        name: 工具名称,全局唯一标识
+        description: 工具功能描述,供 LLM 理解工具用途
+        parameters: 工具参数 JSON Schema,默认为空的 object 类型
+        concurrent: 是否允许并发执行
+        background: 是否为后台任务
+        active: 是否启用
     """
 
     def __init__(
@@ -37,11 +39,11 @@ class FunctionTool(ABC):
         Args:
             name: 工具名称,全局唯一标识
             description: 工具功能描述,供 LLM 理解工具用途
-            parameters: 工具参数 JSON Schema若为 None,则默认为
+            parameters: 工具参数 JSON Schema,若为 None 则默认为
                 ``{"type": "object", "properties": {}}``
-            concurrent: 是否允许并发执行默认为 ``False``
-            background: 是否为后台任务默认为 ``False``
-            active: 是否启用默认为 ``True``
+            concurrent: 是否允许并发执行,默认为 ``False``
+            background: 是否为后台任务,默认为 ``False``
+            active: 是否启用,默认为 ``True``
         """
         self.name: str = name
         """工具名称,全局唯一标识"""
@@ -50,59 +52,108 @@ class FunctionTool(ABC):
         self.parameters: dict = parameters or {"type": "object", "properties": {}}
         """工具参数 JSON Schema"""
         self.concurrent: bool = concurrent
-        """是否允许并发执行为 ``False`` 时调用方应串行化调用"""
+        """是否允许并发执行,为 ``False`` 时调用方应串行化调用"""
         self.background: bool = background
-        """是否为后台任务为 ``True`` 时调用方不需要等待结果"""
+        """是否为后台任务,为 ``True`` 时调用方不需要等待结果"""
         self.active: bool = active
-        """是否启用为 ``False`` 时工具已注册但不可用"""
+        """是否启用"""
 
-    @abstractmethod
     async def execute(
-        self, message_data: ChatMessage, **kwargs: Any
+        self, message_data: ChatMessage | None = None, **kwargs: Any
     ) -> str | CallToolResult:
-        """执行工具
-
-        子类必须实现此方法第一个参数固定为触发此次调用的聊天消息
+        """执行工具 —— 子类必须覆盖此方法
 
         Args:
-            message_data: 触发此次工具调用的聊天消息上下文
-            **kwargs: 工具参数,key 与 ``parameters.properties`` 中的键对应
-
-        Returns:
-            工具执行结果,可以是纯文本字符串或 MCP 标准
-            :class:`~mcp.types.CallToolResult`
-
-        Raises:
-            NotImplementedError: 子类未实现该方法时抛出
+            message_data: 可选的聊天消息上下文
+            **kwargs: 工具参数
         """
         ...
 
     def __repr__(self) -> str:
-        """返回工具的字符串表示,包含名称、描述和参数信息
-
-        Returns:
-            形如 ``ClassName(name='...', description='...', parameters={...})``
-            的字符串
-        """
         return (
             f"{self.__class__.__name__}("
             f"name={self.name!r}, "
-            f"description={self.description!r}, "
-            f"parameters={self.parameters!r}"
+            f"active={self.active!r}"
             f")"
         )
 
 
-class MCPTool(FunctionTool):
-    """MCP 工具子类,用于封装来自 MCP 服务器的远程工具
+class LocalTool(FunctionTool):
+    """本地工具 —— 由本地异步函数驱动的工具
 
-    与本地工具不同,MCP 工具的执行不依赖聊天消息上下文,
-    因此 :meth:`execute` 方法不接受 ``message_data`` 参数
+    Attributes:
+        handler: 异步处理函数
+        handler_module_path: handler 所在模块路径（用于 functools.partial 包装后
+            恢复 ``__module__`` 信息）
+    """
+
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        handler: Awaitable,
+        parameters: dict | None = None,
+        concurrent: bool = False,
+        background: bool = False,
+        active: bool = True,
+        handler_module_path: str | None = None,
+    ) -> None:
+        """初始化本地工具
+
+        Args:
+            name: 工具名称,全局唯一标识
+            description: 工具功能描述
+            handler: 异步处理函数
+            parameters: 工具参数 JSON Schema
+            concurrent: 是否允许并发执行
+            background: 是否为后台任务
+            active: 是否启用
+        """
+        super().__init__(
+            name=name,
+            description=description,
+            parameters=parameters,
+            concurrent=concurrent,
+            background=background,
+            active=active,
+        )
+        self.handler: Awaitable = handler
+        """异步处理函数"""
+
+    async def execute(
+        self, message_data: ChatMessage | None = None, **kwargs: Any
+    ) -> str | CallToolResult:
+        """执行本地工具
+
+        检查 handler 是否存在,自动注入 ``message_data`` 到 handler 签名中,
+        然后调用 ``await self.handler(**kwargs)``
+
+        Args:
+            message_data: 可选的聊天消息上下文
+            **kwargs: 工具参数
+
+        Returns:
+            工具执行结果
+
+        Raises:
+            Exception: handler 不存在时抛出
+        """
+        if not self.handler:
+            raise Exception(f"本地工具 {self.name} 没有绑定处理函数")
+        if message_data is not None and "message_data" in inspect.signature(
+            self.handler
+        ).parameters:
+            kwargs["message_data"] = message_data
+        return await self.handler(**kwargs)
+
+
+class MCPTool(FunctionTool):
+    """MCP 工具
 
     Attributes:
         mcp_tool: MCP SDK 中的原始工具对象
         mcp_client: 与 MCP 服务器通信的客户端实例
-        mcp_server_name: MCP 服务器名称
+        mcp_server_name: MCP 服务名称
     """
 
     def __init__(
@@ -123,27 +174,37 @@ class MCPTool(FunctionTool):
             name: 工具名称
             description: 工具功能描述
             parameters: 工具参数 JSON Schema
-            mcp_tool: MCP SDK 中的原始工具对象
-            mcp_client: 与 MCP 服务器通信的客户端实例
-            mcp_server_name: MCP 服务器名称,用于日志和调试
-            concurrent: 是否允许并发执行默认为 ``False``
-            background: 是否为后台任务默认为 ``False``
-            active: 是否启用默认为 ``True``
+            mcp_tool: MCP SDK 原始工具对象
+            mcp_client: MCP 客户端实例
+            mcp_server_name: MCP 服务名称
+            concurrent: 是否允许并发执行
+            background: 是否为后台任务
+            active: 是否启用
         """
-        super().__init__(name, description, parameters, concurrent, background, active)
+        super().__init__(
+            name=name,
+            description=description,
+            parameters=parameters,
+            concurrent=concurrent,
+            background=background,
+            active=active,
+        )
         self.mcp_tool: mcp.Tool = mcp_tool
         """MCP SDK 中的原始工具对象"""
         self.mcp_client: MCPClient = mcp_client
         """与 MCP 服务器通信的客户端实例"""
         self.mcp_server_name: str = mcp_server_name
-        """MCP 服务器名称"""
+        """MCP 服务名称"""
 
-    async def execute(self, **kwargs: Any) -> str | CallToolResult:
+    async def execute(
+        self, message_data: ChatMessage | None = None, **kwargs: Any
+    ) -> str | CallToolResult:
         """执行 MCP 工具
 
-        通过 MCP 客户端会话调用远程工具MCP 工具不需要聊天消息上下文
+        通过 MCP 客户端会话调用远程工具,MCP 工具不需要聊天消息上下文
 
         Args:
+            message_data: 未使用（MCP 工具忽略此参数）
             **kwargs: 工具参数
 
         Returns:
@@ -422,6 +483,22 @@ class ToolSet:
         """
         for tool in other.tools:
             self.add_tool(tool)
+
+    def filter_by_names(self, names: list[str]) -> ToolSet:
+        """按名称列表筛选工具子集
+
+        Args:
+            names: 要保留的工具名称列表
+
+        Returns:
+            仅包含匹配名称工具的新 ToolSet 实例
+        """
+        result = ToolSet()
+        names_set = set(names)
+        for tool in self.tools:
+            if tool.name in names_set:
+                result.add_tool(tool)
+        return result
 
     def __len__(self) -> int:
         """返回工具数量"""

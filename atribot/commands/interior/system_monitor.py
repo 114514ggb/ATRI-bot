@@ -5,9 +5,10 @@ import psutil
 
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
-from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
+from atribot.LLMchat.MCP.model_tools import ToolCalls
+from atribot.LLMchat.MCP.tool_model import MCPTool
 
-mcp:FuncCall = container.get("MCP")
+tool_set: ToolCalls = container.get("ToolCalls")
 config = container.get("config")
 
 class SystemMonitor:
@@ -134,11 +135,11 @@ class SystemMonitor:
         """查看系统MCP工具信息，返回格式化的字符串"""
         tools_info = []
         
-        for func in mcp.func_list:
+        for func in tool_set.func_list:
             status = "✅" if func.active else "❌"
             
-            origin_info = f"来源: {func.origin}"
-            if func.origin == "mcp" and func.mcp_server_name:
+            origin_info = f"来源: {'mcp' if isinstance(func, MCPTool) else 'local'}"
+            if isinstance(func, MCPTool) and func.mcp_server_name:
                 origin_info += f" (服务: {func.mcp_server_name})"
             
             params_info = []

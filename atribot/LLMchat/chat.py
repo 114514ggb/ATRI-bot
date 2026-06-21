@@ -29,8 +29,7 @@ from atribot.LLMchat.LLM_supervisor import (
     LLMCoordinator,
     LLMSRequestFailed,
 )
-from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
-from atribot.LLMchat.MCP.model_tools import tool_calls
+from atribot.LLMchat.MCP.model_tools import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
@@ -76,8 +75,7 @@ class ChatBasics(ABC):
         skills_manager: SkillsManager,
         user_system: UserSystem,
         emoji_core: EmojiCore,
-        mcp: FuncCall,
-        tool_calls_mgr: tool_calls,
+        tool_calls_mgr: ToolCalls,
         config: atriConfig,
         log: Logger,
     ):
@@ -91,8 +89,7 @@ class ChatBasics(ABC):
         self.skills: SkillsManager = skills_manager
         self.user_system: UserSystem = user_system
         self.emoji_core: EmojiCore = emoji_core
-        self.mcp_tool: FuncCall = mcp
-        self.tool_calls: tool_calls = tool_calls_mgr
+        self.tool_calls: ToolCalls = tool_calls_mgr
         self.config: atriConfig = config
         self.log: Logger = log
         self.build_prompt = build_prompt()
@@ -275,8 +272,7 @@ class GroupChat(ChatBasics):
         skills_manager: SkillsManager,
         user_system: UserSystem,
         emoji_core: EmojiCore,
-        mcp: FuncCall,
-        tool_calls_mgr: tool_calls,
+        tool_calls_mgr: ToolCalls,
         config: atriConfig,
         log: Logger,
     ):
@@ -291,7 +287,6 @@ class GroupChat(ChatBasics):
             skills_manager=skills_manager,
             user_system=user_system,
             emoji_core=emoji_core,
-            mcp=mcp,
             tool_calls_mgr=tool_calls_mgr,
             config=config,
             log=log,
@@ -484,7 +479,7 @@ class GroupChat(ChatBasics):
 
         prompt =(
             f"{custom_prompt}\n触发定时消息用户:<user_id>{user_id}</user_id>"
-            (f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>" if user_id else "")
+            f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>" if user_id else ""
         )
         
         message_builder.add_text(
@@ -955,8 +950,7 @@ class PrivateChat(ChatBasics):
         skills_manager: SkillsManager,
         user_system: UserSystem,
         emoji_core: EmojiCore,
-        mcp: FuncCall,
-        tool_calls_mgr: tool_calls,
+        tool_calls_mgr: ToolCalls,
         config: atriConfig,
         log: Logger,
     ):
@@ -971,7 +965,6 @@ class PrivateChat(ChatBasics):
             skills_manager=skills_manager,
             user_system=user_system,
             emoji_core=emoji_core,
-            mcp=mcp,
             tool_calls_mgr=tool_calls_mgr,
             config=config,
             log=log,

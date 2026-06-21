@@ -23,8 +23,8 @@ from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.LLMchat.chat import GroupChat, PrivateChat
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import LLMCoordinator
-from atribot.LLMchat.MCP.mcp_tool_manager import FuncCall
-from atribot.LLMchat.MCP.model_tools import tool_calls
+from atribot.LLMchat.MCP.mcp_tool_manager import ToolManager
+from atribot.LLMchat.MCP.model_tools import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
@@ -59,16 +59,16 @@ class BotFramework:
 
     _NAMED_SERVICE_CLASSES = (
         (AsyncPostgreSQL, "database"),
-        (FuncCall, "MCP"),
+        (ToolManager, "MCP"),
         (LLMConnectionManager, "LLMSupplier"),
         (QQAPIClient, "SendMessage"),
-        (tool_calls, "ToolCalls"),
+        (ToolCalls, "ToolCalls"),
     )
 
     _RESOLVE_TARGETS = (
         HTTPClient,
         TimeTriggerSupervisor,
-        FuncCall,
+        ToolManager,
         AsyncPostgreSQL,
         TokenManager,
         LLMConnectionManager,
@@ -81,7 +81,7 @@ class BotFramework:
         QQAPIClient,
         EventTrigger,
         CommandSystem,
-        tool_calls,
+        ToolCalls,
         MediaProcessor,
         LLMCoordinator,
         GroupChat,

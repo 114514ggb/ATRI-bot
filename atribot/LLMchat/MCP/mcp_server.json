@@ -58,7 +58,7 @@
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ],
-      "active": false
+      "active": true
     },
     "推荐食谱-mcp": {
       "command": "npx",

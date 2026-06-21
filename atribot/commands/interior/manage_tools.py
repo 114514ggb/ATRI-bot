@@ -5,7 +5,7 @@ from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import ChatMessage
-from atribot.LLMchat.MCP.model_tools import tool_calls
+from atribot.LLMchat.MCP.model_tools import ToolCalls
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 
@@ -33,7 +33,7 @@ cmd_system:CommandSystem = container.get("CommandSystem")
 async def manage_tools(message_data: ChatMessage, action: str, target: str | None = None, extra_arg: str | None = None) -> None:
     send_message:QQAPIClient = container.get("SendMessage")
     config:atriConfig = container.get("config")
-    tool_calls_instance:tool_calls = container.get("ToolCalls")
+    tool_calls_instance: ToolCalls = container.get("ToolCalls")
     
     config_path = config.config_file_path
 
@@ -44,8 +44,8 @@ async def manage_tools(message_data: ChatMessage, action: str, target: str | Non
             return
             
         msg = "当前工具预设:\n"
-        for name, preset_tools in presets.items():
-            msg += f"- {name}: \n{', '.join(preset_tools)}\n\n"
+        for name, toolset in presets.items():
+            msg += f"- {name}: \n{', '.join(toolset.names())}\n\n"
         await send_message.send_group_merge_text(message_data.group_id, msg.strip(), source="工具预设列表")
         
     elif action == "add_tool":

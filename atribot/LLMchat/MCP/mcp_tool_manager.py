@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import json
 import os
-import textwrap
 from contextlib import AsyncExitStack, suppress
-from dataclasses import dataclass
 from datetime import timedelta
 from logging import Logger
 from pathlib import Path
-from typing import Any, Awaitable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 import mcp
@@ -18,74 +15,12 @@ from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
+from atribot.common_utils.timer import retry as timer_retry
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import ServiceBase, container
+from atribot.LLMchat.MCP.tool_model import FunctionTool, MCPTool
 
 DEFAULT_MCP_CONFIG = {"mcpServers": {}}
-
-SUPPORTED_TYPES = [
-    "string",
-    "number",
-    "object",
-    "array",
-    "boolean",
-]  # json schema 支持的数据类型
-
-
-@dataclass(slots=True)
-class FuncTool:
-    """
-    用于描述一个函数调用工具。
-    """
-
-    name: str
-    """名称"""
-    parameters: Dict[str,dict[str,dict]]
-    """参数类型字典"""
-    description: str
-    """工具作用"""
-    handler: Awaitable = None
-    """处理函数, 当 origin 为 mcp 时，这个为空"""
-    handler_module_path: str = None
-    """处理函数的模块路径，当 origin 为 mcp 时，这个为空
-
-    必须要保留这个字段, handler 在初始化会被 functools.partial 包装，导致 handler 的 __module__ 为 functools
-    """
-    active: bool = True
-    """是否激活"""
-
-    origin: Literal["local", "mcp"] = "local"
-    """函数工具的来源, local 为本地函数工具, mcp 为 MCP 服务"""
-
-    # MCP 相关字段
-    mcp_server_name: str = None
-    """MCP 服务名称，当 origin 为 mcp 时有效"""
-    mcp_client: MCPClient = None
-    """MCP 客户端，当 origin 为 mcp 时有效"""
-
-    def __repr__(self):
-        return f"FuncTool(name={self.name}, parameters={self.parameters}, description={self.description}, active={self.active}, origin={self.origin})"
-
-    async def execute(self, _message_data=None, **args) -> Any:
-        """执行函数调用"""
-        if self.origin == "local":
-            if not self.handler:
-                raise Exception(f"Local function {self.name} has no handler")
-            if _message_data is not None and 'message_data' in inspect.signature(self.handler).parameters:
-                args['message_data'] = _message_data
-            return await self.handler(**args)
-        elif self.origin == "mcp":
-            if not self.mcp_client or not self.mcp_client.session:
-                raise Exception(f"MCP client for {self.name} is not available")
-            # 使用name属性而不是额外的mcp_tool_name
-            if ":" in self.name:
-                # 如果名字是格式为 mcp:server:tool_name，提取实际的工具名
-                actual_tool_name = self.name.split(":")[-1]
-                return await self.mcp_client.session.call_tool(actual_tool_name, args)
-            else:
-                return await self.mcp_client.session.call_tool(self.name, args)
-        else:
-            raise Exception(f"Unknown function origin: {self.origin}")
 
 
 class MCPClient:
@@ -98,24 +33,38 @@ class MCPClient:
 
         self.name = None  # 客户端标识名
         self.active: bool = True  # 客户端激活状态
-        self.tools: List[mcp.Tool] = []  # 从服务器获取的工具列表
+        self.tools: list["MCPTool"] = []  # 从服务器获取的工具列表（MCPTool 实例）
         self.server_errlogs: List[str] = []  # 服务器错误日志
 
-    async def connect_to_server(self, mcp_server_config: dict):
+        # 重连支持
+        self._mcp_server_config: dict | None = None  # 保存原始配置用于重连
+        self._server_name: str | None = None  # 服务名称
+        self._reconnect_lock = asyncio.Lock()  # 重连互斥锁
+        self._reconnecting: bool = False  # 重连状态标记
+        self._old_exit_stacks: list[AsyncExitStack] = []  # 旧 exit_stack 延迟清理
+
+    async def connect_to_server(self, mcp_server_config: dict, name: str | None = None):
         """连接到 MCP 服务器
 
         如果 `url` 参数存在：
             1. 当 transport 指定为 `streamable_http` 时，使用 Streamable HTTP 连接方式
-            1. 当 transport 指定为 `sse` 时，使用 SSE 连接方式
-            2. 如果没有指定，默认使用 SSE 的方式连接到 MCP 服务
+            2. 当 transport 指定为 `sse` 时，使用 SSE 连接方式
+            3. 如果没有指定，默认使用 SSE 的方式连接到 MCP 服务
 
         Args:
             mcp_server_config (dict): 服务器配置json
+            name: MCP 服务名称，用于日志和重连标识
         """
+        # 保存配置用于重连
+        self._mcp_server_config = mcp_server_config
+        if name is not None:
+            self._server_name = name
+
         cfg = mcp_server_config.copy()
-        if "mcpServers" in cfg and len(cfg["mcpServers"]) > 0:
-            key_0 = list(cfg["mcpServers"].keys())[0]
-            cfg = cfg["mcpServers"][key_0]
+        if cfg.get("mcpServers"):
+            cfg = dict(cfg["mcpServers"][next(iter(cfg["mcpServers"]))])
+        else:
+            cfg = dict(cfg)
         cfg.pop("active", None)
 
         if "url" in cfg:
@@ -181,26 +130,122 @@ class MCPClient:
         await self.session.initialize()
 
     async def list_tools_and_save(self) -> mcp.ListToolsResult:
-        """从服务器获取工具列表并保存到实例变量"""
+        """从服务器获取工具列表并保存到实例变量（MCPTool 实例）"""
         response = await self.session.list_tools()
         self.logger.info(f"MCP server {self.name}")
-        # self.logger.info(f"返回工具列表: {response}")
-        self.tools = response.tools
+        self.tools = [
+            MCPTool(
+                name=tool.name,
+                description=tool.description or "",
+                parameters=tool.inputSchema,
+                mcp_tool=tool,
+                mcp_client=self,
+                mcp_server_name=self.name or "",
+            )
+            for tool in response.tools
+        ]
         return response
 
+    async def _reconnect(self) -> None:
+        """使用存储的配置重新连接至 MCP 服务器。
+
+        使用 asyncio.Lock 确保并发环境中的线程安全重连。
+        若已在重连中则跳过。
+
+        Raises:
+            Exception: 缺少连接配置或重连失败时抛出
+        """
+        async with self._reconnect_lock:
+            if self._reconnecting:
+                self.logger.debug(f"MCP 客户端 {self._server_name} 正在重连中，已跳过")
+                return
+
+            if not self._mcp_server_config or not self._server_name:
+                raise Exception("无法重连: 缺少连接配置")
+
+            self._reconnecting = True
+            try:
+                self.logger.info(f"正在尝试重连至 MCP 服务器 {self._server_name}...")
+
+                # 保留旧 exit_stack 供延迟清理，避免影响其他任务上下文
+                if self.exit_stack:
+                    self._old_exit_stacks.append(self.exit_stack)
+
+                # 置空旧会话
+                self.session = None
+
+                # 创建新 exit_stack 并重连
+                self.exit_stack = AsyncExitStack()
+                await self.connect_to_server(self._mcp_server_config, self._server_name)
+                await self.list_tools_and_save()
+
+                self.logger.info(f"成功重连至 MCP 服务器 {self._server_name}")
+            except Exception as e:
+                self.logger.error(f"重连至 MCP 服务器 {self._server_name} 失败: {e}")
+                raise
+            finally:
+                self._reconnecting = False
+
+    async def call_tool_with_retry(
+        self,
+        tool_name: str,
+        arguments: dict,
+        read_timeout_seconds: timedelta | None = None,
+    ) -> Any:
+        """调用 MCP 工具（支持出错后自动重连重试），最多重试 2 次。
+
+        使用 timer.py 的 retry 装饰器实现重试逻辑，
+        连接断开时自动触发 _reconnect() 后重试。
+
+        Args:
+            tool_name: 工具名称
+            arguments: 工具参数
+            read_timeout_seconds: 读取超时时间
+
+        Returns:
+            MCP call_tool 方法的结果
+
+        Raises:
+            Exception: 重试耗尽后仍失败时抛出
+        """
+
+        @timer_retry(max_retries=2, interval=1.0, exceptions=(Exception,))
+        async def _call_with_retry():
+            if not self.session:
+                raise Exception(f"MCP 会话不可用，无法调用工具 {tool_name}")
+
+            try:
+                call_kwargs: dict[str, Any] = {"name": tool_name, "arguments": arguments}
+                if read_timeout_seconds is not None:
+                    call_kwargs["read_timeout_seconds"] = read_timeout_seconds
+                return await self.session.call_tool(**call_kwargs)
+            except Exception:
+                self.logger.warning(
+                    f"MCP 工具 {tool_name} 调用失败，正在尝试重连..."
+                )
+                await self._reconnect()
+                raise  # 重新抛出以触发 retry 装饰器重试
+
+        return await _call_with_retry()
+
     async def cleanup(self):
-        """清理所有异步资源"""
-        await self.exit_stack.aclose()
+        """清理所有异步资源，包括重连过程中保留的旧 exit_stack"""
+        try:
+            await self.exit_stack.aclose()
+        except Exception as e:
+            self.logger.debug(f"关闭当前 exit_stack 时出错: {e}")
+        # 旧 exit_stack 交给 GC 处理，仅清空引用
+        self._old_exit_stacks.clear()
 
 
-class FuncCall(ServiceBase):
-    """用于管理MCP工具和函数工具"""
-    
+class ToolManager(ServiceBase):
+    """管理 MCP 连接生命周期"""
+
     def __init__(self, mcp_path: str | Path = "") -> None:
-        self.logger:Logger = container.get("log")
+        self.logger: Logger = container.get("log")
         """日志配置"""
-        self.func_list: List[FuncTool] = []
-        """内部加载的 func tools"""
+        self._mcp_func_list: List[FunctionTool] = []
+        """MCP 服务发现的工具暂存区（不含本地工具），供 ToolCalls 拉取同步"""
         self.mcp_client_dict: Dict[str, MCPClient] = {}
         """MCP 服务列表"""
         self.mcp_service_queue = asyncio.Queue()
@@ -211,9 +256,11 @@ class FuncCall(ServiceBase):
         """MCP配置文件路径"""
         self._mcp_service_task: asyncio.Task | None = None
         """MCP 服务控制后台任务"""
+        self._on_tools_changed: Callable[[str | None, List], None] | None = None
+        """MCP 工具变更回调：(server_name | None, mcp_func_list) -> None"""
 
     @classmethod
-    def factory(cls, config: atriConfig) -> "FuncCall":
+    def factory(cls, config: atriConfig) -> ToolManager:
         instance = cls(config.file_path.mcp_config)
         instance._mcp_service_task = asyncio.create_task(instance.mcp_service_selector())
         instance.mcp_service_queue.put_nowait({"type": "init"})
@@ -227,56 +274,21 @@ class FuncCall(ServiceBase):
             with suppress(asyncio.CancelledError):
                 await self._mcp_service_task
         self._mcp_service_task = None
-        
-    def empty(self) -> bool:
-        """返回是否存在调用的函数"""
-        return len(self.func_list) == 0
 
-    def add_func(
-        self,
-        name: str,
-        func_args: Dict,
-        desc: str,
-        handler: Awaitable,
+    def set_on_tools_changed(
+        self, callback: Callable[[str | None, List], None]
     ) -> None:
-        """添加函数调用工具
+        """设置 MCP 工具变更回调，由 ToolCalls 在初始化时调用"""
+        self._on_tools_changed = callback
 
-        @param name: 函数名
-        @param func_args: 函数参数列表，格式为 {{"type": "string", "name": "arg_name", "description": "arg_description"}, ...}
-        @param desc: 函数描述
-        @param func_obj: 处理函数
-        """
-        # check if the tool has been added before
-        self.remove_func(name)
+    def get_mcp_func_tools(self) -> List:
+        """返回当前 MCP 服务发现的工具列表（不含本地工具）"""
+        return list(self._mcp_func_list)
 
-        params = {
-            "type": "object",  # hard-coded here
-            "properties": func_args
-        }
-        _func = FuncTool(
-            name=name,
-            parameters=params,
-            description=desc,
-            handler=handler,
-        )
-        self.func_list.append(_func)
-        self.logger.info(f"添加函数调用工具: {name}")
-
-    def remove_func(self, name: str) -> None:
-        """
-        删除一个函数调用工具
-        """
-        for i, f in enumerate(self.func_list):
-            if f.name == name:
-                self.func_list.pop(i)
-                break
-
-    def get_func(self, name) -> FuncTool:
-        """根据名字返回工具函数"""
-        for f in self.func_list:
-            if f.name == name:
-                return f
-        return None
+    async def _notify_tools_changed(self, server_name: str | None = None) -> None:
+        """触发工具变更回调"""
+        if self._on_tools_changed is not None:
+            await self._on_tools_changed(server_name, list(self._mcp_func_list))
 
     async def _init_mcp_clients(self) -> None:
         """读取 mcp_server.json 文件，初始化 MCP 服务列表。文件格式如下：
@@ -349,19 +361,21 @@ class FuncCall(ServiceBase):
                     if data["name"] in self.mcp_client_event:
                         self.mcp_client_event[data["name"]].set()
                         self.mcp_client_event.pop(data["name"], None)
-                        self.func_list = [
+                        self._mcp_func_list = [
                             f
-                            for f in self.func_list
+                            for f in self._mcp_func_list
                             if not (
-                                f.origin == "mcp" and f.mcp_server_name == data["name"]
+                                isinstance(f, MCPTool) and f.mcp_server_name == data["name"]
                             )
                         ]
+                        await self._notify_tools_changed(data["name"])
                 else:
                     for name in self.mcp_client_dict.keys():
                         if name in self.mcp_client_event:
                             self.mcp_client_event[name].set()
                             self.mcp_client_event.pop(name, None)
-                    self.func_list = [f for f in self.func_list if f.origin != "mcp"]
+                    self._mcp_func_list = [f for f in self._mcp_func_list if not isinstance(f, MCPTool)]
+                    await self._notify_tools_changed()
 
     async def _init_mcp_client_task_wrapper(
         self, name: str, cfg: dict, event: asyncio.Event
@@ -393,25 +407,26 @@ class FuncCall(ServiceBase):
             tool_names = [tool.name for tool in tools_res.tools]
 
             # 移除该MCP服务之前的工具（如有）
-            self.func_list = [
+            self._mcp_func_list = [
                 f
-                for f in self.func_list
-                if not (f.origin == "mcp" and f.mcp_server_name == name)
+                for f in self._mcp_func_list
+                if not (isinstance(f, MCPTool) and f.mcp_server_name == name)
             ]
 
-            # 将 MCP 工具转换为 FuncTool 并添加到 func_list
+            # 将 MCP 工具转换为 MCPTool 并添加到 _mcp_func_list
             for tool in mcp_client.tools:
-                func_tool = FuncTool(
+                func_tool = MCPTool(
                     name=tool.name,
-                    parameters=tool.inputSchema,
+                    parameters=tool.parameters,
                     description=tool.description,
-                    origin="mcp",
-                    mcp_server_name=name,
+                    mcp_tool=tool,
                     mcp_client=mcp_client,
+                    mcp_server_name=name,
                 )
-                self.func_list.append(func_tool)
+                self._mcp_func_list.append(func_tool)
 
             self.logger.info(f"已连接 MCP 服务 {name}, Tools: {tool_names}")
+            await self._notify_tools_changed(name)
             return
         except Exception as e:
             import traceback
@@ -432,227 +447,23 @@ class FuncCall(ServiceBase):
                 del self.mcp_client_dict[name]
             except Exception as e:
                 self.logger.info(f"清空 MCP 客户端资源 {name}: {e}。")
-            # 移除关联的FuncTool
-            self.func_list = [
+            # 移除关联的 FunctionTool
+            self._mcp_func_list = [
                 f
-                for f in self.func_list
-                if not (f.origin == "mcp" and f.mcp_server_name == name)
+                for f in self._mcp_func_list
+                if not (isinstance(f, MCPTool) and f.mcp_server_name == name)
             ]
             self.logger.info(f"已关闭 MCP 服务 {name}")
-
-    def get_func_desc_openai_style(
-        self,
-        omit_empty_parameter_field: bool = False,
-    ) -> list:
-        """
-        获得 OpenAI API 风格的已激活工具描述
-
-        Args:
-            omit_empty_parameter_field: 为 True 时，若工具无参数则省略 parameters 字段
-        """
-        _l = []
-        # 处理所有工具（包括本地和MCP工具）
-        for f in self.func_list:
-            if not f.active:
-                continue
-            func_ = {
-                "type": "function",
-                "function": {
-                    "name": f.name,
-                    # "parameters": f.parameters,
-                    "description": f.description,
-                },
-            }
-            func_["function"]["parameters"] = f.parameters
-            if not f.parameters.get("properties") and omit_empty_parameter_field:
-                # 如果 properties 为空，并且 omit_empty_parameter_field 为 True，则删除 parameters 字段
-                del func_["function"]["parameters"]
-            _l.append(func_)
-        return _l
-
-    def get_func_desc_anthropic_style(self) -> list:
-        """
-        获得 Anthropic API 风格的已激活工具描述
-        """
-        tools = []
-        for f in self.func_list:
-            if not f.active:
-                continue
-
-            # Convert internal format to Anthropic style
-            tool = {
-                "name": f.name,
-                "description": f.description,
-                "input_schema": {
-                    "type": "object",
-                    "properties": f.parameters.get("properties", {}),
-                    # Keep the required field from the original parameters if it exists
-                    "required": f.parameters.get("required", []),
-                },
-            }
-            tools.append(tool)
-        return tools
-
-    def get_func_desc_google_genai_style(self) -> dict:
-        """
-        获得 Google GenAI API 风格的已激活工具描述
-        """
-
-        # Gemini API 支持的数据类型和格式
-        supported_types = {
-            "string",
-            "number",
-            "integer",
-            "boolean",
-            "array",
-            "object",
-            "null",
-        }
-        supported_formats = {
-            "string": {"enum", "date-time"},
-            "integer": {"int32", "int64"},
-            "number": {"float", "double"},
-        }
-
-        def convert_schema(schema: dict) -> dict:
-            """转换 schema 为 Gemini API 格式"""
-
-            # 如果 schema 包含 anyOf，则只返回 anyOf 字段
-            if "anyOf" in schema:
-                return {"anyOf": [convert_schema(s) for s in schema["anyOf"]]}
-
-            result = {}
-
-            if "type" in schema and schema["type"] in supported_types:
-                result["type"] = schema["type"]
-                if "format" in schema and schema["format"] in supported_formats.get(
-                    result["type"], set()
-                ):
-                    result["format"] = schema["format"]
-            else:
-                # 暂时指定默认为null
-                result["type"] = "null"
-
-            support_fields = {
-                "title",
-                "description",
-                "enum",
-                "minimum",
-                "maximum",
-                "maxItems",
-                "minItems",
-                "nullable",
-                "required",
-            }
-            result.update({k: schema[k] for k in support_fields if k in schema})
-
-            if "properties" in schema:
-                properties = {}
-                for key, value in schema["properties"].items():
-                    prop_value = convert_schema(value)
-                    if "default" in prop_value:
-                        del prop_value["default"]
-                    properties[key] = prop_value
-
-                if properties:  # 只在有非空属性时添加
-                    result["properties"] = properties
-
-            if "items" in schema:
-                result["items"] = convert_schema(schema["items"])
-
-            return result
-
-        tools = [
-            {
-                "name": f.name,
-                "description": f.description,
-                **({"parameters": convert_schema(f.parameters)}),
-            }
-            for f in self.func_list
-            if f.active
-        ]
-
-        declarations = {}
-        if tools:
-            declarations["function_declarations"] = tools
-        return declarations
-
-    async def func_call(self, question: str, session_id: str, provider) -> tuple:
-        _l = []
-        for f in self.func_list:
-            if not f.active:
-                continue
-            _l.append(
-                {
-                    "name": f.name,
-                    "parameters": f.parameters,
-                    "description": f.description,
-                }
-            )
-        func_definition = json.dumps(_l, ensure_ascii=False)
-
-        prompt = textwrap.dedent(f"""
-            ROLE:
-            你是一个 Function calling AI Agent, 你的任务是将用户的提问转化为函数调用。
-
-            TOOLS:
-            可用的函数列表:
-
-            {func_definition}
-
-            LIMIT:
-            1. 你返回的内容应当能够被 Python 的 json 模块解析的 Json 格式字符串。
-            2. 你的 Json 返回的格式如下：`[{{"name": "<func_name>", "args": <arg_dict>}}, ...]`。参数根据上面提供的函数列表中的参数来填写。
-            3. 允许必要时返回多个函数调用，但需保证这些函数调用的顺序正确。
-            4. 如果用户的提问中不需要用到给定的函数，请直接返回 `{{"res": False}}`。
-
-            EXAMPLE:
-            1. `用户提问`：请问一下天气怎么样？ `函数调用`：[{{"name": "get_weather", "args": {{"city": "北京"}}}}]
-
-            用户的提问是：{question}
-        """)
-
-        _c = 0
-        while _c < 3:
-            try:
-                res = await provider.text_chat(prompt, session_id)
-                if res.find("```") != -1:
-                    res = res[res.find("```json") + 7 : res.rfind("```")]
-                res = json.loads(res)
-                break
-            except Exception as e:
-                _c += 1
-                if _c == 3:
-                    raise e
-                if "The message you submitted was too long" in str(e):
-                    raise e
-
-        if "res" in res and not res["res"]:
-            return "", False
-
-        tool_call_result = []
-        for tool in res:
-            # 说明有函数调用
-            func_name = tool["name"]
-            args = tool["args"]
-            # 调用函数
-            func_tool = self.get_func(func_name)
-            if not func_tool:
-                raise Exception(f"Request function {func_name} not found.")
-
-            ret = await func_tool.execute(**args)
-            if ret:
-                tool_call_result.append(str(ret))
-        return tool_call_result, True
+            await self._notify_tools_changed(name)
 
     def __str__(self):
-        return str(self.func_list)
+        return str(self._mcp_func_list)
 
     def __repr__(self):
-        return str(self.func_list)
+        return str(self._mcp_func_list)
 
     async def terminate(self):
         """关闭清理"""
-        for name in self.mcp_client_dict.keys():
+        for name in list(self.mcp_client_dict.keys()):
             await self._terminate_mcp_client(name)
             self.logger.info(f"清理 MCP 客户端 {name} 资源")
