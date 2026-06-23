@@ -414,24 +414,24 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 1.思考每个可用decision是否符合当下情况
 2.如果有人对你进行攻击或情绪激动,请耐心回应,不要骂人
 
-输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON.
-JSON里要求是包含"actions"键及其对应的JSON列表,可以使用相同或不同decision的多个action。
+输出内容要包括一段思考文本接一个符合要求且合法的JSON(参考example标签)
+JSON里要求是包含"actions"键及其对应的决策列表,可以使用相同或不同decision的多个action
 <example>
-<think>
 //让我来分析一下当前情况
-</think>
-```json
 {
     "actions":[
         {
             "decision":"参数值:只能是update,silence,speak其中之一",
             //要求参数
-        }
+        },
+        {
+            "decision":"参数值",
+            //要求参数
+        },
     ]
 }
-```
-请根据情况灵活地进行工具调用完成任务,最后给出你的actions的JSON
 </example>
+请根据情况灵活地进行工具调用完成任务,最后给出你的actions的JSON
 """
             "</output_requirement>"
             "</context>"

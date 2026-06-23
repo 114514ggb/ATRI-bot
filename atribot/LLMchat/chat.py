@@ -377,39 +377,34 @@ class GroupChat(ChatBasics):
 
         self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
         
+        async def execute_response_json(response_json:dict):
+            if decision := response_json.get("decision"):
+                
+                if fun := self.decision_function.get(decision):
+                    
+                    await fun(response_json, message)
+                    
+                else:
+                    self.log.error(f"[{uid}]无效decision:{response_json}")
+                
+            else:
+                self.log.error(f"[{uid}]返回json错误:{response_json}")
+        
         for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
             
             if isinstance(response_json, dict):
                 
-                for response_json in response_json.get("actions",[]):
+                if response_list := response_json.get("actions"):
+                
+                    for response_json in response_list:
+                        
+                        await execute_response_json(response_json)
+                        
+                else:
+                    await execute_response_json(response_json)
                     
-                    response_json:dict[str,str|int]
-                    if decision := response_json.get("decision"):
-                        
-                        if fun := self.decision_function.get(decision):
-                            
-                            await fun(response_json, message)
-                            
-                        else:
-                            self.log.error(f"[{uid}]无效decision:{response_json}")
-                        
-                    else:
-                        self.log.error(f"[{uid}]返回json错误:{response_json}")
             else:
                 self.log.error(f"返回json解析不正确:{type(response_json)}")
-                # 错误的话考虑直接发送?
-            #     chat_condition = self.chat_manager.get_group_LLM_decision_parameters(group_id)
-                
-            #     since = chat_condition.get_seconds_since_llm_time()
-            #     await chat_condition.update_last_time()
-                
-            #     await self.send_reply_message_separator(
-            #         chat_text = response_json,
-            #         message_id = data["message_id"],
-            #         group_id = group_id,
-            #         since_llm = since
-            #     )
-            #     continue
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
         original_context.add_user_message(f"{prompt}\n{message.llm_formatted_message}")
