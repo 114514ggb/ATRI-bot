@@ -552,12 +552,12 @@ class ToolCalls(ServiceBase):
 
     @classmethod
     def register(cls, tool_json: dict):
-        """工具注册装饰器（委托给 :class:`ToolRegistry.register`）"""
+        """工具注册装饰器"""
         return ToolRegistry.register(tool_json)
 
     @classmethod
     def register_tool(cls, name: str, description: str, properties: dict | None = None):
-        """工具注册装饰器便捷版（委托给 :class:`ToolRegistry.register_tool`）"""
+        """工具注册装饰器便捷版"""
         return ToolRegistry.register_tool(name, description, properties)
 
 

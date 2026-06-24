@@ -5,7 +5,7 @@ import psutil
 
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
-from atribot.LLMchat.MCP.model_tools import ToolCalls
+from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import MCPTool
 
 tool_set: ToolCalls = container.get("ToolCalls")

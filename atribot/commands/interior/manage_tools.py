@@ -5,7 +5,7 @@ from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import ChatMessage
-from atribot.LLMchat.MCP.model_tools import ToolCalls
+from atribot.LLMchat.MCP.tool_calls import ToolCalls
 
 cmd_system:CommandSystem = container.get("CommandSystem")
 

@@ -29,7 +29,7 @@ from atribot.LLMchat.LLM_supervisor import (
     LLMCoordinator,
     LLMSRequestFailed,
 )
-from atribot.LLMchat.MCP.model_tools import ToolCalls
+from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import memorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem

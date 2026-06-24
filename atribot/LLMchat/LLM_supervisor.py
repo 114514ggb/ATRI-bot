@@ -8,7 +8,7 @@ from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import ChatMessage
 from atribot.core.type.context_types import Context, MessageBuilder, ToolCallsStopIteration
-from atribot.LLMchat.MCP.model_tools import ToolCalls
+from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
