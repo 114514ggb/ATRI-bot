@@ -385,7 +385,7 @@ JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对
 {
     "decision":"speak",
     "reason":"做出此决策的原因",
-    "content":"将解析发送给用户的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送,适当分段,可以在开头使用[CQ:reply,id=message_id]引用到对应的消息"
+    "content":"将解析发送给用户的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送,适当分段,可以在开头使用[CQ:reply,id=message_id]引用到对应的消息,不要重复"
 }
 
 参数:silence
@@ -414,10 +414,12 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 1.思考每个可用decision是否符合当下情况
 2.如果有人对你进行攻击或情绪激动,请耐心回应,不要骂人
 
-输出内容要包括一段思考文本接一个符合要求且合法的json(参考example标签内容)
-json里要求是包含"actions"键及其对应的决策列表,可以使用相同或不同decision的多个action
+输出内容要包括一段被<think>包裹的思考文本接一个符合要求且合法的json(参考下面<example>标签内容)
+json里要求是包含"actions"键及其对应的决策列表,里面可以有多个decision
 <example>
+<think>
 //让我来分析一下当前情况
+</think>
 ```json
 {
     "actions":[

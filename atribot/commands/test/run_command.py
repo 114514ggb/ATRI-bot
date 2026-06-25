@@ -33,7 +33,14 @@ async def run_async_code(message_data: ChatMessage):
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text(str(container.get("ChatManager").get_private_context(168238719).chat_context)))
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_record(File.from_local_path("/home/atri/音乐/Boblues Remix.mp3")))
     # await send_message.send(PrivateMessage(user_id=1317196420).add_record(File.from_local_path("/home/atri/音乐/彩叶.mp3")))
-
+    
+    # from atribot.core.cache.management_chat_example import ChatManager
+    # context = await container.get_by_type(ChatManager).get_private_context(1317196420)
+    # text = context.chat_context.__str__
+    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_node(text))
+    # with open("./log.txt", "a", encoding="utf-8") as f:
+    #     print(text,file=f)
+    
     raw = message_data.pure_text.strip()
     src = f"""
 async def function(message_data,container):

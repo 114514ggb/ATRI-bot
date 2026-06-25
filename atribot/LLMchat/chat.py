@@ -407,7 +407,7 @@ class GroupChat(ChatBasics):
                 self.log.error(f"返回json解析不正确:{type(response_json)}")
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
-        original_context.add_user_message(f"{prompt}\n{message.llm_formatted_message}")
+        original_context.add_user_message(f"{prompt}\n最新用户消息:{message.llm_formatted_message}")
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
