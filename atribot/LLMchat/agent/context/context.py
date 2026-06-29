@@ -33,6 +33,37 @@ class BaseContext(ABC):
         """
         ...
     
+    @abstractmethod
+    def extend(self, messages: Iterable[BaseMessage]) -> None:
+        """扩展多条实例化的消息
+
+        Args:
+            messages (Iterable[BaseMessage]): 消息集合
+        """
+        ...
+
+    @abstractmethod
+    def copy(self) -> BaseContext:
+        """创建当前上下文的副本
+
+        Returns:
+            BaseContext: 当前上下文的新副本
+        """
+        ...
+
+    def extend_from_context(self, other: BaseContext) -> BaseContext:
+        """将另一个上下文的消息合并到当前上下文的副本中，返回新的上下文
+
+        Args:
+            other (BaseContext): 另一个上下文对象
+
+        Returns:
+            BaseContext: 合并后的新上下文
+        """
+        new_context = self.copy()
+        new_context.extend(other.messages)
+        return new_context
+
     def to_openai_list(self) -> List[Dict[str, Any]]:
         """转换为 OpenAI 兼容的上下文列表
 
@@ -116,6 +147,22 @@ class AgentContext(BaseContext):
             messages (Iterable[BaseMessage]): 消息集合
         """
         self._messages.extend(messages)
+
+    def copy(self) -> AgentContext:
+        """创建当前上下文的副本
+
+        Returns:
+            AgentContext: 当前上下文的新副本
+        """
+        return AgentContext(
+            _messages=deque(self._messages),
+            user_max_record=self.user_max_record,
+            max_output_tokens=self.max_output_tokens,
+            max_context_tokens=self.max_context_tokens,
+            play_role=self.play_role,
+            total_tokens=self.total_tokens,
+            compression_strategies=list(self.compression_strategies),
+        )
 
     def clear(self) -> None:
         """清空上下文"""

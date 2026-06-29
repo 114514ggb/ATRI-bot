@@ -27,5 +27,13 @@ class AgentData:
     model_name: str
     supplier: model_api_basics
     tools: List[str] = field(default_factory=list)
-    kwargs: Dict[str, Any] = field(default_factory=dict)
+    kwargs: Dict[str, Any] = field(
+        default_factory=lambda:{
+            "temperature":0.0,
+            "top_p":0.90,
+            "max_tokens": 65536,
+            "stream":False,
+            "tool_choice": "auto"
+        }
+    )
     hooks: List[BaseAgentHooks] = field(default_factory=list)

@@ -1,30 +1,32 @@
 import logging
 from abc import ABC, abstractmethod
+from typing import AsyncGenerator
 
 from atribot.core.service_container import container
+from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk
 
 
 class model_api_basics(ABC):
     """LLM api 基类"""
     
     model_parameters = {
-        'stream': False,#是否流式输出如果设置为 True，将会以 SSE（server-sent events）的形式以流式发送消息增量。消息流以 data: [DONE] 结尾。
+        'stream': False,#是否流式输出如果设置为 True，将会以 SSE(server-sent events)的形式以流式发送消息增量消息流以 data: [DONE] 结尾
 
-        # 'frequency_penalty': 1.5,#介于 -2.0 和 2.0 之间的数字。如果该值为正，那么新 token 会根据其在已有文本中的出现频率受到相应的惩罚，降低模型重复相同内容的可能性。
+        # 'frequency_penalty': 1.5,#介于 -2.0 和 2.0 之间的数字如果该值为正，那么新 token 会根据其在已有文本中的出现频率受到相应的惩罚，降低模型重复相同内容的可能性
 
-        # 'presence_penalty':0.5, #介于 -2.0 和 2.0 之间的数字。如果该值为正，那么新 token 会根据其是否已在已有文本中出现受到相应的惩罚，从而增加模型谈论新主题的可能性。
+        # 'presence_penalty':0.5, #介于 -2.0 和 2.0 之间的数字如果该值为正，那么新 token 会根据其是否已在已有文本中出现受到相应的惩罚，从而增加模型谈论新主题的可能性
 
-        #'top_p':0.4,#作为调节采样温度的替代方案，模型会考虑前 top_p 概率的 token 的结果。所以 0.1 就意味着只有包括在最高 10% 概率中的 token 会被考虑。
+        #'top_p':0.4,#作为调节采样温度的替代方案，模型会考虑前 top_p 概率的 token 的结果所以 0.1 就意味着只有包括在最高 10% 概率中的 token 会被考虑
         
-        'temperature': 0.5,#采样温度，介于 0 和 2 之间。更高的值，如 0.8，会使输出更随机，而更低的值，如 0.2，会使其更加集中和确定。
+        'temperature': 0.5,#采样温度，介于 0 和 2 之间更高的值，如 0.8，会使输出更随机，而更低的值，如 0.2，会使其更加集中和确定
         # #不建议同时对'top_p','temperature'进行修改 
 
-        'max_tokens': 8192,#介于 1 到 8192 间的整数，限制一次请求中模型生成 completion 的最大 token 数。输入 token 和输出 token 的总长度受模型的上下文长度的限制。
+        'max_tokens': 8192,#介于 1 到 8192 间的整数，限制一次请求中模型生成 completion 的最大 token 数输入 token 和输出 token 的总长度受模型的上下文长度的限制
 
         'reasoning_effort':'high',
-        #推理努力程度，值可以是 "low", "medium", "high", "extreme"。
+        #推理努力程度，值可以是 "low", "medium", "high", "extreme"
         #停用思考功能，可以将 reasoning_effort 设置为 "none"
-        #默认值为 "medium"。更高的推理努力程度通常会导致更准确和详细的回答，但也可能需要更多的计算资源和时间。
+        #默认值为 "medium"更高的推理努力程度通常会导致更准确和详细的回答，但也可能需要更多的计算资源和时间
         # "extra_body": {
         #     "google": {
         #         "thinking_config": {
@@ -33,26 +35,26 @@ class model_api_basics(ABC):
         #         }
         #     }
         # }
-        #谷歌模型的openai兼容.思考总结是模型原始思考的合成版本，可帮助您深入了解模型的内部推理过程。
+        #谷歌模型的openai兼容.思考总结是模型原始思考的合成版本，可帮助您深入了解模型的内部推理过程
         #请注意，思考预算适用于模型的原始想法，而不适用于想法摘要
         
         'tool_choice': "auto",#控制模型调用 tool 的行为
-        # # none 意味着模型不会调用任何 tool，而是生成一条消息。
-        # # auto 意味着模型可以选择生成一条消息或调用一个或多个 tool。
-        # # required 意味着模型必须调用一个或多个 tool。
+        # # none 意味着模型不会调用任何 tool，而是生成一条消息
+        # # auto 意味着模型可以选择生成一条消息或调用一个或多个 tool
+        # # required 意味着模型必须调用一个或多个 tool
         # # 好像只有DS有
-        # # 通过 {"type": "function", "function": {"name": "my_function"}} 指定特定 tool，会强制模型调用该 tool。
+        # # 通过 {"type": "function", "function": {"name": "my_function"}} 指定特定 tool，会强制模型调用该 tool
         
         # 'stop': None
-        #一个 string 或最多包含 16 个 string 的 list，在遇到这些词时，API 将停止生成更多的 token。
+        #一个 string 或最多包含 16 个 string 的 list，在遇到这些词时，API 将停止生成更多的 token
 
         # 'response_format': { 
         #     "type": "text"
         # },
         #响应格式
         #设置为 { "type": "json_object" } 以启用 JSON 模式
-        # 注意: 使用 JSON 模式时，你还必须通过系统或用户消息指示模型生成 JSON。
-        # 否则，模型可能会生成不断的空白字符，直到生成达到令牌限制，从而导致请求长时间运行并显得“卡住”。
+        # 注意: 使用 JSON 模式时，你还必须通过系统或用户消息指示模型生成 JSON
+        # 否则，模型可能会生成不断的空白字符，直到生成达到令牌限制，从而导致请求长时间运行并显得“卡住”
     }
     """模型参数"""
     
@@ -74,9 +76,23 @@ class model_api_basics(ABC):
     @abstractmethod
     async def close(self):
         """异步关闭客户端"""
-        
+        ...
+
     @abstractmethod
-    async def generate_text_tools(self, model:str, messages:list, tools:list)->dict:
+    async def client_post_stream(self, data: dict) -> AsyncGenerator[ChatCompletionChunk]:
+        """
+        底层流式请求方法,返回支持的Server-Sent Events (SSE) 协议包裹的 JSON 数据
+        
+        Args:
+            data (Dict): 请求体参数
+            
+        Yields:
+            Dict: 原始的 chunk json 数据
+        """
+        ...
+
+    @abstractmethod
+    async def generate_text_tools(self, model:str, messages:list, tools:list)->ChatCompletion:
         """请求生成文本，全量默认参数
 
         Args:
@@ -87,10 +103,11 @@ class model_api_basics(ABC):
         Returns:
             dict: 原消息json
         """
+        ...
     
     @abstractmethod
-    async def generate_json_ample(self, model:str,remainder:dict)->dict:
-        """向发起请求，获取json，参数自定
+    async def generate_json_ample(self, model:str,remainder:dict)->ChatCompletion:
+        """向发起请求,获取json,参数自定
 
         Args:
             model (str): 模型名称
@@ -99,9 +116,10 @@ class model_api_basics(ABC):
         Returns:
             dict: 原消息json
         """
+        ...
     
     @abstractmethod
-    async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
+    async def generate_json_ample_stream(self, model: str, remainder: dict) -> ChatCompletion:
         """向发起请求,获取json,参数自定,但是是以流式的方法处理数据，流式接受完成后返回总数据
 
         Args:
@@ -111,6 +129,7 @@ class model_api_basics(ABC):
         Returns:
             dict: 处理后兼容非流式的json数据
         """
+        ...
     
     def alter_parameters(self, parameters:str, value:float|bool|dict):
         """修改模型单个默认参数"""
@@ -184,11 +203,11 @@ class model_api_basics(ABC):
             background: 图片背景
             output_format: 输出图片格式
                 可选: "png" | "jpeg" | "webp"
-            output_compression: 输出图片压缩率 0-100(仅webp/jpeg 时有效）
+            output_compression: 输出图片压缩率 0-100(仅webp/jpeg 时有效)
             **kwargs: 传递给底层 API 的其他额外参数
 
         Returns:
-            长度为 n 的字符串列表。当 response_format="b64_json" 时，
+            长度为 n 的字符串列表当 response_format="b64_json" 时，
             列表元素为 Base64 编码的图片字符串；当 response_format="url"
             时，列表元素为可直接访问的图片 URL
 

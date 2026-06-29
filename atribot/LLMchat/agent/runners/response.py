@@ -1,27 +1,3 @@
-"""Agent 运行时产出的事件 / 响应类型体系
-
-定义了 Agent Runner 在 step() / run() 过程中通过 AsyncGenerator
-产出的所有事件类型，覆盖流式增量、语义级事件、汇总结果和错误
-
-流式模式(AgentData.kwargs["stream"] = True):
-    step()  → TextDelta* → [ToolCallStart → ToolCallResult]* → StepSummary
-    run()   → (step1: TextDelta* → ... → StepSummary) → ... → RunSummary
-
-非流式模式(stream = False / 未设置):
-    step()  → StepSummary
-    run()   → RunSummary
-
-Usage:
-    from atribot.LLMchat.agent.runners.response import (
-        AgentEvent, AgentEventType,
-        TextDeltaChunk, ReasoningDeltaChunk, ToolCallStartChunk,
-        ToolCallResultChunk, AgentStatusChunk,
-        StepSummary, RunSummary, AgentError,
-    )
-"""
-
-from __future__ import annotations
-
 from abc import ABC
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -512,35 +488,3 @@ def generation_response_to_step_summary(
         step_index=step_index,
         is_final=is_final,
     )
-
-
-
-__all__ = [
-    # 枚举
-    "AgentEventType",
-    # 基类
-    "AgentEvent",
-    "AgentStreamChunk",
-    "AgentSummary",
-    # 流式中间事件
-    "TextDeltaChunk",
-    "ReasoningDeltaChunk",
-    "ToolCallStartChunk",
-    "ToolCallResultChunk",
-    "AgentStatusChunk",
-    # 汇总事件
-    "StepSummary",
-    "RunSummary",
-    "AgentError",
-    # 工厂方法
-    "text_delta",
-    "reasoning_delta",
-    "tool_call_start",
-    "tool_call_result",
-    "agent_status",
-    "step_summary",
-    "run_summary",
-    "agent_error",
-    # 桥接
-    "generation_response_to_step_summary",
-]

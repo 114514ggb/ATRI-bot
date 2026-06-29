@@ -378,7 +378,7 @@ class AIContextCommands:
         
         message += f"当前群聊角色：{current_role}\n"
         message += f"群聊消息数量：{message_count}/{max_messages} ({usage_percentage:.1f}%)\n"
-        message += f"预计群聊上下文token: {context.get_context_forecast_token()}\n"
+        message += f"预计群聊上下文token: {context.count_estimate_tokens()}\n"
         message += f"上次响应token: {context.total_tokens}\n"
         
         if usage_percentage < 150:

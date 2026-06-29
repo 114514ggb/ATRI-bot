@@ -5,6 +5,7 @@ from typing import AsyncGenerator, Dict, List
 import aiohttp
 from aiohttp.resolver import AsyncResolver
 
+from atribot.LLMchat.model_api.llm_types import ChatCompletionChunk
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.LLMchat.model_api.stream_processor import StreamProcessor
 
@@ -95,7 +96,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     raise e
                 await asyncio.sleep(retry_delay * attempt)
     
-    async def client_post_stream(self, data: Dict) -> AsyncGenerator[Dict, None]:
+    async def client_post_stream(self, data: Dict) -> AsyncGenerator[ChatCompletionChunk]:
         """
         底层流式请求方法,返回支持的Server-Sent Events (SSE) 协议包裹的 JSON 数据
         

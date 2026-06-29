@@ -36,10 +36,22 @@ async def run_async_code(message_data: ChatMessage):
     
     # from atribot.core.cache.management_chat_example import ChatManager
     # context = await container.get_by_type(ChatManager).get_private_context(1317196420)
-    # text = context.chat_context.__str__
+    # text = context.chat_context.__str__()
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_node(text))
     # with open("./log.txt", "a", encoding="utf-8") as f:
     #     print(text,file=f)
+    
+    # from atribot.common_utils import format_memory_records
+    # sql="""
+    # SELECT *
+    # FROM atri_memory
+    # WHERE event &@ '星奴';
+    # """
+    # async with db:
+    #     record = await db.execute_SQL(sql)
+
+    # text = format_memory_records(record)
+    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_node(text))
     
     raw = message_data.pure_text.strip()
     src = f"""

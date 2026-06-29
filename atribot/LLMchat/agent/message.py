@@ -161,12 +161,16 @@ class SystemMessage(BaseMessage):
 
 @dataclass(slots=True)
 class UserMessage(BaseMessage):
-    """用户消息实体"""
+    """用户消息实体,初始化了str就不要链式调用了"""
     role: Literal["user"] = "user"
-    content: str | List[MessageSegment] = ""
+    content: str | List[MessageSegment] = field(default_factory=list)
     _cached_openai_dict: Dict[str, Any] = field(init=False)
 
     def __post_init__(self):
+        self.refresh_cache()
+
+    def refresh_cache(self) -> None:
+        """刷新内部缓存的 OpenAI 格式字典"""
         if isinstance(self.content, str):
             self._cached_openai_dict = {"role": self.role, "content": self.content}
         else:
@@ -178,10 +182,123 @@ class UserMessage(BaseMessage):
     def to_openai_dict(self) -> Dict[str, Any]:
         return self._cached_openai_dict
 
+    def add_text(self, text: str) -> UserMessage:
+        """添加纯文本消息段
+
+        Args:
+            text: 文本内容
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(TextSegment(text))
+        return self
+
+    def add_image_url(self, url: str, detail: str = "auto") -> UserMessage:
+        """添加图片 URL 消息段
+
+        Args:
+            url: 图片 URL 地址
+            detail: 图片细节级别(auto / low / high)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(ImageURLSegment(url=url, detail=detail))
+        return self
+
+    def add_image_base64(
+        self, data: str, mime: str = "image/png", detail: str = "auto"
+    ) -> UserMessage:
+        """添加图片 Base64 消息段
+
+        Args:
+            data: Base64 编码的图片数据(不含前缀)
+            mime: MIME 类型
+            detail: 图片细节级别(auto / low / high)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(ImageBase64Segment(data=data, mime=mime, detail=detail))
+        return self
+
+    def add_audio(self, data: str, fmt: str = "wav") -> UserMessage:
+        """添加音频输入消息段
+
+        Args:
+            data: Base64 编码的音频数据(不含前缀)
+            fmt: 音频格式(wav / mp3 等)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(AudioSegment(data=data, fmt=fmt))
+        return self
+
+    def add_video_url(self, url: str) -> UserMessage:
+        """添加视频 URL 消息段
+
+        Args:
+            url: 视频 URL 地址
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(VideoURLSegment(url=url))
+        return self
+
+    def add_video_base64(self, data: str, mime: str = "video/mp4") -> UserMessage:
+        """添加视频 Base64 消息段
+
+        Args:
+            data: Base64 编码的视频数据(不含前缀)
+            mime: MIME 类型
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(VideoBase64Segment(data=data, mime=mime))
+        return self
+
+    def add_file(self, url: str, mime: str = "") -> UserMessage:
+        """添加文件消息段
+
+        Args:
+            url: 文件 URL 地址
+            mime: MIME 类型(可选)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(FileSegment(url=url, mime=mime))
+        return self
+
+    def add_segment(self, segment: MessageSegment) -> UserMessage:
+        """添加自定义消息段
+
+        Args:
+            segment: 任意 MessageSegment 子类实例
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(segment)
+        return self
+
+    def clear(self) -> UserMessage:
+        """清空所有消息段
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content = []
+        return self
+
 
 @dataclass(slots=True)
 class AssistantMessage(BaseMessage):
-    """助手消息实体，支持思考内容及工具调用"""
+    """助手消息实体,支持思考内容及工具调用"""
     role: Literal["assistant"] = "assistant"
     content: Optional[str] = None
     reasoning_content: Optional[str] = None
@@ -207,14 +324,21 @@ class AssistantMessage(BaseMessage):
 
 @dataclass(slots=True)
 class ToolMessage(BaseMessage):
-    """工具消息实体"""
+    """工具消息实体,支持链式添加消息段
+    初始化了str就不要链式调用了
+    
+    """
     tool_call_id: str = field(kw_only=True) 
     name: str = ""
     role: Literal["tool"] = "tool"
-    content: str | List[MessageSegment] = ""
+    content: str | List[MessageSegment] = field(default_factory=list)
     _cached_openai_dict: Dict[str, Any] = field(init=False)
 
     def __post_init__(self):
+        self.refresh_cache()
+
+    def refresh_cache(self) -> None:
+        """刷新内部缓存的 OpenAI 格式字典"""
         res: Dict[str, Any] = {
             "role": self.role,
             "tool_call_id": self.tool_call_id,
@@ -229,3 +353,116 @@ class ToolMessage(BaseMessage):
 
     def to_openai_dict(self) -> Dict[str, Any]:
         return self._cached_openai_dict
+
+    def add_text(self, text: str) -> ToolMessage:
+        """添加纯文本消息段
+
+        Args:
+            text: 文本内容
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(TextSegment(text))
+        return self
+
+    def add_image_url(self, url: str, detail: str = "auto") -> ToolMessage:
+        """添加图片 URL 消息段
+
+        Args:
+            url: 图片 URL 地址
+            detail: 图片细节级别(auto / low / high)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(ImageURLSegment(url=url, detail=detail))
+        return self
+
+    def add_image_base64(
+        self, data: str, mime: str = "image/png", detail: str = "auto"
+    ) -> ToolMessage:
+        """添加图片 Base64 消息段
+
+        Args:
+            data: Base64 编码的图片数据(不含前缀)
+            mime: MIME 类型
+            detail: 图片细节级别(auto / low / high)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(ImageBase64Segment(data=data, mime=mime, detail=detail))
+        return self
+
+    def add_audio(self, data: str, fmt: str = "wav") -> ToolMessage:
+        """添加音频输入消息段
+
+        Args:
+            data: Base64 编码的音频数据(不含前缀)
+            fmt: 音频格式(wav / mp3 等)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(AudioSegment(data=data, fmt=fmt))
+        return self
+
+    def add_video_url(self, url: str) -> ToolMessage:
+        """添加视频 URL 消息段
+
+        Args:
+            url: 视频 URL 地址
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(VideoURLSegment(url=url))
+        return self
+
+    def add_video_base64(self, data: str, mime: str = "video/mp4") -> ToolMessage:
+        """添加视频 Base64 消息段
+
+        Args:
+            data: Base64 编码的视频数据(不含前缀)
+            mime: MIME 类型
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(VideoBase64Segment(data=data, mime=mime))
+        return self
+
+    def add_file(self, url: str, mime: str = "") -> ToolMessage:
+        """添加文件消息段
+
+        Args:
+            url: 文件 URL 地址
+            mime: MIME 类型(可选)
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(FileSegment(url=url, mime=mime))
+        return self
+
+    def add_segment(self, segment: MessageSegment) -> ToolMessage:
+        """添加自定义消息段
+
+        Args:
+            segment: 任意 MessageSegment 子类实例
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content.append(segment)
+        return self
+
+    def clear(self) -> ToolMessage:
+        """清空所有消息段
+
+        Returns:
+            Self,用于链式调用
+        """
+        self.content = []
+        return self
