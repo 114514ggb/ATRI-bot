@@ -15,7 +15,7 @@ from atribot.LLMchat.RAG.rag import RAGManager
 from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 
-class memorySystem:
+class MemorySystem:
     """记忆系统门面类"""
 
     def __init__(self, config: atriConfig, api_supplier: LLMConnectionManager, time_trigger: TimeTriggerSupervisor):

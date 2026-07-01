@@ -5,6 +5,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
 from atribot.core.service_container import container
+from atribot.core.type.chat_message_types import ChatMessage
 from atribot.core.type.context_types import ToolCallsStopIteration
 from atribot.LLMchat.agent.agent_data import AgentData
 from atribot.LLMchat.agent.context.context import AgentContext
@@ -31,7 +32,7 @@ from atribot.LLMchat.agent.runners.response import (
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
-from atribot.LLMchat.model_api.llm_types import ChatCompletionChunk
+from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, ToolCall, message
 
 _MAX_TOOL_ROUNDS = 10  # 单步内工具调用最大轮数
 _MAX_EMPTY_RETRIES = 5  # 空响应重试次数
@@ -41,11 +42,14 @@ _TOOL_OUTPUT_TRUNCATE = 20000  # 工具返回结果截断长度
 class SubAgentRunner(BaseAgentRunner): 
     """子 Agent 执行器 —— 管理完整 LLM 交互生命周期"""
 
-    def __init__(self, agent_data: AgentData) -> None:
+    def __init__(
+        self, agent_data: AgentData, message_data: ChatMessage | None = None
+    ) -> None:
         super().__init__(agent_data)
         self.log: Logger = container.get("log")
         self._tool_calls_mgr: ToolCalls = container.get("ToolCalls")
         self._media_processor: MediaProcessor = container.get("MediaProcessor")
+        self._message_data: ChatMessage | None = message_data
 
         # 多模态能力
         self._visual_sense: bool = False
@@ -60,8 +64,8 @@ class SubAgentRunner(BaseAgentRunner):
         self._increase_context: AgentContext = AgentContext()
 
         #最后一次 LLM 响应结果
-        self._last_api_reply: Optional[Dict[str, Any]] = None
-        self._last_assistant_message: Optional[Dict[str, Any]] = None
+        self._last_api_reply: Optional[ChatCompletion] = None
+        self._last_assistant_message: Optional[message] = None
         self._last_content: Optional[str] = None
 
         #当前步的 StepSummary
@@ -192,8 +196,8 @@ class SubAgentRunner(BaseAgentRunner):
             if not api_reply.get("choices"):
                 continue
 
-            assistant_message: Dict[str, Any] = api_reply["choices"][0]["message"]
-            content: Optional[str] = assistant_message.get("content")
+            assistant_message = api_reply["choices"][0]["message"]
+            content = assistant_message.get("content")
 
             if content:
                 return api_reply, assistant_message, content
@@ -323,11 +327,7 @@ class SubAgentRunner(BaseAgentRunner):
         self._last_content = content or None
 
     async def _do_llm_request(self) -> AsyncGenerator[AgentEvent, None]:
-        """统一的 LLM 请求入口 —— 流式/非流式自动分发
-
-        完成后 ``self._last_api_reply`` / ``self._last_assistant_message`` /
-        ``self._last_content`` 均已被设置
-        """
+        """统一的 LLM 请求入口，流式/非流式自动分发"""
         if self.stream:
             async for event in self._request_llm_stream():
                 yield event
@@ -478,7 +478,7 @@ class SubAgentRunner(BaseAgentRunner):
         Yields:
             ``ToolCallResultChunk``(流式时)、``TextDeltaChunk``(流式再请求时)
         """
-        tool_calls: List[Dict[str, Any]] = assistant_message.get("tool_calls", [])
+        tool_calls: List[ToolCall] = assistant_message.get("tool_calls", [])
 
         for _round in range(_MAX_TOOL_ROUNDS):
             self.log.debug(f"工具调用第 {_round + 1} 轮，共 {len(tool_calls)} 个工具")
@@ -506,10 +506,10 @@ class SubAgentRunner(BaseAgentRunner):
                 tool_msg: ToolMessage
                 is_error = False
                 try:
-                    # 从 agent_data.kwargs 获取可选的 message_data
-                    message_data = self.agent_data.kwargs.get("message_data")
                     raw_output = await self._tool_calls_mgr.calls(
-                        tool_name, tool_input_str, message_data=message_data
+                        tool_name,
+                        tool_input_str,
+                        message_data=self._message_data,
                     )
 
                     if isinstance(raw_output, CallToolResult):
@@ -562,15 +562,16 @@ class SubAgentRunner(BaseAgentRunner):
 
                 # 截断过长结果
                 if isinstance(tool_msg.content, str):
-                    tool_msg.clear().add_text(tool_msg.content[:_TOOL_OUTPUT_TRUNCATE])
+                    tool_msg.content = tool_msg.content[:_TOOL_OUTPUT_TRUNCATE]
                 elif isinstance(tool_msg.content, list):
-                    original_segments: List[MessageSegment] = list(tool_msg.content)
+                    original_segs = list(tool_msg.content)
                     tool_msg.clear()
-                    for seg in original_segments:
+                    for seg in original_segs:
                         if isinstance(seg, TextSegment):
                             tool_msg.add_text(seg.text[:_TOOL_OUTPUT_TRUNCATE])
                         else:
                             tool_msg.add_segment(seg)
+                tool_msg.refresh_cache()
 
                 self.log.debug(f"工具 {tool_name} 输出: {str(tool_msg.content)[:300]}...")
 
@@ -586,11 +587,9 @@ class SubAgentRunner(BaseAgentRunner):
                 raise
 
             # 更新新一轮的 assistant_message
-            assistant_message = self._last_assistant_message  # type: ignore[assignment]
+            assistant_message = self._last_assistant_message
 
-            # 检查是否还有 tool_calls
             if next_tool_calls := assistant_message.get("tool_calls"):
-                # 将 assistant_tool_message 加入上下文
                 self._increase_context.add_assistant_message(
                     content=assistant_message.get("content"),
                     tool_calls=next_tool_calls,
@@ -601,7 +600,6 @@ class SubAgentRunner(BaseAgentRunner):
                 tool_calls = next_tool_calls
                 continue
             else:
-                # 无更多工具调用:添加普通 assistant 消息并退出
                 self._increase_context.add_assistant_message(
                     content=assistant_message.get("content") or "",
                     reasoning_content=assistant_message.get(
@@ -628,14 +626,6 @@ class SubAgentRunner(BaseAgentRunner):
             else:
                 parts.append(f"[{type(seg).__name__}]")
         return "".join(parts)
-
-    def _sync_context(self) -> None:
-        """将增量上下文回写到主 ``AgentContext``
-
-        由于 ``_increase_context`` 与 ``agent_data.context`` 同属
-        ``AgentContext``，直接 extend 即可
-        """
-        self.agent_data.context.extend(self._increase_context.messages)
 
     def _build_step_summary(self) -> StepSummary:
         """从增量上下文构建 ``StepSummary``
@@ -709,7 +699,6 @@ class SubAgentRunner(BaseAgentRunner):
         # 重置增量上下文
         self._increase_context = AgentContext()
 
-        # 1. 请求 LLM
         async for event in self._do_llm_request():
             yield event
 
@@ -719,9 +708,7 @@ class SubAgentRunner(BaseAgentRunner):
         if assistant_message is None:
             raise RuntimeError("LLM 请求未返回有效的 assistant_message")
 
-        # 2. 分支:工具调用 vs 普通回复
         if tool_calls := assistant_message.get("tool_calls"):
-            # 将首条 assistant_tool_message 加入上下文
             self._increase_context.add_assistant_message(
                 content=content,
                 tool_calls=tool_calls,
@@ -739,13 +726,10 @@ class SubAgentRunner(BaseAgentRunner):
                 extra_content=assistant_message.get("extra_content"),
             )
 
-        # 3. 回写上下文
-        self._sync_context()
+        self.agent_data.context.extend(self._increase_context.messages)
 
-        # 4. 压缩检查
-        self.agent_data.context.record_validity_check()
+        await self.agent_data.context.record_validity_check()
 
-        # 5. 构建 StepSummary
         self._last_summary = self._build_step_summary()
         self._step_index += 1
 
@@ -851,7 +835,6 @@ class SubAgentRunner(BaseAgentRunner):
                     for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
                         total_usage[k] = total_usage.get(k, 0) + summary.usage.get(k, 0)
 
-                # 终止条件:最后一步没有工具调用
                 if not summary.has_tool_calls:
                     finish_reason = "completed"
                     break

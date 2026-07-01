@@ -37,7 +37,7 @@ class ToolCall(TypedDict):
         index: 工具调用的索引
         id: 工具调用的唯一标识，仅在首个工具调用 chunk 中出现
         type: 调用类型，固定为 "function"
-        function: 函数名和参数的增量信息
+        function: 函数名和参数信息
         extra_content: Google 模型的额外元数据(如思考签名)，仅 Gemini 模型可能携带
     """
     index: NotRequired[int]             # DeepSeek 有，Gemini 无
@@ -53,13 +53,41 @@ class Delta(TypedDict, total=False):
     Attributes:
         role: 角色，通常为 "assistant"，一般在首个 chunk 中
         content: 模型输出的纯文本增量
+        reasoning_content : 思维链
         tool_calls: 工具调用的增量信息列表
         extra_content: Google 模型的额外元数据(如思考签名)
     """
-    role: str
+    role: str | Literal["assistant"]
     content: str
+    reasoning_content: str
     tool_calls: list[ToolCall]
     extra_content: ExtraContent          # Gemini 文本流最后一个 chunk 可能包含
+
+
+class ContentFilterResult(TypedDict):
+    """内容过滤结果
+
+    Attributes:
+        filtered: 是否被过滤
+        severity: 严重程度
+    """
+    filtered: bool
+    severity: str
+
+
+class ContentFilterResults(TypedDict):
+    """内容过滤结果集合
+
+    Attributes:
+        hate: 仇恨言论过滤
+        sexual: 色情内容过滤
+        violence: 暴力内容过滤
+        self_harm: 自残内容过滤
+    """
+    hate: NotRequired[ContentFilterResult]
+    sexual: NotRequired[ContentFilterResult]
+    violence: NotRequired[ContentFilterResult]
+    self_harm: NotRequired[ContentFilterResult]
 
 
 class Choice(TypedDict):
@@ -69,12 +97,14 @@ class Choice(TypedDict):
         index: 候选结果的索引
         delta: 本次增量内容
         logprobs: 日志概率
-        finish_reason: 终止原因，例如 "stop"、"tool_calls" 或 None,可能在最后一个 chunk 出现
+        finish_reason: 终止原因，例如 "stop"、"tool_calls"、"length"、"content_filter" 或 None，可能在最后一个 chunk 出现
+        content_filter_results: 内容过滤结果（Azure OpenAI 等提供）
     """
     index: int
     delta: Delta
     logprobs: NotRequired[None]                # DeepSeek 有，Gemini 无
     finish_reason: NotRequired[Union[str, None]]
+    content_filter_results: NotRequired[ContentFilterResults]
 
 
 class PromptTokensDetails(TypedDict):
@@ -126,14 +156,47 @@ class ChatCompletionChunk(TypedDict):
     nonce: NotRequired[str]                # Gemini 有
     choices: list[Choice]
     usage: NotRequired[Usage]              # DeepSeek 最后一个 chunk 才有
-    
+
+class message(TypedDict):
+    """返回的模型具体消息
+
+    Attributes:
+        role: 角色，通常为 "assistant"
+        content: 模型输出的纯文本内容
+        reasoning_content: 思维链
+        tool_calls: 工具调用列表
+        refusal: 拒绝生成内容时的原因（OpenAI 等提供）
+        extra_content: Google 模型的额外元数据(如思考签名)
+    """
+    role: Literal["assistant"]
+    content: str
+    reasoning_content: NotRequired[str]
+    tool_calls: NotRequired[list[ToolCall]]
+    refusal: NotRequired[str | None]
+    extra_content: NotRequired[ExtraContent]
+
+class choices(TypedDict):
+    """非流式响应中的候选结果
+
+    Attributes:
+        index: 候选结果的索引
+        message: 模型返回的完整消息内容
+        finish_reason: 终止原因，例如 "stop"、"tool_calls"、"length" 或 "content_filter"
+        content_filter_results: 内容过滤结果
+    """
+
+    index: int
+    message: message
+    finish_reason: str
+    content_filter_results: NotRequired[ContentFilterResults]
+
 
 class ChatCompletion(TypedDict):
     """一次性对话补全的完整响应
 
     Attributes:
         id: 请求唯一标识
-        object: 对象类型，通常为 "chat.completion"
+        object: 对象类型，固定为 "chat.completion"
         created: 创建时间戳(Unix 秒)
         model: 模型名称
         choices: 候选回复列表
@@ -142,10 +205,10 @@ class ChatCompletion(TypedDict):
         nonce: 随机数标识(Gemini 流式中常见，非流式偶尔携带)
     """
     id: str
-    object: str                           # 非流式通常为 "chat.completion"
+    object: Literal["chat.completion"]
     created: int
     model: str
-    choices: list[Choice]
+    choices: list[choices]
     usage: Usage
     system_fingerprint: NotRequired[str]  # DeepSeek 提供
     nonce: NotRequired[str]               # Gemini 偶尔携带

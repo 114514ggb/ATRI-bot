@@ -233,7 +233,7 @@ class AgentContext(BaseContext):
         """
         self._messages.append(ToolMessage(name=name, tool_call_id=tool_call_id, content=content))
 
-    def record_validity_check(self, current_tokens: Optional[int] = None) -> Optional[List[BaseMessage]]:
+    async def record_validity_check(self, current_tokens: Optional[int] = None) -> Optional[List[BaseMessage]]:
         """
         遍历压缩策略链，对上下文进行验证与压缩
 
@@ -250,7 +250,7 @@ class AgentContext(BaseContext):
 
         for strategy in self.compression_strategies:
             if strategy.should_compress(self):
-                return strategy.compress(self)
+                return await strategy.compress(self)
 
         return None
 

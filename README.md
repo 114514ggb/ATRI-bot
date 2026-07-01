@@ -379,7 +379,7 @@ chat.py → GroupChat.step()          ← 聊天主入口
       ├─① prompt_structure()        构建提示词
       │     ├─ 群聊历史 (近期消息窗口)
       │     ├─ 用户画像 (UserSystem)
-      │     ├─ 最近记忆片段 (memorySystem.query_user_recently_memory)
+      │     ├─ 最近记忆片段 (MemorySystem.query_user_recently_memory)
       │     ├─ 表情包提示词 (EmojiCore)
       │     └─ Skills 提示词 (SkillsManager)
       │
@@ -411,15 +411,15 @@ chat.py → GroupChat.step()          ← 聊天主入口
 
 #### 短期上下文 (ChatManager)
 - 每个群/用户维护一个滑动的消息窗口 `Context`，直接嵌入每次请求的 `messages` 列表。
-- 当上下文 token 数超限时，触发 `memorySystem.summarize_context()` 对旧消息进行 LLM 压缩摘要，压缩后的文本以 `assistant` 角色消息插入上下文头部，简单的进行记忆压缩。
+- 当上下文 token 数超限时，触发 `MemorySystem.summarize_context()` 对旧消息进行 LLM 压缩摘要，压缩后的文本以 `assistant` 角色消息插入上下文头部，简单的进行记忆压缩。
 
-#### 长期向量记忆 (memorySystem + pgvector)
+#### 长期向量记忆 (MemorySystem + pgvector)
 
 ```
 聊天结束后
       │
       ▼
-memorySystem.extract_stored_group_message()
+MemorySystem.extract_stored_group_message()
       │
       ├─ LLM 信息提取 (PURE_GROUP_FACT_RETRIEVAL_PROMPT)
       │     └─ 输出结构化 JSON：per-user 事件 + 群话题

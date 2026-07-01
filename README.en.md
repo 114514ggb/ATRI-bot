@@ -369,7 +369,7 @@ chat.py → GroupChat.step()          ← Chat entry point
       ├─① prompt_structure()        Build prompt
       │     ├─ Group chat history (recent message window)
       │     ├─ User profile (UserSystem)
-      │     ├─ Recent memory snippets (memorySystem.query_user_recently_memory)
+      │     ├─ Recent memory snippets (MemorySystem.query_user_recently_memory)
       │     ├─ Emoji prompts (EmojiCore)
       │     └─ Skills prompts (SkillsManager)
       │
@@ -401,15 +401,15 @@ The memory system consists of two layers: **short-term context cache** and **lon
 
 #### Short-term Context (ChatManager)
 - Each group/user maintains a sliding message window `Context`, directly embedded into each request's `messages` list.
-- When the context exceeds the token limit, `memorySystem.summarize_context()` triggers LLM-based compression of older messages. The compressed summary is inserted as an `assistant` role message at the head of the context.
+- When the context exceeds the token limit, `MemorySystem.summarize_context()` triggers LLM-based compression of older messages. The compressed summary is inserted as an `assistant` role message at the head of the context.
 
-#### Long-term Vector Memory (memorySystem + pgvector)
+#### Long-term Vector Memory (MemorySystem + pgvector)
 
 ```
 After chat ends
       │
       ▼
-memorySystem.extract_stored_group_message()
+MemorySystem.extract_stored_group_message()
       │
       ├─ LLM Information Extraction (PURE_GROUP_FACT_RETRIEVAL_PROMPT)
       │     └─ Output: structured JSON — per-user events + group topics

@@ -31,7 +31,7 @@ from atribot.LLMchat.LLM_supervisor import (
 )
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
-from atribot.LLMchat.memory.memory_system import memorySystem
+from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.prepare_model_prompt import build_prompt
@@ -68,7 +68,7 @@ class ChatBasics(ABC):
         llm_supervisor: LLMCoordinator,
         media_processor: MediaProcessor,
         llm_supplier: LLMConnectionManager,
-        memory_system: memorySystem,
+        memory_system: MemorySystem,
         token_manager: TokenManager,
         send_message: QQAPIClient,
         chat_manager: ChatManager,
@@ -82,7 +82,7 @@ class ChatBasics(ABC):
         self.model_api_supervisor: LLMCoordinator = llm_supervisor
         self.media_processor: MediaProcessor = media_processor
         self.supplier: LLMConnectionManager = llm_supplier
-        self.memory_system: memorySystem = memory_system
+        self.memory_system: MemorySystem = memory_system
         self.token_manager: TokenManager = token_manager
         self.send_message: QQAPIClient = send_message
         self.chat_manager: ChatManager = chat_manager
@@ -265,7 +265,7 @@ class GroupChat(ChatBasics):
         llm_supervisor: LLMCoordinator,
         media_processor: MediaProcessor,
         llm_supplier: LLMConnectionManager,
-        memory_system: memorySystem,
+        memory_system: MemorySystem,
         token_manager: TokenManager,
         send_message: QQAPIClient,
         chat_manager: ChatManager,
@@ -943,7 +943,7 @@ class PrivateChat(ChatBasics):
         llm_supervisor: LLMCoordinator,
         media_processor: MediaProcessor,
         llm_supplier: LLMConnectionManager,
-        memory_system: memorySystem,
+        memory_system: MemorySystem,
         token_manager: TokenManager,
         send_message: QQAPIClient,
         chat_manager: ChatManager,

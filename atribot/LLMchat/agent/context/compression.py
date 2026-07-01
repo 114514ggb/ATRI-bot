@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from logging import Logger
 from typing import TYPE_CHECKING, List, Optional
 
-from atribot.LLMchat.agent.message import BaseMessage, UserMessage
+from atribot.core.service_container import container
+from atribot.LLMchat.agent.message import AssistantMessage, BaseMessage, UserMessage
+from atribot.LLMchat.memory.memory_system import MemorySystem
 
 if TYPE_CHECKING:
     from atribot.LLMchat.agent.context.context import AgentContext
@@ -31,16 +34,17 @@ class BaseCompressionStrategy(ABC):
         ...
 
     @abstractmethod
-    def compress(self, context: AgentContext) -> Optional[List[BaseMessage]]:
+    async def compress(self, context: AgentContext) -> Optional[List[BaseMessage]]:
         """对上下文执行压缩操作
 
-        该方法会直接修改传入的 context
-        
+        该方法会直接修改传入的 context。
+        子类实现应负责：压缩消息、对移除的消息进行总结、将总结插入上下文开头。
+
         Args:
             context: 待压缩的 Agent 对话上下文
 
         Returns:
-            被移除的消息列表；若无消息被移除则返回 None
+            可选的被移除的消息列表；若无消息被移除则返回 None
         """
         ...
 
@@ -54,6 +58,12 @@ class DefaultCompressionStrategy(BaseCompressionStrategy):
 
     压缩方式：丢弃前半部分消息，并确保剩余部分首条消息为 UserMessage
     """
+
+    def __init__(self):
+        super().__init__()
+        self.log: Logger = container.get("log")
+        self.memory_system = container.get_by_type(MemorySystem)
+
 
     @property
     def name(self) -> str:
@@ -71,8 +81,8 @@ class DefaultCompressionStrategy(BaseCompressionStrategy):
         )
         return trigger_by_count or trigger_by_tokens
 
-    def compress(self, context: AgentContext) -> Optional[List[BaseMessage]]:
-        """丢弃前半部分消息，并确保首条为 UserMessage"""
+    async def compress(self, context: AgentContext) -> Optional[List[BaseMessage]]:
+        """丢弃前半部分消息，确保首条为 UserMessage,并对被移除的消息进行总结后插入上下文开头"""
         removed_messages: List[BaseMessage] = []
 
         discard_count = len(context._messages) // 2
@@ -85,6 +95,25 @@ class DefaultCompressionStrategy(BaseCompressionStrategy):
         while context._messages and not isinstance(context._messages[0], UserMessage):
             removed_messages.append(context._messages.popleft())
 
+        # 对被移除的消息进行总结并插入到上下文开头
+        if removed_messages:
+            try:
+                removed_text = "\n".join(
+                    str(msg.to_openai_dict()) for msg in removed_messages
+                )
+                if summarize_text := await self.memory_system.summarize_context(removed_text):
+                    context._messages.appendleft(
+                        AssistantMessage(content=summarize_text[:3000])
+                    )
+                    self.log.info(
+                        f"Agent上下文总结完成, 压缩 {len(removed_messages)} 条消息"
+                        f" 为 {len(summarize_text)} 字符的摘要"
+                    )
+                else:
+                    self.log.info("Agent上下文总结返回为空, 跳过摘要插入")
+            except Exception as e:
+                self.log.exception(f"Agent上下文总结出现错误: {e}")
+
         context.total_tokens = context.count_estimate_tokens()
 
-        return removed_messages if removed_messages else None
+        return removed_messages

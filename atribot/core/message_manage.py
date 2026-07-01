@@ -13,7 +13,7 @@ from atribot.core.type.chat_message_types import AtSegment, ChatMessage
 from atribot.core.type.chat_types import GroupContext
 from atribot.LLMchat.chat import GroupChat, PrivateChat
 from atribot.LLMchat.initiative_chat import initiativeChat
-from atribot.LLMchat.memory.memory_system import memorySystem
+from atribot.LLMchat.memory.memory_system import MemorySystem
 
 
 class message_router():
@@ -90,7 +90,7 @@ class message_manage(ABC):
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
         self.command_system:CommandSystem = container.get("CommandSystem")
         self.send_message:QQAPIClient = container.get("SendMessage")
-        self.memory_system:memorySystem = container.get("memorySystem")
+        self.memory_system:MemorySystem = container.get("MemorySystem")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.logger:Logger = container.get("log")
         self.initiative_chat = initiativeChat()

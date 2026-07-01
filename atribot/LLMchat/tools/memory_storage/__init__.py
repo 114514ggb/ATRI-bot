@@ -1,7 +1,7 @@
 import time
 
 from atribot.core.service_container import container
-from atribot.LLMchat.memory.memory_system import memorySystem
+from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 tool_json = {
@@ -39,7 +39,7 @@ tool_json = {
     }
 }
 
-memory_system: memorySystem = container.get("memorySystem")
+memory_system: MemorySystem = container.get("MemorySystem")
 
 async def main(
     content_text: str,

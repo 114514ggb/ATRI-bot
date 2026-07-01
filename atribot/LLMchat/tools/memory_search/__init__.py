@@ -4,7 +4,7 @@ from asyncpg import Record
 
 from atribot.common_utils import format_memory_records, parse_time_to_timestamp
 from atribot.core.service_container import container
-from atribot.LLMchat.memory.memory_system import memorySystem
+from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.RAG.vector_store import MemoryCategory
 
 tool_json = {
@@ -87,7 +87,7 @@ tool_json = {
     },
 }
 
-memory_system: memorySystem = container.get("memorySystem")
+memory_system: MemorySystem = container.get("MemorySystem")
 
 
 async def main(

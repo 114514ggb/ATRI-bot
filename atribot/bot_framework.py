@@ -26,7 +26,7 @@ from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.LLMchat.MCP.mcp_tool_manager import ToolManager
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
-from atribot.LLMchat.memory.memory_system import memorySystem
+from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
@@ -43,7 +43,7 @@ class BotFramework:
         HTTPClient,
         TimeTriggerSupervisor,
         TokenManager,
-        memorySystem,
+        MemorySystem,
         UserSystem,
         EventTrigger,
         CommandSystem,
@@ -73,7 +73,7 @@ class BotFramework:
         TokenManager,
         LLMConnectionManager,
         SkillsManager,
-        memorySystem,
+        MemorySystem,
         UserSystem,
         ChatManager,
         EmojiCore,
