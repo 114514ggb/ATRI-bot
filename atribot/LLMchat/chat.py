@@ -884,7 +884,7 @@ class GroupChat(ChatBasics):
     
     async def send_reply_message_separator(
         self,
-        chat_text_list: List[str],
+        chat_text_list: List[str] | str,
         group_id: int,
         since_llm: float,
         message_id: int = None,
@@ -927,7 +927,7 @@ class GroupChat(ChatBasics):
             await self.send_message.send_group_msg(
                 group_id,
                 self.emoji_core.parse_text_to_cqcode_with_emotion(
-                    text  = "\n".join(chat_text_list),
+                    text  = chat_text_list if isinstance(chat_text_list, str) else "\n".join(chat_text_list),
                     emoji_dict = self.emoji_file_dict,
                     reply_id = message_id 
                 )

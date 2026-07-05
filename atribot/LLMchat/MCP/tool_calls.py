@@ -520,7 +520,7 @@ class ToolCalls(ServiceBase):
     """工具调用"""
 
     @classmethod
-    def factory(cls, config: atriConfig) -> "ToolCalls":
+    def factory(cls, config: atriConfig) -> ToolCalls:
         instance = cls(config.file_path.tool_calls)
         instance._preset_manager.load_presets_from_config(config.tool_presets, instance._registry)
         return instance

@@ -33,6 +33,7 @@ from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, ToolCall, message
+from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 
 _MAX_TOOL_ROUNDS = 10  # 单步内工具调用最大轮数
 _MAX_EMPTY_RETRIES = 5  # 空响应重试次数
@@ -56,6 +57,9 @@ class SubAgentRunner(BaseAgentRunner):
         self._audio_sense: bool = False
         self._resolve_model_capabilities()
 
+        # 按名称解析到的供应商 API 对象缓存
+        self.__cached_supplier_api: Optional[model_api_basics] = None
+
         #步状态
         self._step_index: int = 0
         self._hooks_triggered: bool = False
@@ -71,23 +75,36 @@ class SubAgentRunner(BaseAgentRunner):
         #当前步的 StepSummary
         self._last_summary: Optional[StepSummary] = None
 
+    @property
+    def _supplier_api(self) -> model_api_basics:
+        """按 ``self.agent_data.supplier`` 名称查找并缓存供应商 API 对象"""
+        if self.__cached_supplier_api is None:
+            supplier_mgr = container.get_by_type(LLMConnectionManager)
+            conn = supplier_mgr.connections.get(self.agent_data.supplier)
+            if conn is None:
+                raise ValueError(
+                    f"供应商 '{self.agent_data.supplier}' 未在 "
+                    f"LLMConnectionManager 中注册"
+                )
+            self.__cached_supplier_api = conn.connection_object
+        return self.__cached_supplier_api
+
     def _resolve_model_capabilities(self) -> None:
         """设置多模态值"""
         supplier_mgr = container.get_by_type(LLMConnectionManager)
         model_name: str = self.agent_data.model_name
-        supplier_api = self.agent_data.supplier
+        supplier_name: str = self.agent_data.supplier
 
-        for conn in supplier_mgr.connections.values():
-            if conn.connection_object is supplier_api:
-                model_info = conn.model_dict.get(model_name, {})
-                self._visual_sense = model_info.get("visual_sense", False)
-                self._audio_sense = model_info.get("audio_sense", False)
-                return
-
-        self.log.warning(
-            f"未找到模型 {model_name} 的多模态能力配置，"
-            f"默认 visual_sense=False, audio_sense=False"
-        )
+        conn = supplier_mgr.connections.get(supplier_name)
+        if conn is not None:
+            model_info = conn.model_dict.get(model_name, {})
+            self._visual_sense = model_info.get("visual_sense", False)
+            self._audio_sense = model_info.get("audio_sense", False)
+        else:
+            self.log.warning(
+                f"未找到供应商 '{supplier_name}' 的模型 {model_name} 的多模态能力配置，"
+                f"默认 visual_sense=False, audio_sense=False"
+            )
 
     def _get_tool_json(self) -> Optional[List[Dict[str, Any]]]:
         """获取 OpenAI 格式工具定义"""
@@ -169,7 +186,7 @@ class SubAgentRunner(BaseAgentRunner):
         Raises:
             ValueError: 在最大重试次数后仍未获取有效回复
         """
-        model_api = self.agent_data.supplier
+        model_api = self._supplier_api
         model = self.agent_data.model_name
         messages = self._build_payload_messages()
         tools = self._get_tool_json()
@@ -219,7 +236,7 @@ class SubAgentRunner(BaseAgentRunner):
             - ``ToolCallStartChunk`` — 工具调用开始(首次检测到完整工具名时)
             - ``AgentStatusChunk`` — 状态变更
         """
-        model_api = self.agent_data.supplier
+        model_api = self._supplier_api
         model = self.agent_data.model_name
         messages = self._build_payload_messages()
         tools = self._get_tool_json()
@@ -563,15 +580,16 @@ class SubAgentRunner(BaseAgentRunner):
                 # 截断过长结果
                 if isinstance(tool_msg.content, str):
                     tool_msg.content = tool_msg.content[:_TOOL_OUTPUT_TRUNCATE]
+                    tool_msg.refresh_cache()
                 elif isinstance(tool_msg.content, list):
-                    original_segs = list(tool_msg.content)
-                    tool_msg.clear()
-                    for seg in original_segs:
+                    new_segments = []
+                    for seg in tool_msg.content:
                         if isinstance(seg, TextSegment):
-                            tool_msg.add_text(seg.text[:_TOOL_OUTPUT_TRUNCATE])
+                            new_segments.append(TextSegment(seg.text[:_TOOL_OUTPUT_TRUNCATE]))
                         else:
-                            tool_msg.add_segment(seg)
-                tool_msg.refresh_cache()
+                            new_segments.append(seg)
+                    tool_msg.content = new_segments
+                    tool_msg.refresh_cache()
 
                 self.log.debug(f"工具 {tool_name} 输出: {str(tool_msg.content)[:300]}...")
 
