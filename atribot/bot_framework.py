@@ -89,7 +89,7 @@ class BotFramework:
     )
     
     def __init__(self):
-        self.logger: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Bot")
         self._background_tasks: set[asyncio.Task[Any]] = set()
         """退出时统一回收的后台任务"""
         self._shutdown_task: asyncio.Task[None] | None = None
@@ -156,7 +156,7 @@ class BotFramework:
             await sand_box.start()
             container.register("SandBox", sand_box, cleanup=sand_box.stop)
         except Exception as e:
-            self.logger.exception(f"LLM使用的沙盒初始化失败{e}")
+            self.log.exception(f"LLM使用的沙盒初始化失败{e}")
 
     async def _resolve_services(self) -> None:
         """提前解析启动阶段需要的服务实例"""
@@ -193,7 +193,7 @@ class BotFramework:
             log_level="warning",
         )
         server = uvicorn.Server(cfg)
-        self.logger.info(f"管理面板已就绪: http://127.0.0.1:{admin_port}/admin/")
+        self.log.info(f"管理面板已就绪: http://127.0.0.1:{admin_port}/admin/")
         await server.serve()
 
     async def _start_network(self, server_type: str) -> None:
@@ -245,7 +245,7 @@ class BotFramework:
             return
 
         if exc := task.exception():
-            self.logger.exception("后台任务异常退出: %s", task.get_name(), exc_info=exc)
+            self.log.exception("后台任务异常退出: %s", task.get_name(), exc_info=exc)
 
     async def graceful_shutdown(self) -> None:
         """等待关闭流程执行完成"""
@@ -268,7 +268,7 @@ class BotFramework:
         if self._is_shutdown:
             return
 
-        self.logger.info("正在清理回收资源~")
+        self.log.info("正在清理回收资源~")
 
         await self._cancel_background_tasks()
         await container.shutdown()

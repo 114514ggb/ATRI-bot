@@ -64,13 +64,32 @@ class Logger:
     def get_logger(self) -> logging.Logger:
         return self.logger
 
+    def get_child(self, name: str) -> logging.Logger:
+        """获取一个继承当前日志器 handler 的子日志器(atri-bot.<name>)
+
+        子日志器自动将日志传播到父日志器，无需重复配置 handler
+        """
+        return self.logger.getChild(name)
+
+
+def get_named_logger(name: str) -> logging.Logger:
+    """快捷函数：获取一个名为 atri-bot.<name> 的日志器
+
+    用于不想通过容器获取日志器的场景
+    """
+    return logging.getLogger(f"atri-bot.{name}")
+
 
 if __name__ == "__main__":
     logger = Logger().get_logger()
-    
+
     logger.debug("这是一条debug信息")
     logger.info("这是一条info信息")
     logger.warning("这是一条warning信息")
     logger.error("这是一条error信息")
     logger.critical("这是一条critical信息")
+
+    child = logger.getChild("Test")
+    child.info("这是一条来自子日志器 atri-bot.Test 的测试信息")
+    child.error("子日志器错误测试")
     

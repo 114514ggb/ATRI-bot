@@ -19,7 +19,7 @@ class AIContextCommands:
         self.context_management: ChatManager = container.get("ChatManager")
         self.send_message: QQAPIClient = container.get("SendMessage")
         self.user_system: UserSystem = container.get("UserSystem")
-        self.log: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("AICmd")
         
         self.user_global_context:bool = container.get("config").model.connect.user_global_context
         

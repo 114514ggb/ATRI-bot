@@ -47,7 +47,7 @@ class SubAgentRunner(BaseAgentRunner):
         self, agent_data: AgentData, message_data: ChatMessage | None = None
     ) -> None:
         super().__init__(agent_data)
-        self.log: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("SubAgent")
         self._tool_calls_mgr: ToolCalls = container.get("ToolCalls")
         self._media_processor: MediaProcessor = container.get("MediaProcessor")
         self._message_data: ChatMessage | None = message_data

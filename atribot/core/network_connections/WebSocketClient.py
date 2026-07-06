@@ -48,7 +48,7 @@ class WebSocketClient:
         if hasattr(self, '_initialized'):
             return
         
-        self.log:Logger =  container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("WebSocket")
         
         # 连接配置
         self.url = url

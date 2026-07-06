@@ -63,9 +63,12 @@ class DIContainer:
                     inst._factories = {}
                     inst._type_map = {}
 
-                    logger_instance: Logger = Logger().get_logger()
+                    logger_wrapper = Logger()
+                    logger_instance = logger_wrapper.get_logger()
                     inst._services["log"] = logger_instance
                     inst._type_map[type(logger_instance)] = "log"
+                    inst._services["Logger"] = logger_wrapper
+                    inst._type_map[Logger] = "Logger"
 
                     cls._instance = inst
         return cls._instance

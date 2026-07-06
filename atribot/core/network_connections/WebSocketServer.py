@@ -45,7 +45,7 @@ class WebSocketServer:
         if hasattr(self, '_initialized'):
             return
         
-        self.log: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("WebSocket")
         # self.log = logging.getLogger("WebSocketServer")
         
         # 服务器配置

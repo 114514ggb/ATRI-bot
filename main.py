@@ -17,8 +17,8 @@ _____/\\\\\\\\\____        __/\\\\\\\\\\\\\\\_        ____/\\\\\\\\\_____       
 """
 
 async def main():
-    logger:Logger = container.get("log")
-    logger.info(logo_tmpl)
+    log = container.get_by_type(Logger).getChild("Main")
+    log.info(logo_tmpl)
 
     framework: BotFramework | None = None
 

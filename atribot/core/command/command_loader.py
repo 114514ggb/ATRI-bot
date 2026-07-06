@@ -1,7 +1,7 @@
 import importlib
 import importlib.util
-import logging
 import sys
+from logging import Logger
 from pathlib import Path
 
 from atribot.core.atri_config import atriConfig
@@ -20,7 +20,7 @@ class command_loader:
                 `config.file_path.commands`。
         """
         self.command_system:CommandSystem = container.get("CommandSystem")
-        self.logger:logging = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("CmdLoader")
         self.config:atriConfig = container.get("config")
         self.loaded_modules = []
         self.commands_dir: Path = Path(commands_dir) if commands_dir else self.config.file_path.commands
@@ -42,7 +42,7 @@ class command_loader:
         try:
             relative_path = commands_dir.relative_to(project_root)
         except ValueError:
-            self.logger.warning(
+            self.log.warning(
                 f"命令目录 {commands_dir} 不在项目根目录 {project_root} 下，将退回目录名推断包名。"
             )
             return commands_dir.name
@@ -63,11 +63,11 @@ class command_loader:
         self.commands_dir = commands_dir
         
         if not commands_dir.exists():
-            self.logger.error(f"命令目录不存在: {commands_dir}")
+            self.log.error(f"命令目录不存在: {commands_dir}")
             return 0
         
         if not commands_dir.is_dir():
-            self.logger.error(f"指定路径不是目录: {commands_dir}")
+            self.log.error(f"指定路径不是目录: {commands_dir}")
             return 0
         
         if base_package is None:
@@ -83,14 +83,14 @@ class command_loader:
                         package_name = f"{base_package}.{item.name}" if base_package else item.name
                         self._load_package(item, package_name)
                         loaded_count += 1
-                        self.logger.info(f"成功加载命令模块: {item.name}")
+                        self.log.info(f"成功加载命令模块: {item.name}")
                     except Exception as e:
                         hint = ""
                         if isinstance(e, ModuleNotFoundError):
                             hint = "；提示: 请检查该命令包的 __init__.py 是否存在，以及模块内是否使用了绝对导入"
-                        self.logger.exception(f"加载命令模块 {item.name} 失败: {e}{hint}")
+                        self.log.exception(f"加载命令模块 {item.name} 失败: {e}{hint}")
         
-        self.logger.info(f"命令加载完成，共加载 {loaded_count} 个模块")
+        self.log.info(f"命令加载完成，共加载 {loaded_count} 个模块")
         return loaded_count
 
     def _load_package(self, package_path: Path, package_name: str):
@@ -144,7 +144,7 @@ class command_loader:
             raise ImportError(f"无法创建模块规格: {file_path}")
         
         if module_name in sys.modules:
-            self.logger.debug(f"模块 {module_name} 已存在，跳过加载")
+            self.log.debug(f"模块 {module_name} 已存在，跳过加载")
             return sys.modules[module_name]
         
         module = importlib.util.module_from_spec(spec)

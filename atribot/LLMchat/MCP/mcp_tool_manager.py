@@ -26,7 +26,7 @@ DEFAULT_MCP_CONFIG = {"mcpServers": {}}
 class MCPClient:
     def __init__(self):
         # 初始化会话和资源管理对象        
-        self.logger:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("MCPClient")
         """日志配置"""
         self.session: Optional[mcp.ClientSession] = None  # MCP服务器会话
         self.exit_stack = AsyncExitStack()  # 异步上下文资源管理器
@@ -132,7 +132,7 @@ class MCPClient:
     async def list_tools_and_save(self) -> mcp.ListToolsResult:
         """从服务器获取工具列表并保存到实例变量（MCPTool 实例）"""
         response = await self.session.list_tools()
-        self.logger.info(f"MCP server {self.name}")
+        self.log.info(f"MCP server {self.name}")
         self.tools = [
             MCPTool(
                 name=tool.name,
@@ -157,7 +157,7 @@ class MCPClient:
         """
         async with self._reconnect_lock:
             if self._reconnecting:
-                self.logger.debug(f"MCP 客户端 {self._server_name} 正在重连中，已跳过")
+                self.log.debug(f"MCP 客户端 {self._server_name} 正在重连中，已跳过")
                 return
 
             if not self._mcp_server_config or not self._server_name:
@@ -165,7 +165,7 @@ class MCPClient:
 
             self._reconnecting = True
             try:
-                self.logger.info(f"正在尝试重连至 MCP 服务器 {self._server_name}...")
+                self.log.info(f"正在尝试重连至 MCP 服务器 {self._server_name}...")
 
                 # 保留旧 exit_stack 供延迟清理，避免影响其他任务上下文
                 if self.exit_stack:
@@ -179,9 +179,9 @@ class MCPClient:
                 await self.connect_to_server(self._mcp_server_config, self._server_name)
                 await self.list_tools_and_save()
 
-                self.logger.info(f"成功重连至 MCP 服务器 {self._server_name}")
+                self.log.info(f"成功重连至 MCP 服务器 {self._server_name}")
             except Exception as e:
-                self.logger.error(f"重连至 MCP 服务器 {self._server_name} 失败: {e}")
+                self.log.error(f"重连至 MCP 服务器 {self._server_name} 失败: {e}")
                 raise
             finally:
                 self._reconnecting = False
@@ -220,7 +220,7 @@ class MCPClient:
                     call_kwargs["read_timeout_seconds"] = read_timeout_seconds
                 return await self.session.call_tool(**call_kwargs)
             except Exception:
-                self.logger.warning(
+                self.log.warning(
                     f"MCP 工具 {tool_name} 调用失败，正在尝试重连..."
                 )
                 await self._reconnect()
@@ -233,7 +233,7 @@ class MCPClient:
         try:
             await self.exit_stack.aclose()
         except Exception as e:
-            self.logger.debug(f"关闭当前 exit_stack 时出错: {e}")
+            self.log.debug(f"关闭当前 exit_stack 时出错: {e}")
         # 旧 exit_stack 交给 GC 处理，仅清空引用
         self._old_exit_stacks.clear()
 
@@ -242,7 +242,7 @@ class ToolManager(ServiceBase):
     """管理 MCP 连接生命周期"""
 
     def __init__(self, mcp_path: str | Path = "") -> None:
-        self.logger: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("MCPManager")
         """日志配置"""
         self._mcp_func_list: List[FunctionTool] = []
         """MCP 服务发现的工具暂存区（不含本地工具），供 ToolCalls 拉取同步"""
@@ -314,7 +314,7 @@ class ToolManager(ServiceBase):
             # 配置文件不存在错误处理
             with open(mcp_json_file, "w", encoding="utf-8") as f:
                 json.dump(DEFAULT_MCP_CONFIG, f, ensure_ascii=False, indent=4)
-            self.logger.info(f"未找到 MCP 服务配置文件，已创建默认配置文件 {mcp_json_file}")
+            self.log.info(f"未找到 MCP 服务配置文件，已创建默认配置文件 {mcp_json_file}")
             return
 
         mcp_server_json_obj: Dict[str, Dict] = json.load(
@@ -384,13 +384,13 @@ class ToolManager(ServiceBase):
         try:
             await self._init_mcp_client(name, cfg)
             await event.wait()
-            self.logger.info(f"收到 MCP 客户端 {name} 终止信号")
+            self.log.info(f"收到 MCP 客户端 {name} 终止信号")
             await self._terminate_mcp_client(name)
         except Exception as e:
             import traceback
 
             traceback.print_exc()
-            self.logger.error(f"初始化 MCP 客户端 {name} 失败: {e}")
+            self.log.error(f"初始化 MCP 客户端 {name} 失败: {e}")
 
     async def _init_mcp_client(self, name: str, config: dict) -> None:
         """初始化单个MCP客户端"""
@@ -425,14 +425,14 @@ class ToolManager(ServiceBase):
                 )
                 self._mcp_func_list.append(func_tool)
 
-            self.logger.info(f"已连接 MCP 服务 {name}, Tools: {tool_names}")
+            self.log.info(f"已连接 MCP 服务 {name}, Tools: {tool_names}")
             await self._notify_tools_changed(name)
             return
         except Exception as e:
             import traceback
 
-            self.logger.info(traceback.format_exc())
-            self.logger.error(f"初始化 MCP 客户端 {name} 失败: {e}")
+            self.log.info(traceback.format_exc())
+            self.log.error(f"初始化 MCP 客户端 {name} 失败: {e}")
             # 发生错误时确保客户端被清理
             if name in self.mcp_client_dict:
                 await self._terminate_mcp_client(name)
@@ -446,14 +446,14 @@ class ToolManager(ServiceBase):
                 await self.mcp_client_dict[name].cleanup()
                 del self.mcp_client_dict[name]
             except Exception as e:
-                self.logger.info(f"清空 MCP 客户端资源 {name}: {e}。")
+                self.log.info(f"清空 MCP 客户端资源 {name}: {e}。")
             # 移除关联的 FunctionTool
             self._mcp_func_list = [
                 f
                 for f in self._mcp_func_list
                 if not (isinstance(f, MCPTool) and f.mcp_server_name == name)
             ]
-            self.logger.info(f"已关闭 MCP 服务 {name}")
+            self.log.info(f"已关闭 MCP 服务 {name}")
             await self._notify_tools_changed(name)
 
     def __str__(self):
@@ -466,4 +466,4 @@ class ToolManager(ServiceBase):
         """关闭清理"""
         for name in list(self.mcp_client_dict.keys()):
             await self._terminate_mcp_client(name)
-            self.logger.info(f"清理 MCP 客户端 {name} 资源")
+            self.log.info(f"清理 MCP 客户端 {name} 资源")

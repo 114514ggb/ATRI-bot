@@ -29,10 +29,8 @@ SUB_AGENT_SYSTEM_PROMPT: str = (
 _MAX_TURNS = 20
 """子代理最大执行轮数"""
 
-tool_calls = container.get_by_type(ToolCalls)
 
-
-@tool_calls.register_tool(
+@ToolCalls.register_tool(
     name="sub_agent",
     description=(
         "委托一个复杂、多步骤的任务给子代理独立执行。"
@@ -65,8 +63,8 @@ async def sub_agent_task(
     """
     if not task or not task.strip():
         return "子代理执行失败: 任务描述不能为空。"
-
-    log: Logger = container.get("log")
+    
+    log: Logger = container.get_by_type(Logger).getChild("SubAgentTool")
     config: atriConfig = container.get("config")
     supplier_mgr = container.get_by_type(LLMConnectionManager)
 

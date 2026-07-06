@@ -9,7 +9,7 @@ from atribot.LLMchat.token_manage import TokenManager
 
 cmd_system: CommandSystem = container.get("CommandSystem")
 send_message: QQAPIClient = container.get("SendMessage")
-log:Logger = container.get("log")
+log: Logger = container.get_by_type(Logger).getChild("TokenCmd")
 token_manager:TokenManager = container.get("TokenManager")
 
 PERIOD_DAYS = 30

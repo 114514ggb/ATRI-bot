@@ -1,5 +1,5 @@
-import logging
 from abc import ABC, abstractmethod
+from logging import Logger
 from typing import AsyncGenerator
 
 from atribot.core.service_container import container
@@ -65,10 +65,11 @@ class model_api_basics(ABC):
         ):
         super().__init__(**kwargs)
         try:
-            self.log:logging = container.get("log")
+            self.log: Logger = container.get_by_type(Logger).getChild("ModelAPI")
         except Exception:
+            import logging
             logging.basicConfig(level=logging.INFO)
-            self.log = logging.getLogger(self.__class__.__name__)
+            self.log = logging.getLogger("atri-bot.ModelAPI")
         
         self.base_url = base_url
         self.api_key = api_key

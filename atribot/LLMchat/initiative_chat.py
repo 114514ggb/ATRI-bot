@@ -12,7 +12,7 @@ class initiativeChat:
     """决定bot如何在合适的时机加入群聊天"""
     
     def __init__(self):
-        self.logger:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("InitChat")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.group_chat:GroupChat = container.get("GroupChat")
         self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
@@ -31,7 +31,7 @@ class initiativeChat:
         
         if group_context.time_window.get_recent_avg_interval(4) < 0.7:
             #如果消息间隔过低不考虑
-            self.logger.info(f"群{group_id}消息超过限制~不考虑回复")
+            self.log.info(f"群{group_id}消息超过限制~不考虑回复")
             return False
         
         #被@检测
@@ -92,7 +92,7 @@ class initiativeChat:
         prompt:str
     ) -> Literal[True]:
             """回复执行逻辑"""
-            self.logger.info(f"Group {group_id} {log_msg}")
+            self.log.info(f"Group {group_id} {log_msg}")
             await decision_params.reset_turns_since_last_llm() 
             
             await self.group_chat.step(

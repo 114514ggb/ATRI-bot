@@ -1,3 +1,5 @@
+from logging import Logger
+
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
@@ -20,7 +22,7 @@ async def reload_commands_handler(message_data: ChatMessage) -> None:
     from atribot.core.command.command_loader import command_loader as LoaderType
 
     loader: LoaderType = container.get("CommandLoader")
-    log = container.get("log")
+    log = container.get_by_type(Logger).getChild("Reload")
     group_id = message_data.group_id
 
     await send_message.send_group_msg(group_id, "⏳ 正在重载全部命令模块...")

@@ -38,7 +38,7 @@ class QQAPIClient(ServiceBase):
         if "_initialized" not in self.__dict__:
             
             self.File_root_directory:FilePathConfig = container.get("config").file_path
-            self.logger:Logger = container.get("log")
+            self.log: Logger = container.get_by_type(Logger).getChild("QQAPI")
             
             if connection_type == "http":
                 
@@ -60,7 +60,7 @@ class QQAPIClient(ServiceBase):
                 raise Exception("连接类型错误")
                 
             self.connection_type = connection_type # 连接类型
-            self.logger.info(f"当前连接类型为{connection_type}\n")
+            self.log.info(f"当前连接类型为{connection_type}\n")
             self._initialized = True
 
     @classmethod
@@ -81,13 +81,13 @@ class QQAPIClient(ServiceBase):
         try:
             async with self.client.post(f"{self.http_base_url}/{url}", json=payload) as response:
                 if response.status == 200:
-                    self.logger.info("http请求发送成功")
+                    self.log.info("http请求发送成功")
                     return await response.json()
                 else:
-                    self.logger.info(f"http发送请求失败 {response.status} {await response.text()}")
+                    self.log.info(f"http发送请求失败 {response.status} {await response.text()}")
                     return None
         except aiohttp.ClientError as e:
-            self.logger.error("http请求失败:", e)
+            self.log.error("http请求失败:", e)
             return None
 
     async def _send_ws_strategy(self, url: str, payload: dict, echo: bool = False) -> Optional[dict]:
@@ -106,7 +106,7 @@ class QQAPIClient(ServiceBase):
             return None
             
         except Exception as e:
-            self.logger.error("WC发送请求失败: %s", e)
+            self.log.error("WC发送请求失败: %s", e)
     
     async def async_send(self, url, payload, echo = False)->dict|None:
         """通用的发送异步请求,返回json"""
@@ -128,7 +128,7 @@ class QQAPIClient(ServiceBase):
             elif isinstance(message, PrivateMessage):
                 url = "send_private_msg"
             else:
-                self.logger.error(f"不支持的发送消息类型: {type(message)}")
+                self.log.error(f"不支持的发送消息类型: {type(message)}")
                 return None
                 
             return await self.async_send(url, payload=message.to_dict())

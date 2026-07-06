@@ -31,7 +31,7 @@ class atriAsyncMySQL(AsyncDatabaseBase):
         pool_maxsize: int = 8
     ) -> "atriAsyncMySQL":
         """推荐初始创建连接池（单例模式）的方法"""
-        log: Logger = container.get("log")
+        log: Logger = container.get_by_type(Logger).getChild("DB")
         
         if cls._pool is None:
             async with cls._init_lock:

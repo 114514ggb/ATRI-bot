@@ -1,8 +1,8 @@
 import inspect
-import logging
 import shlex
 from dataclasses import dataclass, field
 from enum import Enum
+from logging import Logger
 from typing import Any, Callable, Dict, List, Optional, Type
 
 from atribot.common_utils import jaro_winkler_similarity
@@ -169,7 +169,7 @@ class CommandSystem:
     """命令系统主类"""
     
     def __init__(self):
-        self.log:logging = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("CmdSystem")
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
         self.send_message:QQAPIClient = container.get("SendMessage")
         self.command_registry: Dict[str, Command] = {}

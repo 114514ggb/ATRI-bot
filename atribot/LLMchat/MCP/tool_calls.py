@@ -21,7 +21,7 @@ class ToolRegistry:
     _registry: list[tuple[dict, Any]] = []
 
     def __init__(self, logger: Logger) -> None:
-        self.logger = logger
+        self.log = logger
         self.func_list: List[FunctionTool] = []
 
     def add_func(
@@ -52,7 +52,7 @@ class ToolRegistry:
             handler=handler,
         )
         self.func_list.append(_func)
-        self.logger.info(f"添加本地函数调用工具: {name}")
+        self.log.info(f"添加本地函数调用工具: {name}")
 
     def remove_func(self, name: str) -> None:
         """按名称删除工具"""
@@ -107,35 +107,35 @@ class ToolRegistry:
 
             file_path = os.path.join(dir_path, "__init__.py")
             if not os.path.exists(file_path):
-                self.logger.error(f"文件夹{dir_path}中没有__init__.py文件")
+                self.log.error(f"文件夹{dir_path}中没有__init__.py文件")
                 continue
 
             spec = importlib.util.spec_from_file_location(name, file_path)
             if spec is None:
-                self.logger.error(f"导入模块{file_path} 失败！")
+                self.log.error(f"导入模块{file_path} 失败！")
                 continue
 
             module = importlib.util.module_from_spec(spec)
             if module is None:
-                self.logger.error(f"获取模块{file_path}中的loader 失败！")
+                self.log.error(f"获取模块{file_path}中的loader 失败！")
                 continue
 
             try:
                 spec.loader.exec_module(module)
             except Exception as e:
-                self.logger.error(f"加载模块时发生错误：{e}")
+                self.log.error(f"加载模块时发生错误：{e}")
                 continue
 
             func = getattr(module, default_module_name, None)
             if func is None:
-                self.logger.error(
+                self.log.error(
                     f"获取模块{file_path}中的函数{default_module_name} 失败！"
                 )
                 continue
 
             tool_json = getattr(module, "tool_json", None)
             if tool_json is None:
-                self.logger.error(f"获取模块{file_path}中的函数tool_json 失败！")
+                self.log.error(f"获取模块{file_path}中的函数tool_json 失败！")
                 continue
 
             self.add_func(
@@ -220,7 +220,7 @@ class ToolPresetManager:
     """工具预设组管理"""
 
     def __init__(self, logger: Logger) -> None:
-        self.logger = logger
+        self.log = logger
         self.presets: Dict[str, ToolSetModel] = {}
         self._registry: ToolRegistry | None = None
         self._preset_lock = asyncio.Lock()
@@ -228,7 +228,7 @@ class ToolPresetManager:
     def register_preset(self, preset_name: str, toolset: ToolSetModel) -> None:
         """注册一个工具预设组"""
         self.presets[preset_name] = toolset
-        self.logger.info(f"注册工具预设 '{preset_name}': {toolset.names()}")
+        self.log.info(f"注册工具预设 '{preset_name}': {toolset.names()}")
 
     def remove_preset(self, preset_name: str) -> None:
         """删除一个工具预设组"""
@@ -244,7 +244,7 @@ class ToolPresetManager:
         self._registry = registry
         for name, tools in presets_config.items():
             if not isinstance(tools, list):
-                self.logger.warning(f"工具预设 '{name}' 的内容不是列表，将被跳过")
+                self.log.warning(f"工具预设 '{name}' 的内容不是列表，将被跳过")
                 continue
             toolset = ToolSetModel()
             for tool_name in tools:
@@ -252,9 +252,9 @@ class ToolPresetManager:
                 if func_tool is not None:
                     toolset.add_tool(func_tool)
                 else:
-                    self.logger.warning(f"工具 '{tool_name}' 未在注册表中找到，跳过")
+                    self.log.warning(f"工具 '{tool_name}' 未在注册表中找到，跳过")
             self.register_preset(name, toolset)
-        self.logger.info(f"工具预设共加载 {len(self.presets)} 个")
+        self.log.info(f"工具预设共加载 {len(self.presets)} 个")
 
     async def modify_preset_tools(
         self, preset_name: str, op: str, tools: List[str]
@@ -284,7 +284,7 @@ class ToolPresetManager:
                     if func_tool is not None:
                         toolset.add_tool(func_tool)
                     else:
-                        self.logger.warning(f"工具 '{t}' 未在注册表中找到，无法添加")
+                        self.log.warning(f"工具 '{t}' 未在注册表中找到，无法添加")
             elif op == "remove":
                 for t in tools:
                     toolset.remove_tool(t)
@@ -304,7 +304,7 @@ class ToolPresetManager:
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
-            self.logger.info(
+            self.log.info(
                 f"预设 '{preset_name}' 成功执行 {op} 操作，当前包含: {toolset.names()}"
             )
 
@@ -339,7 +339,7 @@ class ToolPresetManager:
             if toolset := self.presets.get(preset):
                 return toolset
             else:
-                self.logger.warning(f"工具预设 '{preset}' 不存在，将返回空工具集合")
+                self.log.warning(f"工具预设 '{preset}' 不存在，将返回空工具集合")
                 return ToolSetModel()
         if names is not None:
             return full_toolset.filter_by_names(names)
@@ -350,7 +350,7 @@ class ToolSchemaCache:
     """Schema 格式化与缓存"""
 
     def __init__(self, logger: Logger) -> None:
-        self.logger = logger
+        self.log = logger
         self._openai_cache: tuple[list, list] | None = None
         self._anthropic_cache: list | None = None
         self._google_cache: dict | None = None
@@ -363,7 +363,7 @@ class ToolSchemaCache:
         )
         self._anthropic_cache = self._format_anthropic(func_list)
         self._google_cache = self._format_google(func_list)
-        self.logger.info("已缓存所有激活的 MCP 和本地工具描述")
+        self.log.info("已缓存所有激活的 MCP 和本地工具描述")
 
     @staticmethod
     def _format_openai(
@@ -526,13 +526,13 @@ class ToolCalls(ServiceBase):
         return instance
 
     def __init__(self, tool_path: Path) -> None:
-        self.logger: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("ToolCalls")
         self._tool_manager: ToolManager = container.get("MCP")
 
         # 子组件
-        self._registry = ToolRegistry(self.logger)
-        self._preset_manager = ToolPresetManager(self.logger)
-        self._schema_cache = ToolSchemaCache(self.logger)
+        self._registry = ToolRegistry(self.log)
+        self._preset_manager = ToolPresetManager(self.log)
+        self._schema_cache = ToolSchemaCache(self.log)
 
         # 加载本地工具
         self._registry.get_files_in_folder(str(tool_path))
@@ -600,7 +600,7 @@ class ToolCalls(ServiceBase):
         """当 ToolManager 中 MCP 工具发生变更时触发"""
         self._registry.sync_mcp_tools(mcp_func_list, server_name=server_name)
         self._schema_cache.build_tool_description_cache(self._registry.func_list)
-        self.logger.info(
+        self.log.info(
             f"MCP 工具已同步 (server={server_name}, total={len(self._registry.func_list)})"
         )
 

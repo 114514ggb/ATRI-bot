@@ -12,7 +12,7 @@ class MemoryRetriever:
     """记忆检索器:执行复杂的SQL检索和混合召回"""
 
     def __init__(self, rag: RAGManager):
-        self.logger: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Memory.Ret")
         self.rag = rag
         self.vector_store = rag.vector_store
 
@@ -448,7 +448,7 @@ class MemoryRetriever:
             async with self.vector_store.vector_database as db:
                 rows = await db.execute_with_pool(sql, params, fetch_type="all")
         except Exception as e:
-            self.logger.error(f"hybrid_recall 混合查询失败,降级到纯向量: {e}")
+            self.log.error(f"hybrid_recall 混合查询失败,降级到纯向量: {e}")
             try:
                 return await self.vector_store.query_memories(
                     query_vector=query_vector,
@@ -466,7 +466,7 @@ class MemoryRetriever:
                     update_stats=update_stats,
                 )
             except Exception as e2:
-                self.logger.error(f"hybrid_recall 降级查询也失败: {e2}")
+                self.log.error(f"hybrid_recall 降级查询也失败: {e2}")
                 return []
 
         if update_stats and rows:

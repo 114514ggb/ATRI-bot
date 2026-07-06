@@ -46,7 +46,7 @@ class EventTrigger:
 
     def __init__(self):
         """初始化 EventTrigger 实例，并注册默认的事件处理器"""
-        self.log: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Event")
         self.send_message:QQAPIClient = container.get("SendMessage")
         self.str_response = string_response()
 

@@ -15,7 +15,7 @@ class MediaProcessor:
     def __init__(self) -> None:
         config = container.get("config")
         supplier = container.get("LLMSupplier")
-        self.log: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Media")
 
         # 图像识别
         try:

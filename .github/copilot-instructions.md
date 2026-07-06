@@ -2,7 +2,7 @@
 # ATRI-bot AI Coding Instructions
 
 ## Architecture Overview
-- **Entry Point**: `main.py` → `atribot/bot_framework.py`（`BotFramework.create()` 工厂方法）。所有服务在 `initialize()` 中**严格按顺序**注册，初始化完成后调用 `TimeTriggerSupervisor.start()` 启动定时循环。
+- **Entry Point**: `main.py` → `atribot/bot_framework.py`（`BotFramework.create()` 工厂方法）所有服务在 `initialize()` 中**严格按顺序**注册，初始化完成后调用 `TimeTriggerSupervisor.start()` 启动定时循环
 - **实际初始化流程**:
   1. 注册 `config`（atriConfig）
   2. `_register_services()` — 分两组注册：`_SERVICE_CLASSES`（类名即服务名）和 `_NAMED_SERVICE_CLASSES`（显式指定服务名的类，如 `AsyncPostgreSQL`→`"database"`、`LLMConnectionManager`→`"LLMSupplier"`）
@@ -13,8 +13,8 @@
   6. 在 `_resolve_services` 最后，手动注册 `command_loader`（`CommandLoader`）
   7. `_start_runtime_services()` — 启动 `TimeTriggerSupervisor` 循环及 `admin_panel`
   8. `_start_network()` — 绑定 `message_router` 并开始监听
-- **后台任务管理**: `BotFramework.create_background_task(coro, name=...)` 创建受控后台任务，自动跟踪并在 `shutdown` 时统一取消。异常退出时自动记录日志。`graceful_shutdown()` 使用 `asyncio.shield` 保护关闭流程不被取消。
-- **依赖注入**: 使用模块级单例 `container`（`from atribot.core.service_container import container` = `DIContainer()` 单例）。核心 API：
+- **后台任务管理**: `BotFramework.create_background_task(coro, name=...)` 创建受控后台任务，自动跟踪并在 `shutdown` 时统一取消异常退出时自动记录日志`graceful_shutdown()` 使用 `asyncio.shield` 保护关闭流程不被取消
+- **依赖注入**: 使用模块级单例 `container`（`from atribot.core.service_container import container` = `DIContainer()` 单例）核心 API：
 
   | 方法 | 说明 |
   |---|---|
@@ -54,14 +54,14 @@
       async def initialize(self) -> None: ...   # 异步初始化（resolve 后自动调用）
       async def cleanup(self) -> None: ...      # 异步清理（shutdown 时自动调用）
   ```
-  - `factory()` — 若覆写，`resolve()` 会用自定义工厂替代默认构造器。典型用法：`AsyncPostgreSQL.factory(config)` 通过 `config` 从容器获取 `atriConfig` 并提取数据库连接参数
+  - `factory()` — 若覆写，`resolve()` 会用自定义工厂替代默认构造器典型用法：`AsyncPostgreSQL.factory(config)` 通过 `config` 从容器获取 `atriConfig` 并提取数据库连接参数
   - `initialize()` — 若覆写，`resolve()` 在实例化后自动调用（同样注入参数），用于异步初始化逻辑
   - `cleanup()` — 若覆写，`resolve()` 自动提取为清理回调注册到容器，`shutdown` 时逆序调用
   - **不强制继承**：即使不继承 `ServiceBase`，只要在 `container.register(name, obj, cleanup=fn)` 时手动传入清理回调即可
 
-- **消息流**: `NapCat`（外部QQ） → `WebSocketClient`（单例） → `message_router.main()` → 群聊白名单校验 → `PermissionsManagement.check_access()` → `CommandSystem` 或 `EventTrigger` 或 `LLMCoordinator`。群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理。
-- **数据库**: PostgreSQL + `pgvector`（HNSW 1024维，m=16/ef=64）+ `pgroonga` 扩展。全异步，使用 `async with db as db:` 上下文管理器。Schema 定义在 `docker/db/info.sql`，含自定义枚举 `permission_type`、`memory_category`。
-- **配置访问**: `atriConfig` 将 JSON 包装为支持点操作的 `ConfigObject`（`assets/config.json`）。路径统一通过 `config.file_path.*` 访问，均为 `Path` 对象。
+- **消息流**: `NapCat`（外部QQ） → `WebSocketClient`（单例） → `message_router.main()` → 群聊白名单校验 → `PermissionsManagement.check_access()` → `CommandSystem` 或 `EventTrigger` 或 `LLMCoordinator`群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理
+- **数据库**: PostgreSQL + `pgvector`（HNSW 1024维，m=16/ef=64）+ `pgroonga` 扩展全异步，使用 `async with db as db:` 上下文管理器Schema 定义在 `docker/db/info.sql`，含自定义枚举 `permission_type`、`memory_category`
+- **配置访问**: `atriConfig` 将 JSON 包装为支持点操作的 `ConfigObject`（`assets/config.json`）路径统一通过 `config.file_path.*` 访问，均为 `Path` 对象
 
 ## 完整服务名称表
 | 服务名 | 类型 | Shutdown | 备注 |
@@ -114,7 +114,7 @@ class ChatMessage:
     def update_llm_formatted_message(self) -> None  # 调用 format_for_llm() 更新 llm_formatted_message 字段
 ```
 
-> **注意**：`sender_nickname` 不是独立字段，通过 `message_data.sender_info["nickname"]` 访问。
+> **注意**：`sender_nickname` 不是独立字段，通过 `message_data.sender_info["nickname"]` 访问
 
 ### MessageSegment 消息段类型
 | 类名 | 用途 | 构造 |
@@ -143,7 +143,7 @@ class File:
 ```
 
 ### SendMessage（多模态消息构建）
-> **注意**：此处的 `SendMessage` 是多模态消息构建器类（位于 `atribot/core/type/chat_message_types.py`），与发送服务 `QQAPIClient`（也注册为 `SendMessage`）不同。
+> **注意**：此处的 `SendMessage` 是多模态消息构建器类（位于 `atribot/core/type/chat_message_types.py`），与发送服务 `QQAPIClient`（也注册为 `SendMessage`）不同
 
 ```python
 from atribot.core.type.chat_message_types import SendMessage
@@ -184,14 +184,14 @@ msg = (SendMessage()
 - `2`：管理员
 - `3`：Root 用户
 
-`authority_level` 字段含义：`0`=无限制，`1`=普通用户可用，`2`=管理员，`3`=Root。
+`authority_level` 字段含义：`0`=无限制，`1`=普通用户可用，`2`=管理员，`3`=Root
 
 ## Key Extension Patterns
 
 ### 1. 添加新命令
-- 在 `atribot/commands/<category>/` 下创建目录，`command_loader`（`CommandLoader`）自动扫描并加载各子目录的 `__init__.py`。
-- **重要**：`command_loader` 动态注入父模块时必须设置 `__path__`，否则子模块绝对导入会报"不是包"。加载命令包时应先执行 `__init__.py`，再加载同级其他 `.py` 文件，避免同包绝对导入失败。
-- 处理函数**第一个参数固定为** `message_data: ChatMessage`，通过 `message_data.group_id`、`message_data.user_id` 等属性访问。
+- 在 `atribot/commands/<category>/` 下创建目录，`command_loader`（`CommandLoader`）自动扫描并加载各子目录的 `__init__.py`
+- **重要**：`command_loader` 动态注入父模块时必须设置 `__path__`，否则子模块绝对导入会报"不是包"加载命令包时应先执行 `__init__.py`，再加载同级其他 `.py` 文件，避免同包绝对导入失败
+- 处理函数**第一个参数固定为** `message_data: ChatMessage`，通过 `message_data.group_id`、`message_data.user_id` 等属性访问
 - **三种参数装饰器**（顺序：register_command → option/argument/flag → 处理函数）：
 
 ```python
@@ -220,8 +220,8 @@ async def handler(message_data: ChatMessage, param: str, opt: str | None, verbos
 ```
 
 ### 2. LLM Function Calling 工具
-- 在 `atribot/LLMchat/tools/<tool_name>/` 下创建目录 + `__init__.py`。
-- 必须导出：`tool_json`（OpenAI function calling 格式）和 `async def main(**kwargs)` 执行函数。
+- 在 `atribot/LLMchat/tools/<tool_name>/` 下创建目录 + `__init__.py`
+- 必须导出：`tool_json`（OpenAI function calling 格式）和 `async def main(**kwargs)` 执行函数
 
 ```python
 tool_json = {
@@ -238,7 +238,7 @@ async def main(**kwargs) -> Any:
     # kwargs key 与 tool_json.properties 一致
 ```
 
-**已内置工具**：`web_search`、`web_extract`、`get_user_info`、`memory_search`、`send_image_message`、`send_speech_message`、`send_create_image`、`load_skill_prompt`、`run_python_code`（沙盒执行）。
+**已内置工具**：`web_search`、`web_extract`、`get_user_info`、`memory_search`、`send_image_message`、`send_speech_message`、`send_create_image`、`load_skill_prompt`、`run_python_code`（沙盒执行）
 
 ### 3. 定时任务
 - 通过 `container.get("TimeTriggerSupervisor")` 获取调度器，支持一次性延迟、固定间隔、Cron 三种模式：
@@ -257,14 +257,14 @@ async def main(**kwargs) -> Any:
 - `add_cron_task()` 完整签名：`add_cron_task(func, cron_expression, task_id=None, priority=10, timeout=5.0, kwargs=None, remarks="")`
 
 ### 4. Agent Skills
-- 在 `atribot/LLMchat/skills/agent_skills/<skill-name>/` 下创建含 YAML frontmatter 的 `SKILL.md`。
-- 必填字段：`name`（小写字母+数字+`-`）和 `description`；可选：`version`、`author`、`tags`。
-- 参考说明文档：`atribot/LLMchat/skills/agent_skills/如何创建一个skills.md`。
-- 技能在运行时通过 `load_skill_prompt` 工具加载给 LLM 使用，也可通过 `container.get("SkillsManager").get_skill_md_prompt(skill_name)` 直接获取。
-- **性能说明**：`SkillsManager` 启动时使用 `validator.load_validated_properties()` 一次性完成读取、解析、验证和 `SkillProperties` 构建，避免重复 I/O。
+- 在 `atribot/LLMchat/skills/agent_skills/<skill-name>/` 下创建含 YAML frontmatter 的 `SKILL.md`
+- 必填字段：`name`（小写字母+数字+`-`）和 `description`；可选：`version`、`author`、`tags`
+- 参考说明文档：`atribot/LLMchat/skills/agent_skills/如何创建一个skills.md`
+- 技能在运行时通过 `load_skill_prompt` 工具加载给 LLM 使用，也可通过 `container.get("SkillsManager").get_skill_md_prompt(skill_name)` 直接获取
+- **性能说明**：`SkillsManager` 启动时使用 `validator.load_validated_properties()` 一次性完成读取、解析、验证和 `SkillProperties` 构建，避免重复 I/O
 
 ### 5. EventTrigger 扩展
-- 使用装饰器注册钩子，支持带条件 lambda 过滤。处理函数若返回 `True` 则**拦截后续处理**，不再向下分发。
+- 使用装饰器注册钩子，支持带条件 lambda 过滤处理函数若返回 `True` 则**拦截后续处理**，不再向下分发
   ```python
   event_trigger = container.get("EventTrigger")
   
@@ -289,8 +289,8 @@ async def main(**kwargs) -> Any:
   async def on_self_message(message: ChatMessage, data: dict) -> None:
       pass
   ```
-- 也可使用通用 `on(event_type, condition)` 装饰器，`event_type` 取自 `EventType` 枚举。
-- 也可以直接在 `atribot/core/event_trigger/event_trigger.py` 的 `processors` 列表中添加 `(条件lambda, 处理协程)` 元组。
+- 也可使用通用 `on(event_type, condition)` 装饰器，`event_type` 取自 `EventType` 枚举
+- 也可以直接在 `atribot/core/event_trigger/event_trigger.py` 的 `processors` 列表中添加 `(条件lambda, 处理协程)` 元组
 
 ## SendMessage API（QQAPIClient）
 ```python
@@ -331,10 +331,10 @@ await send_message.send_group_json(group_id, json_dict)           # 发送 JSON 
 await send_message.send_group_music(group_id, type, id, ...)      # 分享音乐
 await send_message.set_msg_emoji_like(message_id, emoji_id, set)  # 消息贴表情
 ```
-URL 格式：`http(s)://...`、`file://绝对路径`（需 `local_Path_type=True`）、`base64://编码字符串`。
+URL 格式：`http(s)://...`、`file://绝对路径`（需 `local_Path_type=True`）、`base64://编码字符串`
 
 ## 记忆系统
-- `MemorySystem` 是门面类（`atribot/LLMchat/memory/memory_system.py`），内部聚合 `MemoryRetriever`（向量+全文检索）、`MemoryExtractor`（LLM 提取记忆）和 `MemoryConsolidator`（记忆合并去重）。**关键实践**：构建时应共享 `MemoryRetriever`/`MemoryExtractor` 实例注入 `MemoryConsolidator`，避免重复初始化 LLM 供应商和模型。相似度边 SQL 聚集逻辑归属 `MemoryRetriever`，`MemoryConsolidator` 仅负责编排聚集/合并流程。
+- `MemorySystem` 是门面类（`atribot/LLMchat/memory/memory_system.py`），内部聚合 `MemoryRetriever`（向量+全文检索）、`MemoryExtractor`（LLM 提取记忆）和 `MemoryConsolidator`（记忆合并去重）**关键实践**：构建时应共享 `MemoryRetriever`/`MemoryExtractor` 实例注入 `MemoryConsolidator`，避免重复初始化 LLM 供应商和模型相似度边 SQL 聚集逻辑归属 `MemoryRetriever`，`MemoryConsolidator` 仅负责编排聚集/合并流程
 **MemoryCategory** 8 种分类（`atribot/LLMchat/memory/vector_store.py`）：
 ```
 "preference"  # 用户偏好
@@ -347,7 +347,7 @@ URL 格式：`http(s)://...`、`file://绝对路径`（需 `local_Path_type=True
 "guideline"   # 行为准则知识
 ```
 
-`group_id` 语义：`None` = 知识库，`0` = 私聊，`>0` = 群聊。记忆条目含 `importance`（1-10）和 `credibility`（1-10）质量指标，HNSW 向量索引 + pgroonga 全文索引双重检索。
+`group_id` 语义：`None` = 知识库，`0` = 私聊，`>0` = 群聊记忆条目含 `importance`（1-10）和 `credibility`（1-10）质量指标，HNSW 向量索引 + pgroonga 全文索引双重检索
 
 ## 数据库 API（AsyncPostgreSQL）
 ```python
@@ -361,25 +361,25 @@ async with db as db:
     await db.add_message(message_id, content, ...)
     await db.add_group(group_id, group_name)
 ```
-核心表：`users`、`user_group`、`user_info`、`permissions`、`message`、`atri_memory`（pgvector 1024维）、`chat_context`（JSONB 上下文）。
+核心表：`users`、`user_group`、`user_info`、`permissions`、`message`、`atri_memory`（pgvector 1024维）、`chat_context`（JSONB 上下文）
 
 ## Coding Standards
-- **异步优先**: 所有 IO（DB、网络、LLM API）必须使用 `async/await`。
-- **绝对路径**: 使用 `container.get("config").file_path.*` 获取路径，**禁止使用相对路径**。
+- **异步优先**: 所有 IO（DB、网络、LLM API）必须使用 `async/await`
+- **绝对路径**: 使用 `container.get("config").file_path.*` 获取路径，**禁止使用相对路径**
   - 项目路径：`project_root`、`document_root`
   - 核心目录：`commands`、`chat_manager`、`supplier_config_path`、`agent_skills`、`tool_calls`、`mcp_config`
   - 文档目录：`emoji`、`audio`、`img`、`video`、`temp`、`file`
-- **日志**: `log = container.get("log")`，使用 `log.info/warning/error/exception()`。
-- **类型注解**: 所有函数参数和返回值都需添加类型注解。
-- **优雅关闭**: 新服务注册后，调用 `container.register_cleanup(name, cleanup_coro)` 注册清理回调（shutdown 按逆序执行）。
+- **日志**: 使用命名子日志器标识模块来源获取方式：`log = container.get_by_type(Logger).getChild("ModuleName")`日志输出格式为 `%(asctime)s [%(levelname)s] atri-bot.ModuleName | %(message)s`统一使用 `self.log`（实例变量）或 `log`（局部/模块级变量），类型注解为 `Logger`
+- **类型注解**: 所有函数参数和返回值都需添加类型注解
+- **优雅关闭**: 新服务注册后，调用 `container.register_cleanup(name, cleanup_coro)` 注册清理回调（shutdown 按逆序执行）
 
 ## Critical Developer Workflows
-- **运行 Bot**: 从**项目根目录**执行 `uv run main.py` 或 `python main.py`，路径解析依赖工作目录。
-- **数据库 Schema**: 修改持久化逻辑前先查看 `docker/db/info.sql`，所有新建表应在此文件定义。
-- **LLM 供应商配置**: 在 `assets/supplier_config.json` 中添加供应商（`base_url` + `api_key` + `model_dict`）。智谱AI（`bigModel`）在 `bot_framework.py` 中硬编码注册，支持 GLM-4.5/4.6V/4.1V 等系列。
-- **备用模型**: `config.model.standby_model` 列表维护多个备选模型，主模型不可用时自动切换。
-- **RAG/Memory**: 记忆系统基于 pgvector 向量检索（Qwen3-Embedding 1024维 + Qwen3-Reranker 重排序），入口为 `container.get("MemorySystem")`，向量分类参见 MemoryCategory 8 种枚举。
-- **MCP 服务**: 配置文件路径由 `config.file_path.mcp_config` 指定（`atribot/LLMchat/MCP/mcp_server.json`），支持 SSE 和 Streamable HTTP。`ToolManager` 通过 `asyncio.create_task` 启动后台 `mcp_service_selector`，使用 `asyncio.Queue` (`mcp_service_queue`) 管理指令：`{"type": "init"}` 初始化所有激活服务，`{"type": "terminate"}` 关闭所有服务；`active: false` 的服务不会启动。配置格式：
+- **运行 Bot**: 从**项目根目录**执行 `uv run main.py` 或 `python main.py`，路径解析依赖工作目录
+- **数据库 Schema**: 修改持久化逻辑前先查看 `docker/db/info.sql`，所有新建表应在此文件定义
+- **LLM 供应商配置**: 在 `assets/supplier_config.json` 中添加供应商（`base_url` + `api_key` + `model_dict`）智谱AI（`bigModel`）在 `bot_framework.py` 中硬编码注册，支持 GLM-4.5/4.6V/4.1V 等系列
+- **备用模型**: `config.model.standby_model` 列表维护多个备选模型，主模型不可用时自动切换
+- **RAG/Memory**: 记忆系统基于 pgvector 向量检索（Qwen3-Embedding 1024维 + Qwen3-Reranker 重排序），入口为 `container.get("MemorySystem")`，向量分类参见 MemoryCategory 8 种枚举
+- **MCP 服务**: 配置文件路径由 `config.file_path.mcp_config` 指定（`atribot/LLMchat/MCP/mcp_server.json`），支持 SSE 和 Streamable HTTP`ToolManager` 通过 `asyncio.create_task` 启动后台 `mcp_service_selector`，使用 `asyncio.Queue` (`mcp_service_queue`) 管理指令：`{"type": "init"}` 初始化所有激活服务，`{"type": "terminate"}` 关闭所有服务；`active: false` 的服务不会启动配置格式：
   ```json
   {
     "mcpServers": {
@@ -393,7 +393,8 @@ async with db as db:
     }
   }
   ```
-- **SandBox**: 使用前务必调用 `container.exists("SandBox")` 检查，`DockerSandbox` 初始化失败不阻断启动；沙盒镜像预装 numpy/pandas/matplotlib/pillow/opencv。
-- **群组白名单**: `config.group_white_list` 控制哪些群接收消息处理，`group_initiative_chat_white_list` 控制主动发起对话的群，`group_information_extraction` 指定自动提取话题的群。
+- **SandBox**: 使用前务必调用 `container.exists("SandBox")` 检查，`DockerSandbox` 初始化失败不阻断启动；沙盒镜像预装 numpy/pandas/matplotlib/pillow/opencv
+- **群组白名单**: `config.group_white_list` 控制哪些群接收消息处理，`group_initiative_chat_white_list` 控制主动发起对话的群，`group_information_extraction` 指定自动提取话题的群
 
 ````
+环境里面要运行py代码请使用uv

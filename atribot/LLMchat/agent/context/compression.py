@@ -61,7 +61,7 @@ class DefaultCompressionStrategy(BaseCompressionStrategy):
 
     def __init__(self):
         super().__init__()
-        self.log: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("AgentCtx")
         self.memory_system = container.get_by_type(MemorySystem)
 
 

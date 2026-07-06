@@ -1,4 +1,4 @@
-import logging
+from logging import Logger
 from typing import Set
 
 from atribot.common_utils import is_qq
@@ -30,7 +30,7 @@ class PermissionsManagement(ServiceBase):
 
     def __init__(self):
         self.db: AsyncDatabaseBase = container.get("database")
-        self.logging: logging.Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Permissions")
         self.root: Set[int] = {container.get("config").root_user_id}
         self.administrator: Set[int] = set()
         self.blacklist: Set[int] = set()
@@ -109,7 +109,7 @@ class PermissionsManagement(ServiceBase):
             
             target_list.add(target_user_id)
             
-            self.logging.info(f"操作成功：用户 {target_user_id} 已被 {operator_id} 添加到 {permission_role} 列表。")
+            self.log.info(f"操作成功：用户 {target_user_id} 已被 {operator_id} 添加到 {permission_role} 列表。")
 
         elif action == 'remove':
             if target_user_id not in target_list:
@@ -119,7 +119,7 @@ class PermissionsManagement(ServiceBase):
             
             target_list.remove(target_user_id)
             
-            self.logging.info(f"操作成功：用户 {target_user_id} 已被 {operator_id} 从 {permission_role} 列表移除。")
+            self.log.info(f"操作成功：用户 {target_user_id} 已被 {operator_id} 从 {permission_role} 列表移除。")
         else:
             raise ValueError("无效的操作类型。")
 
@@ -173,15 +173,15 @@ class PermissionsManagement(ServiceBase):
                 sql = "DELETE FROM permissions WHERE user_id = $1"
                 await self.db.execute_SQL(sql, (user_id,))
             
-            self.logging.info(f"数据库同步成功: 用户 {user_id}, 权限 {permission_type}, 操作 {action}.")
+            self.log.info(f"数据库同步成功: 用户 {user_id}, 权限 {permission_type}, 操作 {action}.")
         except Exception as e:
-            self.logging.error(f"同步权限到数据库失败: {e}", exc_info=True)
+            self.log.error(f"同步权限到数据库失败: {e}", exc_info=True)
             self.sync_from_db()
             raise IOError(f"同步权限到数据库失败: {e}\n已经尝试回滚")
 
     async def sync_from_db(self):
         """从数据库加载所有权限信息，并同步到本地内存中。"""
-        self.logging.info("正在从数据库同步权限到本地...")
+        self.log.info("正在从数据库同步权限到本地...")
         try:
             sql = "SELECT user_id, permission_type FROM permissions"
             results = await self.db.execute_SQL(sql, ())
@@ -197,11 +197,11 @@ class PermissionsManagement(ServiceBase):
                 elif permission_type == self.ROLE_ROOT:
                     self.root.add(user_id)
 
-            self.logging.info("从数据库同步权限到本地成功。")
-            self.logging.info(f"加载权限\n - Root: {self.root},\n - Admin: {self.administrator},\n - Blacklist: {self.blacklist}")
+            self.log.info("从数据库同步权限到本地成功。")
+            self.log.info(f"加载权限\n - Root: {self.root},\n - Admin: {self.administrator},\n - Blacklist: {self.blacklist}")
 
         except Exception as e:
-            self.logging.error(f"从数据库同步权限到本地失败: {e}", exc_info=True)
+            self.log.error(f"从数据库同步权限到本地失败: {e}", exc_info=True)
             raise IOError(f"从数据库同步权限到本地失败: {e}")
 
     def check_access(self, user_id: int) -> bool:
@@ -210,7 +210,7 @@ class PermissionsManagement(ServiceBase):
 
     def view_permissions(self) -> tuple[Set[int], Set[int]]:
         """查看现有的权限划分情况"""
-        self.logging.info(f"Root: {self.root}, Administrator: {self.administrator}")
+        self.log.info(f"Root: {self.root}, Administrator: {self.administrator}")
         return self.root, self.administrator
 
     def get_my_permission(self, user_id: int) -> str:

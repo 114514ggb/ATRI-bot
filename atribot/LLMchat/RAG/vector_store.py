@@ -24,7 +24,7 @@ class VectorStoreBasics(ABC):
     """向量存查的基类"""
     
     def __init__(self):
-        self.logger:Logger = container.get("log")
+        self.logger: Logger = container.get_by_type(Logger).getChild("VectorStore")
         self.vector_database:AsyncPostgreSQL = container.get("database")
         
     @abstractmethod

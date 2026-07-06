@@ -10,7 +10,7 @@ class TokenManager:
     """Token 消耗统计日志与管理服务"""
 
     def __init__(self):
-        self.log:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Token")
         self.db:AsyncPostgreSQL = container.get("database")
 
     async def record_token_usage(

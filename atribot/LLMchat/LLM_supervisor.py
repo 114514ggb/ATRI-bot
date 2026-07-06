@@ -157,7 +157,7 @@ class LLMCoordinator():
     def __init__(self):
         self.supplier:LLMConnectionManager = container.get("LLMSupplier")
         self.tool_management: ToolCalls = container.get("ToolCalls")
-        self.logger:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("LLMCoord")
         self._media_processor:MediaProcessor = container.get("MediaProcessor")
         
     async def step(self, request:GenerationRequest)->GenerationResponse:
@@ -246,7 +246,7 @@ class LLMCoordinator():
         Returns:
             GenerationResponse: 返回
         """
-        self.logger.debug("从中断继续请求!")
+        self.log.debug("从中断继续请求!")
         
         for msg in request.generation_response.messages: 
             if msg['role'] in ['assistant','tool']:
@@ -329,7 +329,7 @@ class LLMCoordinator():
         Returns:
             GenerationResponse: 返回
         """
-        self.logger.debug("模型进入工具调用!")
+        self.log.debug("模型进入工具调用!")
         
         response = request.generation_response or GenerationResponse(model = request.model)
         
@@ -352,16 +352,16 @@ class LLMCoordinator():
                     
                 except ToolCallsStopIteration:
                     increase_context.add_tool_message(tool_name,tool_call['id'],tool_output)
-                    self.logger.info("模型主动结束工具调用!")
+                    self.log.info("模型主动结束工具调用!")
                     response.messages = increase_context.messages
                     return response
                     
                 except Exception as e:
                     text = f"调用工具发生错误。\nErrors:{e}"
-                    self.logger.error(text,exc_info=True)
+                    self.log.error(text,exc_info=True)
                     tool_output = text
 
-                self.logger.debug(f"工具调用输出:{tool_output}")
+                self.log.debug(f"工具调用输出:{tool_output}")
                 
                 # 截断防止有的工具返回过长的结果
                 if isinstance(tool_output, str):
@@ -404,7 +404,7 @@ class LLMCoordinator():
                 )
                 break
         
-        self.logger.debug("工具调用结束!")
+        self.log.debug("工具调用结束!")
         
         response.messages = increase_context.messages
         
@@ -525,7 +525,7 @@ class LLMCoordinator():
                 desc = await self._media_processor.image_to_text(f"data:{mime};base64,{data}")
                 builder.add_text(f"[{tag}描述: {desc}]")
             except Exception as e:
-                self.logger.warning(f"工具返回{tag}降级描述失败: {e}")
+                self.log.warning(f"工具返回{tag}降级描述失败: {e}")
                 builder.add_text(f"[{tag}: {mime}]")
 
     async def _handle_audio_block(
@@ -546,7 +546,7 @@ class LLMCoordinator():
                 desc = await self._media_processor.audio_to_text(f"data:{mime};base64,{data}")
                 builder.add_text(f"[{tag}转文字:{desc}]")
             except Exception as e:
-                self.logger.warning(f"工具返回{tag}降级转文字失败:{e}")
+                self.log.warning(f"工具返回{tag}降级转文字失败:{e}")
                 builder.add_text(f"[{tag}:{mime}]")
 
     @staticmethod
@@ -614,7 +614,7 @@ class LLMCoordinator():
                 model_api = model_api
             )
             
-            self.logger.debug(f"模型返回:{api_reply}")
+            self.log.debug(f"模型返回:{api_reply}")
             
             assistant_message:Dict = api_reply['choices'][0]['message']
             content = assistant_message.get('content')

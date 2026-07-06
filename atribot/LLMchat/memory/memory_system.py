@@ -19,7 +19,7 @@ class MemorySystem:
     """记忆系统门面类"""
 
     def __init__(self, config: atriConfig, api_supplier: LLMConnectionManager, time_trigger: TimeTriggerSupervisor):
-        self.logger: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Memory.Sys")
         self.api_supplier: LLMConnectionManager = api_supplier
         self.config = config
         self.model = self.config.model.memory.summarize_model.model_name

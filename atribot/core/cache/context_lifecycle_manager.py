@@ -25,7 +25,7 @@ class ContextLifecycleManager:
     """用于管理上下文冷热分离的"""
     
     def __init__(self, archival_after:float):
-        self.logger:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Cache")
         self.database:AsyncPostgreSQL = container.get("database")
         self.archival_after: float = archival_after
         """归档的时间，超过这个时间不活跃的会被归档"""
@@ -61,11 +61,11 @@ class ContextLifecycleManager:
                 if success:
                     if time.monotonic() - container_data.last_msg_at > self.archival_after:
                         keys_to_remove.append(key)
-                        self.logger.info(f"上下文归档成功: {'User' if is_user_context else 'Group'} {target_id}")
+                        self.log.info(f"上下文归档成功: {'User' if is_user_context else 'Group'} {target_id}")
                     else:
-                        self.logger.info(f"归档期间 {'User' if is_user_context else 'Group'} {target_id} 变为活跃状态，跳过内存移除")
+                        self.log.info(f"归档期间 {'User' if is_user_context else 'Group'} {target_id} 变为活跃状态，跳过内存移除")
                 else:
-                    self.logger.warning(f"上下文持久化失败: {'User' if is_user_context else 'Group'} {target_id}, 保留在内存中")
+                    self.log.warning(f"上下文持久化失败: {'User' if is_user_context else 'Group'} {target_id}, 保留在内存中")
 
         for k in keys_to_remove:
             management_context_dict.pop(k, None)
@@ -131,7 +131,7 @@ class ContextLifecycleManager:
                 )
             return True
         except Exception as e:
-            self.logger.error(f"保存用户 {user_id} 上下文失败: {e}", exc_info=True)
+            self.log.error(f"保存用户 {user_id} 上下文失败: {e}", exc_info=True)
             return False
     
     async def get_user_context(self, user_id: int) -> Optional[list[dict[str, Any]]]:
@@ -161,7 +161,7 @@ class ContextLifecycleManager:
                     return json.loads(data[0])
                 return None
         except Exception as e:
-            self.logger.error(f"获取用户 {user_id} 上下文失败: {e}")
+            self.log.error(f"获取用户 {user_id} 上下文失败: {e}")
             return None
     
     async def save_group_context(
@@ -200,7 +200,7 @@ class ContextLifecycleManager:
                 )
             return True
         except Exception as e:
-            self.logger.error(f"保存群组 {group_id} 上下文失败: {e}")
+            self.log.error(f"保存群组 {group_id} 上下文失败: {e}")
             return False
     
     async def get_group_context(self, group_id: int) -> Optional[list[dict[str, Any]]]:
@@ -230,7 +230,7 @@ class ContextLifecycleManager:
                     return json.loads(data[0])
                 return None
         except Exception as e:
-            self.logger.error(f"获取群组 {group_id} 上下文失败: {e}")
+            self.log.error(f"获取群组 {group_id} 上下文失败: {e}")
             return None
 
     async def batch_save_user_contexts(
@@ -272,13 +272,13 @@ class ContextLifecycleManager:
                 results[user_id] = True
                 # self.logger.debug(f"批量保存用户 {user_id} 上下文成功")
         except Exception as e:
-            self.logger.error(f"批量保存用户上下文失败: {e}")
+            self.log.error(f"批量保存用户上下文失败: {e}")
             for user_id, context_data, total_tokens in user_contexts:
                 try:
                     success = await self.save_user_context(user_id, context_data, total_tokens)
                     results[user_id] = success
                 except Exception as inner_e:
-                    self.logger.error(f"单条保存用户 {user_id} 上下文失败: {inner_e}")
+                    self.log.error(f"单条保存用户 {user_id} 上下文失败: {inner_e}")
                     results[user_id] = False
         
         return results
@@ -322,13 +322,13 @@ class ContextLifecycleManager:
                 results[group_id] = True
                 # self.logger.debug(f"批量保存群组 {group_id} 上下文成功")
         except Exception as e:
-            self.logger.error(f"批量保存群组上下文失败: {e}")
+            self.log.error(f"批量保存群组上下文失败: {e}")
             for group_id, context_data, total_tokens in group_contexts:
                 try:
                     success = await self.save_group_context(group_id, context_data, total_tokens)
                     results[group_id] = success
                 except Exception as inner_e:
-                    self.logger.error(f"单条保存群组 {group_id} 上下文失败: {inner_e}")
+                    self.log.error(f"单条保存群组 {group_id} 上下文失败: {inner_e}")
                     results[group_id] = False
         
         return results

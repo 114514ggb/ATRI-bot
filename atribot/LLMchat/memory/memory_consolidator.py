@@ -24,7 +24,7 @@ class MemoryConsolidator:
         time_trigger: TimeTriggerSupervisor,
         extractor: Optional[MemoryExtractor] = None,
     ):
-        self.logger: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Memory.Cons")
         self.time_trigger: TimeTriggerSupervisor = time_trigger
         self.rag = rag
         self.vector_store = rag.vector_store
@@ -41,10 +41,10 @@ class MemoryConsolidator:
 
     async def scheduled_memory_maintenance(self) -> None:
         """统一触发记忆维护"""
-        self.logger.info("开始执行定时记忆维护任务")
+        self.log.info("开始执行定时记忆维护任务")
         await self.cleanup_expired_memories()
         await self.consolidate_memories_sequential(use_llm_merge=True)
-        self.logger.info("定时记忆维护任务执行完成")
+        self.log.info("定时记忆维护任务执行完成")
 
 
     async def cleanup_expired_memories(self):
@@ -89,7 +89,7 @@ class MemoryConsolidator:
             use_llm_merge: 是否使用 LLM 将同簇记忆合并为一条文本
             min_cluster_size: 分组/簇参与整理所需的最小记忆条数
         """
-        self.logger.info(
+        self.log.info(
             f"开始执行记忆整理任务... threshold={threshold}, recent_days={recent_days}, use_llm_merge={use_llm_merge}, min_cluster_size={min_cluster_size}"
         )
 
@@ -141,7 +141,7 @@ class MemoryConsolidator:
             rows = await db.execute_with_pool(sql, (start_time, min_cluster_size), fetch_type="all")
 
         if not rows:
-            self.logger.info("记忆整理结束：没有满足条件的数据")
+            self.log.info("记忆整理结束：没有满足条件的数据")
             return
 
         groups: Dict[Tuple[int, str], List[dict]] = {}
@@ -195,7 +195,7 @@ class MemoryConsolidator:
                         async with semaphore:
                             merged_event = await self.extractor.merge_cluster_event_with_llm(category, cluster_rows)
                     except Exception as e:
-                        self.logger.error(f"LLM合并失败,回退保留原文本: {e}")
+                        self.log.error(f"LLM合并失败,回退保留原文本: {e}")
 
                 final_event = (merged_event or keeper["event"] or "").strip()
                 if not final_event:
@@ -220,7 +220,7 @@ class MemoryConsolidator:
                 try:
                     embedding = (await self.rag.calculate_embedding([final_event]))[0]
                 except Exception as e:
-                    self.logger.error(f"记忆重算 embedding 失败, memory_id={keeper['memory_id']}, error={e}")
+                    self.log.error(f"记忆重算 embedding 失败, memory_id={keeper['memory_id']}, error={e}")
                     continue
 
                 try:
@@ -236,9 +236,9 @@ class MemoryConsolidator:
                     if updated:
                         updated_count += 1
                 except Exception as e:
-                    self.logger.error(f"更新保留记忆失败, memory_id={keeper['memory_id']}, error={e}")
+                    self.log.error(f"更新保留记忆失败, memory_id={keeper['memory_id']}, error={e}")
 
-        self.logger.info(
+        self.log.info(
             f"记忆整理完成: groups={len(groups)}, consolidated_clusters={total_clusters}, deleted={deleted_count}, updated={updated_count}"
         )
 
@@ -259,7 +259,7 @@ class MemoryConsolidator:
             use_llm_merge: 是否使用 LLM 将同簇记忆合并为一条文本
             min_cluster_size: 分组/簇参与整理所需的最小记忆条数
         """
-        self.logger.info(
+        self.log.info(
             f"开始执行顺序记忆整理任务... threshold={threshold}, recent_days={recent_days}, use_llm_merge={use_llm_merge}, min_cluster_size={min_cluster_size}"
         )
 
@@ -311,7 +311,7 @@ class MemoryConsolidator:
             rows = await db.execute_with_pool(sql, (start_time, min_cluster_size), fetch_type="all")
 
         if not rows:
-            self.logger.info("顺序记忆整理结束：没有满足条件的数据")
+            self.log.info("顺序记忆整理结束：没有满足条件的数据")
             return
 
         groups: Dict[Tuple[int, str], List[dict]] = {}
@@ -365,7 +365,7 @@ class MemoryConsolidator:
                         # 不使用 semaphore，直接顺序执行
                         merged_event = await self.extractor.merge_cluster_event_with_llm(category, cluster_rows)
                     except Exception as e:
-                        self.logger.error(f"LLM合并失败,回退保留原文本: {e}")
+                        self.log.error(f"LLM合并失败,回退保留原文本: {e}")
 
                 final_event = (merged_event or keeper["event"] or "").strip()
                 if not final_event:
@@ -390,7 +390,7 @@ class MemoryConsolidator:
                 try:
                     embedding = (await self.rag.calculate_embedding([final_event]))[0]
                 except Exception as e:
-                    self.logger.error(f"记忆重算 embedding 失败, memory_id={keeper['memory_id']}, error={e}")
+                    self.log.error(f"记忆重算 embedding 失败, memory_id={keeper['memory_id']}, error={e}")
                     continue
 
                 try:
@@ -406,8 +406,8 @@ class MemoryConsolidator:
                     if updated:
                         updated_count += 1
                 except Exception as e:
-                    self.logger.error(f"更新保留记忆失败, memory_id={keeper['memory_id']}, error={e}")
+                    self.log.error(f"更新保留记忆失败, memory_id={keeper['memory_id']}, error={e}")
 
-        self.logger.info(
+        self.log.info(
             f"顺序记忆整理完成: groups={len(groups)}, consolidated_clusters={total_clusters}, deleted={deleted_count}, updated={updated_count}"
         )

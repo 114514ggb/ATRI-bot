@@ -14,7 +14,7 @@ class UserSystem:
     
     
     def __init__(self):
-        self.logger:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("User")
         self.database:AsyncPostgreSQL = container.get("database")
         self.base_json_data = self.get_base_user_json()
         """参考的基础用户信息结构"""

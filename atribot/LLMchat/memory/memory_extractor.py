@@ -31,7 +31,7 @@ class MemoryExtractor:
         retriever: MemoryRetriever,
         request_concurrency_limit: int = 4,
     ):
-        self.logger: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Memory.Ext")
         self.supplier = supplier
         self.model = model_name
         self.rag = rag
@@ -66,7 +66,7 @@ class MemoryExtractor:
         """
         result:Dict = await self.extract_and_summarize_group_facts(messages_str, bot_id)
         
-        self.logger.info(f"群消息总结信息:{result}")
+        self.log.info(f"群消息总结信息:{result}")
         
         args_list = []
         
@@ -127,7 +127,7 @@ class MemoryExtractor:
         """
         result:Dict = await self.extract_and_summarize_group_facts(messages_str, bot_id)
         
-        self.logger.info(f"群消息总结信息:{result}")
+        self.log.info(f"群消息总结信息:{result}")
         if not result:
             return
 
@@ -241,7 +241,7 @@ class MemoryExtractor:
                     play_role=GROUP_MEMORY_DECISION_PROMPT
                 )
                 
-                self.logger.info(f"群消息总结,后决策json:{decision}")
+                self.log.info(f"群消息总结,后决策json:{decision}")
                 
                 action = decision.get("action", "add")
                 if action not in ["add", "update", "overwrite", "skip"]:
@@ -462,7 +462,7 @@ class MemoryExtractor:
                         await self.supplier.generate_json_ample(self.model, parameters)
                     )['choices'][0]['message'].get('content')
             except Exception as e:
-                self.logger.error(f"第{i}次总结请求出错:{e}")
+                self.log.error(f"第{i}次总结请求出错:{e}")
                 await asyncio.sleep(1)
 
             if assistant_content:
@@ -472,10 +472,10 @@ class MemoryExtractor:
                     extracted = extract_json_from_text(assistant_content)
                     if isinstance(extracted, dict):
                         return extracted
-                    self.logger.error(f"总结的提取解析json问题,data:{assistant_content}")
+                    self.log.error(f"总结的提取解析json问题,data:{assistant_content}")
                     
                 except Exception:
-                    self.logger.error(f"总结的提取解析json问题,data:{assistant_content}")
+                    self.log.error(f"总结的提取解析json问题,data:{assistant_content}")
 
             await asyncio.sleep(1)
 

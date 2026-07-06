@@ -21,7 +21,7 @@ class SkillsManager(ServiceBase):
     
     
     def __init__(self, skill_dir=Path(__file__).parent / "agent_skills"):
-        self.log:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("Skills")
         self.log.info("正在初始化SkillsManager!")
         self.skills_dict = {}
         self.prompt = ""

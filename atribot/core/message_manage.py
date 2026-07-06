@@ -20,7 +20,7 @@ class message_router():
     """分流消息主类"""
     
     def __init__(self):
-        self.logger:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("MsgRouter")
         self.db:AsyncDatabaseBase = container.get("database")
         self.send_message:QQAPIClient = container.get("SendMessage")
         self.group_manage = group_manage()
@@ -36,7 +36,7 @@ class message_router():
             if data.get("meta_event_type") ==  'heartbeat':
                 return #目前心跳的话就跳过吧
             else:
-                self.logger.debug(f"原始消息:\n{data}")
+                self.log.debug(f"原始消息:\n{data}")
             chat_message = ChatMessage.from_not_chat_event(data)
         
         if chat_message.group_id:  #有群号就是群相关的直接简单分发处理了
@@ -62,13 +62,13 @@ class message_router():
                 async with self.db as db:
                     await db.add_group(**user_group)
             except Exception as e:
-                self.logger.warning(f"群信息存储失败:{e}")
+                self.log.warning(f"群信息存储失败:{e}")
         
         try:
             users = {"user_id":chat_message.user_id,"nickname":data['sender']['nickname']}
             message ={"message_id":chat_message.message_id,"content":chat_message.user_cq_message,"timestamp":data["time"],"group_id":group_id,"user_id":chat_message.user_id}
         except Exception as e:
-            self.logger.warning(f"获取db存储参数失败:{e}")
+            self.log.warning(f"获取db存储参数失败:{e}")
             return
         
         try:
@@ -79,7 +79,7 @@ class message_router():
             return
             
         except Exception as e:
-            self.logger.warning(f"数据存储失败:{e}")
+            self.log.warning(f"数据存储失败:{e}")
             return
 
     
@@ -92,7 +92,7 @@ class message_manage(ABC):
         self.send_message:QQAPIClient = container.get("SendMessage")
         self.memory_system:MemorySystem = container.get("MemorySystem")
         self.chat_manager:ChatManager = container.get("ChatManager")
-        self.logger:Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("MsgManage")
         self.initiative_chat = initiativeChat()
     
     @abstractmethod

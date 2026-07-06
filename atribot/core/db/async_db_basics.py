@@ -17,7 +17,7 @@ class AsyncDatabaseBase(ABC):
     _context_cursor: ContextVar[Optional[Any]] = ContextVar('cursor', default=None)
     
     def __init__(self):
-        self.log: Logger = container.get("log")
+        self.log: Logger = container.get_by_type(Logger).getChild("DB")
     
     @classmethod
     @abstractmethod

@@ -19,7 +19,7 @@ tool_json = {
 }
 
 skills_manager: SkillsManager = container.get("SkillsManager")
-log: Logger = container.get("log")
+log: Logger = container.get_by_type(Logger).getChild("SkillPrompt")
 
 
 async def main(skill_name: str, relative_path: str = None) -> str:
