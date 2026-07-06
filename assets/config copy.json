@@ -58,6 +58,10 @@
                 "model_name":""
             }
         },
+        "agency_Agent":{
+            "supplier":"",
+            "model_name":""
+        },
         "standby_model":[
             {
                 "supplier":"deepseek",

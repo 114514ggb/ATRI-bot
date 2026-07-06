@@ -69,6 +69,10 @@
                 "model_name":"GeminiCLI/gemini-2.5-flash-search"
             }
         },
+        "agency_Agent":{#给ai子代理使用的模型
+            "supplier":"",
+            "model_name":""
+        },
         "standby_model":[#当主聊天模型尝试失败后会使用的其他供应商或其他的模型,但是备用模型会使用的model参数是一个默认的通用参数硬编码在里面
             {
                 "supplier":"zaxprisのapi",
