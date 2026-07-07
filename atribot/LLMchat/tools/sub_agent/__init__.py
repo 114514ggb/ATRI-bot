@@ -9,7 +9,6 @@ from atribot.LLMchat.agent.context.context import AgentContext
 from atribot.LLMchat.agent.runners.response import RunSummary
 from atribot.LLMchat.agent.runners.subagent.sub_agent_runner import SubAgentRunner
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
-from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 
 SUB_AGENT_SYSTEM_PROMPT: str = (
     "你是助手的子代理，负责执行主助手委派给你的具体任务。\n"
@@ -36,14 +35,14 @@ _MAX_TURNS = 20
         "委托一个复杂、多步骤的任务给子代理独立执行。"
         "子代理拥有独立的工具集和LLM交互循环,可以进行多步推理、"
         "组合使用工具、并在完成后返回结构化的结果"
-        "适用于查找资料或是需要独立上下文执行的复杂任务"
+        "适用于查找资料或是深度寻找相关记忆,需要独立上下文执行的只用关注结果的复杂任务"
     ),
     properties={
         "task": {
             "type": "string",
             "description": (
                 "要委托给子代理的详细任务描述。应包含：任务目标、"
-                "具体要求和约束条件、期望的输出格式。越详细越好。"
+                "具体要求和约束条件、期望的输出格式。越详细越好"
             ),
         },
     },
@@ -66,7 +65,6 @@ async def sub_agent_task(
     
     log: Logger = container.get_by_type(Logger).getChild("SubAgentTool")
     config: atriConfig = container.get("config")
-    supplier_mgr = container.get_by_type(LLMConnectionManager)
 
     agency_cfg = getattr(config.model, "agency_Agent", None)
     if agency_cfg and agency_cfg.get("model_name"):
@@ -81,18 +79,7 @@ async def sub_agent_task(
     if not model_name:
         return "子代理执行失败: 配置中未找到有效的模型名称。"
 
-    connections: List = supplier_mgr.get_filtration_connection(
-        supplier_name=supplier_name, model_name=model_name
-    )
-    if not connections:
-        connections = supplier_mgr.get_filtration_connection(model_name=model_name)
-    if not connections:
-        return (
-            f"子代理执行失败: 未找到匹配的供应商连接 "
-            f"(supplier={supplier_name}, model={model_name})。"
-        )
-
-    agency_preset = config.get("tool_presets", {}).get("agency_Agent", [])
+    agency_preset = config.tool_presets.agency_Agent
     if not agency_preset:
         log.warning("config.json 中未配置 agency_Agent 工具预设，子代理将无工具可用")
         tool_names: List[str] = []
@@ -105,7 +92,7 @@ async def sub_agent_task(
     )
 
     context = AgentContext()
-    context.play_role = SUB_AGENT_SYSTEM_PROMPT
+    context.play_role = SUB_AGENT_SYSTEM_PROMPT + f"环境的群号是:{message_data.group_id}"
     context.add_user_message(content=task)
 
     agent_data = AgentData(

@@ -44,7 +44,10 @@ class SubAgentRunner(BaseAgentRunner):
     """子 Agent 执行器 —— 管理完整 LLM 交互生命周期"""
 
     def __init__(
-        self, agent_data: AgentData, message_data: ChatMessage | None = None
+        self, 
+        agent_data: AgentData, 
+        message_data: ChatMessage | None = None,
+        stream:bool = False
     ) -> None:
         super().__init__(agent_data)
         self.log: Logger = container.get_by_type(Logger).getChild("SubAgent")
@@ -52,6 +55,8 @@ class SubAgentRunner(BaseAgentRunner):
         self._media_processor: MediaProcessor = container.get("MediaProcessor")
         self._message_data: ChatMessage | None = message_data
 
+        self.stream = stream
+        
         # 多模态能力
         self._visual_sense: bool = False
         self._audio_sense: bool = False

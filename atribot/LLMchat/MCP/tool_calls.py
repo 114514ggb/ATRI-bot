@@ -128,8 +128,8 @@ class ToolRegistry:
 
             func = getattr(module, default_module_name, None)
             if func is None:
-                self.log.error(
-                    f"获取模块{file_path}中的函数{default_module_name} 失败！"
+                self.log.warning(
+                    f"获取模块{file_path}中的函数{default_module_name} 失败！\n因为不一定会通过这种方式导入所以不一定会有问题"
                 )
                 continue
 

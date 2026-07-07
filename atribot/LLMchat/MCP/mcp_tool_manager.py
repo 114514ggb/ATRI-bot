@@ -361,21 +361,11 @@ class ToolManager(ServiceBase):
                     if data["name"] in self.mcp_client_event:
                         self.mcp_client_event[data["name"]].set()
                         self.mcp_client_event.pop(data["name"], None)
-                        self._mcp_func_list = [
-                            f
-                            for f in self._mcp_func_list
-                            if not (
-                                isinstance(f, MCPTool) and f.mcp_server_name == data["name"]
-                            )
-                        ]
-                        await self._notify_tools_changed(data["name"])
                 else:
                     for name in self.mcp_client_dict.keys():
                         if name in self.mcp_client_event:
                             self.mcp_client_event[name].set()
                             self.mcp_client_event.pop(name, None)
-                    self._mcp_func_list = [f for f in self._mcp_func_list if not isinstance(f, MCPTool)]
-                    await self._notify_tools_changed()
 
     async def _init_mcp_client_task_wrapper(
         self, name: str, cfg: dict, event: asyncio.Event

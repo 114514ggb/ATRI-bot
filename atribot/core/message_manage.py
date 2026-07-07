@@ -103,7 +103,7 @@ class message_manage(ABC):
     def error_occurred(self, error: Exception, text:str) -> None:
         """处理消息处理过程中出现的错误"""
         import traceback
-        self.logger.critical(
+        self.log.critical(
             f"{text}出现了错误:{error}\n"
             "异常类型: %s\n"
             "详细回溯:\n%s",
@@ -135,11 +135,11 @@ class group_manage(message_manage):
         chat_message.update_llm_formatted_message()
 
         if data.get("message_sent_type") == "self":
-            self.logger.debug(f"收到自己的群消息:{data}")
+            self.log.debug(f"收到自己的群消息:{data}")
             asyncio.create_task(self._process_memory_summary(chat_message, group_id))
             return
 
-        self.logger.debug(f"Received group message: {data}")
+        self.log.debug(f"Received group message: {data}")
 
         has_permission = self.permissions_management.check_access(user_id)
 
@@ -188,7 +188,7 @@ class group_manage(message_manage):
                     f"ATRI的聊天模块抛出了个错误,疑似不够高性能!\nType Error:\n{e}"
                 )
         else:
-            self.logger.info(f"黑名单人员被拒绝聊天{chat_message.user_id}!") 
+            self.log.info(f"黑名单人员被拒绝聊天{chat_message.user_id}!") 
 
 
     async def _process_memory_summary(self, chat_message:ChatMessage, group_id):
@@ -198,7 +198,7 @@ class group_manage(message_manage):
                 messages, group_context = summary_needed
                 async with group_context.summarizing() as ctx:
                     if ctx is not None:
-                        self.logger.info(f"开始总结 {group_id} 群消息!")
+                        self.log.info(f"开始总结 {group_id} 群消息!")
                         await self.memory_system.extract_stored_group_message_advanced(
                             messages_str=messages,
                             bot_id=chat_message.self_id,
@@ -224,7 +224,7 @@ class private_manage(message_manage):
 
         return
     
-        self.logger.debug(f"Received private message: {data}")
+        self.log.debug(f"Received private message: {data}")
         chat_message.update_llm_formatted_simplify_message()
 
         has_permission = self.permissions_management.check_access(user_id)
@@ -254,5 +254,5 @@ class private_manage(message_manage):
                     message=f"ATRI的聊天模块抛出了个错误!Type Error:\n{e}"
                 )
         else:
-            self.logger.info(f"黑名单人员被拒绝私聊{user_id}!")
+            self.log.info(f"黑名单人员被拒绝私聊{user_id}!")
 
