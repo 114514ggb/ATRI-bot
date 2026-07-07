@@ -42,7 +42,7 @@ _MAX_TURNS = 20
             "type": "string",
             "description": (
                 "要委托给子代理的详细任务描述。应包含：任务目标、"
-                "具体要求和约束条件、期望的输出格式。越详细越好"
+                "具体要求和约束条件、期望的输出格式,越详细越好"
             ),
         },
     },
@@ -61,7 +61,7 @@ async def sub_agent_task(
         子代理执行结果字符串
     """
     if not task or not task.strip():
-        return "子代理执行失败: 任务描述不能为空。"
+        return "子代理执行失败: 任务描述不能为空"
     
     log: Logger = container.get_by_type(Logger).getChild("SubAgentTool")
     config: atriConfig = container.get("config")
@@ -72,19 +72,18 @@ async def sub_agent_task(
         supplier_name = agency_cfg.get("supplier", "")
     else:
         summarize_cfg = config.model.memory.summarize_model
-        model_name = summarize_cfg.get("model_name", "")
+        model_name = summarize_cfg["model_name"]
         supplier_name = summarize_cfg.get("supplier", "")
         log.info(f"未配置 model.agency_Agent,回退到 summarize_model 模型: {model_name}")
 
     if not model_name:
-        return "子代理执行失败: 配置中未找到有效的模型名称。"
+        return "子代理执行失败: 配置中未找到有效的模型名称"
 
-    agency_preset = config.tool_presets.agency_Agent
-    if not agency_preset:
+    if agency_preset := config.tool_presets.agency_Agent:
+        tool_names = agency_preset
+    else:
         log.warning("config.json 中未配置 agency_Agent 工具预设，子代理将无工具可用")
         tool_names: List[str] = []
-    else:
-        tool_names = list(agency_preset)
 
     log.info(
         f"子代理启动: model={model_name}, supplier={supplier_name}, "
@@ -104,7 +103,6 @@ async def sub_agent_task(
             "temperature": 0.3,
             "top_p": 0.90,
             "max_tokens": 32768,
-            "stream": False,
             "tool_choice": "auto",
         },
     )

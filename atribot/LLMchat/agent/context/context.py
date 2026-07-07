@@ -176,7 +176,7 @@ class AgentContext(BaseContext):
         """
         res = []
         if self.play_role:
-            res.append(SystemMessage(content=self.play_role).to_openai_dict())
+            res.append({"role": "system", "content": self.play_role})
         
         for msg in self._messages:
             res.append(msg.to_openai_dict())
