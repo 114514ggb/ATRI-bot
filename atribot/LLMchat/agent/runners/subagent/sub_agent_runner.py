@@ -37,7 +37,7 @@ from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 
 _MAX_TOOL_ROUNDS = 10  # 单步内工具调用最大轮数
 _MAX_EMPTY_RETRIES = 5  # 空响应重试次数
-_TOOL_OUTPUT_TRUNCATE = 20000  # 工具返回结果截断长度
+_TOOL_OUTPUT_TRUNCATE = 100000  # 工具返回结果截断长度
 
 
 class SubAgentRunner(BaseAgentRunner): 
@@ -579,7 +579,7 @@ class SubAgentRunner(BaseAgentRunner):
                         step_index=self._step_index,
                     )
 
-                # 截断过长结果
+                # 截断过长结果？好像没必要
                 if isinstance(tool_msg.content, str):
                     tool_msg.content = tool_msg.content[:_TOOL_OUTPUT_TRUNCATE]
                     tool_msg.refresh_cache()

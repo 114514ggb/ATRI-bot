@@ -1,7 +1,7 @@
 from abc import ABC
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
 if TYPE_CHECKING:
     from atribot.LLMchat.LLM_supervisor import GenerationResponse
@@ -70,7 +70,7 @@ class TextDeltaChunk(AgentStreamChunk):
 
     delta: str
     step_index: int = 0
-    event_type: AgentEventType = field(default=AgentEventType.TEXT_DELTA, init=False)
+    event_type: Literal[AgentEventType.TEXT_DELTA] = field(default=AgentEventType.TEXT_DELTA, init=False)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -91,7 +91,7 @@ class ReasoningDeltaChunk(AgentStreamChunk):
 
     delta: str
     step_index: int = 0
-    event_type: AgentEventType = field(default=AgentEventType.REASONING_DELTA, init=False)
+    event_type: Literal[AgentEventType.REASONING_DELTA] = field(default=AgentEventType.REASONING_DELTA, init=False)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -116,7 +116,7 @@ class ToolCallStartChunk(AgentStreamChunk):
     tool_call_id: str
     arguments: Dict[str, Any] = field(default_factory=dict)
     step_index: int = 0
-    event_type: AgentEventType = field(default=AgentEventType.TOOL_CALL_START, init=False)
+    event_type: Literal[AgentEventType.TOOL_CALL_START] = field(default=AgentEventType.TOOL_CALL_START, init=False)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -145,7 +145,7 @@ class ToolCallResultChunk(AgentStreamChunk):
     result: Any
     is_error: bool = False
     step_index: int = 0
-    event_type: AgentEventType = field(default=AgentEventType.TOOL_CALL_RESULT, init=False)
+    event_type: Literal[AgentEventType.TOOL_CALL_RESULT] = field(default=AgentEventType.TOOL_CALL_RESULT, init=False)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -174,7 +174,7 @@ class AgentStatusChunk(AgentStreamChunk):
     status: str
     message: str = ""
     step_index: int = 0
-    event_type: AgentEventType = field(default=AgentEventType.AGENT_STATUS, init=False)
+    event_type: Literal[AgentEventType.AGENT_STATUS] = field(default=AgentEventType.AGENT_STATUS, init=False)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -219,7 +219,7 @@ class StepSummary(AgentSummary):
     step_index: int = 0
     is_final: bool = False
     metadata: Dict[str, Any] = field(default_factory=dict)
-    event_type: AgentEventType = field(default=AgentEventType.STEP_SUMMARY, init=False)
+    event_type: Literal[AgentEventType.STEP_SUMMARY] = field(default=AgentEventType.STEP_SUMMARY, init=False)
 
     @property
     def has_content(self) -> bool:
@@ -268,7 +268,7 @@ class RunSummary(AgentSummary):
     total_usage: Optional[Dict[str, Any]] = None
     finish_reason: str = "completed"
     metadata: Dict[str, Any] = field(default_factory=dict)
-    event_type: AgentEventType = field(default=AgentEventType.RUN_SUMMARY, init=False)
+    event_type: Literal[AgentEventType.RUN_SUMMARY] = field(default=AgentEventType.RUN_SUMMARY, init=False)
 
     @property
     def step_count(self) -> int:
@@ -308,7 +308,7 @@ class AgentError(AgentSummary):
     exception_type: str = ""
     partial_summary: Optional[StepSummary | RunSummary] = None
     step_index: int = -1
-    event_type: AgentEventType = field(default=AgentEventType.ERROR, init=False)
+    event_type: Literal[AgentEventType.ERROR] = field(default=AgentEventType.ERROR, init=False)
 
     def to_dict(self) -> Dict[str, Any]:
         result: Dict[str, Any] = {

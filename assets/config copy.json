@@ -106,7 +106,7 @@
             "send_file","add_file",
             "send_image_message",
             "load_skill_prompt", "get_user_info",
-            "schedule_self_trigger"
+            "schedule_self_trigger", "sub_agent"
         ],
         "private_chat": [
             "web_search", "memory_search",
