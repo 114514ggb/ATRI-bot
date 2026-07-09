@@ -30,6 +30,10 @@ class ToolRegistry:
         func_args: Dict,
         desc: str,
         handler,
+        concurrent: bool = False,
+        background: bool = False,
+        active: bool = True,
+        handler_module_path: str | None = None,
     ) -> None:
         """添加本地函数调用工具
 
@@ -38,6 +42,10 @@ class ToolRegistry:
             func_args: 参数 properties 字典
             desc: 函数描述
             handler: 异步处理函数
+            concurrent: 是否允许并发执行
+            background: 是否为后台任务
+            active: 是否启用
+            handler_module_path: handler 所在模块路径
         """
         self.remove_func(name)
 
@@ -50,6 +58,10 @@ class ToolRegistry:
             parameters=params,
             description=desc,
             handler=handler,
+            concurrent=concurrent,
+            background=background,
+            active=active,
+            handler_module_path=handler_module_path,
         )
         self.func_list.append(_func)
         self.log.info(f"添加本地函数调用工具: {name}")
@@ -145,6 +157,10 @@ class ToolRegistry:
                 else tool_json["properties"],
                 desc=tool_json["description"],
                 handler=func,
+                concurrent=tool_json.get("concurrent", False),
+                background=tool_json.get("background", False),
+                active=tool_json.get("active", True),
+                handler_module_path=spec.origin,
             )
 
     def _load_registered_tools(self) -> None:
@@ -157,6 +173,9 @@ class ToolRegistry:
                 else tool_json["properties"],
                 desc=tool_json["description"],
                 handler=func,
+                concurrent=tool_json.get("concurrent", False),
+                background=tool_json.get("background", False),
+                active=tool_json.get("active", True),
             )
 
     @classmethod
@@ -188,6 +207,9 @@ class ToolRegistry:
         name: str,
         description: str,
         properties: dict | None = None,
+        concurrent: bool = False,
+        background: bool = False,
+        active: bool = True,
     ):
         """工具注册装饰器（便捷版）
 
@@ -207,6 +229,9 @@ class ToolRegistry:
             "name": name,
             "description": description,
             "properties": properties or {},
+            "concurrent": concurrent,
+            "background": background,
+            "active": active,
         }
 
         def decorator(func: Any) -> Any:
@@ -556,9 +581,43 @@ class ToolCalls(ServiceBase):
         return ToolRegistry.register(tool_json)
 
     @classmethod
-    def register_tool(cls, name: str, description: str, properties: dict | None = None):
-        """工具注册装饰器便捷版"""
-        return ToolRegistry.register_tool(name, description, properties)
+    def register_tool(
+        cls,
+        name: str,
+        description: str,
+        properties: dict | None = None,
+        concurrent: bool = False,
+        background: bool = False,
+        active: bool = True,
+    ):
+        """工具注册装饰器（便捷版）
+
+        Args:
+            name: 工具名称，全局唯一标识
+            description: 工具功能描述，供 LLM 理解工具用途
+            properties: 工具参数 properties 字典，默认为 None
+            concurrent: 是否允许并发执行，默认为 False
+            background: 是否为后台任务，默认为 False
+            active: 是否启用，默认为 True
+
+        Usage::
+
+            @ToolCalls.register_tool(
+                name="my_tool",
+                description="工具描述",
+                properties={
+                    "param": {"type": "string", "description": "参数描述"}
+                }
+            )
+            async def my_tool(param: str):
+                ...
+        """
+        return ToolRegistry.register_tool(
+            name, description, properties,
+            concurrent=concurrent,
+            background=background,
+            active=active,
+        )
 
 
     async def calls(

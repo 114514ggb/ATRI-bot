@@ -46,6 +46,8 @@ _MAX_TURNS = 20
             ),
         },
     },
+    concurrent = True,
+    background = True
 )
 async def sub_agent_task(
     task: str,

@@ -42,7 +42,7 @@ class FunctionTool:
             parameters: 工具参数 JSON Schema,若为 None 则默认为
                 ``{"type": "object", "properties": {}}``
             concurrent: 是否允许并发执行,默认为 ``False``
-            background: 是否为后台任务,默认为 ``False``
+            background: 是否为后台任务,默认为 ``False``,会返回一个结果标识,等待完成后触发回调函数给出结果
             active: 是否启用,默认为 ``True``
         """
         self.name: str = name
