@@ -6,7 +6,6 @@ from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import ChatMessage
-from atribot.core.type.context_types import ToolCallsStopIteration
 from atribot.LLMchat.agent.agent_data import AgentData
 from atribot.LLMchat.agent.context.context import AgentContext
 from atribot.LLMchat.agent.message import (
@@ -32,10 +31,9 @@ from atribot.LLMchat.agent.runners.response import (
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
-from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, ToolCall, message
+from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, message
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 
-_MAX_TOOL_ROUNDS = 10  # 单步内工具调用最大轮数
 _MAX_EMPTY_RETRIES = 5  # 空响应重试次数
 _TOOL_OUTPUT_TRUNCATE = 100000  # 工具返回结果截断长度
 
@@ -50,10 +48,11 @@ class SubAgentRunner(BaseAgentRunner):
     ) -> None:
         super().__init__(agent_data)
         self.log: Logger = container.get_by_type(Logger).getChild("SubAgent")
-        self._tool_calls_mgr: ToolCalls = container.get("ToolCalls")
-        self._media_processor: MediaProcessor = container.get("MediaProcessor")
+        self._tool_calls_mgr = container.get_by_type(ToolCalls)
+        self._executor = self._tool_calls_mgr.executor
+        self._media_processor = container.get_by_type(MediaProcessor)
         self._message_data: ChatMessage | None = message_data
-        
+
         # 多模态能力
         self._visual_sense: bool = False
         self._audio_sense: bool = False
@@ -488,151 +487,77 @@ class SubAgentRunner(BaseAgentRunner):
                 self.log.warning(f"工具返回{tag}降级转文字失败:{e}")
                 return TextSegment(f"[{tag}:{mime}]")
 
-    async def _execute_tool_calls_loop(
+    async def _execute_tool_batch(
         self,
-        assistant_message: Dict[str, Any],
+        tool_calls: List[Dict[str, Any]],
     ) -> AsyncGenerator[AgentEvent, None]:
-        """执行工具调用循环
+        """执行一批工具调用，将结果写入持久化上下文
+
+        由 ``run()`` 在每步 LLM 响应返回 tool_calls 后调用。
+        执行结果直接追加到 ``self.agent_data.context``，
+        确保下一步 LLM 请求可见。
 
         Yields:
-            ``ToolCallResultChunk``(流式时)、``TextDeltaChunk``(流式再请求时)
+            ``ToolCallResultChunk`` 事件
         """
-        tool_calls: List[ToolCall] = assistant_message.get("tool_calls", [])
-
-        for _round in range(_MAX_TOOL_ROUNDS):
-            self.log.debug(f"工具调用第 {_round + 1} 轮，共 {len(tool_calls)} 个工具")
-
-            #执行本轮所有工具
-            for tool_call in tool_calls:
-                function = tool_call.get("function", {})
-                tool_name: str = function.get("name", "")
-                tool_input_str: str = function.get("arguments", "{}")
-                tool_call_id: str = tool_call.get("id", tool_name)
-
-                # 解析参数
-                try:
-                    arguments: Dict[str, Any] = json.loads(tool_input_str)
-                except (json.JSONDecodeError, TypeError):
-                    arguments = {}
-                    self.log.warning(
-                        f"工具 {tool_name} 参数解析失败: {tool_input_str[:200]}"
-                    )
-
-                # 触发 on_tool_call 钩子
-                await self._trigger_on_tool_call(tool_name, arguments)
-
-                # 执行工具
-                tool_msg: ToolMessage
-                is_error = False
-                try:
-                    raw_output = await self._tool_calls_mgr.calls(
-                        tool_name,
-                        tool_input_str,
-                        message_data=self._message_data,
-                    )
-
-                    if isinstance(raw_output, CallToolResult):
-                        tool_msg = await self._format_mcp_result(
-                            raw_output, tool_name, tool_call_id
-                        )
-                    else:
-                        tool_msg = ToolMessage(
-                            name=tool_name, 
-                            tool_call_id=tool_call_id,
-                            content=str(raw_output)
-                        )
-
-                except ToolCallsStopIteration:
-                    self.log.info(f"模型通过工具 {tool_name} 主动结束工具调用")
-                    self._increase_context.append(
-                        ToolMessage(
-                            name=tool_name,
-                            tool_call_id=tool_call_id,
-                            content = "结束工具调用"
-                        )
-                    )
-                    # 保持当前 assistant_message 为最后状态
-                    self._last_assistant_message = assistant_message
-                    return
-
-                except Exception as e:
-                    tool_msg = ToolMessage(
-                        name=tool_name, 
-                        tool_call_id=tool_call_id,
-                        content= f"调用工具发生错误\nErrors:{e}"
-                    )
-                    is_error = True
-                    self.log.error(
-                        f"工具 {tool_name} 执行失败: {e}", exc_info=True
-                    )
-
-                # 触发 on_tool_return 钩子
-                await self._trigger_on_tool_return(tool_name, tool_msg.content)
-
-                # 流式:产出 ToolCallResultChunk
-                if self.stream:
-                    yield tool_call_result(
-                        tool_name=tool_name,
-                        tool_call_id=tool_call_id,
-                        result=tool_msg.content,
-                        is_error=is_error,
-                        step_index=self._step_index,
-                    )
-
-                # 截断过长结果？好像没必要
-                if isinstance(tool_msg.content, str):
-                    tool_msg.content = tool_msg.content[:_TOOL_OUTPUT_TRUNCATE]
-                    tool_msg.refresh_cache()
-                elif isinstance(tool_msg.content, list):
-                    new_segments = []
-                    for seg in tool_msg.content:
-                        if isinstance(seg, TextSegment):
-                            new_segments.append(TextSegment(seg.text[:_TOOL_OUTPUT_TRUNCATE]))
-                        else:
-                            new_segments.append(seg)
-                    tool_msg.content = new_segments
-                    tool_msg.refresh_cache()
-
-                self.log.debug(f"工具 {tool_name} 输出: {str(tool_msg.content)[:300]}...")
-
-                # 追加工具消息到增量上下文
-                self._increase_context.append(tool_msg)
-
-            #再次请求 LLM
+        for tc in tool_calls:
+            function = tc.get("function", {})
+            t_name: str = function.get("name", "")
             try:
-                async for event in self._do_llm_request():
-                    yield event
-            except Exception as e:
-                self.log.error(f"工具循环中 LLM 请求失败: {e}")
-                raise
+                t_args: Dict[str, Any] = json.loads(function.get("arguments", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                t_args = {}
+            await self._trigger_on_tool_call(t_name, t_args)
 
-            # 更新新一轮的 assistant_message
-            assistant_message = self._last_assistant_message
+        for result in await self._executor.execute_batch(
+            tool_calls=tool_calls,
+            get_func=self._tool_calls_mgr._registry.get_func,
+            message_data=self._message_data,
+        ):
+            tool_name = result.tool_name
+            tool_call_id = result.tool_call_id
+            is_error = result.is_error
 
-            if next_tool_calls := assistant_message.get("tool_calls"):
-                self._increase_context.add_assistant_message(
-                    content=assistant_message.get("content"),
-                    tool_calls=next_tool_calls,
-                    reasoning_content=assistant_message.get(
-                        "reasoning_content"
-                    ),
+            tool_msg: ToolMessage
+
+            if isinstance(result.result, CallToolResult):
+                tool_msg = await self._format_mcp_result(
+                    result.result, tool_name, tool_call_id,
                 )
-                tool_calls = next_tool_calls
-                continue
             else:
-                self._increase_context.add_assistant_message(
-                    content=assistant_message.get("content") or "",
-                    reasoning_content=assistant_message.get(
-                        "reasoning_content"
-                    ),
-                    extra_content=assistant_message.get("extra_content"),
+                tool_msg = ToolMessage(
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                    content=str(result.result),
                 )
-                self._last_assistant_message = assistant_message
-                return
 
-        self.log.warning(
-            f"工具调用循环达到最大轮数 {_MAX_TOOL_ROUNDS}，强制终止"
-        )
+            await self._trigger_on_tool_return(tool_name, tool_msg.content)
+
+            yield tool_call_result(
+                tool_name=tool_name,
+                tool_call_id=tool_call_id,
+                result=tool_msg.content,
+                is_error=is_error,
+                step_index=self._step_index,
+            )
+
+            # 截断过长结果
+            if isinstance(tool_msg.content, str):
+                tool_msg.content = tool_msg.content[:_TOOL_OUTPUT_TRUNCATE]
+                tool_msg.refresh_cache()
+            elif isinstance(tool_msg.content, list):
+                new_segments = []
+                for seg in tool_msg.content:
+                    if isinstance(seg, TextSegment):
+                        new_segments.append(TextSegment(seg.text[:_TOOL_OUTPUT_TRUNCATE]))
+                    else:
+                        new_segments.append(seg)
+                tool_msg.content = new_segments
+                tool_msg.refresh_cache()
+
+            self.log.debug(f"工具 {tool_name} 输出: {str(tool_msg.content)[:300]}...")
+
+            self.agent_data.context.append(tool_msg)
 
     @staticmethod
     def _stringify_content(content: str | List[MessageSegment]) -> str:
@@ -668,9 +593,7 @@ class SubAgentRunner(BaseAgentRunner):
                         tool_calls_info.append({
                             "id": t.get("id", ""),
                             "name": t.get("function", {}).get("name", ""),
-                            "arguments": t.get("function", {}).get(
-                                "arguments", ""
-                            ),
+                            "arguments": t.get("function", {}).get("arguments", ""),
                         })
             elif isinstance(msg, ToolMessage):
                 tid = msg.tool_call_id
@@ -709,10 +632,12 @@ class SubAgentRunner(BaseAgentRunner):
         )
 
     async def _execute_step(self) -> AsyncGenerator[AgentEvent, None]:
-        """执行单步 LLM 交互(不含钩子触发)
+        """执行单次 LLM 请求（不含工具执行）
+
+        仅发起一次 LLM 请求并记录回复；工具调用由 ``run()`` 在步间处理。
 
         Yields:
-            流式中间事件(TextDelta / ReasoningDelta / ToolCall*)
+            流式中间事件(TextDelta / ReasoningDelta / ToolCallStart)
         """
         self.update_state(AgentState.RUNNING)
 
@@ -728,24 +653,15 @@ class SubAgentRunner(BaseAgentRunner):
         if assistant_message is None:
             raise RuntimeError("LLM 请求未返回有效的 assistant_message")
 
-        if tool_calls := assistant_message.get("tool_calls"):
-            self._increase_context.add_assistant_message(
-                content=content,
-                tool_calls=tool_calls,
-                reasoning_content=assistant_message.get("reasoning_content"),
-            )
+        # 记录本步的助手消息（无论是否包含 tool_calls）
+        self._increase_context.add_assistant_message(
+            content=content or "",
+            tool_calls=assistant_message.get("tool_calls"),
+            reasoning_content=assistant_message.get("reasoning_content"),
+            extra_content=assistant_message.get("extra_content"),
+        )
 
-            # 进入工具调用循环
-            async for event in self._execute_tool_calls_loop(assistant_message):
-                yield event
-        else:
-            # 普通回复
-            self._increase_context.add_assistant_message(
-                content=content or "",
-                reasoning_content=assistant_message.get("reasoning_content"),
-                extra_content=assistant_message.get("extra_content"),
-            )
-
+        # 扩展持久化上下文
         self.agent_data.context.extend(self._increase_context.messages)
 
         await self.agent_data.context.record_validity_check()
@@ -762,7 +678,7 @@ class SubAgentRunner(BaseAgentRunner):
         异常时触发 ``on_error`` 钩子并产出 ``AgentError``
 
         Yields:
-            - 流式模式:TextDeltaChunk* → [ToolCallStartChunk → ToolCallResultChunk*]* → StepSummary
+            - 流式模式:TextDeltaChunk* → [ToolCallStartChunk*] → StepSummary
             - 非流式模式:StepSummary
         """
         await self._trigger_before_run()
@@ -795,14 +711,14 @@ class SubAgentRunner(BaseAgentRunner):
     ) -> AsyncGenerator[AgentEvent, None]:
         """完整运行 Agent 多步逻辑，直至任务完结或受阻
 
-        循环调用步逻辑(最多 ``max_turns`` 次),
-        聚合各步的 ``StepSummary`` 为 ``RunSummary``
+        每步 = 一次 LLM 请求；若 LLM 返回 tool_calls 则执行工具并将结果写入上下文，
+        然后进入下一步。循环直到 LLM 不再返回 tool_calls 或达到 ``max_turns``
 
         Args:
             max_turns: 最大步数(防止无限循环)，默认 20
 
         Yields:
-            - 流式模式:各步的流式中间事件 + 每一步的 StepSummary
+            - 流式模式:各步的流式中间事件 + ToolCallResult + 每一步的 StepSummary
             - 最终:RunSummary(或 AgentError)
         """
         steps: List[StepSummary] = []
@@ -815,12 +731,10 @@ class SubAgentRunner(BaseAgentRunner):
         }
         finish_reason = "completed"
 
-        # 确保 before_run 在 run() 中触发一次(而非 step() 重复触发)
         await self._trigger_before_run()
 
         try:
             for _turn in range(max_turns):
-                # 执行一步(不再触发 before_run)
                 async for event in self._execute_step():
                     yield event
 
@@ -833,7 +747,12 @@ class SubAgentRunner(BaseAgentRunner):
                     )
                     break
 
-                # 标记是否为最终步(临时)，产出 StepSummary
+                if self._last_assistant_message and self._last_assistant_message.get("tool_calls"):
+                    async for event in self._execute_tool_batch(
+                        self._last_assistant_message["tool_calls"]
+                    ):
+                        yield event
+
                 yield step_summary(
                     content=summary.content,
                     reasoning_content=summary.reasoning_content,
@@ -841,7 +760,7 @@ class SubAgentRunner(BaseAgentRunner):
                     usage=summary.usage,
                     finish_reason=summary.finish_reason,
                     step_index=summary.step_index,
-                    is_final=False,  # 在 RunSummary 中统一标记
+                    is_final=False,
                 )
 
                 steps.append(summary)
@@ -859,13 +778,11 @@ class SubAgentRunner(BaseAgentRunner):
                     finish_reason = "completed"
                     break
             else:
-                # 达到 max_turns
                 finish_reason = "max_turns"
                 self.log.warning(
                     f"run() 达到最大步数 {max_turns}，强制终止"
                 )
 
-            # 构建 RunSummary
             final = run_summary(
                 steps=steps,
                 total_content=total_content,
@@ -882,7 +799,6 @@ class SubAgentRunner(BaseAgentRunner):
             await self._trigger_on_error(e)
             self.update_state(AgentState.ERROR)
 
-            # 产出部分结果(若有)
             partial = run_summary(
                 steps=steps,
                 total_content=total_content,

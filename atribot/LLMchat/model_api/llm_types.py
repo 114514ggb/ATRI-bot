@@ -158,7 +158,7 @@ class ChatCompletionChunk(TypedDict):
     usage: NotRequired[Usage]              # DeepSeek 最后一个 chunk 才有
 
 class message(TypedDict):
-    """返回的模型具体消息
+    """非流式返回的模型具体消息
 
     Attributes:
         role: 角色，通常为 "assistant"

@@ -11,6 +11,7 @@ from mcp.types import CallToolResult
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import ServiceBase, container
 from atribot.LLMchat.MCP.mcp_tool_manager import ToolManager
+from atribot.LLMchat.MCP.tool_executor import ToolExecutionEngine
 from atribot.LLMchat.MCP.tool_model import FunctionTool, LocalTool, MCPTool
 from atribot.LLMchat.MCP.tool_model import ToolSet as ToolSetModel
 
@@ -558,6 +559,7 @@ class ToolCalls(ServiceBase):
         self._registry = ToolRegistry(self.log)
         self._preset_manager = ToolPresetManager(self.log)
         self._schema_cache = ToolSchemaCache(self.log)
+        self._executor = ToolExecutionEngine(self.log)
 
         # 加载本地工具
         self._registry.get_files_in_folder(str(tool_path))
@@ -733,3 +735,8 @@ class ToolCalls(ServiceBase):
     def func_list(self) -> List[FunctionTool]:
         """当前所有已加载工具列表"""
         return self._registry.func_list
+
+    @property
+    def executor(self) -> ToolExecutionEngine:
+        """获取工具执行引擎实例"""
+        return self._executor

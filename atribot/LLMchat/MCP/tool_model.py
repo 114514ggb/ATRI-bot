@@ -21,7 +21,7 @@ class FunctionTool:
         description: 工具功能描述,供 LLM 理解工具用途
         parameters: 工具参数 JSON Schema,默认为空的 object 类型
         concurrent: 是否允许并发执行
-        background: 是否为后台任务
+        background: 是否为后台任务,执行后返回已执行标志，等待执行完成后回调返回结果
         active: 是否启用
     """
 
