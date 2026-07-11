@@ -42,8 +42,7 @@
   - [2. 数据库配置 (PostgreSQL)](#2-数据库配置-postgresql)
   - [3. 模型与环境配置](#3-模型与环境配置)
   - [4. 启动项目](#4-启动项目)
-  - [5. 运行测试](#5-运行测试)
-  - [6. 使用 Docker 启动](#6-使用-docker-启动)
+  - [5. 使用 Docker 启动](#5-使用-docker-启动)
 - [📂 项目结构](#-项目结构)
 - [🏗️ 架构设计](#-架构设计)
   - [整体消息流](#整体消息流)
@@ -143,7 +142,7 @@ http://127.0.0.1:1314/admin/
     - 必须安装 `pgroonga`（全文检索）[PGroonga 文档](https://pgroonga.github.io/)
 3.  **数据库初始化**：
     项目提供了初始化 SQL 文件，推荐使用 `docker/db/info.sql`（含完整表结构与扩展配置）。
-    也可参考 `assets/PostgreSQL基础.sql`（开发版）。
+    也可参考 `atribot/docs/PostgreSQL基础.sql`（开发版）。
     进入数据库（Linux 示例）：
     ```bash
     sudo -u postgres psql
@@ -296,9 +295,9 @@ ATRI-main/
 ├─README.md / README.en.md      # 中英文说明文档
 ├─requirements-*.txt            # 各平台依赖导出文件
 ├─tests/                        # 🧪 单元测试与集成测试
-├─assets/                       # ⚙️ 配置文件、示例配置
+├─assets/                       # ⚙️ 配置文件与示例
 ├─atribot/                      # 核心代码
-│  ├─bot_framework.py           # Bot 初始化与整体装配入口
+│  ├─bot_framework.py           # Bot 初始化与服务装配入口
 │  ├─C/                         # C 扩展模块（Levenshtein 算法等）
 │  ├─commands/                  # 💻 群聊命令实现
 │  │  ├─audio/                  # 音频与 TTS 相关命令
@@ -306,25 +305,78 @@ ATRI-main/
 │  │  ├─interior/               # 内部管理与状态查询命令
 │  │  └─test/                   # 实验性 / 测试命令
 │  ├─common_utils/              # 通用工具函数
-│  │  └─file/                   # 文件、图片、文本处理工具
+│  │  ├─cluster_utils.py        # 图聚类与连通分量分析
+│  │  ├─data_manage.py          # 数据管理工具
+│  │  ├─db_format.py            # 数据库格式化
+│  │  ├─http_client.py          # 异步 HTTP 客户端
+│  │  ├─json_utils.py           # JSON 处理与序列化
+│  │  ├─message_utils.py        # 消息处理工具
+│  │  ├─music.py                # 音乐分享工具
+│  │  ├─request_header.py       # HTTP 请求头配置
+│  │  ├─similarity.py           # 文本相似度计算
+│  │  ├─timer.py                # 计时与限频工具
+│  │  ├─validation.py           # 参数验证工具
+│  │  └─file/                   # 文件、图片、文本处理
+│  │     ├─file_utils.py        # 文件操作工具
+│  │     ├─image_utils.py       # 图片处理与压缩
+│  │     ├─media_utils.py       # 媒体文件处理
+│  │     └─text_utils.py        # 文本清洗与格式化
 │  ├─core/                      # 核心架构
+│  │  ├─atri_config.py          # 配置加载与管理
+│  │  ├─logger.py               # 日志系统
+│  │  ├─message_manage.py       # 消息路由与管理
+│  │  ├─service_container.py    # 依赖注入容器 (DIContainer)
+│  │  ├─time_trigger.py         # 定时任务调度器
 │  │  ├─cache/                  # 上下文缓存与生命周期管理
 │  │  ├─command/                # 命令系统与权限管理
 │  │  ├─db/                     # 数据库连接与数据访问
 │  │  ├─event_trigger/          # 事件处理
 │  │  ├─network_connections/    # WebSocket 与消息收发
 │  │  └─type/                   # 核心类型定义
-│  ├─docs/                      # 开发过程中的文档与笔记
+│  ├─docs/                      # 开发文档与笔记
 │  ├─LLMchat/                   # 🧠 LLM 聊天与 Agent 能力
-│  │  ├─character_setting/      # 人设预设
-│  │  ├─discard_tools/          # 已废弃的工具
-│  │  ├─MCP/                    # MCP 协议工具与配置
+│  │  ├─chat.py                 # 群聊/私聊对话处理入口
+│  │  ├─emoji_system.py         # 表情包管理与自然发送
+│  │  ├─initiative_chat.py      # 主动发起群聊话题
+│  │  ├─LLM_supervisor.py       # LLM 调度与降级策略
+│  │  ├─media_processor.py      # 多模态消息转文本
+│  │  ├─prepare_model_prompt.py # 提示词构建与组装
+│  │  ├─token_manage.py         # Token 用量统计与管理
+│  │  ├─agent/                  # 子 Agent 系统
+│  │  ├─character_setting/      # 人设预设（15+ 角色）
+│  │  ├─discard_tools/          # 已废弃 / 旧版工具
+│  │  ├─MCP/                    # MCP 协议工具集成
+│  │  │  ├─mcp_tool_manager.py  # MCP 工具管理器
+│  │  │  ├─tool_calls.py        # 工具调用编排
+│  │  │  ├─tool_executor.py     # 工具执行引擎
+│  │  │  ├─tool_model.py        # 工具数据模型
+│  │  │  └─local_mcp_tools/     # 本地 MCP 工具集
 │  │  ├─memory/                 # 记忆系统
+│  │  │  ├─memory_system.py     # 记忆系统门面
+│  │  │  ├─memory_extractor.py  # LLM 记忆提取
+│  │  │  ├─memory_retriever.py  # 向量 + 全文混合检索
+│  │  │  ├─memory_consolidator.py # 记忆合并去重
+│  │  │  ├─user_info_system.py  # 用户画像系统
+│  │  │  └─prompts.py           # 记忆提示词模板
 │  │  ├─model_api/              # 模型供应商接口
-│  │  ├─RAG/                    # 检索增强生成逻辑
-│  │  ├─sandbox/                # 沙盒
-│  │  ├─skills/                 # skills 提示词相关模块
-│  │  └─tools/                  # 函数调用工具集
+│  │  ├─RAG/                    # 检索增强生成
+│  │  ├─sandbox/                # 代码沙盒环境
+│  │  ├─skills/                 # Agent Skills 管理
+│  │  │  ├─skills_manager.py    # Skills 加载与管理
+│  │  │  ├─validator.py         # YAML 属性验证
+│  │  │  ├─parser.py            # Markdown 解析
+│  │  │  ├─models.py            # 数据模型
+│  │  │  └─agent_skills/        # Skills 提示词文件
+│  │  └─tools/                  # 函数调用工具集（16 个）
+│  │     ├─web_search/          # 网页搜索
+│  │     ├─web_extract/         # 网页内容提取
+│  │     ├─run_python_code/     # 沙盒代码执行
+│  │     ├─memory_search/       # 记忆检索
+│  │     ├─memory_storage/      # 记忆写入
+│  │     ├─send_image_message/  # 图片消息发送
+│  │     ├─send_speech_message/ # 语音消息发送
+│  │     ├─load_skill_prompt/   # Skills 提示词加载
+│  │     └─...                  # 等 16 个工具
 │  └─web_panel/                 # 🖥️ Web 管理面板
 ├─docker/                       # 🐳 Docker 相关资源
 │  ├─db/                        # 数据库初始化脚本与镜像文件
@@ -363,6 +415,15 @@ message_router.main()
 ```
 
 因为是专门用来聊天的，只关心必要的消息处理不需要插件系统或其他复杂什么的过度设计,先简单过滤只处理群相关的消息简单分为@和其他,@就是区分命令和聊天,其他就会分发到一个简单的分发处理器EventTrigger
+
+**支撑系统**：除了消息主干，项目还包含以下后台支撑模块——
+
+| 模块 | 说明 |
+|------|------|
+| `TimeTriggerSupervisor` | 定时任务调度器，支持延迟任务、固定间隔和 Cron 表达式 |
+| `MediaProcessor` | 多模态消息处理器，将图片 / 音频 / 视频统一转为文本供 LLM 理解 |
+| `agent/` 子 Agent 系统 | 用于委派复杂多步任务，支持上下文隔离与工具链编排 |
+| `PermissionsManagement` | 四级权限校验（黑名单 → 普通用户 → 管理员 → Root） |
 
 ---
 
