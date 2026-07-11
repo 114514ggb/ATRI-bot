@@ -298,7 +298,6 @@ ATRI-main/
 ├─assets/                       # ⚙️ 配置文件与示例
 ├─atribot/                      # 核心代码
 │  ├─bot_framework.py           # Bot 初始化与服务装配入口
-│  ├─C/                         # C 扩展模块（Levenshtein 算法等）
 │  ├─commands/                  # 💻 群聊命令实现
 │  │  ├─audio/                  # 音频与 TTS 相关命令
 │  │  ├─bromidic/               # 图片 / B 站等杂项功能命令
@@ -367,7 +366,7 @@ ATRI-main/
 │  │  │  ├─parser.py            # Markdown 解析
 │  │  │  ├─models.py            # 数据模型
 │  │  │  └─agent_skills/        # Skills 提示词文件
-│  │  └─tools/                  # 函数调用工具集（16 个）
+│  │  └─tools/                  # 函数调用工具集
 │  │     ├─web_search/          # 网页搜索
 │  │     ├─web_extract/         # 网页内容提取
 │  │     ├─run_python_code/     # 沙盒代码执行
@@ -390,7 +389,6 @@ ATRI-main/
 │  │  └─tmp/                    # 临时图片目录
 │  ├─video/                     # 视频资源
 │  └─temp/                      # 临时运行文件
-├─privacy/                      # 开发笔记与隐私文件
 └─log/                          # 运行时日志
 ```
 
