@@ -58,7 +58,7 @@ body:
     attributes:
       label: 相关配置与上下文
       description: 可脱敏后提供与问题相关的配置、数据库环境、MCP/模型配置等。
-      placeholder: 使用 PostgreSQL + pgvector，本地 NapCat，Python 3.13，未启用 Docker sandbox。
+      placeholder: 使用 PostgreSQL + pgvector，本地 NapCat，Python 3.14，未启用 Docker sandbox。
 
   - type: input
     id: version
@@ -83,7 +83,7 @@ body:
     id: python-version
     attributes:
       label: Python 版本
-      placeholder: 3.13.x
+      placeholder: 3.14.x
 
   - type: textarea
     id: additional

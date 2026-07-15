@@ -31,7 +31,7 @@ body:
     attributes:
       label: 环境信息
       description: 提供系统、Python 版本、数据库版本、NapCat/模型供应商等关键信息。
-      placeholder: Windows 11 / Python 3.13 / PostgreSQL 16 + pgvector / NapCat 最新版
+      placeholder: Windows 11 / Python 3.14 / PostgreSQL 16 + pgvector / NapCat 最新版
     validations:
       required: true
 

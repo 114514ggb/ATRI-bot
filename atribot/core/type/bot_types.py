@@ -18,7 +18,7 @@ class Message:
         event = OneBotEvent.from_dict(raw)
         msg = Message(event=event, source="napcat", direction="incoming")
         # ... 处理 ...
-        msg.update_process_time()  # 进入下一处理节点时调用
+        msg.update_process_time()  # 建议在进入下一处理节点时调用
     """
 
     __slots__ = (
