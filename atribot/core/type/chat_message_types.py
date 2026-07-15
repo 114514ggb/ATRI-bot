@@ -538,6 +538,84 @@ class UnknownSegment(MessageSegment):
         return f"[CQ:{self._raw_type},data:{str(self.data)[:1000]}]"
 
 
+def parse_onebot_segments(raw_segments: List[Dict[str, Any]]) -> List[MessageSegment]:
+    """将 OneBot 原始消息段列表(List[Dict]) 解析为 MessageSegment 对象列表
+
+    Args:
+        raw_segments: OneBot 格式的消息段列表,例如 data.get("message", [])
+
+    Returns:
+        解析后的 MessageSegment 对象列表
+    """
+    parsed: List[MessageSegment] = []
+
+    for seg in raw_segments:
+        t = seg.get("type")
+        d: Dict[str, Any] = seg.get("data", {})
+
+        if t == MessageSegmentType.TEXT.value:
+            parsed.append(TextSegment(d.get("text", "")))
+
+        elif t == MessageSegmentType.IMAGE.value:
+            file_str = d.get("url") or d.get("path")
+            parsed.append(ImageSegment(
+                file=File(file_str),
+                file_name=d.get("file"),
+                url=d.get("url"),
+                path=d.get("path"),
+                file_size=d.get("file_size", 0),
+                summary=d.get("summary"),
+            ))
+
+        elif t == MessageSegmentType.REPLY.value:
+            parsed.append(ReplySegment(str(d.get("id", ""))))
+
+        elif t == MessageSegmentType.AT.value:
+            parsed.append(AtSegment(d.get("qq", 0)))
+
+        elif t == MessageSegmentType.FACE.value:
+            parsed.append(FaceSegment(str(d.get("id", ""))))
+
+        elif t == MessageSegmentType.RECORD.value:
+            file_str = d.get("url") or d.get("path")
+            parsed.append(RecordSegment(
+                file=File(file_str),
+                file_name=d.get("file"),
+                url=d.get("url"),
+                path=d.get("path"),
+                file_size=d.get("file_size", 0),
+            ))
+
+        elif t == MessageSegmentType.FORWARD.value:
+            parsed.append(ForwardSegment(id=d.get("id", ""), content=d.get("content")))
+
+        elif t == MessageSegmentType.FILE.value:
+            file_str = d.get("url") or d.get("path") or d.get("file", "")
+            parsed.append(FileSegment(
+                file=File(file_str),
+                file_name=d.get("file"),
+                url=d.get("url"),
+                path=d.get("path"),
+                file_size=d.get("file_size", 0),
+            ))
+
+        elif t == MessageSegmentType.VIDEO.value:
+            file_str = d.get("url") or d.get("path")
+            parsed.append(VideoSegment(
+                file=File(file_str),
+                file_name=d.get("file"),
+                url=d.get("url"),
+                path=d.get("path"),
+                file_size=d.get("file_size", 0),
+                thumb=d.get("thumb"),
+            ))
+
+        else:
+            parsed.append(UnknownSegment(t, d))
+
+    return parsed
+
+
 @dataclass(slots=True)
 class ChatMessage:
     """接收的消息"""
@@ -579,81 +657,15 @@ class ChatMessage:
         """
         工厂方法：从接收到的 JSON 事件中实例化 ChatMessage
         """
-        self_id = event.get('self_id', 0)
-        user_id = event.get('user_id', 0)
+        parsed_segments = parse_onebot_segments(event.get('message', []))
+        pure_text = "".join(
+            s.text for s in parsed_segments
+            if isinstance(s, TextSegment)
+        ).strip()
 
-        parsed_segments: List[MessageSegment] = []
-        pure_text_parts: List[str] = []
-
-        for seg in event.get('message', []):
-            t = seg.get('type')
-            d: Dict[str, Any] = seg.get('data', {})
-
-            if t == MessageSegmentType.TEXT.value:
-                text = d.get('text', '')
-                parsed_segments.append(TextSegment(text))
-                pure_text_parts.append(text)
-            
-            elif t == MessageSegmentType.IMAGE.value:
-                file_str = d.get('url') or d.get('path')
-                parsed_segments.append(ImageSegment(
-                    file=File(file_str),
-                    file_name=d.get('file'),
-                    url=d.get('url'),
-                    path=d.get('path'),
-                    file_size=d.get('file_size', 0),
-                    summary=d.get('summary')
-                ))
-            
-            elif t == MessageSegmentType.REPLY.value:
-                parsed_segments.append(ReplySegment(str(d.get('id', ''))))
-            
-            elif t == MessageSegmentType.AT.value:
-                parsed_segments.append(AtSegment(d.get('qq', 0)))
-            
-            elif t == MessageSegmentType.FACE.value:
-                parsed_segments.append(FaceSegment(str(d.get('id', ''))))
-            
-            elif t == MessageSegmentType.RECORD.value:
-                file_str = d.get('url') or d.get('path')
-                parsed_segments.append(RecordSegment(
-                    file=File(file_str),
-                    file_name=d.get('file'),
-                    url=d.get('url'),
-                    path=d.get('path'),
-                    file_size=d.get('file_size', 0)
-                ))
-            
-            elif t == MessageSegmentType.FORWARD.value:
-                parsed_segments.append(ForwardSegment(id=d.get('id', ""), content=d.get('content')))
-            
-            elif t == MessageSegmentType.FILE.value:
-                file_str = d.get('url') or d.get('path') or d.get('file', '')
-                parsed_segments.append(FileSegment(
-                    file=File(file_str),
-                    file_name=d.get('file'),
-                    url=d.get('url'),
-                    path=d.get('path'),
-                    file_size=d.get('file_size', 0)
-                ))
-            
-            elif t == MessageSegmentType.VIDEO.value:
-                file_str = d.get('url') or d.get('path')
-                parsed_segments.append(VideoSegment(
-                    file=File(file_str),
-                    file_name=d.get('file'),
-                    url=d.get('url'),
-                    path=d.get('path'),
-                    file_size=d.get('file_size', 0),
-                    thumb=d.get('thumb')
-                ))
-            
-            else:
-                parsed_segments.append(UnknownSegment(t, d))
-        
         chat_message = cls(
-            self_id=self_id,
-            user_id=user_id,
+            self_id=event.get('self_id', 0),
+            user_id=event.get('user_id', 0),
             group_id=event.get('group_id'),
             message_id=event.get('message_id', 0),
             time=event.get('time', int(time.time())),
@@ -661,7 +673,7 @@ class ChatMessage:
             raw_message=event.get('raw_message', ''),
             user_cq_message="",
             llm_formatted_message="",
-            pure_text="".join(pure_text_parts).strip(),
+            pure_text=pure_text,
             segments=parsed_segments,
             sender_info=event.get('sender', {})
         )
@@ -696,7 +708,7 @@ class ChatMessage:
     
     def get_cq_code(self) -> str:
         """获取完整的CQ码字符串"""
-        return "".join([str(seg) for seg in self.segments])
+        return "".join([seg.__str__() for seg in self.segments])
 
     def format_for_llm(self) -> str:
         """获取llm可读的字符串"""
@@ -739,17 +751,17 @@ class SendMessage:
     segments: List[MessageSegment] = field(default_factory=list)
     """消息段列表"""
     
-    def add_text(self, text: str) -> "SendMessage":
+    def add_text(self, text: str) -> SendMessage:
         """添加纯文本消息段"""
         self.segments.append(TextSegment(text))
         return self
 
-    def add_markdown(self, text: str) -> "SendMessage":
+    def add_markdown(self, text: str) -> SendMessage:
         """添加markdown消息段"""
         self.segments.append(MarkdownSegment(text))
         return self
 
-    def add_xml(self, text: str) -> "SendMessage":
+    def add_xml(self, text: str) -> SendMessage:
         """添加xml消息段"""
         self.segments.append(XmlSegment(text))
         return self
@@ -759,7 +771,7 @@ class SendMessage:
         file: str|File,
         file_name: Optional[str] = None,
         summary: Optional[str] = None
-    ) -> "SendMessage":
+    ) -> SendMessage:
         """
         添加图片消息段
         
@@ -785,17 +797,17 @@ class SendMessage:
         ))
         return self
     
-    def add_at(self, user_id: int) -> "SendMessage":
+    def add_at(self, user_id: int) -> SendMessage:
         """添加@某人的消息段"""
         self.segments.append(AtSegment(user_id))
         return self
     
-    def add_reply(self, message_id: str|int) -> "SendMessage":
+    def add_reply(self, message_id: str|int) -> SendMessage:
         """添加回复消息段,要添加的话要放在第一个"""
         self.segments.append(ReplySegment(message_id))
         return self
     
-    def add_face(self, face_id: str|int) -> "SendMessage":
+    def add_face(self, face_id: str|int) -> SendMessage:
         """添加QQ表情消息段"""
         self.segments.append(FaceSegment(face_id))
         return self
@@ -804,7 +816,7 @@ class SendMessage:
         self,
         file: str|File,
         file_name: Optional[str] = None
-    ) -> "SendMessage":
+    ) -> SendMessage:
         """添加语音消息段"""
         if isinstance(file, str):
             if file.startswith(("file://", "http://", "https://", "base64://")):
@@ -825,7 +837,7 @@ class SendMessage:
         file: str | File,
         file_name: Optional[str] = None,
         thumb: Optional[str] = None
-    ) -> "SendMessage":
+    ) -> SendMessage:
         """添加视频消息段"""
         if isinstance(file, str):
             if file.startswith(("file://", "http://", "https://", "base64://")):
@@ -846,7 +858,7 @@ class SendMessage:
         self,
         file: str|File,
         file_name: Optional[str] = None
-    ) -> "SendMessage":
+    ) -> SendMessage:
         """添加文件消息段"""
         if isinstance(file, str):
             if file.startswith(("file://", "http://", "https://", "base64://")):
@@ -862,12 +874,12 @@ class SendMessage:
         ))
         return self
     
-    def add_json(self, json_data: str) -> "SendMessage":
+    def add_json(self, json_data: str) -> SendMessage:
         """添加JSON消息段"""
         self.segments.append(JsonSegment(json_data))
         return self
     
-    def add_forward(self, id: str, content: Optional[List[Dict]] = None) -> "SendMessage":
+    def add_forward(self, id: str, content: Optional[List[Dict]] = None) -> SendMessage:
         """
         添加合并转发消息段
         
@@ -894,7 +906,7 @@ class SendMessage:
         summary: str | None = "点击即看",
         prompt: str | None = "果然是群聊天记录",
         time: str | None = None
-    ) -> "SendMessage":
+    ) -> SendMessage:
         """
         添加合并转发消息节点
         
@@ -930,12 +942,12 @@ class SendMessage:
         self.segments.append(node)
         return self
     
-    def add_segment(self, segment: MessageSegment) -> "SendMessage":
+    def add_segment(self, segment: MessageSegment) -> SendMessage:
         """直接添加自定义消息段"""
         self.segments.append(segment)
         return self
     
-    def clear(self) -> "SendMessage":
+    def clear(self) -> SendMessage:
         """清空所有消息段"""
         self.segments.clear()
         return self

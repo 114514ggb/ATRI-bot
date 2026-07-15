@@ -385,7 +385,7 @@ JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对
 {
     "decision":"speak",
     "reason":"做出此决策的原因",
-    "content":"将解析发送给用户的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送,适当分段,可以在开头使用[CQ:reply,id=message_id]引用到对应的消息,不要重复"
+    "content":"将解析发送给用户的字符串列表,列表中的每个字符串都将作为一条独立的消息按顺序发送,适当分段,可以在开头使用[CQ:reply,id=message_id]引用到对应的消息,不要重复,不建议使用CQ:image,图片过期会导致发不出来消息"
 }
 
 参数:silence
