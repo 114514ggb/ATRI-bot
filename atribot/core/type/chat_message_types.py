@@ -9,30 +9,54 @@ from typing import Any, Dict, List, Optional
 
 
 class MessageSegmentType(Enum):
-    AT = "at"              # @消息段
-    CONTACT = "contact"    # 联系人消息段
-    DICE = "dice"          # 骰子消息段
-    FACE = "face"          # QQ表情消息段
-    FILE = "file"          # 文件消息段
-    FLASHTRANSFER = "flashtransfer"  # QQ闪传消息段
-    FORWARD = "forward"    # 合并转发消息段
-    IMAGE = "image"        # 图片消息段
-    JSON = "json"          # JSON消息段
-    LOCATION = "location"  # 位置消息段
-    MARKDOWN = "markdown"  # Markdown消息段
-    MFACE = "mface"        # 商城表情消息段
-    MINIAPP = "miniapp"    # 小程序消息段
-    MUSIC = "music"        # 音乐消息段
-    NODE = "node"          # 合并转发消息节点
-    ONLINEFILE = "onlinefile"  # 在线文件消息段
-    POKE = "poke"          # 戳一戳消息段
-    RECORD = "record"      # 语音消息段
-    REPLY = "reply"        # 回复消息段
-    RPS = "rps"            # 猜拳消息段
-    TEXT = "text"          # 纯文本消息段
-    VIDEO = "video"        # 视频消息段
-    XML = "xml"            # XML消息段
-    UNKNOWN = "unknown"    # 不支持的消息段,用于使用我没适配的消息统一换成这个
+    AT = "at"
+    """@消息段"""
+    CONTACT = "contact"
+    """联系人消息段"""
+    DICE = "dice"
+    """骰子消息段"""
+    FACE = "face"
+    """QQ表情消息段"""
+    FILE = "file"
+    """文件消息段"""
+    FLASHTRANSFER = "flashtransfer"
+    """QQ闪传消息段"""
+    FORWARD = "forward"
+    """合并转发消息段"""
+    IMAGE = "image"
+    """图片消息段"""
+    JSON = "json"
+    """JSON消息段"""
+    LOCATION = "location"
+    """位置消息段"""
+    MARKDOWN = "markdown"
+    """Markdown消息段"""
+    MFACE = "mface"
+    """商城表情消息段"""
+    MINIAPP = "miniapp"
+    """小程序消息段"""
+    MUSIC = "music"
+    """音乐消息段"""
+    NODE = "node"
+    """合并转发消息节点"""
+    ONLINEFILE = "onlinefile"
+    """在线文件消息段"""
+    POKE = "poke"
+    """戳一戳消息段"""
+    RECORD = "record"
+    """语音消息段"""
+    REPLY = "reply"
+    """回复消息段"""
+    RPS = "rps"
+    """猜拳消息段"""
+    TEXT = "text"
+    """纯文本消息段"""
+    VIDEO = "video"
+    """视频消息段"""
+    XML = "xml"
+    """XML消息段"""
+    UNKNOWN = "unknown"
+    """不支持的消息段,用于使用我没适配的消息统一换成这个"""
 
 
 class MessageSegment(ABC):
@@ -120,10 +144,10 @@ class XmlSegment(MessageSegment):
 
 class AtSegment(MessageSegment):
     """@"""
-    __slots__ = ['user_id']#一个qq号或是'all'全体
+    __slots__ = ['user_id']
     
     def __init__(self, user_id: str|int):
-        self.user_id = user_id
+        self.user_id = user_id#一个qq号，或是str时为'all'@全体
         super().__init__(MessageSegmentType.AT.value)
     
     @property
