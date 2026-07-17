@@ -321,7 +321,7 @@ class WebSocketClientConfig:
     """连接类型"""
     access_token: str | None = None
     """访问令牌"""
-    url: str
+    url: str = ""
     """WS client 目标地址 (host:port)"""
     source_name: str = ""
     """来源标识（为空时自动取平台条目 key"""
