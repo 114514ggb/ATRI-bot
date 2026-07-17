@@ -4,6 +4,7 @@ from datetime import datetime
 import psutil
 
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
+from atribot.core.network_connections.WebSocketBase import WebSocketBase
 from atribot.core.service_container import container
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import MCPTool
@@ -315,7 +316,7 @@ class SystemMonitor:
             output.append("服务状态:        未注册")
             return "\n".join(output)
 
-        ws = container.get("WebSocket")
+        ws = container.get_by_type(WebSocketBase)
         ws_type = type(ws).__name__
         running = self._safe_attr(ws, "_running", False)
         connected = False

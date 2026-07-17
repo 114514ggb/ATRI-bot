@@ -16,6 +16,7 @@ from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.event_trigger.event_trigger import EventTrigger
 from atribot.core.message_manage import message_router
 from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.network_connections.WebSocketBase import WebSocketBase
 from atribot.core.network_connections.WebSocketClient import WebSocketClient
 from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
@@ -140,12 +141,14 @@ class BotFramework:
                 access_token=self.config.network.access_token,
             )
             container.register("WebSocket", ws, cleanup=ws.close)
+            container._type_map[WebSocketBase] = "WebSocket"
         elif server_type == "WebSocket_client":
             ws = WebSocketClient(
                 url=self.config.network.url,
                 access_token=self.config.network.access_token,
             )
             container.register("WebSocket", ws, cleanup=ws.close)
+            container._type_map[WebSocketBase] = "WebSocket"
         elif server_type != "http":
             raise ValueError(f"不支持的连接类型: {server_type}")
 
@@ -199,16 +202,18 @@ class BotFramework:
     async def _start_network(self, server_type: str) -> None:
         """根据连接类型启动网络服务并开始消息监听"""
         if server_type == "WebSocket_server":
-            ws: WebSocketServer = container.get("WebSocket")
+            ws = container.get_by_type(WebSocketBase)
+            assert isinstance(ws, WebSocketServer)
             ws.add_listener(message_router().main)
             ws_task = self.create_background_task(ws.start(), name="BotFramework.websocket_server")
             await ws.wait_for_connection()
             await ws_task
 
         elif server_type == "WebSocket_client":
-            ws_client: WebSocketClient = container.get("WebSocket")
-            ws_client.add_listener(message_router().main)
-            await ws_client.start()
+            ws = container.get_by_type(WebSocketBase)
+            assert isinstance(ws, WebSocketClient)
+            ws.add_listener(message_router().main)
+            await ws.start()
 
         elif server_type == "http":
             _message_router = message_router()

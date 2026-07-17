@@ -11,13 +11,14 @@ from typing import Any, Callable, Dict, List, Optional
 import websockets
 from websockets.legacy.client import WebSocketClientProtocol
 
+from atribot.core.network_connections.WebSocketBase import WebSocketBase
 from atribot.core.service_container import container
 
 
-class WebSocketClient:
+class WebSocketClient(WebSocketBase):
     """WebSocket 客户端类（单例模式）"""
     
-    _instance: Optional['WebSocketClient'] = None
+    _instance: Optional[WebSocketClient] = None
     _lock = asyncio.Lock()
     
     def __new__(cls, *args, **kwargs):

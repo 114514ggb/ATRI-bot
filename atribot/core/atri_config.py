@@ -1,8 +1,8 @@
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, Literal, Mapping, Union
 
 
 class ConfigObject(dict):
@@ -303,6 +303,162 @@ class FilePathConfig:
         return self.document_relative[name]
 
 
+@dataclass(slots=True)
+class WebSocketClientConfig:
+    """WebSocket 客户端模式平台实例配置
+
+    Attributes:
+        adapter: 适配器类型名称，如 "onebot"
+        connection_type: 连接类型
+        access_token: 访问令牌
+        url: WS client 目标地址 (host:port)，必填
+        source_name: 来源标识，默认取平台条目 key
+        enabled: 是否启用
+    """
+    adapter: str
+    """适配器类型名称"""
+    connection_type: Literal["WebSocket_client"] = "WebSocket_client"
+    """连接类型"""
+    access_token: str | None = None
+    """访问令牌"""
+    url: str
+    """WS client 目标地址 (host:port)"""
+    source_name: str = ""
+    """来源标识（为空时自动取平台条目 key"""
+    enabled: bool = True
+    """是否启用"""
+
+
+@dataclass(slots=True)
+class WebSocketServerConfig:
+    """WebSocket 服务端模式平台实例配置
+
+    Attributes:
+        adapter: 适配器类型名称，如 "onebot"
+        connection_type: 连接类型
+        access_token: 访问令牌
+        host: WS server 监听地址
+        port: WS server 监听端口
+        source_name: 来源标识，默认取平台条目 key
+        enabled: 是否启用
+    """
+    adapter: str
+    """适配器类型名称"""
+    connection_type: Literal["WebSocket_server"] = "WebSocket_server"
+    """连接类型"""
+    access_token: str | None = None
+    """访问令牌"""
+    host: str = "127.0.0.1"
+    """WS server 监听地址"""
+    port: int = 8080
+    """WS server 监听端口"""
+    source_name: str = ""
+    """来源标识（为空时自动取平台条目 key"""
+    enabled: bool = True
+    """是否启用"""
+
+
+@dataclass(slots=True)
+class HttpAdapterConfig:
+    """HTTP 模式平台实例配置
+
+    Attributes:
+        adapter: 适配器类型名称，如 "onebot"
+        connection_type: 连接类型
+        access_token: 访问令牌
+        url: HTTP 目标地址 (host:port)
+        host: HTTP 监听地址
+        port: HTTP 监听端口
+        source_name: 来源标识，默认取平台条目 key
+        enabled: 是否启用
+    """
+    adapter: str
+    """适配器类型名称"""
+    connection_type: Literal["http"] = "http"
+    """连接类型"""
+    access_token: str | None = None
+    """访问令牌"""
+    url: str | None = None
+    """HTTP 目标地址 (host:port)"""
+    host: str = "127.0.0.1"
+    """HTTP 监听地址"""
+    port: int = 8080
+    """HTTP 监听端口"""
+    source_name: str = ""
+    """来源标识（为空时自动取平台条目 key"""
+    enabled: bool = True
+    """是否启用"""
+
+
+PlatformInstanceConfig = Union[WebSocketClientConfig, WebSocketServerConfig, HttpAdapterConfig]
+"""平台实例配置联合类型，由 connection_type 区分具体变体"""
+
+
+@dataclass(slots=True)
+class PlatformsConfig:
+    """聚合所有平台配置
+
+    Attributes:
+        instances: key=平台名称, value=PlatformInstanceConfig
+    """
+    instances: dict[str, PlatformInstanceConfig] = field(default_factory=dict)
+    """平台实例字典"""
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "PlatformsConfig":
+        """从原始 JSON 字典构建 PlatformsConfig
+
+        Args:
+            data: {"平台名": {...字段...}, ...} 或 None
+
+        Returns:
+            PlatformsConfig 实例
+        """
+        if not data:
+            return cls()
+        instances: dict[str, PlatformInstanceConfig] = {}
+        for name, raw in data.items():
+            if not isinstance(raw, dict):
+                continue
+
+            conn_type: str = raw.get("connection_type", "WebSocket_client")
+            # 旧别名 "WebSocket" 归一化为 "WebSocket_client"
+            if conn_type == "WebSocket":
+                conn_type = "WebSocket_client"
+
+            source_name: str = raw.get("source_name") or name
+
+            if conn_type == "WebSocket_client":
+                cfg = WebSocketClientConfig(
+                    adapter=raw.get("adapter", ""),
+                    access_token=raw.get("access_token"),
+                    url=raw.get("url") or "127.0.0.1:8080",
+                    source_name=source_name,
+                    enabled=raw.get("enabled", True),
+                )
+            elif conn_type == "WebSocket_server":
+                cfg = WebSocketServerConfig(
+                    adapter=raw.get("adapter", ""),
+                    access_token=raw.get("access_token"),
+                    host=raw.get("host", "127.0.0.1"),
+                    port=raw.get("port", 8080),
+                    source_name=source_name,
+                    enabled=raw.get("enabled", True),
+                )
+            else:  # "http"
+                cfg = HttpAdapterConfig(
+                    adapter=raw.get("adapter", ""),
+                    access_token=raw.get("access_token"),
+                    url=raw.get("url"),
+                    host=raw.get("host", "127.0.0.1"),
+                    port=raw.get("port", 8080),
+                    source_name=source_name,
+                    enabled=raw.get("enabled", True),
+                )
+            instances[name] = cfg
+        return cls(instances=instances)
+
+
 class atriConfig:
     """提供项目配置参数
 
@@ -311,6 +467,8 @@ class atriConfig:
     """
     file_path:FilePathConfig
     """路径配置"""
+    platforms:PlatformsConfig
+    """平台配置"""
 
     @staticmethod
     def _find_project_root(start_path: Path) -> Path:
@@ -351,6 +509,11 @@ class atriConfig:
 
         file_path_data = config_data.get("file_path", {})
         self.file_path = FilePathConfig.from_dict(file_path_data, project_root)
+
+        #平台配置
+        platforms_raw: dict[str, Any] = config_data.get("platforms", {})
+        platforms_config: PlatformsConfig = PlatformsConfig.from_dict(platforms_raw)
+        self._config["platforms"] = platforms_config
 
     @property
     def config_file_path(self) -> Path:

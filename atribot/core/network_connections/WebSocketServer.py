@@ -10,13 +10,14 @@ from websockets.datastructures import Headers
 from websockets.legacy.server import Serve, WebSocketServerProtocol
 from websockets.legacy.server import WebSocketServer as WSSercer
 
+from atribot.core.network_connections.WebSocketBase import WebSocketBase
 from atribot.core.service_container import container
 
 
-class WebSocketServer:
+class WebSocketServer(WebSocketBase):
     """WebSocket 服务端类（单例模式）"""
     
-    _instance: Optional['WebSocketServer'] = None
+    _instance: Optional[WebSocketServer] = None
     _lock = asyncio.Lock()
     
     def __new__(cls, *args, **kwargs):

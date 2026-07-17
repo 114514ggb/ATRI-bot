@@ -16,18 +16,18 @@
 - **后台任务管理**: `BotFramework.create_background_task(coro, name=...)` 创建受控后台任务，自动跟踪并在 `shutdown` 时统一取消异常退出时自动记录日志`graceful_shutdown()` 使用 `asyncio.shield` 保护关闭流程不被取消
 - **依赖注入**: 使用模块级单例 `container`（`from atribot.core.service_container import container` = `DIContainer()` 单例）核心 API：
 
-  | 方法 | 说明 |
-  |---|---|
-  | `container.get("ServiceName")` | 按名称获取已解析实例（不存在抛 `ValueError`） |
-  | `container.get_by_type(ClassName)` | 按类型获取实例：先精确匹配 `_type_map`，再 `isinstance` 遍历查找 |
-  | `container.exists(name)` | 检查服务是否已注册 |
-  | `container.register(name, obj, cleanup=None)` | 注册已创建的实例（同名覆盖会 warning），可选附带清理回调 |
-  | `container.register_class(cls, name=None)` | 注册类供后续 `resolve()` 自动实例化 + 注入依赖 |
-  | `container.register_factory(cls, factory, name=None)` | 注册自定义工厂函数（替代默认构造器） |
-  | `container.unregister(name)` | 注销服务及其清理回调，同时清理 `_type_map` |
-  | `container.resolve(cls)` | **最核心方法**（见下方详解） |
-  | `container.register_cleanup(name, handler)` | 单独注册清理回调（同名重复抛 `ValueError`） |
-  | `container.shutdown()` | 按**注册逆序**执行所有 cleanup 回调（`reversed` 遍历 `_cleanup_handlers`） |
+  | 方法 | 说明 | 推荐 |
+  |---|---|---|
+  | `container.get_by_type(ClassName)` | 按类型获取实例：先精确匹配 `_type_map`，再 `isinstance` 遍历查找 | ✅ **优先使用** |
+  | `container.get("ServiceName")` | 按名称获取已解析实例（不存在抛 `ValueError`） | ⚠️ 字符串回退 |
+  | `container.exists(name)` | 检查服务是否已注册 | |
+  | `container.register(name, obj, cleanup=None)` | 注册已创建的实例（同名覆盖会 warning），可选附带清理回调 | |
+  | `container.register_class(cls, name=None)` | 注册类供后续 `resolve()` 自动实例化 + 注入依赖 | |
+  | `container.register_factory(cls, factory, name=None)` | 注册自定义工厂函数（替代默认构造器） | |
+  | `container.unregister(name)` | 注销服务及其清理回调，同时清理 `_type_map` | |
+  | `container.resolve(cls)` | **最核心方法**（见下方详解） | |
+  | `container.register_cleanup(name, handler)` | 单独注册清理回调（同名重复抛 `ValueError`） | |
+  | `container.shutdown()` | 按**注册逆序**执行所有 cleanup 回调（`reversed` 遍历 `_cleanup_handlers`） | |
 
   **`resolve(cls)` 详细流程**：
   1. 先尝试 `get_by_type(cls)`，若已解析则直接返回
@@ -64,32 +64,32 @@
 - **配置访问**: `atriConfig` 将 JSON 包装为支持点操作的 `ConfigObject`（`assets/config.json`）路径统一通过 `config.file_path.*` 访问，均为 `Path` 对象
 
 ## 完整服务名称表
-| 服务名 | 类型 | Shutdown | 备注 |
-|---|---|---|---|
-| `log` | `Logger` | — | 容器初始化时自动注册 |
-| `config` | `atriConfig` | — | |
-| `HTTPClient` | `HTTPClient` | — | 异步 HTTP 客户端（`get_bytes`/`post_form`/`post_json`） |
-| `database` | `AsyncPostgreSQL` | ✅ `close_pool()` | 需 `async with` 使用 |
-| `TokenManager` | `TokenManager` | — | Token 用量统计 |
-| `SendMessage` | `QQAPIClient` | ✅ `cleanup()` | QQ 消息发送 API（实现 ServiceBase，shutdown 时自动关闭 HTTP session） |
-| `LLMSupplier` | `LLMConnectionManager` | ✅ `close()` | LLM 供应商连接管理 |
-| `LLMSupervisor` | `LLMCoordinator` | — | LLM 调度协调 |
-| `CommandSystem` | `CommandSystem` | — | 命令注册与解析 |
-| `MemorySystem` | `MemorySystem` | — | 记忆系统门面（聚合 Retriever/Extractor/Consolidator） |
-| `SandBox` | `DockerSandbox` | ✅ `stop()` | 初始化可能失败，使用前调用 `container.exists("SandBox")` |
-| `SkillsManager` | `SkillsManager` | — | Agent Skills 加载与管理 |
-| `MCP` | `ToolManager` | ✅ `terminate()` | MCP 通过后台队列异步初始化 |
-| `TimeTriggerSupervisor` | `TimeTriggerSupervisor` | ✅ `stop()` | 定时任务调度 |
-| `UserSystem` | `UserSystem` | — | 用户信息管理 |
-| `ChatManager` | `ChatManager` | — | 群聊/私聊上下文管理 |
-| `EmojiCore` | `EmojiCore` | — | 表情系统 |
-| `PermissionsManagement` | `PermissionsManagement` | — | async 创建，权限 0-3 四级 |
-| `EventTrigger` | `EventTrigger` | — | 事件钩子注册与分发 |
-| `WebSocket` | `WebSocketServer` 或 `WebSocketClient` | ✅ `close()` | 由 `connection_type` 决定 |
-| `ToolCalls` | `ToolCalls` | ✅ cleanup | 本地工具加载与预设管理 |
-| `MediaProcessor` | `MediaProcessor` | — | 多模态转文本（image/audio/video → text） |
-| `GroupChat` | `GroupChat` | — | 群聊 LLM 对话处理 |
-| `PrivateChat` | `PrivateChat` | — | 私聊 LLM 对话处理 |
+| 服务名 | 类型 | 推荐获取方式 | Shutdown | 备注 |
+|---|---|---|---|---|
+| `log` | `Logger` | `get_by_type(Logger)` | — | 容器初始化时自动注册 |
+| `config` | `atriConfig` | `get_by_type(atriConfig)` 或 `get("config")` | — | |
+| `HTTPClient` | `HTTPClient` | `get_by_type(HTTPClient)` | — | 异步 HTTP 客户端（`get_bytes`/`post_form`/`post_json`） |
+| `database` | `AsyncPostgreSQL` | `get_by_type(AsyncPostgreSQL)` 或 `get("database")` | ✅ `close_pool()` | 需 `async with` 使用 |
+| `TokenManager` | `TokenManager` | `get_by_type(TokenManager)` | — | Token 用量统计 |
+| `SendMessage` | `QQAPIClient` | `get_by_type(QQAPIClient)` 或 `get("SendMessage")` | ✅ `cleanup()` | QQ 消息发送 API（实现 ServiceBase，shutdown 时自动关闭 HTTP session） |
+| `LLMSupplier` | `LLMConnectionManager` | `get_by_type(LLMConnectionManager)` 或 `get("LLMSupplier")` | ✅ `close()` | LLM 供应商连接管理 |
+| `LLMSupervisor` | `LLMCoordinator` | `get_by_type(LLMCoordinator)` | — | LLM 调度协调 |
+| `CommandSystem` | `CommandSystem` | `get_by_type(CommandSystem)` | — | 命令注册与解析 |
+| `MemorySystem` | `MemorySystem` | `get_by_type(MemorySystem)` | — | 记忆系统门面（聚合 Retriever/Extractor/Consolidator） |
+| `SandBox` | `DockerSandbox` | `get_by_type(SandBoxBase)` 或 `get("SandBox")`（先 `exists` 检查） | ✅ `stop()` | 初始化可能失败，使用前调用 `container.exists("SandBox")` |
+| `SkillsManager` | `SkillsManager` | `get_by_type(SkillsManager)` | — | Agent Skills 加载与管理 |
+| `MCP` | `ToolManager` | `get_by_type(ToolManager)` 或 `get("MCP")` | ✅ `terminate()` | MCP 通过后台队列异步初始化 |
+| `TimeTriggerSupervisor` | `TimeTriggerSupervisor` | `get_by_type(TimeTriggerSupervisor)` | ✅ `stop()` | 定时任务调度 |
+| `UserSystem` | `UserSystem` | `get_by_type(UserSystem)` | — | 用户信息管理 |
+| `ChatManager` | `ChatManager` | `get_by_type(ChatManager)` | — | 群聊/私聊上下文管理 |
+| `EmojiCore` | `EmojiCore` | `get_by_type(EmojiCore)` | — | 表情系统 |
+| `PermissionsManagement` | `PermissionsManagement` | `get_by_type(PermissionsManagement)` | — | async 创建，权限 0-3 四级 |
+| `EventTrigger` | `EventTrigger` | `get_by_type(EventTrigger)` | — | 事件钩子注册与分发 |
+| `WebSocket` | `WebSocketServer` 或 `WebSocketClient`（共享基类 `WebSocketBase`） | `get_by_type(WebSocketBase)` | ✅ `close()` | 由 `connection_type` 决定；通过 `WebSocketBase` 统一按类型获取，无需字符串名 |
+| `ToolCalls` | `ToolCalls` | `get_by_type(ToolCalls)` 或 `get("ToolCalls")` | ✅ cleanup | 本地工具加载与预设管理 |
+| `MediaProcessor` | `MediaProcessor` | `get_by_type(MediaProcessor)` | — | 多模态转文本（image/audio/video → text） |
+| `GroupChat` | `GroupChat` | `get_by_type(GroupChat)` | — | 群聊 LLM 对话处理 |
+| `PrivateChat` | `PrivateChat` | `get_by_type(PrivateChat)` | — | 私聊 LLM 对话处理 |
 
 ## 消息类型系统
 
@@ -198,8 +198,8 @@ msg = (SendMessage()
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import ChatMessage
 
-cmd_system = container.get("CommandSystem")
-send_message = container.get("SendMessage")
+cmd_system = container.get_by_type(CommandSystem)
+send_message = container.get_by_type(QQAPIClient)
 
 @cmd_system.register_command(
     name="cmd",
@@ -241,9 +241,9 @@ async def main(**kwargs) -> Any:
 **已内置工具**：`web_search`、`web_extract`、`get_user_info`、`memory_search`、`send_image_message`、`send_speech_message`、`send_create_image`、`load_skill_prompt`、`run_python_code`（沙盒执行）
 
 ### 3. 定时任务
-- 通过 `container.get("TimeTriggerSupervisor")` 获取调度器，支持一次性延迟、固定间隔、Cron 三种模式：
+- 通过 `container.get_by_type(TimeTriggerSupervisor)` 获取调度器，支持一次性延迟、固定间隔、Cron 三种模式：
   ```python
-  trigger = container.get("TimeTriggerSupervisor")
+  trigger = container.get_by_type(TimeTriggerSupervisor)
   # 一次性延迟任务（5 秒后执行）
   await trigger.add_task(func=my_async_func, trigger_delta=5.0, remarks="一次性任务")
   # 固定间隔循环任务（每 60 秒执行）
@@ -260,13 +260,13 @@ async def main(**kwargs) -> Any:
 - 在 `atribot/LLMchat/skills/agent_skills/<skill-name>/` 下创建含 YAML frontmatter 的 `SKILL.md`
 - 必填字段：`name`（小写字母+数字+`-`）和 `description`；可选：`version`、`author`、`tags`
 - 参考说明文档：`atribot/LLMchat/skills/agent_skills/如何创建一个skills.md`
-- 技能在运行时通过 `load_skill_prompt` 工具加载给 LLM 使用，也可通过 `container.get("SkillsManager").get_skill_md_prompt(skill_name)` 直接获取
+- 技能在运行时通过 `load_skill_prompt` 工具加载给 LLM 使用，也可通过 `container.get_by_type(SkillsManager).get_skill_md_prompt(skill_name)` 直接获取
 - **性能说明**：`SkillsManager` 启动时使用 `validator.load_validated_properties()` 一次性完成读取、解析、验证和 `SkillProperties` 构建，避免重复 I/O
 
 ### 5. EventTrigger 扩展
 - 使用装饰器注册钩子，支持带条件 lambda 过滤处理函数若返回 `True` 则**拦截后续处理**，不再向下分发
   ```python
-  event_trigger = container.get("EventTrigger")
+  event_trigger = container.get_by_type(EventTrigger)
   
   @event_trigger.on_message(condition=lambda data: "关键词" in data.get("raw_message", ""))
   async def handler(message: ChatMessage, data: dict) -> bool:
@@ -294,7 +294,7 @@ async def main(**kwargs) -> Any:
 
 ## SendMessage API（QQAPIClient）
 ```python
-send_message = container.get("SendMessage")
+send_message = container.get_by_type(QQAPIClient)
 
 # 基础发送
 await send_message.send_group_msg(group_id, message)        # 发送群聊文本/混合消息（message 可为 str 或 list[dict]）
@@ -351,7 +351,7 @@ URL 格式：`http(s)://...`、`file://绝对路径`（需 `local_Path_type=True
 
 ## 数据库 API（AsyncPostgreSQL）
 ```python
-db = container.get("database")
+db = container.get_by_type(AsyncPostgreSQL)
 async with db as db:
     rows = await db.fetch(sql, params)
     row  = await db.fetchrow(sql, params)
@@ -365,7 +365,7 @@ async with db as db:
 
 ## Coding Standards
 - **异步优先**: 所有 IO（DB、网络、LLM API）必须使用 `async/await`
-- **绝对路径**: 使用 `container.get("config").file_path.*` 获取路径，**禁止使用相对路径**
+- **绝对路径**: 使用 `container.get_by_type(atriConfig).file_path.*` 获取路径，**禁止使用相对路径**
   - 项目路径：`project_root`、`document_root`
   - 核心目录：`commands`、`chat_manager`、`supplier_config_path`、`agent_skills`、`tool_calls`、`mcp_config`
   - 文档目录：`emoji`、`audio`、`img`、`video`、`temp`、`file`
@@ -378,7 +378,7 @@ async with db as db:
 - **数据库 Schema**: 修改持久化逻辑前先查看 `docker/db/info.sql`，所有新建表应在此文件定义
 - **LLM 供应商配置**: 在 `assets/supplier_config.json` 中添加供应商（`base_url` + `api_key` + `model_dict`）智谱AI（`bigModel`）在 `bot_framework.py` 中硬编码注册，支持 GLM-4.5/4.6V/4.1V 等系列
 - **备用模型**: `config.model.standby_model` 列表维护多个备选模型，主模型不可用时自动切换
-- **RAG/Memory**: 记忆系统基于 pgvector 向量检索（Qwen3-Embedding 1024维 + Qwen3-Reranker 重排序），入口为 `container.get("MemorySystem")`，向量分类参见 MemoryCategory 8 种枚举
+- **RAG/Memory**: 记忆系统基于 pgvector 向量检索（Qwen3-Embedding 1024维 + Qwen3-Reranker 重排序），入口为 `container.get_by_type(MemorySystem)`，向量分类参见 MemoryCategory 8 种枚举
 - **MCP 服务**: 配置文件路径由 `config.file_path.mcp_config` 指定（`atribot/LLMchat/MCP/mcp_server.json`），支持 SSE 和 Streamable HTTP`ToolManager` 通过 `asyncio.create_task` 启动后台 `mcp_service_selector`，使用 `asyncio.Queue` (`mcp_service_queue`) 管理指令：`{"type": "init"}` 初始化所有激活服务，`{"type": "terminate"}` 关闭所有服务；`active: false` 的服务不会启动配置格式：
   ```json
   {

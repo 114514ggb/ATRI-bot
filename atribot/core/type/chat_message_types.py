@@ -989,7 +989,6 @@ class SendMessage:
     
     def to_json(self) -> str:
         """转换为JSON字符串"""
-        import json
         return json.dumps(self.data, ensure_ascii=False)
     
     def __len__(self) -> int:
@@ -1021,7 +1020,6 @@ class GroupMessage(SendMessage):
     
     def to_json(self) -> str:
         """转换为发送群消息的JSON字符串"""
-        import json
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
 
@@ -1041,7 +1039,6 @@ class PrivateMessage(SendMessage):
     
     def to_json(self) -> str:
         """转换为发送私聊消息的JSON字符串"""
-        import json
         return json.dumps(self.to_dict(), ensure_ascii=False)
 
 

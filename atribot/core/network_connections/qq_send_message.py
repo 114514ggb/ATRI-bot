@@ -4,8 +4,7 @@ from typing import Optional
 import aiohttp
 
 from atribot.core.atri_config import FilePathConfig, atriConfig
-from atribot.core.network_connections.WebSocketClient import WebSocketClient
-from atribot.core.network_connections.WebSocketServer import WebSocketServer
+from atribot.core.network_connections.WebSocketBase import WebSocketBase
 from atribot.core.service_container import ServiceBase, container
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 
@@ -53,7 +52,7 @@ class QQAPIClient(ServiceBase):
                 
             elif connection_type in ["WebSocket","WebSocket_client","WebSocket_server"]:
                 
-                self.websocket:WebSocketClient | WebSocketServer = container.get("WebSocket")
+                self.websocket = container.get_by_type(WebSocketBase)
                 self._send_impl = self._send_ws_strategy
                 
             else:
