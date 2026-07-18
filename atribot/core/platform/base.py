@@ -44,3 +44,35 @@ class PlatformAdapter(ABC):
         用于填充 Message.source 字段，如 "napcat"、"llonebot"、"telegram"
         """
         ...
+
+    @abstractmethod
+    def get_client(self) -> object:
+        """获取平台的底层客户端对象
+
+        返回平台原生客户端对象（如 OneBotSendClient
+        用于调用平台特有方法。调用方应使用 isinstance 检查类型后再调用。
+
+        Returns:
+            平台客户端对象，具体类型由子类决定
+        """
+        ...
+
+    async def call_api(self, action: str, params: dict, echo: bool = False) -> Any:
+        """通用 API 调用
+
+        当平台特有操作未在客户端对象中暴露时，
+        可直接通过 action 字符串调用底层 API。
+
+        子类可按需覆写此方法以实现具体的 API 调用逻辑。
+
+        Args:
+            action: API 动作名称（如 "set_group_ban"
+            params: 请求参数字典
+            echo: 是否等待并返回结果
+
+        Returns:
+            API 响应，或 None
+        """
+        raise NotImplementedError(
+            f"{type(self).__name__} 未实现 call_api()"
+        )

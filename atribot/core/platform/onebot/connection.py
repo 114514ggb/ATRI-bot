@@ -1,4 +1,6 @@
 import asyncio
+import asyncio as _asyncio
+import inspect
 import json
 import logging
 import uuid
@@ -56,7 +58,7 @@ class OneBotWSClient:
         return f"{protocol}{self.url}/"
 
     async def _connect(self) -> None:
-        """连接到 WebSocket 服务器（带重试）"""
+        """连接到 WebSocket 服务器"""
         while self._retry_count < self.max_retries and self._running:
             try:
                 self.websocket = await websockets.connect(
@@ -163,8 +165,6 @@ class OneBotWSClient:
     @staticmethod
     async def _safe_callback(callback: Callable, data: dict) -> None:
         """安全执行回调函数"""
-        import asyncio as _asyncio
-        import inspect
         try:
             if inspect.iscoroutinefunction(callback):
                 await callback(data)
@@ -183,7 +183,7 @@ class OneBotWSClient:
             with_echo: 是否等待并返回 echo 响应
 
         Returns:
-            echo 响应字典（with_echo=True 时），否则 None
+            echo 响应字典(with_echo=True 时），否则 None
         """
         if with_echo:
             echo_id = str(uuid.uuid4())
@@ -261,18 +261,7 @@ class OneBotWSClient:
 
 
 class OneBotWSServer:
-    """OneBot WebSocket 反向连接服务端
-
-    监听端口，等待 OneBot 实现端（NapCat/LLOneBot）主动连接。
-
-    用法:
-        server = OneBotWSServer(host="127.0.0.1", port=8888, access_token="ATRI114514")
-        server.add_listener(my_handler)
-        server_task = asyncio.create_task(server.start())
-        await server.wait_for_connection()
-        ...
-        await server.close()
-    """
+    """OneBot WebSocket 反向连接服务端"""
 
     def __init__(
         self,

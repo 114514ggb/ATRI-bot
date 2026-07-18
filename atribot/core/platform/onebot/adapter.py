@@ -56,7 +56,7 @@ class OneBotAdapter(PlatformAdapter):
                 access_token=config.access_token,
                 log=self._log.getChild("HttpServer"),
             )
-            http_base_url = config.url or f"http://{config.host}:{config.port}"
+            http_base_url = config.url
         else:
             raise ValueError(
                 f"不支持的连接类型: {config.connection_type} "
@@ -122,6 +122,25 @@ class OneBotAdapter(PlatformAdapter):
             API 响应，或 None
         """
         return await self._send_client.send(message, echo=echo)
+
+    def get_client(self) -> object:
+        """获取 OneBotSendClient 实例"""
+        return self._send_client
+
+    async def call_api(self, action: str, params: dict, echo: bool = False) -> Any:
+        """通用 OneBot API 调用
+
+        直接调用任意 OneBot API 动作
+
+        Args:
+            action: API 动作名称
+            params: 请求参数字典
+            echo: 是否等待并返回结果
+
+        Returns:
+            API 响应，或 None
+        """
+        return await self._send_client.async_send(action, params, echo=echo)
 
     async def _on_raw_message(self, data: dict) -> None:
         """收到原始 OneBot 事件后的回调(WS / HTTP)
