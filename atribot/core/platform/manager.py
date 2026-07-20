@@ -1,31 +1,34 @@
+import asyncio
 import importlib
 import logging
 import pkgutil
-from typing import TYPE_CHECKING
+from logging import Logger
+from typing import Any
 
 import atribot.core.platform as _platform_pkg
 from atribot.core.atri_config import atriConfig
+from atribot.core.event_bus.bus import EventBus
+from atribot.core.pipeline.pipeline import Pipeline
 from atribot.core.platform import _ADAPTER_REGISTRY, get_registered_adapters
 from atribot.core.platform.base import PlatformAdapter
-from atribot.core.platform.event_bus import EventBus
 from atribot.core.platform.message_queue import MessageQueue
+from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import SendMessage
-
-if TYPE_CHECKING:
-    from typing import Any
 
 
 class PlatformManager:
     """统一管理所有平台适配器"""
 
     def __init__(self, config: atriConfig):
-        self._log = logging.getLogger("PlatformManager")
+        self._log = container.get_by_type(Logger).getChild("PlatformManager")
         self._config = config
         self._adapters: dict[str, PlatformAdapter] = {}
         self._running = False
 
         self._queue = MessageQueue()
+        self._pipeline = Pipeline()
         self._event_bus = EventBus(self._queue)
+        self._bus_task: asyncio.Task[None] | None = None
 
         self._discover_adapters()
         self._log.info(
@@ -72,7 +75,7 @@ class PlatformManager:
         """扫描 atribot/core/platform/ 下的子包，触发 @register_adapter 装饰器
 
         通过导入每个子包（如 onebot/），触发其 __init__.py 中
-        对适配器类的导入，从而执行 @register_adapter 装饰器。
+        对适配器类的导入，从而执行 @register_adapter 装饰器
         """
         for _, name, is_pkg in pkgutil.iter_modules(_platform_pkg.__path__):
             if is_pkg:
@@ -84,7 +87,7 @@ class PlatformManager:
                     )
 
     async def start_all(self) -> None:
-        """启动所有适配器"""
+        """启动所有适配器及 EventBus"""
         if self._running:
             return
 
@@ -95,12 +98,25 @@ class PlatformManager:
             except Exception:
                 self._log.exception("启动平台 '%s' 失败", name)
 
+        self._bus_task = asyncio.create_task(
+            self._event_bus.run(pipeline=self._pipeline),
+            name="EventBus.main_loop",
+        )
+
         self._running = True
-        self._log.info("所有平台已启动 (%d 个)", len(self._adapters))
+        self._log.info("所有平台已启动 (%d 个),EventBus 已就绪", len(self._adapters))
 
     async def stop_all(self) -> None:
-        """停止所有适配器"""
+        """停止所有适配器及 EventBus"""
         self._running = False
+
+        if self._bus_task and not self._bus_task.done():
+            self._bus_task.cancel()
+            try:
+                await self._bus_task
+            except asyncio.CancelledError:
+                pass
+        self._bus_task = None
 
         for name, adapter in self._adapters.items():
             self._log.info("停止平台 '%s'...", name)
@@ -114,7 +130,7 @@ class PlatformManager:
     async def send(self, message: SendMessage) -> dict[str, Any]:
         """向所有适配器发送消息
 
-        遍历所有适配器尝试发送，返回每个适配器的结果。
+        遍历所有适配器尝试发送，返回每个适配器的结果
 
         Args:
             message: 已构建的消息对象
@@ -137,6 +153,11 @@ class PlatformManager:
         return self._event_bus
 
     @property
+    def pipeline(self) -> Pipeline:
+        """共享的预处理管道"""
+        return self._pipeline
+
+    @property
     def queue(self) -> MessageQueue:
         """共享的消息队列"""
         return self._queue
@@ -145,7 +166,7 @@ class PlatformManager:
         """按名称获取适配器实例
 
         Args:
-            name: 平台名称（对应 config.platforms 的 key）
+            name: 平台名称（对应 config.platforms 的 key
 
         Returns:
             适配器实例，未找到返回 None

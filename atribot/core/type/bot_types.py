@@ -11,7 +11,7 @@ class Message:
     携带:
         - event:     OneBot 事件对象
         - 时序元数据: 创建时间 / 接收时间 / 当前处理节点时间
-        - 元信息:     来源平台 / 消息方向
+        - 元信息:     来源平台
 
     Usage:
         raw = {"post_type": "message", "message_type": "group", ...}
@@ -28,6 +28,9 @@ class Message:
         "event",
         "direction",
         "source",
+        "stop_propagation",
+        "prevent_default",
+        "_extra",
     )
 
     create_time: float
@@ -40,6 +43,12 @@ class Message:
     """强类型的 OneBot 事件对象"""
     source: str
     """来源标识，如 'napcat'、'llonebot' 等，用于区分不同平台适配器"""
+    stop_propagation: bool
+    """设置为 True 可中断 EventBus 后续监听器的传播"""
+    prevent_default: bool
+    """设置为 True 可阻止默认行为"""
+    _extra: dict
+    """通用上下文挂载点，供 Pipeline 中间件写入数据"""
 
     def __init__(
         self,
@@ -53,6 +62,9 @@ class Message:
         self.event = event
         self.direction = direction
         self.source = source
+        self.stop_propagation = False
+        self.prevent_default = False
+        self._extra = {}
 
     def update_process_time(self) -> None:
         """更新当前处理节点时间为当前时间戳
@@ -104,6 +116,17 @@ class Message:
             if isinstance(uid, int) and uid > 0:
                 return uid
         return None
+
+    def set_extra(self, key: str, value: object) -> None:
+        """在消息信封上挂载自定义上下文数据
+
+        Pipeline 中间件可用此方法向后续处理器传递数据。
+        """
+        self._extra[key] = value
+
+    def get_extra(self, key: str, default: object = None) -> object:
+        """读取消息信封上的自定义上下文数据"""
+        return self._extra.get(key, default)
 
     def __repr__(self) -> str:
         ev_type = type(self.event).__name__

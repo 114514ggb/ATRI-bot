@@ -4,7 +4,7 @@ import inspect
 import json
 import logging
 import uuid
-from asyncio import CancelledError, Event, Queue, Task, create_task, gather, sleep
+from asyncio import CancelledError, Event, Task, create_task, gather, sleep
 from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
@@ -24,7 +24,6 @@ class OneBotWSClient:
         access_token: Optional[str] = None,
         max_retries: int = 120,
         retry_delay: float = 1.0,
-        queue_size: int = 100,
         echo_timeout: float = 15.0,
         log: logging.Logger | None = None,
     ):
@@ -43,7 +42,6 @@ class OneBotWSClient:
         self._retry_count = 0
 
         # 消息处理
-        self.message_queue: Queue = Queue(queue_size)
         self.pending_requests: dict[str, asyncio.Future] = {}
         self._listeners: list[Callable] = []
 
@@ -93,7 +91,6 @@ class OneBotWSClient:
 
         self._tasks = [
             create_task(self._receive_messages()),
-            create_task(self._process_messages()),
         ]
 
         try:
@@ -106,7 +103,7 @@ class OneBotWSClient:
             self._running = False
 
     async def _receive_messages(self) -> None:
-        """接收消息并放入队列"""
+        """接收消息并分发给所有监听器"""
         while self._running:
             try:
                 if not self.websocket:
@@ -124,7 +121,8 @@ class OneBotWSClient:
                             future.set_result(data)
                     continue
 
-                await self.message_queue.put(data)
+                for listener in self._listeners:
+                    await self._safe_callback(listener, data)
 
             except json.JSONDecodeError as e:
                 self.log.error("JSON 解析错误: %s", e)
@@ -142,25 +140,6 @@ class OneBotWSClient:
                     self._connected.clear()
                     await sleep(self.retry_delay)
                     await self._connect()
-
-    async def _process_messages(self) -> None:
-        """处理队列中的消息，分发给所有监听器"""
-        running_tasks: set[Task] = set()
-
-        while self._running:
-            try:
-                data = await self.message_queue.get()
-
-                for listener in self._listeners:
-                    task = create_task(self._safe_callback(listener, data))
-                    running_tasks.add(task)
-                    task.add_done_callback(running_tasks.discard)
-
-            except Exception as e:
-                self.log.exception("处理消息时发生错误: %s", e)
-
-        if running_tasks:
-            await gather(*running_tasks, return_exceptions=True)
 
     @staticmethod
     async def _safe_callback(callback: Callable, data: dict) -> None:
@@ -240,13 +219,6 @@ class OneBotWSClient:
                 future.cancel()
         self.pending_requests.clear()
 
-        # 清空消息队列
-        while not self.message_queue.empty():
-            try:
-                self.message_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
-
         self.log.info("WebSocket 客户端已关闭")
 
     @property
@@ -268,7 +240,6 @@ class OneBotWSServer:
         host: str = "127.0.0.1",
         port: int = 8080,
         access_token: Optional[str] = None,
-        queue_size: int = 100,
         echo_timeout: float = 15.0,
         log: logging.Logger | None = None,
     ):
@@ -286,7 +257,6 @@ class OneBotWSServer:
         self._server: Optional[WSServer] = None
 
         # 消息处理
-        self.message_queue: Queue = Queue(queue_size)
         self.pending_requests: dict[str, asyncio.Future] = {}
         self._listeners: list[Callable] = []
 
@@ -348,7 +318,8 @@ class OneBotWSServer:
                                 future.set_result(data)
                         continue
 
-                    await self.message_queue.put(data)
+                    for listener in self._listeners:
+                        await self._safe_callback(listener, data)
 
                 except json.JSONDecodeError as e:
                     self.log.error("JSON 解析错误: %s", e)
@@ -379,7 +350,7 @@ class OneBotWSServer:
         )
         self.log.info("WebSocket 服务器已启动: ws://%s:%d", self.host, self.port)
 
-        self._tasks = [create_task(self._process_messages())]
+        self._tasks = []
 
         try:
             await gather(*self._tasks, return_exceptions=False)
@@ -389,25 +360,6 @@ class OneBotWSServer:
             self.log.exception("事件循环异常: %s", e)
         finally:
             self._running = False
-
-    async def _process_messages(self) -> None:
-        """处理队列中的消息"""
-        running_tasks: set[Task] = set()
-
-        while self._running:
-            try:
-                data = await self.message_queue.get()
-
-                for listener in self._listeners:
-                    task = create_task(self._safe_callback(listener, data))
-                    running_tasks.add(task)
-                    task.add_done_callback(running_tasks.discard)
-
-            except Exception as e:
-                self.log.error("处理消息时发生错误: %s", e)
-
-        if running_tasks:
-            await gather(*running_tasks, return_exceptions=True)
 
     @staticmethod
     async def _safe_callback(callback: Callable, data: dict) -> None:
@@ -499,13 +451,6 @@ class OneBotWSServer:
             if not future.done():
                 future.cancel()
         self.pending_requests.clear()
-
-        # 清空消息队列
-        while not self.message_queue.empty():
-            try:
-                self.message_queue.get_nowait()
-            except asyncio.QueueEmpty:
-                break
 
         self.log.info("WebSocket 服务器已关闭")
 

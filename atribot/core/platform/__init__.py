@@ -1,5 +1,4 @@
 from atribot.core.platform.base import PlatformAdapter
-from atribot.core.platform.event_bus import EventBus
 from atribot.core.platform.message_queue import MessageQueue
 
 _ADAPTER_REGISTRY: dict[str, type[PlatformAdapter]] = {}
@@ -53,7 +52,6 @@ def get_registered_adapters() -> dict[str, type[PlatformAdapter]]:
 __all__ = [
     "PlatformAdapter",
     "MessageQueue",
-    "EventBus",
     "register_adapter",
     "get_adapter_class",
     "get_registered_adapters",

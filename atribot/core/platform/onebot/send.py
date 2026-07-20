@@ -50,7 +50,7 @@ class OneBotSendClient:
 
         self.log.info("发送客户端已就绪 (模式: %s)", connection_type)
 
-    async def _send_http(self, action: str, params: dict, echo: bool = False) -> Optional[dict]:
+    async def _send_http(self, action: str, params: dict, echo: bool = True) -> Optional[dict]:
         """通过 HTTP POST 发送"""
         try:
             async with self._http_session.post(
@@ -67,7 +67,7 @@ class OneBotSendClient:
             self.log.error("HTTP 请求异常: %s", e)
             return None
 
-    async def _send_ws(self, action: str, params: dict, echo: bool = False) -> Optional[dict]:
+    async def _send_ws(self, action: str, params: dict, echo: bool = True) -> Optional[dict]:
         """通过 WebSocket 发送"""
         message = {
             "action": action,
@@ -79,7 +79,7 @@ class OneBotSendClient:
             self.log.error("WS 发送失败: %s", e)
             return None
 
-    async def send(self, message: SendMessage, echo: bool = False) -> Optional[dict]:
+    async def send(self, message: SendMessage, echo: bool = True) -> Optional[dict]:
         """发送消息对象
 
         Args:
@@ -99,7 +99,7 @@ class OneBotSendClient:
 
         return await self._send_impl(action, message.to_dict(), echo=echo)
 
-    async def async_send(self, action: str, params: dict, echo: bool = False) -> Optional[dict]:
+    async def async_send(self, action: str, params: dict, echo: bool = True) -> Optional[dict]:
         """通用的发送请求
 
         Args:
@@ -116,25 +116,27 @@ class OneBotSendClient:
         self,
         group_id: int,
         message: str | list,
+        echo: bool = True,
     ) -> Optional[dict]:
         """发送群聊消息
 
         Args:
             group_id: 目标群号
             message: 文本字符串或消息段列表(OneBot 格式)
+            echo: 是否等待并返回结果
         """
         params = {
             "group_id": group_id,
             "message": message,
         }
-        return await self._send_impl("send_group_msg", params)
+        return await self._send_impl("send_group_msg", params, echo=echo)
 
     async def send_private_msg(
         self,
         user_id: int,
         message: str | list,
         auto_escape: bool = False,
-        echo: bool = False,
+        echo: bool = True,
     ) -> Optional[dict]:
         """发送私聊消息
 
@@ -157,13 +159,21 @@ class OneBotSendClient:
         group_id: int,
         message: str,
         reply_message_id: int,
+        echo: bool = True,
     ) -> Optional[dict]:
-        """发送群聊回复消息"""
+        """发送群聊回复消息
+
+        Args:
+            group_id: 目标群号
+            message: 回复文本
+            reply_message_id: 被回复的消息 ID
+            echo: 是否等待并返回结果
+        """
         params = [
             {"type": "reply", "data": {"id": reply_message_id}},
             {"type": "text", "data": {"text": message}},
         ]
-        return await self.send_group_msg(group_id, params)
+        return await self.send_group_msg(group_id, params, echo=echo)
 
     async def close(self) -> None:
         """关闭发送客户端，释放 HTTP session"""
@@ -171,7 +181,7 @@ class OneBotSendClient:
             await self._http_session.close()
             self.log.debug("HTTP session 已关闭")
 
-    async def send_group(self, message: GroupMessage, echo: bool = False) -> dict | None:
+    async def send_group(self, message: GroupMessage, echo: bool = True) -> dict | None:
         """专门发送群聊消息对象
 
         Args:
@@ -183,7 +193,7 @@ class OneBotSendClient:
         """
         return await self.async_send("send_group_msg", message.to_dict(), echo=echo)
 
-    async def send_private(self, message: PrivateMessage, echo: bool = False) -> dict | None:
+    async def send_private(self, message: PrivateMessage, echo: bool = True) -> dict | None:
         """专门发送私聊消息对象
 
         Args:
@@ -195,13 +205,25 @@ class OneBotSendClient:
         """
         return await self.async_send("send_private_msg", message.to_dict(), echo=echo)
 
-    async def send_group_poke(self, group_id: int, user_id: int) -> None:
-        """发送群戳一戳"""
-        await self.async_send("group_poke", {"group_id": group_id, "user_id": user_id})
+    async def send_group_poke(self, group_id: int, user_id: int, echo: bool = True) -> dict | None:
+        """发送群戳一戳
 
-    async def send_group_json(self, group_id: int, json_dict: dict) -> None:
-        """发送群 JSON 卡片消息"""
-        await self.send_group_msg(group_id, [{"type": "json", "data": json_dict}])
+        Args:
+            group_id: 群号
+            user_id: 目标用户 QQ
+            echo: 是否等待并返回结果
+        """
+        return await self.async_send("group_poke", {"group_id": group_id, "user_id": user_id}, echo=echo)
+
+    async def send_group_json(self, group_id: int, json_dict: dict, echo: bool = True) -> dict | None:
+        """发送群 JSON 卡片消息
+
+        Args:
+            group_id: 群号
+            json_dict: JSON 数据字典
+            echo: 是否等待并返回结果
+        """
+        return await self.send_group_msg(group_id, [{"type": "json", "data": json_dict}], echo=echo)
 
     async def send_group_music(
         self,
@@ -213,7 +235,8 @@ class OneBotSendClient:
         singer: str | None = None,
         title: str | None = None,
         content: str | None = None,
-    ) -> None:
+        echo: bool = True,
+    ) -> dict | None:
         """分享音乐到群
 
         Args:
@@ -225,6 +248,7 @@ class OneBotSendClient:
             singer: 歌手(可选)
             title: 标题(可选)
             content: 内容描述(可选)
+            echo: 是否等待并返回结果
         """
         if type != "custom" and not id:
             raise ValueError("当 type 不是 'custom' 时,id 必须提供")
@@ -241,7 +265,7 @@ class OneBotSendClient:
             "content": content,
         }
         message = [{"type": "music", "data": {k: v for k, v in data.items() if v is not None}}]
-        await self.send_group_msg(group_id, message)
+        return await self.send_group_msg(group_id, message, echo=echo)
 
     async def set_group_ban(
         self,
@@ -270,23 +294,25 @@ class OneBotSendClient:
         flag: str,
         approve: bool,
         reason: str = "不行哦!",
-    ) -> None:
+        echo: bool = True,
+    ) -> dict | None:
         """处理加群请求
 
         Args:
             flag: 请求 ID
             approve: 是否同意
             reason: 拒绝理由(可选)
+            echo: 是否等待并返回结果
         """
         payload: dict = {"flag": flag, "approve": approve}
         if not approve:
             payload["reason"] = reason
-        await self.async_send("set_group_add_request", payload)
+        return await self.async_send("set_group_add_request", payload, echo=echo)
 
     async def delete_msg(
         self,
         message_id: int | str,
-        echo: bool = False,
+        echo: bool = True,
     ) -> dict | None:
         """撤回消息
 
@@ -304,7 +330,7 @@ class OneBotSendClient:
         message_id: int | str,
         emoji_id: int,
         set: bool = True,
-        echo: bool = False,
+        echo: bool = True,
     ) -> dict | None:
         """给消息贴表情
 
@@ -398,7 +424,7 @@ class OneBotSendClient:
         url_img: str = "img_ATRI.png",
         default: bool = False,
         local_Path_type: bool = True,
-        get_return: bool = False,
+        echo: bool = True,
     ) -> dict | None:
         """发送群图片
 
@@ -407,7 +433,7 @@ class OneBotSendClient:
             url_img: 图片 URL 或文件名
             default: 是否使用默认图片目录
             local_Path_type: 是否按本地文件处理
-            get_return: 是否返回发送状态
+            echo: 是否返回发送状态
         """
         file_url = await self._resolve_file_url(url_img, default, local_Path_type, base_dir="img")
         return await self._send_impl(
@@ -416,15 +442,21 @@ class OneBotSendClient:
                 "group_id": group_id,
                 "message": [{"type": "image", "data": {"file": file_url}}],
             },
-            echo=get_return,
+            echo=echo,
         )
 
     async def send_group_image(
         self,
         group_id: int,
         url_img: str,
+        echo: bool = True,
     ) -> Optional[dict]:
         """发送群聊图片
+
+        Args:
+            group_id: 群号
+            url_img: 图片 URL
+            echo: 是否等待并返回结果
 
         完整功能请使用 send_group_pictures
         """
@@ -434,6 +466,7 @@ class OneBotSendClient:
                 "group_id": group_id,
                 "message": [{"type": "image", "data": {"file": url_img}}],
             },
+            echo=echo,
         )
 
     async def send_group_video(
@@ -442,15 +475,25 @@ class OneBotSendClient:
         url_video: str = "ATRIの珍贵录像.mp4",
         default: bool = False,
         local_Path_type: bool = True,
-    ) -> None:
-        """发送群视频"""
+        echo: bool = True,
+    ) -> dict | None:
+        """发送群视频
+
+        Args:
+            group_id: 群号
+            url_video: 视频 URL 或文件名
+            default: 是否使用默认视频目录
+            local_Path_type: 是否按本地文件处理
+            echo: 是否等待并返回结果
+        """
         file_url = await self._resolve_file_url(url_video, default, local_Path_type, base_dir="video")
-        await self._send_impl(
+        return await self._send_impl(
             "send_group_msg",
             {
                 "group_id": group_id,
                 "message": [{"type": "video", "data": {"file": file_url}}],
             },
+            echo=echo,
         )
 
     async def send_group_audio(
@@ -459,8 +502,17 @@ class OneBotSendClient:
         url_audio: str = "Atri my dear moments.mp3",
         default: bool = False,
         local_Path_type: bool = True,
+        echo: bool = True,
     ) -> Optional[dict]:
-        """发送群聊语音(增强版，支持默认路径和本地文件协议)"""
+        """发送群聊语音(增强版，支持默认路径和本地文件协议)
+
+        Args:
+            group_id: 群号
+            url_audio: 语音 URL 或文件名
+            default: 是否使用默认音频目录
+            local_Path_type: 是否按本地文件处理
+            echo: 是否等待并返回结果
+        """
         file_url = await self._resolve_file_url(url_audio, default, local_Path_type, base_dir="audio")
         return await self._send_impl(
             "send_group_msg",
@@ -468,6 +520,7 @@ class OneBotSendClient:
                 "group_id": group_id,
                 "message": [{"type": "record", "data": {"file": file_url}}],
             },
+            echo=echo,
         )
 
     async def send_group_file(
@@ -477,7 +530,7 @@ class OneBotSendClient:
         name: str | None = None,
         default: bool = False,
         local_Path_type: bool = True,
-        echo: bool = False,
+        echo: bool = True,
     ) -> Optional[dict]:
         """发送群文件(增强版，支持默认路径和本地文件协议)
 
@@ -510,7 +563,7 @@ class OneBotSendClient:
         url_img: str = "img_ATRI.png",
         default: bool = False,
         local_Path_type: bool = False,
-        echo: bool = False,
+        echo: bool = True,
     ) -> dict | None:
         """发送私聊图片
 
@@ -531,9 +584,17 @@ class OneBotSendClient:
         url_audio: str = "Atri my dear moments.mp3",
         default: bool = False,
         local_Path_type: bool = False,
-        echo: bool = False,
+        echo: bool = True,
     ) -> dict | None:
-        """发送私聊语音"""
+        """发送私聊语音
+
+        Args:
+            qq_id: 目标 QQ 号
+            url_audio: 语音 URL 或文件名
+            default: 是否使用默认音频目录
+            local_Path_type: 是否按本地文件处理
+            echo: 是否返回发送结果
+        """
         file_url = await self._resolve_file_url(url_audio, default, local_Path_type, base_dir="audio")
         message = [{"type": "record", "data": {"file": file_url}}]
         return await self.send_private_msg(qq_id, message, echo=echo)
@@ -545,9 +606,18 @@ class OneBotSendClient:
         name: str | None = None,
         default: bool = False,
         local_Path_type: bool = True,
-        echo: bool = False,
+        echo: bool = True,
     ) -> dict | None:
-        """发送私聊文件"""
+        """发送私聊文件
+
+        Args:
+            qq_id: 目标 QQ 号
+            url_file: 文件 URL 或文件名
+            name: 自定义文件名
+            default: 是否使用默认文件目录
+            local_Path_type: 是否按本地文件处理
+            echo: 是否返回发送结果
+        """
         raw_path = url_file
         if default and self.file_paths:
             raw_path = str(self.file_paths.file / url_file)
@@ -569,7 +639,7 @@ class OneBotSendClient:
         if item in ("cleanup", "initialize") or item.startswith("_"):
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
-        async def _dynamic_api_call(echo: bool = False, **kwargs) -> dict | None:
+        async def _dynamic_api_call(echo: bool = True, **kwargs) -> dict | None:
             return await self.async_send(url=item, payload={k: v for k, v in kwargs.items() if v is not None}, echo=echo)
 
         return _dynamic_api_call
@@ -582,6 +652,7 @@ class OneBotSendClient:
         preview: str = "ATRI:晚上一个人偷偷看[图片]",
         user_id: int = 3889393615,
         nickname: str = "ATRI-亚托莉",
+        echo: bool = True,
     ) -> Optional[dict]:
         """发送群合并转发消息(单文本)
 
@@ -594,6 +665,7 @@ class OneBotSendClient:
             preview: 预览文本
             user_id: 发送者 QQ(用于合并转发节点)
             nickname: 发送者昵称
+            echo: 是否等待并返回结果
 
         Returns:
             API 响应
@@ -617,7 +689,7 @@ class OneBotSendClient:
             "summary": "点击即看",
             "source": source,
         }
-        return await self._send_impl("send_group_forward_msg", payload)
+        return await self._send_impl("send_group_forward_msg", payload, echo=echo)
 
     async def send_group_merge_forward(
         self,
@@ -627,6 +699,7 @@ class OneBotSendClient:
         preview: str = "ATRI:晚上一个人偷偷看[图片]",
         user_id: int = 3889393615,
         nickname: str = "ATRI-亚托莉",
+        echo: bool = True,
     ) -> Optional[dict]:
         """发送群合并转发消息(多节点)
 
@@ -637,6 +710,7 @@ class OneBotSendClient:
             preview: 预览文本
             user_id: 发送者 QQ(用于合并转发节点)
             nickname: 发送者昵称
+            echo: 是否等待并返回结果
 
         Returns:
             API 响应
@@ -661,4 +735,4 @@ class OneBotSendClient:
             "summary": "点击即看",
             "source": source,
         }
-        return await self._send_impl("send_group_forward_msg", payload)
+        return await self._send_impl("send_group_forward_msg", payload, echo=echo)

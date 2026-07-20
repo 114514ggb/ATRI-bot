@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from logging import Logger
 from typing import Awaitable, Callable, Optional
 
+from atribot.core.service_container import container
 from atribot.core.type.bot_types import Message
 from atribot.core.type.onebot_event_types import PostType
 
@@ -16,7 +17,7 @@ class MessageQueue:
     def __init__(self, maxsize: int = MAX_QUEUE_SIZE):
         self._queue: asyncio.Queue[Message] = asyncio.Queue(maxsize)
         self._overflow_handler: Optional[Callable[[Message], Awaitable[None]]] = None
-        self._log: Logger = Logger("MessageQueue")
+        self._log: Logger = container.get_by_type(Logger).getChild("MessageQueue")
 
         self.total_pushed: int = 0
         """累计推入消息数"""

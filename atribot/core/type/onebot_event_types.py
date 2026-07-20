@@ -216,7 +216,7 @@ class OneBotEvent(ABC):
         ...
 
     def format_event_simple(self) -> str:
-        """获取简洁 AI 可读事件描述（惰性缓存）"""
+        """获取简洁 AI 可读事件描述"""
         if not self._cached_simple:
             self._cached_simple = self._format_event_simple()
         return self._cached_simple
@@ -1550,11 +1550,6 @@ class MessageEvent(OneBotEvent):
     def sender_nickname(self) -> str:
         """发送者昵称"""
         return self.sender.get("nickname", "")
-
-    @property
-    def sender_user_id(self) -> int:
-        """发送者 QQ 号"""
-        return self.sender.get("user_id", self.user_id)
 
     @property
     def pure_text(self) -> str:
