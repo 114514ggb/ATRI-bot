@@ -11,7 +11,7 @@ from atribot.core.type.onebot_event_types import PostType
 
 if TYPE_CHECKING:
     from atribot.core.pipeline.pipeline import Pipeline
-    from atribot.core.type.bot_types import Message
+    from atribot.core.type.bot_types import atriMessageEvent
 
 _RULE_TYPE_ORDER: tuple[str, ...] = (
     "command",
@@ -86,8 +86,8 @@ class EventBus:
         """
 
         def decorator(
-            func: Callable[[Message], Awaitable[None]],
-        ) -> Callable[[Message], Awaitable[None]]:
+            func: Callable[[atriMessageEvent], Awaitable[None]],
+        ) -> Callable[[atriMessageEvent], Awaitable[None]]:
             r = rule if rule is not None else AlwaysRule()
             listener = Listener(
                 handler=func,
@@ -179,7 +179,7 @@ class EventBus:
         if listener in bucket:
             bucket.remove(listener)
 
-    async def dispatch(self, msg: Message) -> None:
+    async def dispatch(self, msg: atriMessageEvent) -> None:
         """将消息分发给所有匹配的监听器
 
         Args:

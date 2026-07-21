@@ -5,7 +5,7 @@ from atribot.core.service_container import container
 
 if TYPE_CHECKING:
     from atribot.core.pipeline.middleware import PipelineMiddleware
-    from atribot.core.type.bot_types import Message
+    from atribot.core.type.bot_types import atriMessageEvent
 
 
 class Pipeline:
@@ -44,7 +44,7 @@ class Pipeline:
                 return mw
         return None
 
-    async def process(self, msg: Message) -> Message | None:
+    async def process(self, msg: atriMessageEvent) -> atriMessageEvent | None:
         """链式处理消息
 
         Args:

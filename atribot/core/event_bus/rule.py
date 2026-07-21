@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
-    from atribot.core.type.bot_types import Message
+    from atribot.core.type.bot_types import atriMessageEvent
 
 
 class Rule(ABC):
@@ -21,7 +21,7 @@ class Rule(ABC):
     """规则类型标识，供 EventBus 两级索引用"""
 
     @abstractmethod
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         """判断消息是否满足此规则
 
         Args:
@@ -38,7 +38,7 @@ class AlwaysRule(Rule):
 
     rule_type: ClassVar[str] = "always"
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         return True
 
 
@@ -56,7 +56,7 @@ class CommandRule(Rule):
         self._command = command
         self._prefix = prefix
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         text = getattr(msg.event, "pure_text", "").strip()
         if not text:
             return False
@@ -90,7 +90,7 @@ class RegexRule(Rule):
         self._re = re.compile(pattern, flags)
         self._pattern = pattern
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         text = getattr(msg.event, "raw_message", "")
         if not text:
             return False
@@ -113,7 +113,7 @@ class GroupRule(Rule):
     def __init__(self, group_id: int) -> None:
         self._group_id = group_id
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         return msg.group_id == self._group_id
 
     @property
@@ -133,7 +133,7 @@ class UserRule(Rule):
     def __init__(self, user_id: int) -> None:
         self._user_id = user_id
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         return msg.user_id == self._user_id
 
     @property
@@ -155,7 +155,7 @@ class AndRule(Rule):
             raise ValueError("AndRule 至少需要一个子规则")
         self._rules = rules
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         for r in self._rules:
             if not await r.match(msg):
                 return False
@@ -181,7 +181,7 @@ class OrRule(Rule):
             raise ValueError("OrRule 至少需要一个子规则")
         self._rules = rules
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         for r in self._rules:
             if await r.match(msg):
                 return True
@@ -205,7 +205,7 @@ class NotRule(Rule):
     def __init__(self, rule: Rule) -> None:
         self._rule = rule
 
-    async def match(self, msg: Message) -> bool:
+    async def match(self, msg: atriMessageEvent) -> bool:
         return not await self._rule.match(msg)
 
     @property

@@ -1,24 +1,32 @@
 ﻿import time
-from typing import TYPE_CHECKING, Optional
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     from atribot.core.type.onebot_event_types import OneBotEvent
 
+from atribot.core.type.chat_message_types import SendMessage
 
-class Message:
-    """消息信封
+
+class atriMessageEvent(ABC):
+    """消息事件基类
 
     携带:
-        - event:     OneBot 事件对象
+        - event:     OneBot 事件对象（或其他平台事件）
         - 时序元数据: 创建时间 / 接收时间 / 当前处理节点时间
         - 元信息:     来源平台
+
+    子类职责:
+        - 实现 send() 将 SendMessage 发送到平台
+        - 可覆写 message() 以返回预填目标 ID 的类型化消息
 
     Usage:
         raw = {"post_type": "message", "message_type": "group", ...}
         event = OneBotEvent.from_dict(raw)
-        msg = Message(event=event, source="napcat", direction="incoming")
+        msg = OneBotMessageEvent(event=event, source="napcat",
+                                  direction="incoming", adapter=adapter)
         # ... 处理 ...
-        msg.update_process_time()  # 建议在进入下一处理节点时调用
+        await msg.send(msg.text("hello"))
     """
 
     __slots__ = (
@@ -117,6 +125,14 @@ class Message:
                 return uid
         return None
 
+    @property
+    def message_id(self) -> Optional[int]:
+        """消息 ID(非消息事件返回 None"""
+        ev = self.event
+        if hasattr(ev, "message_id"):
+            return ev.message_id
+        return None
+
     def set_extra(self, key: str, value: object) -> None:
         """在消息信封上挂载自定义上下文数据
 
@@ -128,10 +144,66 @@ class Message:
         """读取消息信封上的自定义上下文数据"""
         return self._extra.get(key, default)
 
+    @abstractmethod
+    async def send(self, message: SendMessage) -> Any:
+        """发送消息到平台
+
+        Args:
+            message: 已构建的 SendMessage 对象(GroupMessage / PrivateMessage
+
+        Returns:
+            平台响应，具体类型由子类实现决定
+        """
+        ...
+
+    def message(self) -> SendMessage:
+        """创建一个空的 SendMessage 构建器
+
+        平台子类应覆写此方法以返回预填目标 ID 的类型化消息
+        （如 GroupMessage、PrivateMessage
+        """
+        return SendMessage()
+
+    def text(self, text: str) -> SendMessage:
+        """创建纯文本消息"""
+        return self.message().add_text(text)
+
+    def image(
+        self,
+        file: str,
+        file_name: Optional[str] = None,
+        summary: Optional[str] = None,
+    ) -> SendMessage:
+        """创建图片消息
+
+        Args:
+            file: 文件路径、URL、Base64 字符串
+            file_name: 文件名(可选)
+            summary: 图片描述(可选)
+        """
+        return self.message().add_image(file, file_name, summary)
+
+    def markdown(self, text: str) -> SendMessage:
+        """创建 Markdown 消息"""
+        return self.message().add_markdown(text)
+
+    def reply_text(self, text: str) -> SendMessage:
+        """创建回复+文本消息（自动添加 reply 段）
+
+        Args:
+            text: 回复的文本内容
+        """
+        msg = self.message()
+        mid = self.message_id
+        if mid is not None:
+            msg.add_reply(mid)
+        msg.add_text(text)
+        return msg
+
     def __repr__(self) -> str:
         ev_type = type(self.event).__name__
         return (
-            f"Message(event={ev_type}, direction={self.direction!r}, "
+            f"atriMessageEvent(event={ev_type}, direction={self.direction!r}, "
             f"source={self.source!r}, age={self.age_seconds:.1f}s)"
         )
 

@@ -1,3 +1,3 @@
-from atribot.core.platform.onebot.adapter import OneBotAdapter
+from atribot.core.platform.onebot.adapter import OneBotAdapter, OneBotMessageEvent
 
-__all__ = ["OneBotAdapter"]
+__all__ = ["OneBotAdapter", "OneBotMessageEvent"]

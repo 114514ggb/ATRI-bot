@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Awaitable, Callable
 
 if TYPE_CHECKING:
     from atribot.core.event_bus.rule import Rule
-    from atribot.core.type.bot_types import Message
+    from atribot.core.type.bot_types import atriMessageEvent
     from atribot.core.type.onebot_event_types import PostType
 
 
@@ -19,7 +19,7 @@ class Listener:
         once:        为 True 时触发一次后自动注销
     """
 
-    handler: Callable[[Message], Awaitable[None]]
+    handler: Callable[[atriMessageEvent], Awaitable[None]]
     """异步处理函数"""
     event_type: PostType
     """监听的事件类型"""

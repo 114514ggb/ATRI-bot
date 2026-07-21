@@ -14,9 +14,46 @@ from atribot.core.platform.base import PlatformAdapter
 from atribot.core.platform.message_queue import MessageQueue
 from atribot.core.platform.onebot.connection import OneBotHttpServer, OneBotWSClient, OneBotWSServer
 from atribot.core.platform.onebot.send import OneBotSendClient
-from atribot.core.type.bot_types import Message
-from atribot.core.type.chat_message_types import SendMessage
+from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 from atribot.core.type.onebot_event_types import OneBotEvent
+
+
+class OneBotMessageEvent(atriMessageEvent):
+    """OneBot 平台的消息事件实现"""
+
+    __slots__ = ("_send_client",)
+
+    _send_client: OneBotSendClient
+    """持有的消息发送客户端"""
+
+    def __init__(
+        self,
+        event: OneBotEvent,
+        *,
+        send_client: OneBotSendClient,
+        direction: str = "incoming",
+        source: str = "",
+    ):
+        super().__init__(event=event, direction=direction, source=source)
+        self._send_client = send_client
+
+    async def send(self, message: SendMessage) -> Any:
+        """发送消息到 OneBot 平台"""
+        return await self._send_client.send(message)
+
+    def message(self) -> SendMessage:
+        """创建预填目标 ID 的类型化消息
+
+        - 群聊消息 → GroupMessage(group_id=...)
+        - 私聊消息 → PrivateMessage(user_id=...)
+        - 其他     → 普通 SendMessage
+        """
+        if self.group_id:
+            return GroupMessage(group_id=self.group_id)
+        elif self.user_id:
+            return PrivateMessage(user_id=self.user_id)
+        return SendMessage()
 
 
 @register_adapter("onebot")
@@ -157,7 +194,12 @@ class OneBotAdapter(PlatformAdapter):
             )
             return
 
-        msg = Message(event=event, source=self._source_name, direction="incoming")
+        msg = OneBotMessageEvent(
+            event=event,
+            source=self._source_name,
+            direction="incoming",
+            send_client=self._send_client,
+        )
         pushed = await self._queue.push(msg)
 
         if not pushed:

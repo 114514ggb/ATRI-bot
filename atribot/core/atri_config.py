@@ -117,6 +117,8 @@ class FilePathConfig:
     """视频目录的绝对路径"""
     temp: Path
     """临时目录的绝对路径"""
+    plugins: Path
+    """插件目录的绝对路径"""
     root_relative: Dict[str, Path]
     """基于 project_root 的其他相对路径映射"""
     document_relative: Dict[str, Path]
@@ -213,6 +215,7 @@ class FilePathConfig:
             "tool_calls": "atribot/LLMchat/tools",
             "mcp_config": "atribot/LLMchat/MCP/mcp_server.json",
             "agent_skills": "atribot/LLMchat/skills/agent_skills",
+            "plugins": "atribot/plugins",
         }
         root_relative.update(file_path_config.get("relative_to_root", {}))
 
@@ -245,6 +248,7 @@ class FilePathConfig:
             supplier_config_path=resolved_root.get("supplier_config_path", Path()),
             mcp_config=resolved_root.get("mcp_config", Path()),
             agent_skills=resolved_root.get("agent_skills", Path()),
+            plugins=resolved_root.get("plugins", Path()),
             tool_calls=resolved_root.get("tool_calls", Path()),
             emoji=normalize(emoji_path),
             audio=resolved_document.get("audio", Path()),

@@ -4,7 +4,7 @@ from logging import Logger
 from typing import Awaitable, Callable, Optional
 
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import Message
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.onebot_event_types import PostType
 
 MAX_QUEUE_SIZE = 200
@@ -15,8 +15,8 @@ class MessageQueue:
     """平台消息队列"""
 
     def __init__(self, maxsize: int = MAX_QUEUE_SIZE):
-        self._queue: asyncio.Queue[Message] = asyncio.Queue(maxsize)
-        self._overflow_handler: Optional[Callable[[Message], Awaitable[None]]] = None
+        self._queue: asyncio.Queue[atriMessageEvent] = asyncio.Queue(maxsize)
+        self._overflow_handler: Optional[Callable[[atriMessageEvent], Awaitable[None]]] = None
         self._log: Logger = container.get_by_type(Logger).getChild("MessageQueue")
 
         self.total_pushed: int = 0
@@ -28,7 +28,7 @@ class MessageQueue:
         self.stale_dropped: int = 0
         """出队时因过期丢弃的消息数"""
 
-    def set_overflow_handler(self, handler: Callable[[Message], Awaitable[None]]) -> None:
+    def set_overflow_handler(self, handler: Callable[[atriMessageEvent], Awaitable[None]]) -> None:
         """设置队列满时的溢出处理器
 
         Args:
@@ -37,7 +37,7 @@ class MessageQueue:
         """
         self._overflow_handler = handler
 
-    async def push(self, msg: Message) -> bool:
+    async def push(self, msg: atriMessageEvent) -> bool:
         """将消息推入队列
 
         Args:
@@ -68,7 +68,7 @@ class MessageQueue:
                 )
             return False
 
-    async def consume(self) -> AsyncIterator[Message]:
+    async def consume(self) -> AsyncIterator[atriMessageEvent]:
         """消费消息的异步生成器
 
         持续从队列取出 Message,过期消息直接丢弃。

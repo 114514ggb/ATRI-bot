@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from atribot.core.pipeline.pipeline import Pipeline
-    from atribot.core.type.bot_types import Message
+    from atribot.core.type.bot_types import atriMessageEvent
 
 
 class PipelineMiddleware(ABC):
@@ -21,7 +21,7 @@ class PipelineMiddleware(ABC):
         pass
 
     @abstractmethod
-    async def process(self, msg: Message) -> Message | None:
+    async def process(self, msg: atriMessageEvent) -> atriMessageEvent | None:
         """处理消息
 
         Args:
