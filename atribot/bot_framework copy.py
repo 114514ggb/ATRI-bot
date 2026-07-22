@@ -1,6 +1,6 @@
 import asyncio
 from logging import Logger
-from typing import Any, Awaitable
+from typing import Any, Awaitable, Dict
 
 import uvicorn
 from fastapi import FastAPI
@@ -10,9 +10,15 @@ from atribot.common_utils.http_client import HTTPClient
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.core.command.command_loader import command_loader
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
+from atribot.core.event_trigger.event_trigger import EventTrigger
+from atribot.core.message_manage import message_router
 from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.platform.manager import PlatformManager
+from atribot.core.network_connections.WebSocketBase import WebSocketBase
+from atribot.core.network_connections.WebSocketClient import WebSocketClient
+from atribot.core.network_connections.WebSocketServer import WebSocketServer
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.LLMchat.chat import GroupChat, PrivateChat
@@ -28,10 +34,10 @@ from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 from atribot.LLMchat.skills.skills_manager import SkillsManager
 from atribot.LLMchat.token_manage import TokenManager
-from atribot.plugins.manager import PluginManager
 
 
 class BotFramework:
+    """主初始化类"""
 
     _SERVICE_CLASSES = (
         atriConfig,
@@ -40,6 +46,8 @@ class BotFramework:
         TokenManager,
         MemorySystem,
         UserSystem,
+        EventTrigger,
+        CommandSystem,
         MediaProcessor,
         LLMCoordinator,
         GroupChat,
@@ -48,14 +56,13 @@ class BotFramework:
         EmojiCore,
         ChatManager,
         PermissionsManagement,
-        PluginManager,
     )
 
     _NAMED_SERVICE_CLASSES = (
         (AsyncPostgreSQL, "database"),
         (ToolManager, "MCP"),
         (LLMConnectionManager, "LLMSupplier"),
-        # (QQAPIClient, "SendMessage"),
+        (QQAPIClient, "SendMessage"),
         (ToolCalls, "ToolCalls"),
     )
 
@@ -72,15 +79,16 @@ class BotFramework:
         ChatManager,
         EmojiCore,
         PermissionsManagement,
-        # QQAPIClient,
+        QQAPIClient,
+        EventTrigger,
+        CommandSystem,
         ToolCalls,
         MediaProcessor,
         LLMCoordinator,
         GroupChat,
         PrivateChat,
-        PluginManager,
     )
-
+    
     def __init__(self):
         self.log: Logger = container.get_by_type(Logger).getChild("Bot")
         self._background_tasks: set[asyncio.Task[Any]] = set()
@@ -88,9 +96,7 @@ class BotFramework:
         self._shutdown_task: asyncio.Task[None] | None = None
         self._is_shutdown = False
         """标记是否已经完成关闭"""
-        self._platform_manager: PlatformManager | None = None
-        """平台管理器实例"""
-
+    
     @classmethod
     async def create(cls):
         """工厂初始化方法"""
@@ -101,47 +107,22 @@ class BotFramework:
             await self.graceful_shutdown()
             raise
         return self
-
+    
     async def initialize(self):
-        """初始化
-
-        新初始化顺序：
-        1. 配置 → 2. 注册服务类 → 3. 创建 PlatformManager
-        4. 可选沙盒 → 5. 解析服务（PluginManager 在此步自动 initialize 加载插件）
-        6. 启动 PlatformManager → 7. 启动运行时服务
-        """
+        """初始化"""
         self.config = atriConfig()
         container.register("config", self.config)
 
         self._register_services()
 
-        # 创建 PlatformManager（从 config.platforms 发现适配器）
-        self._platform_manager = PlatformManager(self.config)
-        container.register("PlatformManager", self._platform_manager, cleanup=self._platform_manager.stop_all)
-        container._type_map[PlatformManager] = "PlatformManager"
-
-        # 注册 SendMessage 桥接：将首个适配器的 OneBotSendClient 暴露为旧类型
-        # 这样 GroupChat/PrivateChat 等服务的 send_message: QQAPIClient 依赖可被满足
-        if self._platform_manager.adapters:
-            _first_adapter = next(iter(self._platform_manager.adapters.values()))
-            _send_client = _first_adapter.get_client()
-            container.register("SendMessage", _send_client)
-            container._type_map[QQAPIClient] = "SendMessage"
-            self.log.info(
-                "SendMessage 已桥接到适配器 '%s' (%s)",
-                next(iter(self._platform_manager.adapters.keys())),
-                type(_send_client).__name__,
-            )
-        else:
-            self.log.warning("没有可用适配器，SendMessage 未注册")
+        server_type: str = self.config.network.connection_type
+        self._register_network(server_type)
 
         await self._start_sandbox()
         await self._resolve_services()
-
-        # 启动所有平台适配器 + EventBus 主循环
-        await self._platform_manager.start_all()
-
         await self._start_runtime_services()
+
+        await self._start_network(server_type)
 
     def _register_services(self) -> None:
         """注册可由容器解析的服务类型"""
@@ -150,6 +131,26 @@ class BotFramework:
 
         for service_cls, service_name in self._NAMED_SERVICE_CLASSES:
             container.register_class(service_cls, name=service_name)
+
+    def _register_network(self, server_type: str) -> None:
+        """按连接类型注册网络连接实例"""
+        if server_type == "WebSocket_server":
+            ws = WebSocketServer(
+                host=self.config.network.host,
+                port=self.config.network.server_port,
+                access_token=self.config.network.access_token,
+            )
+            container.register("WebSocket", ws, cleanup=ws.close)
+            container._type_map[WebSocketBase] = "WebSocket"
+        elif server_type == "WebSocket_client":
+            ws = WebSocketClient(
+                url=self.config.network.url,
+                access_token=self.config.network.access_token,
+            )
+            container.register("WebSocket", ws, cleanup=ws.close)
+            container._type_map[WebSocketBase] = "WebSocket"
+        elif server_type != "http":
+            raise ValueError(f"不支持的连接类型: {server_type}")
 
     async def _start_sandbox(self) -> None:
         """启动 LLM 可选沙盒"""
@@ -161,15 +162,11 @@ class BotFramework:
             self.log.exception(f"LLM使用的沙盒初始化失败{e}")
 
     async def _resolve_services(self) -> None:
-        """提前解析启动阶段需要的服务实例
-
-        PluginManager 在此步被 resolve，其 initialize() 会自动：
-        1. 从容器获取 PlatformManager
-        2. 创建 PluginLoader 扫描 atribot/plugins/
-        3. 加载所有插件，插件自动将 handlers 注册到 EventBus
-        """
+        """提前解析启动阶段需要的服务实例"""
         for tgt in self._RESOLVE_TARGETS:
             await container.resolve(tgt)
+        
+        container.register("CommandLoader", command_loader(self.config.file_path.commands))
 
     async def _start_runtime_services(self) -> None:
         """启动依赖容器完成后的运行期服务"""
@@ -201,6 +198,43 @@ class BotFramework:
         server = uvicorn.Server(cfg)
         self.log.info(f"管理面板已就绪: http://127.0.0.1:{admin_port}/admin/")
         await server.serve()
+
+    async def _start_network(self, server_type: str) -> None:
+        """根据连接类型启动网络服务并开始消息监听"""
+        if server_type == "WebSocket_server":
+            ws = container.get_by_type(WebSocketBase)
+            assert isinstance(ws, WebSocketServer)
+            ws.add_listener(message_router().main)
+            ws_task = self.create_background_task(ws.start(), name="BotFramework.websocket_server")
+            await ws.wait_for_connection()
+            await ws_task
+
+        elif server_type == "WebSocket_client":
+            ws = container.get_by_type(WebSocketBase)
+            assert isinstance(ws, WebSocketClient)
+            ws.add_listener(message_router().main)
+            await ws.start()
+
+        elif server_type == "http":
+            _message_router = message_router()
+            app = FastAPI()
+
+            @app.post("/")
+            async def handle_http_event(data: Dict[str, Any]):
+                """处理HTTP事件"""
+                self.create_background_task(_message_router.main(data), name="BotFramework.http_event")
+                return {"status": "OK", "code": 200}
+
+            uvicorn_app = uvicorn.Config(
+                app,
+                host="localhost",
+                port=self.config.network.server_port,
+                workers=8,
+            )
+            server = uvicorn.Server(uvicorn_app)
+            await server.serve()
+        else:
+            raise ValueError(f"启动连接的时候接收了错误的连接类型:{server_type}")
 
     def create_background_task(self, coro: Awaitable[Any], *, name: str | None = None) -> asyncio.Task[Any]:
         """创建受控后台任务"""

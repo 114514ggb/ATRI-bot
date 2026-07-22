@@ -1,6 +1,7 @@
 from logging import Logger
 from typing import TYPE_CHECKING
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.service_container import ServiceBase, container
 
@@ -9,7 +10,6 @@ from .registry import clear as _clear_registry
 from .types import PluginMetadata
 
 if TYPE_CHECKING:
-    from atribot.core.atri_config import atriConfig
     from atribot.plugins.plugin import Plugin
 
 

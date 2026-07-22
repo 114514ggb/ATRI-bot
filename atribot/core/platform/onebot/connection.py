@@ -52,11 +52,15 @@ class OneBotWSClient:
         """构建 WebSocket URI"""
         protocol = "ws://"
         if self.access_token:
-            return f"{protocol}{self.url}/websocket?access_token={self.access_token}"
-        return f"{protocol}{self.url}/"
+            uri = f"{protocol}{self.url}/websocket?access_token={self.access_token}"
+        else:
+            uri = f"{protocol}{self.url}/"
+        self.log.info("目标 URI: %s", uri.replace(self.access_token or "", "***") if self.access_token else uri)
+        return uri
 
     async def _connect(self) -> None:
         """连接到 WebSocket 服务器"""
+        self.log.info("正在尝试连接 %s ...", self.url)
         while self._retry_count < self.max_retries and self._running:
             try:
                 self.websocket = await websockets.connect(
@@ -65,7 +69,7 @@ class OneBotWSClient:
                     ping_timeout=10,
                     close_timeout=10,
                 )
-                self.log.info("WebSocket 连接成功: %s", self.url)
+                self.log.info("WebSocket 连接成功: %s (耗时 %.1fs)", self.url, self._retry_count * self.retry_delay)
                 self._retry_count = 0
                 self._connected.set()
                 return
@@ -73,11 +77,14 @@ class OneBotWSClient:
                 self._retry_count += 1
                 self._connected.clear()
                 if self._retry_count >= self.max_retries:
-                    self.log.error("连接失败，已达最大重试次数 (%d): %s", self.max_retries, e)
+                    self.log.error(
+                        "连接失败，已达最大重试次数 %d 次: %s",
+                        self.max_retries, e,
+                    )
                     raise
                 self.log.warning(
-                    "连接失败: %s, %.1f秒后重试 (%d/%d)",
-                    e, self.retry_delay, self._retry_count, self.max_retries,
+                    "连接失败 (第%d次): %s, %.1f秒后重试...",
+                    self._retry_count, e, self.retry_delay,
                 )
                 await sleep(self.retry_delay)
 
@@ -111,7 +118,7 @@ class OneBotWSClient:
                     continue
 
                 data = json.loads(await self.websocket.recv())
-
+                
                 # 处理 echo 响应
                 if "echo" in data and data["echo"]:
                     echo_id = data["echo"]
@@ -129,15 +136,18 @@ class OneBotWSClient:
             except websockets.exceptions.ConnectionClosed as e:
                 self._connected.clear()
                 if e.code == 1005:
-                    self.log.info("WebSocket 连接正常关闭")
+                    self.log.info("WebSocket 连接正常关闭 (code=1005)")
                 else:
-                    self.log.warning("WebSocket 连接异常关闭: %s", e)
+                    self.log.warning("WebSocket 连接异常关闭: code=%s %s", e.code, e)
                 if self._running:
+                    self.log.info("正在重新连接...")
                     await self._connect()
+                    self.log.info("重新连接成功")
             except Exception as e:
                 self.log.error("接收消息时发生错误: %s", e)
                 if self._running:
                     self._connected.clear()
+                    self.log.info("将在 %.1f 秒后重试...", self.retry_delay)
                     await sleep(self.retry_delay)
                     await self._connect()
 

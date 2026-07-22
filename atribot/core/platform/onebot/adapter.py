@@ -14,6 +14,7 @@ from atribot.core.platform.base import PlatformAdapter
 from atribot.core.platform.message_queue import MessageQueue
 from atribot.core.platform.onebot.connection import OneBotHttpServer, OneBotWSClient, OneBotWSServer
 from atribot.core.platform.onebot.send import OneBotSendClient
+from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 from atribot.core.type.onebot_event_types import OneBotEvent
@@ -68,7 +69,7 @@ class OneBotAdapter(PlatformAdapter):
         self._config = config
         self._queue = queue
         self._source_name = config.source_name
-        self._log = logging.getLogger(f"OneBotAdapter.{config.source_name}")
+        self._log = container.get_by_type(logging.Logger).getChild(f"OneBotAdapter.{config.source_name}")
         self._started = False
 
         if isinstance(config, WebSocketClientConfig):
@@ -123,14 +124,23 @@ class OneBotAdapter(PlatformAdapter):
 
         self._connection.add_listener(self._on_raw_message)
         self._log.info(
-            "正在启动 (type=%s, source=%s)",
+            "正在连接 (type=%s, source=%s, target=%s)",
             self._config.connection_type,
             self._source_name,
+            getattr(self._config, "url", f"{getattr(self._config, 'host', '?')}:{getattr(self._config, 'port', '?')}"),
         )
 
         self._conn_task = asyncio.create_task(self._connection.start())
         self._started = True
-        self._log.info("已启动")
+
+        if hasattr(self._connection, "wait_for_connection"):
+            ok = await self._connection.wait_for_connection(timeout=5.0)
+            if ok:
+                self._log.info("连接已建立")
+            else:
+                self._log.warning("连接尚未建立（后台重试中）")
+        else:
+            self._log.info("已启动（监听中）")
 
     async def stop(self) -> None:
         """停止适配器"""
@@ -184,6 +194,7 @@ class OneBotAdapter(PlatformAdapter):
 
         将原始事件字典转换为类型化的 Message 并推入队列。
         """
+        self._log.debug(f"事件:{data}")
         try:
             event = OneBotEvent.from_dict(data)
         except (ValueError, Exception) as e:
@@ -194,6 +205,8 @@ class OneBotAdapter(PlatformAdapter):
             )
             return
 
+        print(event)
+
         msg = OneBotMessageEvent(
             event=event,
             source=self._source_name,
@@ -202,9 +215,11 @@ class OneBotAdapter(PlatformAdapter):
         )
         pushed = await self._queue.push(msg)
 
-        if not pushed:
-            self._log.debug(
-                "消息未能入队(队列满): %s post_type=%s",
+        if pushed:
+            self._log.debug("事件已入队 (queue_depth=%d)", self._queue.depth)
+        else:
+            self._log.warning(
+                "❌ 消息未能入队(队列满): %s post_type=%s",
                 type(event).__name__,
                 event.post_type.value,
             )

@@ -55,10 +55,10 @@ class Pipeline:
             None     — 被某个中间件短路丢弃
         """
         for mw in self._middlewares:
-            if msg := await mw.process(msg):
-                return msg
-            self._log.debug("中间件 %s 短路，丢弃消息", mw)
-            return None
+            if (msg := await mw.process(msg)) is None:
+                self._log.debug("中间件 %s 短路,丢弃消息", mw)
+                return None
+        return msg
 
     @property
     def middleware_count(self) -> int:

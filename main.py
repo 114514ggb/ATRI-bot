@@ -24,6 +24,9 @@ async def main():
 
     try:
         framework = await BotFramework.create()
+        await asyncio.Event().wait()
+    except asyncio.CancelledError:
+        log.info("收到停止信号")
     finally:
         if framework:
             await framework.graceful_shutdown()
