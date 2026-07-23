@@ -15,8 +15,8 @@ class Pipeline:
         self._middlewares: list[PipelineMiddleware] = []
         self._log: Logger = container.get_by_type(Logger).getChild("Pipeline")
 
-    def add_middleware(self, mw: PipelineMiddleware) -> Pipeline:
-        """追加中间件到链尾
+    async def add_middleware(self, mw: PipelineMiddleware) -> Pipeline:
+        """追加中间件到链尾，自动调用其 initialize
 
         Args:
             mw: 中间件实例
@@ -25,11 +25,12 @@ class Pipeline:
             self,支持链式调用
         """
         self._middlewares.append(mw)
+        await mw.initialize()
         self._log.debug("添加中间件: %s", mw)
         return self
 
-    def remove_middleware(self, name: str) -> PipelineMiddleware | None:
-        """按名称移除中间件
+    async def remove_middleware(self, name: str) -> PipelineMiddleware | None:
+        """按名称移除中间件，自动调用其 cleanup
 
         Args:
             name: 中间件的 name 属性值
@@ -40,6 +41,7 @@ class Pipeline:
         for i, mw in enumerate(self._middlewares):
             if mw.name == name:
                 del self._middlewares[i]
+                await mw.cleanup()
                 self._log.debug("移除中间件: %s", mw)
                 return mw
         return None

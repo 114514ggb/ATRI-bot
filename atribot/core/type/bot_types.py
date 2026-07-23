@@ -5,7 +5,10 @@ from typing import TYPE_CHECKING, Any, Optional
 if TYPE_CHECKING:
     from atribot.core.type.onebot_event_types import OneBotEvent
 
+from typing import NotRequired, TypedDict
+
 from atribot.core.type.chat_message_types import SendMessage
+from atribot.core.type.chat_types import GroupContext, PrivateContext
 
 
 class atriMessageEvent(ABC):
@@ -39,6 +42,9 @@ class atriMessageEvent(ABC):
         "stop_propagation",
         "prevent_default",
         "_extra",
+        "group_id",
+        "user_id",
+        "message_id",
     )
 
     create_time: float
@@ -55,7 +61,7 @@ class atriMessageEvent(ABC):
     """设置为 True 可中断 EventBus 后续监听器的传播"""
     prevent_default: bool
     """设置为 True 可阻止默认行为"""
-    _extra: dict
+    _extra: extra
     """通用上下文挂载点，供 Pipeline 中间件写入数据"""
 
     def __init__(
@@ -73,6 +79,10 @@ class atriMessageEvent(ABC):
         self.stop_propagation = False
         self.prevent_default = False
         self._extra = {}
+
+        ev = self.event
+        self.group_id: Optional[int] = getattr(ev, "group_id", None)
+        self.user_id: Optional[int] = getattr(ev, "user_id", None)
 
     def update_process_time(self) -> None:
         """更新当前处理节点时间为当前时间戳
@@ -104,34 +114,6 @@ class atriMessageEvent(ABC):
     def is_discardable(self, max_latency: float = 60.0) -> bool:
         """消息是否应丢弃(从接收到现在超过阈值)"""
         return self.latency_seconds > max_latency
-
-    @property
-    def group_id(self) -> Optional[int]:
-        """便捷获取群号"""
-        ev = self.event
-        if hasattr(ev, "group_id"):
-            gid = getattr(ev, "group_id")
-            if isinstance(gid, int) and gid > 0:
-                return gid
-        return None
-
-    @property
-    def user_id(self) -> Optional[int]:
-        """便捷获取用户 QQ 号"""
-        ev = self.event
-        if hasattr(ev, "user_id"):
-            uid = getattr(ev, "user_id")
-            if isinstance(uid, int) and uid > 0:
-                return uid
-        return None
-
-    @property
-    def message_id(self) -> Optional[int]:
-        """消息 ID(非消息事件返回 None"""
-        ev = self.event
-        if hasattr(ev, "message_id"):
-            return ev.message_id
-        return None
 
     def set_extra(self, key: str, value: object) -> None:
         """在消息信封上挂载自定义上下文数据
@@ -209,3 +191,9 @@ class atriMessageEvent(ABC):
 
     def __str__(self) -> str:
         return self.__repr__()
+
+
+class extra(TypedDict):
+    
+    group_context:NotRequired[GroupContext]
+    private_context:NotRequired[PrivateContext]

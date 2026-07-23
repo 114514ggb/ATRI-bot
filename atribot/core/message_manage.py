@@ -13,7 +13,6 @@ from atribot.core.type.chat_message_types import AtSegment, ChatMessage
 from atribot.core.type.chat_types import GroupContext
 from atribot.LLMchat.chat import GroupChat, PrivateChat
 from atribot.LLMchat.initiative_chat import initiativeChat
-from atribot.LLMchat.memory.memory_system import MemorySystem
 
 
 class message_router():
@@ -90,7 +89,6 @@ class message_manage(ABC):
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
         self.command_system:CommandSystem = container.get("CommandSystem")
         self.send_message:QQAPIClient = container.get("SendMessage")
-        self.memory_system:MemorySystem = container.get("MemorySystem")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.log: Logger = container.get_by_type(Logger).getChild("MsgManage")
         self.initiative_chat = initiativeChat()
@@ -136,7 +134,6 @@ class group_manage(message_manage):
 
         if data.get("message_sent_type") == "self":
             self.log.debug(f"收到自己的群消息:{data}")
-            asyncio.create_task(self._process_memory_summary(chat_message, group_id))
             return
 
         self.log.debug(f"Received group message: {data}")
@@ -152,8 +149,6 @@ class group_manage(message_manage):
                     await self.event_trigger.dispatch(chat_message,data)
             except Exception as e:
                 self.error_occurred(e, "事件触发器")
-        
-        asyncio.create_task(self._process_memory_summary(chat_message, group_id))
 
     def _check_is_mentioned(self, chat_message:ChatMessage) -> bool:
         """检查bot是否被 @"""
@@ -190,22 +185,6 @@ class group_manage(message_manage):
         else:
             self.log.info(f"黑名单人员被拒绝聊天{chat_message.user_id}!") 
 
-
-    async def _process_memory_summary(self, chat_message:ChatMessage, group_id):
-        """处理记忆存储与总结"""
-        try:
-            if summary_needed := await self.chat_manager.add_message_record(chat_message):
-                messages, group_context = summary_needed
-                async with group_context.summarizing() as ctx:
-                    if ctx is not None:
-                        self.log.info(f"开始总结 {group_id} 群消息!")
-                        await self.memory_system.extract_stored_group_message_advanced(
-                            messages_str=messages,
-                            bot_id=chat_message.self_id,
-                            group_id=group_id
-                        )
-        except Exception as e:
-            self.error_occurred(e, "记忆总结模块")
                         
 
 class private_manage(message_manage):

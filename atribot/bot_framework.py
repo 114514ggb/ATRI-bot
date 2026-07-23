@@ -9,9 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from atribot.common_utils.http_client import HTTPClient
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
+from atribot.core.cache.message_store import store_message_to_db
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.pipeline.whitelist import WhitelistMiddleware
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
@@ -103,25 +105,16 @@ class BotFramework:
         return self
 
     async def initialize(self):
-        """初始化
-
-        新初始化顺序：
-        1. 配置 → 2. 注册服务类 → 3. 创建 PlatformManager
-        4. 可选沙盒 → 5. 解析服务（PluginManager 在此步自动 initialize 加载插件）
-        6. 启动 PlatformManager → 7. 启动运行时服务
-        """
+        """初始化"""
         self.config = atriConfig()
         container.register("config", self.config)
 
         self._register_services()
 
-        # 创建 PlatformManager（从 config.platforms 发现适配器）
         self._platform_manager = PlatformManager(self.config)
         container.register("PlatformManager", self._platform_manager, cleanup=self._platform_manager.stop_all)
         container._type_map[PlatformManager] = "PlatformManager"
 
-        # 注册 SendMessage 桥接：将首个适配器的 OneBotSendClient 暴露为旧类型
-        # 这样 GroupChat/PrivateChat 等服务的 send_message: QQAPIClient 依赖可被满足
         if self._platform_manager.adapters:
             _first_adapter = next(iter(self._platform_manager.adapters.values()))
             _send_client = _first_adapter.get_client()
@@ -133,7 +126,14 @@ class BotFramework:
                 type(_send_client).__name__,
             )
         else:
-            self.log.warning("没有可用适配器，SendMessage 未注册")
+            self.log.warning("没有可用适配器,SendMessage 未注册")
+
+        #白名单
+        await self._platform_manager.pipeline.add_middleware(WhitelistMiddleware())
+        
+        #存储
+        self._platform_manager.queue.set_overflow_handler(store_message_to_db)
+        self._platform_manager.event_bus.on_message(priority=-100)(store_message_to_db)
 
         await self._start_sandbox()
         await self._resolve_services()

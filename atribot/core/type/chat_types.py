@@ -4,10 +4,13 @@ import time
 from collections import deque
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import List
+from typing import TYPE_CHECKING, List
 
-from atribot.core.type.chat_message_types import ChatMessage
 from atribot.core.type.context_types import Context
+
+if TYPE_CHECKING:
+    from atribot.core.type.bot_types import atriMessageEvent
+    from atribot.core.type.onebot_event_types import MessageEvent
 
 
 class TimeWindow:
@@ -22,10 +25,10 @@ class TimeWindow:
     """存储在当前窗口时间内的有效时间戳,顺序：[旧 -> 新]"""
 
     def __init__(self, window_seconds: int = 60):
-        """初始化时间窗口。
+        """初始化时间窗口
 
         Args:
-            window_seconds: 时间窗口的大小，单位秒。必须为正整数。
+            window_seconds: 时间窗口的大小，单位秒必须为正整数
 
         Raises:
             ValueError: 如果 window_seconds 不是正整数
@@ -63,10 +66,10 @@ class TimeWindow:
 
     def get_sub_window(self, sub_seconds: int) -> 'TimeWindow':
         """
-        创建一个更短时间的子窗口，并继承当前窗口内的有效数据。
+        创建一个更短时间的子窗口，并继承当前窗口内的有效数据
 
         Args:
-            sub_seconds: 子窗口的时间长度（秒）。必须小于等于当前窗口长度。
+            sub_seconds: 子窗口的时间长度（秒）必须小于等于当前窗口长度
         """
         if sub_seconds > self.window_seconds:
             raise ValueError("子窗口时间不能大于父窗口时间")
@@ -112,18 +115,18 @@ class TimeWindow:
     def get_padded_avg_interval(
         self,
         sample_count: int = 5,
-        default_interval: float = 1.1
+        default_interval: float = 3
     ) -> float:
         """获取最近几条消息的平均时间间隔
 
-        用于判断瞬时流量密度。如果返回的时间极短，说明发生了突发流量
+        用于判断瞬时流量密度如果返回的时间极短，说明发生了突发流量
 
         Args:
-            sample_count: 采样数量。默认为5，即计算最近5条消息（4个间隔）的平均值
+            sample_count: 采样数量默认为5，即计算最近5条消息（4个间隔）的平均值
             default_interval: 缺省时的补偿间隔（秒）
 
         Returns:
-            float: 平均间隔秒数。
+            float: 平均间隔秒数
                    如果消息不足2条，返回 float('inf')
         """
         real_count = len(self.events)
@@ -144,14 +147,14 @@ class TimeWindow:
     def get_recent_avg_interval(self, sample_count: int = 5) -> float:
         """获取最近几条消息的真实平均时间间隔（高效率版）
 
-        直接计算采样范围内的时间跨度除以间隔数，不进行任何填充。
-        能够最快地反映出当前的瞬时流量密度。
+        直接计算采样范围内的时间跨度除以间隔数，不进行任何填充
+        能够最快地反映出当前的瞬时流量密度
 
         Args:
             sample_count: 采样数量（即计算最近 N 条消息的跨度）
 
         Returns:
-            float: 平均间隔秒数。如果消息不足 2 条，返回 float('inf')
+            float: 平均间隔秒数如果消息不足 2 条，返回 float('inf')
         """
         real_count = len(self.events)
 
@@ -180,10 +183,10 @@ class LLMGroupChatCondition:
     """距离上次触发发言次数"""
 
     def __init__(self, window_time: int = 60):
-        """初始化时间窗口。
+        """初始化时间窗口
 
         Args:
-            window_time: 时间窗口的大小，单位秒。必须为正整数。
+            window_time: 时间窗口的大小，单位秒必须为正整数
 
         Raises:
             ValueError: 如果 window_time 不是正整数
@@ -230,7 +233,7 @@ class GroupContext:
 
     group_id: int
     """群号"""
-    messages: deque[ChatMessage] = field(init=False)
+    messages: deque[MessageEvent] = field(init=False)
     """消息列表"""
     group_max_record: int
     """群维持的消息数量"""
@@ -267,7 +270,7 @@ class GroupContext:
         return iter(self.messages)
 
     def update_time(self):
-        """更新私聊类的最新使用时间"""
+        """更新群组的最新使用时间"""
         self.last_msg_at = time.time()
 
     def _record_validity_check(self) -> List[str] | None:
@@ -284,21 +287,25 @@ class GroupContext:
 
     def build_context(self) -> str:
         """返回构建的LLM文本上下文"""
-        return "".join(msg.llm_formatted_message for msg in self.messages)
+        return "".join(ev.llm_formatted_message for ev in self.messages)
 
-    async def add_group_chat_message(self, message: ChatMessage) -> tuple[List[str], "GroupContext"] | None:
-        """添加群消息,然后做有效性验证
+    async def add_group_chat_event(
+        self, event: atriMessageEvent
+    ) -> tuple[str, GroupContext] | None:
+        """基于 atriMessageEvent 存储消息到群上下文
+
+        将 event.event (OneBotEvent) 存入 messages 队列，
+        达到阈值时触发记忆总结
 
         Args:
-            message (str): 添加的消息
+            event: 新系统的消息事件对象
 
         Returns:
-            tuple[List[str], GroupContext]|None:  如果需要总结,返回 (消息列表, 上下文对象)
+            需要总结时返回 (消息文本, self)
         """
-
         async with self.async_lock:
-            self.last_msg_at = time.time()  # 更新群最后处理时间
-            self.messages.append(message)
+            self.last_msg_at = time.time()
+            self.messages.append(event.event)
             self.summarize_message_count += 1
             messages_to_summarize = self._record_validity_check()
 
@@ -310,8 +317,8 @@ class GroupContext:
     @asynccontextmanager
     async def summarizing(self):
         """
-        如果上一轮总结还没跑完，会直接跳过（返回 None），
-        否则把 IS_SUMMARIZING 置 True，退出块时自动复位。
+        如果上一轮总结还没跑完，会直接跳过（返回 None
+        否则把 IS_SUMMARIZING 置 True 退出块时自动复位
         """
         if self.IS_SUMMARIZING:
             yield None
@@ -331,24 +338,94 @@ class GroupContext:
 
 @dataclass(slots=True)
 class PrivateContext:
+    """私聊上下文"""
 
     user_id: int
     """user的qq号"""
     chat_context: Context
-    """群LLM聊天上下文"""
+    """私聊LLM聊天上下文"""
     play_roles: str
     """当前LLM聊天人设名称"""
+    max_record: int = 30
+    """私聊维持的消息数量(默认30)"""
 
+    messages: deque[MessageEvent] = field(init=False)
+    """消息列表"""
     async_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """异步锁"""
     last_msg_at: float = field(default=time.monotonic(), init=False)
     """最后一次消息的使用时间"""
     time_window: TimeWindow = field(init=False)
-    """统计群近期消息数量的窗口对象"""
+    """统计近期消息数量的窗口对象"""
+    IS_SUMMARIZING: bool = field(default=False, init=False)
+    """是否在总结"""
+    summarize_message_count: int = field(default=0, init=False)
+    """未总结的计数"""
+    async_summarize_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
+    """私聊异步总结锁"""
 
     def __post_init__(self, window_time: int = 60):
+        self.messages = deque(maxlen=self.max_record)
         self.time_window = TimeWindow(window_time)
 
     def update_time(self):
         """更新私聊类的最新使用时间"""
         self.last_msg_at = time.time()
+
+    def build_context(self) -> str:
+        """返回构建的LLM文本上下文"""
+        return "".join(ev.llm_formatted_message for ev in self.messages)
+
+    def _record_validity_check(self) -> List[str] | None:
+        """针对私聊消息条数的验证
+
+        Returns:
+            List[str]: 要总结的原始消息列表(如果达到阈值)
+        """
+        if self.summarize_message_count >= self.max_record:
+            self.summarize_message_count = 0
+            return self.build_context()
+        return None
+
+    async def add_private_chat_event(
+        self, event: atriMessageEvent
+    ) -> tuple[str, PrivateContext] | None:
+        """基于 atriMessageEvent 存储消息到私聊上下文
+
+        Args:
+            event: 新系统的消息事件对象
+
+        Returns:
+            需要总结时返回 (消息文本, self)
+        """
+        async with self.async_lock:
+            self.last_msg_at = time.time()
+            self.messages.append(event.event)
+            self.summarize_message_count += 1
+            messages_to_summarize = self._record_validity_check()
+
+            if messages_to_summarize is not None:
+                return (messages_to_summarize, self)
+
+        return None
+
+    @asynccontextmanager
+    async def summarizing(self):
+        """
+        如果上一轮总结还没跑完，会直接跳过（返回 None
+        否则把 IS_SUMMARIZING 置 True 退出块时自动复位
+        """
+        if self.IS_SUMMARIZING:
+            yield None
+            return
+
+        async with self.async_summarize_lock:
+            if self.IS_SUMMARIZING:
+                yield None
+                return
+            self.IS_SUMMARIZING = True
+
+        try:
+            yield self
+        finally:
+            self.IS_SUMMARIZING = False

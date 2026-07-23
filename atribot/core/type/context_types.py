@@ -16,7 +16,7 @@ class ToolCallsStopIteration(Exception):
 
 
 class MessageBuilder:
-    """链式消息构建器，支持多模态内容自动合并相邻文本块"""
+    """LLM使用的链式消息构建器,支持多模态内容自动合并相邻文本块"""
     __slots__ = ['_role', '_parts']
 
     def __init__(self, role: str = "user"):

@@ -1,4 +1,5 @@
 import time
+from datetime import datetime as dt
 
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.network_connections.qq_send_message import QQAPIClient
@@ -136,8 +137,6 @@ async def cmd_query_memories(
     query_text: list[str] = None,
 ):
     """查询记忆命令处理函数"""
-    from datetime import datetime as dt
-
     if query_text:
         query_string = " ".join(query_text)
     else:

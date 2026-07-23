@@ -1,13 +1,25 @@
 from logging import Logger
-from typing import Dict, List
+from typing import TYPE_CHECKING, Dict, List
 
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
-from atribot.core.service_container import ServiceBase
+from atribot.core.event_bus.rule import Rule
+from atribot.core.pipeline.middleware import PipelineMiddleware
+from atribot.core.platform.manager import PlatformManager
+from atribot.core.service_container import ServiceBase, container
 from atribot.core.time_trigger import TimeTriggerSupervisor
-from atribot.core.type.chat_message_types import ChatMessage
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition, PrivateContext
 from atribot.core.type.context_types import Context
+from atribot.core.type.onebot_event_types import (
+    GroupMessageEvent,
+    MessageSentEvent,
+    PostType,
+    PrivateMessageEvent,
+)
+from atribot.LLMchat.memory.memory_system import MemorySystem
+
+if TYPE_CHECKING:
+    from atribot.core.type.bot_types import atriMessageEvent
 
 
 class ChatManager(ServiceBase):
@@ -19,7 +31,7 @@ class ChatManager(ServiceBase):
         config: atriConfig,
         time_trigger: TimeTriggerSupervisor,
         log: Logger,
-    ) -> "ChatManager":
+    ) -> ChatManager:
         return cls(
             log=log,
             time_trigger=time_trigger,
@@ -85,7 +97,92 @@ class ChatManager(ServiceBase):
         )
         
         self._load_character_settings()
-    
+        
+        self._mw_instance: PipelineMiddleware | None = None
+        self._listener_fn = None
+        self._pm: PlatformManager | None = None
+
+    async def initialize(self) -> None:
+        """初始化：注册上下文加载中间件和消息存储监听器"""
+        pm = container.get_by_type(PlatformManager)
+        self._pm = pm
+
+        class _ContextLoader(PipelineMiddleware):
+            name = "context_loader"
+            async def process(self_, msg: atriMessageEvent) -> atriMessageEvent | None:
+                return await self._context_loader(msg)
+
+        self._mw_instance = _ContextLoader()
+        await pm.pipeline.add_middleware(self._mw_instance)
+
+        class _StoreRule(Rule):
+            rule_type = "always"
+            async def match(self_, msg: atriMessageEvent) -> bool:
+                return isinstance(msg.event, (
+                    GroupMessageEvent, PrivateMessageEvent, MessageSentEvent,
+                ))
+
+        self._listener_fn = self._store_message_context
+        pm.event_bus.on(PostType.MESSAGE, rule=_StoreRule())(self._store_message_context)
+
+    async def cleanup(self) -> None:
+        """清理：注销上下文处理器"""
+        if self._pm is not None:
+            if self._mw_instance is not None:
+                await self._pm.pipeline.remove_middleware("context_loader")
+                self._mw_instance = None
+            if self._listener_fn is not None:
+                self._pm.event_bus.remove_listener(self._listener_fn)
+                self._listener_fn = None
+
+    async def _context_loader(self, msg: atriMessageEvent) -> atriMessageEvent | None:
+        """加载上下文,更新时间窗口,"""
+        ev = msg.event
+        group_id = msg.group_id
+
+        if group_id is not None:
+            ctx = await self.get_group_context(group_id)
+            ctx.time_window.add()
+            msg._extra["group_context"] = ctx
+        elif isinstance(ev, PrivateMessageEvent):
+            ctx = await self.get_private_context(ev.user_id)
+            ctx.time_window.add()
+            msg._extra["private_context"] = ctx
+        
+        return msg
+
+    async def _store_message_context(self, msg: atriMessageEvent) -> None:
+        """EventBus 监听器：存储消息到上下文,触发记忆总结,丢弃消息"""
+
+        result = await self.add_message_record(msg)
+        if result is None:
+            return
+        
+        messages_str, context_obj = result
+        group_id = msg.group_id
+        memory_system = container.get_by_type(MemorySystem)
+
+        if group_id is not None:
+            context_obj:GroupContext
+            async with context_obj.summarizing() as ctx:
+                if ctx is not None:
+                    self.logger.info("开始总结群 %d 消息", group_id)
+                    await memory_system.extract_stored_group_message_advanced(
+                        messages_str=messages_str,
+                        bot_id=msg.event.self_id,
+                        group_id=group_id,
+                    )
+        else:
+            context_obj:PrivateContext
+            async with context_obj.summarizing() as ctx:
+                if ctx is not None:
+                    self.logger.info("开始总结私聊 %d 消息", context_obj.user_id)
+                    msgs = [{"role": "user", "content": messages_str}]
+                    await memory_system.extract_stored_message(
+                        messages=msgs,
+                        user_id=context_obj.user_id,
+                    )
+
     async def groom_context_storage(self):
         """整理上下文存储：归档不活跃项目"""
         self.logger.info("正在对上下文进行检测归档!")
@@ -140,7 +237,8 @@ class ChatManager(ServiceBase):
             PrivateContext(
                 user_id = user_id,
                 chat_context = chat_context,
-                play_roles = self.default_play_role
+                play_roles = self.default_play_role,
+                max_record = self.private_max_record,
             )
             return private_example
             
@@ -225,42 +323,32 @@ class ChatManager(ServiceBase):
         
     async def add_message_record(
         self,
-        chat_message:ChatMessage
-    ) -> tuple[str,GroupContext] | None:
-        """添加消息到群组上下文
-        
-        Args:
-            data: 原始响应数据
-            message_text: 消息数据
-        Returns:
-            tuple[str]|None: 返回列表和群对象，或是没满足条件返回None
-        """
-        data = chat_message.primeval
-        
-        if message_type := data.get("message_type"): 
-        
-            if message_type == 'group':
-                
-                group_context: GroupContext = await self.get_group_context(data["group_id"])
-                
-                if data.get("message_sent_type") == "self":
-                    group_context.LLM_chat_decision_parameters.time_window.add()
-                
-                return await group_context.add_group_chat_message(chat_message)
-            
-            elif message_type == 'private':
-                
-                # await self._set_private_messages(
-                #     data['sender']['user_id'],
-                #     message_text
-                # )
-                
-                return None
-             
+        msg: atriMessageEvent,
+    ) -> tuple[str, GroupContext | PrivateContext] | None:
+        """添加消息到群组/私聊上下文
 
-        else:
-            #应该基本都是非聊天事件
-            return None
+        基于 atriMessageEvent 中的 OneBotEvent 类型判断路由：
+        - 有 group_id → 群上下文 (GroupMessageEvent / GroupNoticeEvent / MessageSentEvent)
+        - PrivateMessageEvent → 私聊上下文
+
+        Args:
+            msg: 新系统的消息事件对象
+
+        Returns:
+            需要总结时返回 (消息文本, 上下文对象)
+        """
+        if msg.group_id is not None:
+            group_context = msg._extra["group_context"]
+
+            if isinstance(msg.event, MessageSentEvent):
+                group_context.LLM_chat_decision_parameters.time_window.add()
+
+            return await group_context.add_group_chat_event(msg)
+
+        elif isinstance(msg.event, PrivateMessageEvent):
+            return await msg._extra['private_context'].add_private_chat_event(msg)
+
+        return None
         
     
     async def reset_group_chat(self, group_id: int) -> None:

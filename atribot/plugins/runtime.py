@@ -50,7 +50,7 @@ class PluginRuntime:
         在调用 ``plugin.initialize()`` 之前执行
         """
         self._register_handlers()
-        self._register_middlewares()
+        await self._register_middlewares()
 
     def _register_handlers(self) -> None:
         """将 definition.handlers 注册到 EventBus"""
@@ -69,7 +69,7 @@ class PluginRuntime:
                 f" rule={h.rule!r}" if h.rule else "",
             )
 
-    def _register_middlewares(self) -> None:
+    async def _register_middlewares(self) -> None:
         """将 definition.middlewares 注册到 Pipeline
 
         每个中间件包装为 PipelineMiddleware 匿名子类，
@@ -88,7 +88,7 @@ class PluginRuntime:
                     return await handler(msg)
 
             mw = _PluginMiddleware()
-            self._pipeline.add_middleware(mw)
+            await self._pipeline.add_middleware(mw)
             self._middleware_instances.append(mw)
 
             self._log.debug(
@@ -99,7 +99,7 @@ class PluginRuntime:
                 full_name,
             )
 
-    def unregister_all(self) -> None:
+    async def unregister_all(self) -> None:
         """从 EventBus 移除所有已注册的事件处理器，从 Pipeline 移除中间件"""
         for handler in self._listener_handlers:
             try:
@@ -110,7 +110,7 @@ class PluginRuntime:
 
         for mw in self._middleware_instances:
             try:
-                self._pipeline.remove_middleware(mw.name)
+                await self._pipeline.remove_middleware(mw.name)
             except (ValueError, Exception):
                 self._log.debug("移除中间件时出错（可能已移除）: %s", mw.name)
         self._middleware_instances.clear()

@@ -263,14 +263,14 @@ class Plugin:
         """
         pass
 
-    def unregister_all(self) -> None:
+    async def unregister_all(self) -> None:
         """从 EventBus 移除所有已注册的事件处理器，从 Pipeline 移除中间件
 
         委托给 PluginRuntime.unregister_all()
         若未加载运行时，则为空操作
         """
         if self._runtime is not None:
-            self._runtime.unregister_all()
+            await self._runtime.unregister_all()
 
     @property
     def log(self) -> Logger:

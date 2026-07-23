@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
-    from atribot.core.pipeline.pipeline import Pipeline
     from atribot.core.type.bot_types import atriMessageEvent
 
 
@@ -12,12 +11,12 @@ class PipelineMiddleware(ABC):
     name: ClassVar[str] = ""
     """中间件名称，用于日志标识和动态移除"""
 
-    async def on_setup(self, pipeline: Pipeline) -> None:
-        """中间件挂载到 Pipeline 时的回调（可选覆写）
+    async def initialize(self) -> None:
+        """中间件初始化回调"""
+        pass
 
-        Args:
-            pipeline: 所属的 Pipeline 实例
-        """
+    async def cleanup(self) -> None:
+        """中间件清理回调"""
         pass
 
     @abstractmethod

@@ -127,7 +127,7 @@ class PluginLoader:
             await instance.initialize()
         except Exception:
             self._log.exception("插件 '%s' initialize 失败", metadata.name)
-            runtime.unregister_all()
+            await runtime.unregister_all()
             del self._loaded_runtimes[module_path]
             raise
 
@@ -173,7 +173,7 @@ class PluginLoader:
         except Exception:
             self._log.exception("插件 '%s' cleanup 失败", instance.plugin_name)
 
-        runtime.unregister_all()
+        await runtime.unregister_all()
         del self._loaded_runtimes[module_path]
 
         self._log.info("插件已卸载: %s", instance.plugin_name)

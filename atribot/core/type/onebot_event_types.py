@@ -12,7 +12,7 @@ from atribot.core.type.chat_message_types import (
     parse_onebot_segments,
 )
 
-TEXT_LENGTH_LIMIT = 2000
+TEXT_LENGTH_LIMIT = 5000
 
 
 class PostType(str, Enum):
@@ -1530,8 +1530,14 @@ class MessageEvent(OneBotEvent):
     sender: Dict[str, Any] = field(default_factory=dict)
     """发送者信息字典"""
 
+    cq_code: str = field(default="", init=False)
+    """简略的 CQ 码表示"""
+
     post_type: PostType = field(default=PostType.MESSAGE, init=False)
     """事件大类(固定为消息事件)"""
+
+    def __post_init__(self) -> None:
+        self.cq_code = "".join(s.__str__() for s in self.segments)
 
     @classmethod
     def from_data(cls, data: Dict[str, Any]) -> MessageEvent:
@@ -1558,11 +1564,6 @@ class MessageEvent(OneBotEvent):
             s.text for s in self.segments
             if isinstance(s, TextSegment)
         )
-
-    @property
-    def cq_code(self) -> str:
-        """获取简略的 CQ 码表示"""
-        return "".join(s.__str__() for s in self.segments)
 
     def _format_event_simple(self) -> str:
         return f"[消息] 用户{self.user_id}: {self.pure_text[:150]}"
