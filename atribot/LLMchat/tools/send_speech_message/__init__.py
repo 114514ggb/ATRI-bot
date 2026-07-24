@@ -1,7 +1,7 @@
 from atribot.commands.audio.TTS import TTSService
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 
 send_message:QQAPIClient = container.get("SendMessage")
 tts_main = TTSService()
@@ -28,7 +28,7 @@ tool_json = {
     }
 }
 
-async def main(text: str, message_data: ChatMessage, emotion: str = "高兴", speed: float = 0.9) -> str:
+async def main(text: str, message_data: atriMessageEvent, emotion: str = "高兴", speed: float = 0.9) -> str:
     """发送语音消息"""
     audio_path = await tts_main.get_tts_path(
         text = text,

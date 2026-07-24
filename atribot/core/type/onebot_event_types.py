@@ -6,6 +6,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from atribot.core.type.chat_message_types import (
+    AtSegment,
     ChatMessage,
     MessageSegment,
     TextSegment,
@@ -1532,12 +1533,29 @@ class MessageEvent(OneBotEvent):
 
     cq_code: str = field(default="", init=False)
     """简略的 CQ 码表示"""
+    pure_text:str = ""
+    """提取消息中的纯文本"""
+    is_at: bool = False
+    """是否被 @"""
 
     post_type: PostType = field(default=PostType.MESSAGE, init=False)
     """事件大类(固定为消息事件)"""
 
     def __post_init__(self) -> None:
-        self.cq_code = "".join(s.__str__() for s in self.segments)
+        cq_parts = []
+        pure_text = []
+        is_at = False
+        
+        for s in self.segments:
+            cq_parts.append(s.__str__())
+            if isinstance(s, TextSegment):
+                pure_text.append(s.text)
+            if isinstance(s, AtSegment) and str(s.user_id) == str(self.self_id):
+                is_at = True
+                
+        self.pure_text = "".join(pure_text)
+        self.cq_code = "".join(cq_parts)
+        self.is_at = is_at
 
     @classmethod
     def from_data(cls, data: Dict[str, Any]) -> MessageEvent:
@@ -1556,14 +1574,6 @@ class MessageEvent(OneBotEvent):
     def sender_nickname(self) -> str:
         """发送者昵称"""
         return self.sender.get("nickname", "")
-
-    @property
-    def pure_text(self) -> str:
-        """提取消息中的纯文本"""
-        return "".join(
-            s.text for s in self.segments
-            if isinstance(s, TextSegment)
-        )
 
     def _format_event_simple(self) -> str:
         return f"[消息] 用户{self.user_id}: {self.pure_text[:150]}"

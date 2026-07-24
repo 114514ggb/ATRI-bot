@@ -4,13 +4,16 @@ from typing import Literal, Optional
 import aiohttp
 
 from atribot.core.atri_config import FilePathConfig, atriConfig
+from atribot.core.platform.send_client import SendClientBase
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
+from atribot.core.type.onebot_event_types import OneBotEvent
 
 from .connection import OneBotWSClient, OneBotWSServer
+from .message_event import OneBotMessageEvent
 
 
-class OneBotSendClient:
+class OneBotSendClient(SendClientBase):
     """OneBot 消息发送客户端"""
 
     def __init__(
@@ -364,10 +367,15 @@ class OneBotSendClient:
         """
         return await self.async_send("get_stranger_info", {"user_id": qq_id}, echo=True)
 
-    async def get_msg_details(self, message_id: int | str) -> dict | None:
+    async def get_msg_details(self, message_id: int | str) -> OneBotMessageEvent | None:
         """获取消息详情"""
-        return await self.async_send("get_msg", {"message_id": message_id}, echo=True)
-
+        if data := (await self.async_send("get_msg", {"message_id": message_id}, echo=True)).get("data"):
+            return OneBotMessageEvent(
+                event=OneBotEvent.from_dict(data),
+                send_client=self,
+            )
+        return None
+        
     async def get_img_details(self, file_id: str) -> dict | None:
         """获取图片消息详情"""
         return await self.async_send("get_image", {"file_id": file_id}, echo=True)

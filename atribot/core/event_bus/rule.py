@@ -57,10 +57,9 @@ class CommandRule(Rule):
         self._prefix = prefix
 
     async def match(self, msg: atriMessageEvent) -> bool:
-        text = getattr(msg.event, "pure_text", "").strip()
-        if not text:
-            return False
-        return text.startswith(f"{self._prefix}{self._command}")
+        if text := getattr(msg.event, "pure_text", "").strip():
+            return text.startswith(f"{self._prefix}{self._command}")
+        return False
 
     @property
     def prefix(self) -> str:
@@ -91,10 +90,10 @@ class RegexRule(Rule):
         self._pattern = pattern
 
     async def match(self, msg: atriMessageEvent) -> bool:
-        text = getattr(msg.event, "raw_message", "")
-        if not text:
-            return False
-        return bool(self._re.search(text))
+        if text := getattr(msg.event, "raw_message", ""):
+            return bool(self._re.search(text))
+            
+        return False
 
     @property
     def pattern(self) -> str:
@@ -215,3 +214,32 @@ class NotRule(Rule):
 
     def __repr__(self) -> str:
         return f"NotRule({self._rule!r})"
+
+
+class AtRule(Rule):
+    """@ 规则：匹配 bot 被 @ 的消息
+
+    基于 atriMessageEvent.is_at 判断，零遍历开销。
+
+    Usage::
+        AtRule()              # 匹配被 @ 的消息
+        AtRule(is_at=False)   # 匹配未被 @ 的消息
+    """
+
+    rule_type: ClassVar[str] = "at"
+
+    def __init__(self, is_at: bool = True) -> None:
+        self._expect_at = is_at
+
+    async def match(self, msg: atriMessageEvent) -> bool:
+        return msg.is_at is self._expect_at
+
+    @property
+    def is_at(self) -> bool:
+        """期望的 @ 状态"""
+        return self._expect_at
+
+    def __repr__(self) -> str:
+        if self._expect_at:
+            return "AtRule()"
+        return "AtRule(is_at=False)"

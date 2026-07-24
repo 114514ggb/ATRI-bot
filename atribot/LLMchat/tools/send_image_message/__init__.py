@@ -1,6 +1,6 @@
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 
 send_message:QQAPIClient = container.get("SendMessage")
 
@@ -15,7 +15,7 @@ tool_json = {
     }
 }
 
-async def main(url: str, message_data: ChatMessage) -> str:
+async def main(url: str, message_data: atriMessageEvent) -> str:
 
     text = await send_message.send_group_pictures(
             message_data.group_id,

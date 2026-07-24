@@ -11,6 +11,7 @@ from atribot.common_utils import download_text, extract_json_from_text, url_to_a
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.chat_message_types import (
     ChatMessage,
     FileMessageSegment,
@@ -115,14 +116,14 @@ class ChatBasics(ABC):
     ) -> None:
         """系统内部触发思考的入口"""
 
-    async def update_conduct(self, response_json: Dict, message: ChatMessage) -> None:
+    async def update_conduct(self, response_json: Dict, event: atriMessageEvent) -> None:
         """更新用户信息（通用）"""
         self.log.info(f"LLM决定更新用户信息理由:{response_json.get('reason')}")
 
         if user_id := response_json.get("user_id"):
             user_id = int(user_id)
         else:
-            user_id = message.user_id
+            user_id = event.user_id
 
         if await self.user_system.update_user_info(
             user_id=user_id,
@@ -133,28 +134,28 @@ class ChatBasics(ABC):
         else:
             self.log.info(f"用户信息无变化无需更新!user_id:{user_id}")
 
-    async def silence_conduct(self, response_json: Dict, message: ChatMessage) -> None:
+    async def silence_conduct(self, response_json: Dict, event: atriMessageEvent) -> None:
         """保持沉默（通用）"""
         self.log.info(f"LLM决定静默理由:{response_json.get('reason')}")
 
     async def append_message_segments_prompt(
         self,
-        chat_message: ChatMessage,
+        event: atriMessageEvent,
         message_builder: MessageBuilder,
         including_pictures: bool,
         including_audios: bool = False,
         including_videos: bool = False,
     ) -> None:
         """为当前用户输入附加结构化的消息片段"""
-        Segment = chat_message.segments[0]
+        Segment = event.event.segments[0]
         quote_message = None
         message_builder.add_text(
             f"最新用户消息:\n<MESSAGE>"
-            f"<user_id>{chat_message.user_id}</user_id>"
-            f"<nick_name>{chat_message.sender_info['nickname']}</nick_name>"
-            f"<group_role>{chat_message.sender_info['role']}</group_role>"
+            f"<user_id>{event.user_id}</user_id>"
+            f"<nick_name>{event.event.sender['nickname']}</nick_name>"
+            f"<group_role>{event.event.sender['role']}</group_role>"
             f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-            f"<message_id>{chat_message.message_id}</message_id>"
+            f"<message_id>{event.event.message_id}</message_id>"
             "<user_message>"
         )
 
@@ -225,18 +226,20 @@ class ChatBasics(ABC):
             if reply_data := await self.send_message.get_msg_details(Segment.message_id):
                 quote_message = ChatMessage.from_chat_event(reply_data["data"])
                 message_builder.add_text("<引用消息段>")
+            else:
+                message_builder.add_text("<引用消息段>[引用消息解析失败]</引用消息段>")
 
         if quote_message:
             await append_segments(quote_message.segments)
             message_builder.add_text("</引用消息段>")
-            await append_segments(chat_message.segments[1:])
+            await append_segments(event.event.segments[1:])
         else:
-            await append_segments(chat_message.segments)
+            await append_segments(event.event.segments)
 
         message_builder.add_text("</user_message></MESSAGE>")
 
         if (
-            len(chat_message.pure_text) >= 5
+            len(event.event.pure_text) >= 5
             and (memory := [
                 (
                     f"user:{r[0]}",
@@ -246,8 +249,8 @@ class ChatBasics(ABC):
                     f"可信度:{r[3]}",
                 )
                 for r in await self.memory_system.query_user_recently_memory(
-                    user=chat_message.user_id,
-                    text=chat_message.pure_text,
+                    user=event.user_id,
+                    text=event.event.pure_text,
                     limit=10,
                 )
             ])
@@ -328,25 +331,25 @@ class GroupChat(ChatBasics):
         
     async def step(
         self,
-        message: ChatMessage,
+        event: atriMessageEvent,
         prompt: str,
         group_id: int,
     ) -> None:
         """群聊天用的json处理版的加强版本,会携带消息中图片的位置信息"""
         
-        user_id = message.user_id
+        user_id = event.user_id
         uid: str = uuid.uuid4().hex
         
         self.log.info(f"[{uid}]群LLM聊天json处理")
 
         await self.send_message.set_msg_emoji_like(
-            message_id = message.message_id,
+            message_id = event.event.message_id,
             # emoji_id = 183 #表情:我最可爱
             emoji_id = 66 #爱心❤
         )
         
         message_builder: MessageBuilder = await self.prompt_structure(
-            message=message,
+            message=event,
             prompt=prompt,
             group_id=group_id,
             user_id=user_id,
@@ -365,12 +368,12 @@ class GroupChat(ChatBasics):
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
             tool_json=self.tool_calls.get_func_desc_openai_style(preset="group_chat"),
-            message_data=message
+            message_data=event
         )
         
         response = await self._request_model_with_fallback_(
             request = request, 
-            message = message,
+            event = event,
             prompt = prompt, 
             uid = uid
         )
@@ -382,7 +385,7 @@ class GroupChat(ChatBasics):
                 
                 if fun := self.decision_function.get(decision):
                     
-                    await fun(response_json, message)
+                    await fun(response_json, event)
                     
                 else:
                     self.log.error(f"[{uid}]无效decision:{response_json}")
@@ -412,7 +415,7 @@ class GroupChat(ChatBasics):
                 )
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
-        original_context.add_user_message(f"{prompt}\n最新用户消息:{message.llm_formatted_message}")
+        original_context.add_user_message(f"{prompt}\n最新用户消息:{event.llm_formatted_message}")
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
@@ -426,8 +429,8 @@ class GroupChat(ChatBasics):
             original_context.total_tokens = total_tokens#更新tiken计数
             try:
                 await self.token_manager.record_token_usage(
-                    user_id=message.user_id,
-                    group_id=message.group_id,
+                    user_id=event.user_id,
+                    group_id=event.group_id,
                     prompt_tokens=response.metadata.get("prompt_tokens", 0),
                     completion_tokens=response.metadata.get("completion_tokens", 0),
                     total_tokens=total_tokens,
@@ -509,7 +512,7 @@ class GroupChat(ChatBasics):
         
         response = await self._request_model_with_fallback_(
             request = request, 
-            message = message,
+            event = message,
             prompt = prompt, 
             uid = uid
         )
@@ -579,7 +582,7 @@ class GroupChat(ChatBasics):
     
     async def prompt_structure(
         self,
-        message: ChatMessage,
+        event: atriMessageEvent,
         prompt: str,
         group_id: int,
         user_id: int,
@@ -590,7 +593,7 @@ class GroupChat(ChatBasics):
         """构建提示结构
 
         Args:
-            message: 当前传入的聊天消息
+            event: 当前传入的聊天消息事件
             prompt: 主要的决策提示文本
             group_id: 当前群组ID
             user_id: 当前用户ID
@@ -611,7 +614,7 @@ class GroupChat(ChatBasics):
             f"<group_history>{group_history[:10000]}</group_history>"
         )
         await self.append_message_segments_prompt(
-            message,
+            event,
             message_builder,
             including_pictures,
             including_audios,
@@ -632,7 +635,7 @@ class GroupChat(ChatBasics):
 
     async def append_message_segments_prompt(
         self, 
-        chat_message: ChatMessage,
+        event: atriMessageEvent,
         message_builder: MessageBuilder,
         including_pictures: bool,
         including_audios: bool = False,
@@ -641,23 +644,23 @@ class GroupChat(ChatBasics):
         """为当前用户输入附加结构化的消息片段
 
         Args:
-            chat_message: 当前传入的聊天消息
+            event: 当前传入的聊天消息事件
             message_builder: 用于附加内容的提示构建器
             including_pictures: 目标模型是否能够接收图像
             including_audios: 目标模型是否能够接收音频
             including_videos: 目标模型是否能够接收视频
         """
         
-        Segment = chat_message.segments[0]
+        Segment = event.event.segments[0]
         quote_message = None
 
         message_builder.add_text(
             f"最新用户消息:\n<MESSAGE>"
-            f"<user_id>{chat_message.user_id}</user_id>"
-            f"<nick_name>{chat_message.sender_info['nickname']}</nick_name>"
-            f"<group_role>{chat_message.sender_info['role']}</group_role>"
+            f"<user_id>{event.user_id}</user_id>"
+            f"<nick_name>{event.event.sender['nickname']}</nick_name>"
+            f"<group_role>{event.event.sender['role']}</group_role>"
             f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-            f"<message_id>{chat_message.message_id}</message_id>"
+            f"<message_id>{event.event.message_id}</message_id>"
             "<user_message>"
         )
         
@@ -741,10 +744,10 @@ class GroupChat(ChatBasics):
             
             message_builder.add_text("</引用消息段>")
             
-            await append_segments(chat_message.segments[1:])
+            await append_segments(event.event.segments[1:])
 
         else:
-            await append_segments(chat_message.segments)
+            await append_segments(event.event.segments)
         
         message_builder.add_text("</user_message></MESSAGE>")
         
@@ -757,16 +760,16 @@ class GroupChat(ChatBasics):
                 f"可信度:{r[3]}"
             ) 
             for r in await self.memory_system.query_recently_memory(
-                text = chat_message.pure_text,
+                text = event.event.pure_text,
                 limit = 10
             )
-        ] if len(chat_message.pure_text) >= 5 else False:#文本长度要大于一个值不然大概率没什么意义
+        ] if len(event.event.pure_text) >= 5 else False:#文本长度要大于一个值不然大概率没什么意义
             message_builder.add_text(f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>")
     
-    async def reply_conduct(self, response_json:Dict, message:ChatMessage)->None:
+    async def reply_conduct(self, response_json:Dict, event:atriMessageEvent)->None:
         
         self.log.info(f"LLM决定回复消息理由:{response_json.get("reason")}")
-        group_id = message.group_id
+        group_id = event.group_id
         
         chat_condition =await self.chat_manager.get_group_LLM_decision_parameters(group_id)
         
@@ -781,13 +784,13 @@ class GroupChat(ChatBasics):
             since_llm = since,
         )
     
-    async def use_tools_conduct(self, response_json:Dict, message:ChatMessage)->None:
+    async def use_tools_conduct(self, response_json:Dict, event:atriMessageEvent)->None:
         self.log.info(f"LLM决定调用工具理由:{response_json.get("reason")}")
 
     async def _request_model_with_fallback_(
         self,
         request: GenerationRequestSimplify,
-        message: ChatMessage,
+        event: atriMessageEvent,
         prompt: str,
         uid: str
     ) -> GenerationResponse:
@@ -795,7 +798,7 @@ class GroupChat(ChatBasics):
 
         Args:
             request (GenerationRequestSimplify): 请求体
-            message (ChatMessage): 原始消息体
+            event (atriMessageEvent): 原始消息事件
             prompt (str): 响应提示词
             uid (str): 唯一响应的标识
 
@@ -843,10 +846,10 @@ class GroupChat(ChatBasics):
                 if not opposite_structure_increment_messages:
                     #没有缓存重新构建消息
                     message_builder = await self.prompt_structure(
-                        message=message,
+                        event=event,
                         prompt=prompt,
-                        group_id=message.group_id,
-                        user_id=message.user_id,
+                        group_id=event.group_id,
+                        user_id=event.user_id,
                         including_pictures=visual_sense,
                     )
                     
@@ -992,15 +995,15 @@ class PrivateChat(ChatBasics):
             audio_sense=self.audio_sense,
         )
 
-    async def step(self, message: ChatMessage, prompt: str) -> None:
+    async def step(self, event: atriMessageEvent, prompt: str) -> None:
         """私聊 LLM 处理全流程"""
-        user_id = message.user_id
+        user_id = event.user_id
         uid: str = uuid.uuid4().hex
 
         self.log.info(f"[{uid}]私聊LLM聊天json处理 user:{user_id}")
 
         message_builder: MessageBuilder = await self.prompt_structure(
-            message=message,
+            event=event,
             prompt=prompt,
             user_id=user_id,
             including_pictures=self.visual_sense,
@@ -1016,12 +1019,12 @@ class PrivateChat(ChatBasics):
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
             tool_json=self.tool_calls.get_func_desc_openai_style(preset="private_chat"),
-            message_data=message,
+            message_data=event,
         )
 
         response = await self._request_model_with_fallback_private_(
             request=request,
-            message=message,
+            event=event,
             prompt=prompt,
             uid=uid,
         )
@@ -1034,11 +1037,11 @@ class PrivateChat(ChatBasics):
                     action: dict[str, str | int]
                     if decision := action.get("decision"):
                         if decision == "speak":
-                            await self._private_speak_conduct(action, message)
+                            await self._private_speak_conduct(action, event)
                         elif decision == "update":
-                            await self.update_conduct(action, message)
+                            await self.update_conduct(action, event)
                         elif decision == "silence":
-                            await self.silence_conduct(action, message)
+                            await self.silence_conduct(action, event)
                         else:
                             self.log.error(f"[{uid}]无效decision:{action}")
                     else:
@@ -1046,7 +1049,7 @@ class PrivateChat(ChatBasics):
             else:
                 self.log.error(f"[{uid}]返回json解析不正确:{type(response_json)}")
 
-        original_context.add_user_message(f"{prompt}\n{message.llm_formatted_message}")
+        original_context.add_user_message(f"{prompt}\n{event.llm_formatted_message}")
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
@@ -1060,8 +1063,8 @@ class PrivateChat(ChatBasics):
             original_context.total_tokens = total_tokens
             try:
                 await self.token_manager.record_token_usage(
-                    user_id=message.user_id,
-                    group_id=message.group_id,
+                    user_id=event.user_id,
+                    group_id=event.group_id,
                     prompt_tokens=response.metadata.get("prompt_tokens", 0),
                     completion_tokens=response.metadata.get("completion_tokens", 0),
                     total_tokens=total_tokens,
@@ -1096,7 +1099,7 @@ class PrivateChat(ChatBasics):
 
     async def prompt_structure(
         self,
-        message: ChatMessage,
+        event: atriMessageEvent,
         prompt: str,
         user_id: int,
         including_pictures: bool,
@@ -1107,7 +1110,7 @@ class PrivateChat(ChatBasics):
         message_builder = MessageBuilder()
 
         await self.append_message_segments_prompt(
-            message,
+            event,
             message_builder,
             including_pictures,
             including_audios,
@@ -1128,12 +1131,12 @@ class PrivateChat(ChatBasics):
         )
         return message_builder
 
-    async def _private_speak_conduct(self, response_json: Dict, message: ChatMessage) -> None:
+    async def _private_speak_conduct(self, response_json: Dict, event: atriMessageEvent) -> None:
         """发送消息决定"""
         self.log.info(f"私聊LLM决定回复 理由:{response_json.get('reason')}")
         await self.send_reply_message_separator(
             chat_text_list=response_json.get("content", []),
-            user_id=message.user_id,
+            user_id=event.user_id,
         )
 
     async def send_reply_message_separator(
@@ -1167,7 +1170,7 @@ class PrivateChat(ChatBasics):
     async def _request_model_with_fallback_private_(
         self,
         request: GenerationRequestSimplify,
-        message: ChatMessage,
+        event: atriMessageEvent,
         prompt: str,
         uid: str,
     ) -> GenerationResponse:
@@ -1209,9 +1212,9 @@ class PrivateChat(ChatBasics):
             else:
                 if not opposite_structure_increment_messages:
                     message_builder = await self.prompt_structure(
-                        message=message,
+                        event=event,
                         prompt=prompt,
-                        user_id=message.user_id,
+                        user_id=event.user_id,
                         including_pictures=visual_sense,
                     )
                     opposite_structure_increment_messages = [message_builder.build()]

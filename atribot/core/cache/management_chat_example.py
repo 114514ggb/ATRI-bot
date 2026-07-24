@@ -136,7 +136,7 @@ class ChatManager(ServiceBase):
                 self._listener_fn = None
 
     async def _context_loader(self, msg: atriMessageEvent) -> atriMessageEvent | None:
-        """加载上下文,更新时间窗口,"""
+        """加载上下文,更新时间窗口"""
         ev = msg.event
         group_id = msg.group_id
 

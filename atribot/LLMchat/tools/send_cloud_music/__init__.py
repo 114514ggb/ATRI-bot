@@ -1,7 +1,7 @@
 from atribot.common_utils import search_music
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 
 tool_json = {
     "name": "send_cloud_music",
@@ -21,7 +21,7 @@ tool_json = {
 
 send_message:QQAPIClient = container.get("SendMessage")
 
-async def main(name:str, message_data: ChatMessage):
+async def main(name:str, message_data: atriMessageEvent):
     """分享网易云歌曲
 
     Args:

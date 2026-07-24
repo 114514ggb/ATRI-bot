@@ -3,7 +3,7 @@ from typing import Optional
 
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.chat import GroupChat
 
 tool_json = {
@@ -55,7 +55,7 @@ async def _trigger_self(group_id: int,user_id:int, note: str) -> None:
 
 async def main(
     note: str,
-    message_data: ChatMessage,
+    message_data: atriMessageEvent,
     target_datetime: Optional[str] = None,
     hours: float = 0,
     minutes: float = 0,

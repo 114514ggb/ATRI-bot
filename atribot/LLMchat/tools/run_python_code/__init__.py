@@ -2,7 +2,8 @@ from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage, FileMessageSegment
+from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.chat_message_types import FileMessageSegment
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
 from atribot.LLMchat.tools.run_python_code.run_code import run_python_code_with_segments
 
@@ -37,7 +38,7 @@ tool_json = {
     }
 }
 
-async def main(code: str, message_data: ChatMessage, files: list[str] | None = None) -> str:
+async def main(code: str, message_data: atriMessageEvent, files: list[str] | None = None) -> str:
 
     file_segments = []
     group_id = message_data.group_id

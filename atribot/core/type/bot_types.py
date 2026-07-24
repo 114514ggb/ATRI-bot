@@ -1,14 +1,13 @@
 ﻿import time
-from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Optional
+from abc import ABC
+from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict
 
 if TYPE_CHECKING:
-    from atribot.core.type.onebot_event_types import OneBotEvent
-
-from typing import NotRequired, TypedDict
+    from atribot.core.platform.send_client import SendClientBase
 
 from atribot.core.type.chat_message_types import SendMessage
 from atribot.core.type.chat_types import GroupContext, PrivateContext
+from atribot.core.type.onebot_event_types import OneBotEvent
 
 
 class atriMessageEvent(ABC):
@@ -20,14 +19,14 @@ class atriMessageEvent(ABC):
         - 元信息:     来源平台
 
     子类职责:
-        - 实现 send() 将 SendMessage 发送到平台
+        - 在 __init__ 中传入 send_client
         - 可覆写 message() 以返回预填目标 ID 的类型化消息
 
     Usage:
         raw = {"post_type": "message", "message_type": "group", ...}
         event = OneBotEvent.from_dict(raw)
         msg = OneBotMessageEvent(event=event, source="napcat",
-                                  direction="incoming", adapter=adapter)
+                                  direction="incoming", send_client=client)
         # ... 处理 ...
         await msg.send(msg.text("hello"))
     """
@@ -44,17 +43,20 @@ class atriMessageEvent(ABC):
         "_extra",
         "group_id",
         "user_id",
-        "message_id",
+        "is_at",
+        "send_client",
     )
 
-    create_time: float
+    create_time: int
     """消息产生时间(取自 event.time,Unix 秒)"""
     receive_time: float
     """消息处理器首次接收到这次消息的时间(time.time())"""
     process_time: float
     """到达当前处理节点的时间(time.time())，每次进入新节点应调用 update_process_time()"""
     event: OneBotEvent
-    """强类型的 OneBot 事件对象"""
+    """平台事件对象"""
+    send_client: SendClientBase
+    """发送客户端，委托发消息到平台"""
     source: str
     """来源标识，如 'napcat'、'llonebot' 等，用于区分不同平台适配器"""
     stop_propagation: bool
@@ -68,12 +70,14 @@ class atriMessageEvent(ABC):
         self,
         event: OneBotEvent,
         *,
+        send_client: SendClientBase,
         direction: str = "incoming",
         source: str = "",
     ):
-        self.create_time = float(event.time)
+        self.create_time = event.time
         self.receive_time = self.process_time = time.time()
         self.event = event
+        self.send_client = send_client
         self.direction = direction
         self.source = source
         self.stop_propagation = False
@@ -83,6 +87,7 @@ class atriMessageEvent(ABC):
         ev = self.event
         self.group_id: Optional[int] = getattr(ev, "group_id", None)
         self.user_id: Optional[int] = getattr(ev, "user_id", None)
+        self.is_at: bool = getattr(ev, "is_at", False)
 
     def update_process_time(self) -> None:
         """更新当前处理节点时间为当前时间戳
@@ -115,6 +120,16 @@ class atriMessageEvent(ABC):
         """消息是否应丢弃(从接收到现在超过阈值)"""
         return self.latency_seconds > max_latency
 
+    @property
+    def llm_formatted_message(self) -> str:
+        """AI 可读格式化消息"""
+        return self.event.llm_formatted_message
+
+    @property
+    def primeval(self) -> dict:
+        """原始事件字典"""
+        return self.event.primeval
+
     def set_extra(self, key: str, value: object) -> None:
         """在消息信封上挂载自定义上下文数据
 
@@ -126,17 +141,18 @@ class atriMessageEvent(ABC):
         """读取消息信封上的自定义上下文数据"""
         return self._extra.get(key, default)
 
-    @abstractmethod
     async def send(self, message: SendMessage) -> Any:
         """发送消息到平台
 
+        委托给 self.send_client.send() 实现，子类一般无需覆写。
+
         Args:
-            message: 已构建的 SendMessage 对象(GroupMessage / PrivateMessage
+            message: 已构建的 SendMessage 对象(GroupMessage / PrivateMessage)
 
         Returns:
-            平台响应，具体类型由子类实现决定
+            平台响应，具体类型由子类决定
         """
-        ...
+        return await self.send_client.send(message)
 
     def message(self) -> SendMessage:
         """创建一个空的 SendMessage 构建器
@@ -176,7 +192,7 @@ class atriMessageEvent(ABC):
             text: 回复的文本内容
         """
         msg = self.message()
-        mid = self.message_id
+        mid = getattr(self.event, "message_id", None)
         if mid is not None:
             msg.add_reply(mid)
         msg.add_text(text)

@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 from mcp.types import CallToolResult
 
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.MCP.tool_model import FunctionTool
 from atribot.LLMchat.model_api.llm_types import ToolCall
 
@@ -47,14 +47,14 @@ class ToolExecutionEngine:
         self,
         tool_calls: list[ToolCall],
         get_func: Callable[[str], FunctionTool | None],
-        message_data: ChatMessage | None = None,
+        message_data: atriMessageEvent | None = None,
     ) -> list[ToolCallResult]:
         """执行一批工具调用
 
         Args:
             tool_calls: LLM 返回的工具调用列表
             get_func: 按名称获取 :class:`FunctionTool` 的回调
-            message_data: 可选的聊天消息上下文
+            message_data: 可选的聊天消息上下文(atriMessageEvent)
 
         Returns:
             所有工具的执行结果列表

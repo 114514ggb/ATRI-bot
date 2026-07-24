@@ -3,7 +3,7 @@ from typing import List
 
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.agent.agent_data import AgentData
 from atribot.LLMchat.agent.context.context import AgentContext
 from atribot.LLMchat.agent.runners.response import RunSummary
@@ -51,7 +51,7 @@ _MAX_TURNS = 20
 )
 async def sub_agent_task(
     task: str,
-    message_data: ChatMessage,
+    message_data: atriMessageEvent,
 ) -> str:
     """子代理工具入口 —— 创建独立 Agent 执行委派任务并返回结果。
 

@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.context_types import Context, MessageBuilder, ToolCallsStopIteration
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
@@ -69,8 +69,8 @@ class GenerationRequest():
     如果是调用工具时出现api响应错误时重试的时候这个会有值\n
     如果是初始请求则为None
     """
-    message_data: ChatMessage = None
-    """触发此次请求的 ChatMessage,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
+    message_data: atriMessageEvent | None = None
+    """触发此次请求的事件对象,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
     visual_sense: bool = False
     """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
     audio_sense: bool = False
@@ -100,8 +100,8 @@ class GenerationRequestSimplify():
     如果是调用工具时出现api响应错误时重试的时候这个会有值\n
     如果是初始请求则为None
     """
-    message_data: ChatMessage|None = None
-    """触发此次请求的 ChatMessage,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
+    message_data: atriMessageEvent|None = None
+    """触发此次请求的事件对象,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
     visual_sense: bool = False
     """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
     audio_sense: bool = False

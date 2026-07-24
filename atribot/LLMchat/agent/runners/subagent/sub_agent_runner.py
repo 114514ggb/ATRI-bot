@@ -5,7 +5,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.agent.agent_data import AgentData
 from atribot.LLMchat.agent.context.context import AgentContext
 from atribot.LLMchat.agent.message import (
@@ -44,14 +44,14 @@ class SubAgentRunner(BaseAgentRunner):
     def __init__(
         self, 
         agent_data: AgentData, 
-        message_data: ChatMessage | None = None
+        message_data: atriMessageEvent | None = None
     ) -> None:
         super().__init__(agent_data)
         self.log: Logger = container.get_by_type(Logger).getChild("SubAgent")
         self._tool_calls_mgr = container.get_by_type(ToolCalls)
         self._executor = self._tool_calls_mgr.executor
         self._media_processor = container.get_by_type(MediaProcessor)
-        self._message_data: ChatMessage | None = message_data
+        self._message_data: atriMessageEvent | None = message_data
 
         # 多模态能力
         self._visual_sense: bool = False

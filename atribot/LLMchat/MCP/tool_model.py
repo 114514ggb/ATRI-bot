@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Awaitable
 import mcp
 from mcp.types import CallToolResult
 
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 
 if TYPE_CHECKING:
     from atribot.LLMchat.MCP.mcp_tool_manager import MCPClient
@@ -59,12 +59,12 @@ class FunctionTool:
         """是否启用"""
 
     async def execute(
-        self, message_data: ChatMessage | None = None, **kwargs: Any
+        self, message_data: atriMessageEvent | None = None, **kwargs: Any
     ) -> str | CallToolResult:
         """执行工具 —— 子类必须覆盖此方法
 
         Args:
-            message_data: 可选的聊天消息上下文
+            message_data: 可选的聊天消息上下文(atriMessageEvent)
             **kwargs: 工具参数
         """
         ...
@@ -121,7 +121,7 @@ class LocalTool(FunctionTool):
         """异步处理函数"""
 
     async def execute(
-        self, message_data: ChatMessage | None = None, **kwargs: Any
+        self, message_data: atriMessageEvent | None = None, **kwargs: Any
     ) -> str | CallToolResult:
         """执行本地工具
 
@@ -129,7 +129,7 @@ class LocalTool(FunctionTool):
         然后调用 ``await self.handler(**kwargs)``
 
         Args:
-            message_data: 可选的聊天消息上下文
+            message_data: 可选的聊天消息上下文(atriMessageEvent)
             **kwargs: 工具参数
 
         Returns:
@@ -197,7 +197,7 @@ class MCPTool(FunctionTool):
         """MCP 服务名称"""
 
     async def execute(
-        self, message_data: ChatMessage | None = None, **kwargs: Any
+        self, message_data: atriMessageEvent | None = None, **kwargs: Any
     ) -> str | CallToolResult:
         """执行 MCP 工具
 

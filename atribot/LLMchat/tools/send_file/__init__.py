@@ -10,7 +10,7 @@ import tarfile
 from atribot.core.atri_config import atriConfig
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 
 sand_box: DockerSandbox = container.get("SandBox")
@@ -31,7 +31,7 @@ tool_json = {
 }
 
 
-async def main(path: str, message_data: ChatMessage) -> str:
+async def main(path: str, message_data: atriMessageEvent) -> str:
     if not container.exists("SandBox") or not sand_box.is_running:
         return "[Error]沙盒未运行"
 

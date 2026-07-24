@@ -2,7 +2,7 @@ import shlex
 
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 
 sand_box: DockerSandbox = container.get("SandBox")
@@ -39,7 +39,7 @@ tool_json = {
 }
 
 
-async def main(command: str, message_data: ChatMessage, path: str | None = None, timeout: int = 30) -> str:
+async def main(command: str, message_data: atriMessageEvent, path: str | None = None, timeout: int = 30) -> str:
     if not sand_box.is_running:
         await sand_box.start()
 

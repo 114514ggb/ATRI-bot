@@ -11,14 +11,18 @@ from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.cache.message_store import store_message_to_db
 from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
+from atribot.core.event_bus.rule import AtRule
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.pipeline.whitelist import WhitelistMiddleware
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.chat import GroupChat, PrivateChat
 from atribot.LLMchat.emoji_system import EmojiCore
+from atribot.LLMchat.initiative_chat import initiativeChat
 from atribot.LLMchat.LLM_supervisor import LLMCoordinator
 from atribot.LLMchat.MCP.mcp_tool_manager import ToolManager
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
@@ -138,10 +142,46 @@ class BotFramework:
         await self._start_sandbox()
         await self._resolve_services()
 
+        # 注册 @ 路由监听器
+        self._register_at_routes()
+
         # 启动所有平台适配器 + EventBus 主循环
         await self._platform_manager.start_all()
 
         await self._start_runtime_services()
+
+    def _register_at_routes(self) -> None:
+        """注册消息路由监听器到 EventBus
+
+        基于 AtRule + priority 实现优先级路由：
+          10  @ + / 命令 → CommandSystem
+           1  任意消息   → initiativeChat（由 event.is_at 区分 @/非 @）
+        """
+        bus = self._platform_manager.event_bus
+        log = self.log
+        _initiative_chat = initiativeChat()
+
+        @bus.on_message(rule=AtRule(), priority=10)
+        async def on_at_command(event:atriMessageEvent):
+            pure_text = getattr(event.event, "pure_text", "")
+            if not pure_text.startswith("/"):
+                return
+            try:
+                cmd_system = container.get_by_type(CommandSystem)
+                await cmd_system.dispatch_command(event)
+                event.stop_propagation = True
+            except Exception as e:
+                log.exception("命令处理失败: %s", e)
+
+        @bus.on_message(priority=1)
+        async def on_chat(event:atriMessageEvent):
+            try:
+                group_context = event._extra["group_context"]
+                if group_context is not None:
+                    await _initiative_chat.decision(event, group_context, at=event.is_at)
+                event.stop_propagation = True
+            except Exception as e:
+                log.exception("聊天处理失败: %s", e)
 
     def _register_services(self) -> None:
         """注册可由容器解析的服务类型"""

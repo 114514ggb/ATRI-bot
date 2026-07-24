@@ -9,7 +9,8 @@ from atribot.common_utils import jaro_winkler_similarity
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.onebot_event_types import MessageEvent
 
 
 class ParamType(Enum):
@@ -537,10 +538,10 @@ class CommandSystem:
         
         return [cmd for cmd, _ in matches[:max_suggestions]]
     
-    async def dispatch_command(self, chat_message:ChatMessage) -> bool:
+    async def dispatch_command(self, event:atriMessageEvent) -> bool:
         """解析并分发指令，会直接抛出命令执行的错误"""
-        
-        tokens = shlex.split(chat_message.pure_text[1:])
+        inner_event: MessageEvent = event.event
+        tokens = shlex.split(inner_event.pure_text[1:])
         if not tokens:
             raise TypeError("空命令,请输入有效命令哦！")
         
@@ -550,17 +551,17 @@ class CommandSystem:
         
         if parsed.get("_help"):
             await self.send_message.send_group_merge_text(
-                group_id = chat_message.group_id,
+                group_id = event.group_id,
                 message = self._get_command_help(command),
                 source = "命令的帮助信息"
             )
             return 
         
-        if self.permissions_management.has_permission(chat_message.user_id,command.authority_level):#判断权限
+        if self.permissions_management.has_permission(event.user_id,command.authority_level):#判断权限
             
             filtered_args = {k: v for k, v in parsed.items() if not k.startswith("_")}
             
-            await command.handler(**filtered_args,message_data = chat_message)
+            await command.handler(**filtered_args,message_data = event)
 
             
     def _get_command_help(self, command: Command) -> str:

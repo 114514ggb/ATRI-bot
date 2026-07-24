@@ -19,6 +19,7 @@ _RULE_TYPE_ORDER: tuple[str, ...] = (
     "group",
     "user",
     "permission",
+    "at",
     "always",
     "composite",
     "base",

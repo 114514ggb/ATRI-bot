@@ -3,7 +3,7 @@ from typing import List, Literal, Optional
 
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition
 from atribot.LLMchat.chat import GroupChat
 
@@ -17,16 +17,16 @@ class initiativeChat:
         self.group_chat:GroupChat = container.get("GroupChat")
         self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
     
-    async def decision(self, message: ChatMessage, group_context:GroupContext, at: bool = False) -> bool:
+    async def decision(self, event: atriMessageEvent, group_context:GroupContext, at: bool = False) -> bool:
         """决策是否应该发言"""
-        # if not message.segments:
+        # if not event.segments:
         #     return False
 
-        if not message.pure_text:#你不输入文本内容在那里@什么呢
+        if not event.event.pure_text:#你不输入文本内容在那里@什么呢
             return False
 
-        group_id: int = message.group_id
-        user_id: int = message.user_id
+        group_id: int = event.group_id
+        user_id: int = event.user_id
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
         
         if group_context.time_window.get_recent_avg_interval(4) < 0.7:
@@ -37,7 +37,7 @@ class initiativeChat:
         #被@检测
         if at:
             decision =  await self._execute_reply(
-                message, group_id, params,
+                event, group_id, params,
                 log_msg=f"Bot was @ed by user {user_id}, preparing to respond.",
                 prompt="你现在被群里的人@到了，最好回复一下别人，除非你觉得不感兴趣或你在短时间连续发送了过多的消息或是面对多次重复或类似没有意义的输入,就选择静默不回复"
             )
@@ -45,12 +45,12 @@ class initiativeChat:
             return decision
 
         #要存在文本
-        if message.pure_text.strip():
+        if event.event.pure_text.strip():
             
             #追问检测
             if params.get_seconds_since_user_time() < 7 and user_id == params.last_trigger_user_id:#这个看起来不太对,好像包括了响应时间
                 return await self._execute_reply(
-                    message, group_id, params,
+                    event, group_id, params,
                     log_msg=f"User {user_id} follow-up detected, preparing to respond.",
                     prompt="尝试考虑用户在你回复后，是否下一句是想接着聊天的情况,你应观察是否应该进行回复,如果有人在追问你，或者话题没有说完，请你继续回复，不然就建议静默"
                 )
@@ -59,9 +59,9 @@ class initiativeChat:
             if group_context.initiative_chat and self.get_bot_active_reference(group_context, 3) < 0.5:
                 
                 #关键词触发检测
-                if value := self.find_first_match(message.pure_text, self.keyword_trigger_list):
+                if value := self.find_first_match(event.event.pure_text, self.keyword_trigger_list):
                     decision = await self._execute_reply(
-                        message, group_id, params,
+                        event, group_id, params,
                         log_msg=f"Keyword '{value}' triggered by user {user_id}, preparing to respond.",
                         prompt=f"现在群里触发了关键词:{value},你该考虑一下是否回复他的消息了,无关就保持沉默"
                     )
@@ -73,7 +73,7 @@ class initiativeChat:
                 
                 if self.roll_trigger_probability(group_context, params):
                     return await self._execute_reply(
-                        message, group_id, params,
+                        event, group_id, params,
                         log_msg="Random trigger activated, preparing to respond.",
                         prompt="你现在要做的是观察上下文,简单判断一下群里情况,看看群里聊的是不是你感兴趣的.如果感兴趣可以尝试回复.但是不要提出问题，不知道就建议保持沉默.如果传入了图像是当前群里发送最新一条消息的所带或最新消息引用消息里的图像，这种情况下的消息都不是特意发送给你的,如果没有明确提到你就不是在说你，不要特意回复"
                         "推荐在群里当卖萌充当吉祥物。如果有一些事你可以表示一些看法，或是赞同别人的话，或是夸别人还有和群友一起复读一些话，回答一些你自己认为能完美解决的问题,不要打断或打扰到别人的聊天,不要在话中带上或问有什么需要帮忙,如果你看不懂建议就保持静默,不要频繁发言，尽量保持低调"
@@ -85,7 +85,7 @@ class initiativeChat:
     
     async def _execute_reply(
         self, 
-        message: ChatMessage, 
+        event: atriMessageEvent, 
         group_id:int,  
         decision_params:LLMGroupChatCondition,
         log_msg:str, 
@@ -96,7 +96,7 @@ class initiativeChat:
             await decision_params.reset_turns_since_last_llm() 
             
             await self.group_chat.step(
-                message=message,
+                event=event,
                 group_id=group_id,
                 prompt=prompt
             )
