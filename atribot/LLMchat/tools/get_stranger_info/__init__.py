@@ -1,7 +1,6 @@
 import time
 
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.service_container import container
+from atribot.core.type.bot_types import atriMessageEvent
 
 tool_json = {
     "name": "get_stranger_info",
@@ -15,11 +14,8 @@ tool_json = {
 }
 
 
-send_message:QQAPIClient = container.get("SendMessage")
-
-
-async def main(qq_id):
-    qq_data = await send_message.get_stranger_info(qq_id)
+async def main(qq_id, message_data: atriMessageEvent):
+    qq_data = await message_data.send_client.get_stranger_info(qq_id)
     return {"get_stranger_info": parse_qq_profile(qq_data)}
 
 

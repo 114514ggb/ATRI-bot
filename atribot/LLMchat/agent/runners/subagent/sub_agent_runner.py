@@ -44,14 +44,14 @@ class SubAgentRunner(BaseAgentRunner):
     def __init__(
         self, 
         agent_data: AgentData, 
-        message_data: atriMessageEvent | None = None
+        message_data: atriMessageEvent
     ) -> None:
         super().__init__(agent_data)
         self.log: Logger = container.get_by_type(Logger).getChild("SubAgent")
         self._tool_calls_mgr = container.get_by_type(ToolCalls)
         self._executor = self._tool_calls_mgr.executor
         self._media_processor = container.get_by_type(MediaProcessor)
-        self._message_data: atriMessageEvent | None = message_data
+        self._message_data: atriMessageEvent = message_data
 
         # 多模态能力
         self._visual_sense: bool = False

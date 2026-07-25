@@ -8,13 +8,11 @@ import tarfile
 
 # from uuid import uuid4
 from atribot.core.atri_config import atriConfig
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 
 sand_box: DockerSandbox = container.get("SandBox")
-send_message: QQAPIClient = container.get("SendMessage")
 config: atriConfig = container.get("config")
 
 _IMAGE_EXTS = {"png", "jpg", "jpeg", "gif"}
@@ -66,28 +64,14 @@ async def main(path: str, message_data: atriMessageEvent) -> str:
 
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext in _IMAGE_EXTS:
-        await send_message.send_group_pictures(
+        await message_data.send_client.send_group_pictures(
             group_id=group_id,
             url_img=f"base64://{base64.b64encode(content).decode()}",
             local_Path_type=False,
         )
         return f"已发送图片:{filename}"
     else:
-        # temp_dir = config.file_path.temp / f"send_file_{uuid4().hex}"
-        # temp_path = temp_dir / filename
-        # temp_path.parent.mkdir(parents=True, exist_ok=True)
-        # temp_path.write_bytes(content)
-        # try:
-        #     await send_message.send_group_file(
-        #         group_id=group_id,
-        #         url_file=str(temp_path),
-        #         local_Path_type=True,
-        #         echo=True,
-        #     )
-        # finally:
-        #     shutil.rmtree(temp_dir, ignore_errors=True)
-        
-        await send_message.send_group_file(
+        await message_data.send_client.send_group_file(
             group_id = group_id,
             url_file = f"base64://{base64.b64encode(content).decode()}",
             name = filename,

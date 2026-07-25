@@ -1,12 +1,10 @@
 from atribot.commands.audio.song import song
 from atribot.core.atri_config import atriConfig
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 config: atriConfig = container.get("config")
 song_manager: song = song()
 
@@ -34,7 +32,7 @@ song_manager: song = song()
     metavar='SONG_NAME'
 )
 async def handle_song_command(
-    message_data: ChatMessage,
+    message_data: MessageEventEnvelope,
     list: bool,
     refresh: bool,
     file: bool,
@@ -47,15 +45,16 @@ async def handle_song_command(
 
     if refresh:
         song_manager.refresh()
-        await send_message.send_group_msg(group_id, "✅ 歌曲列表已成功刷新！")
+        await message_data.send_client.send_group_msg(group_id, "✅ 歌曲列表已成功刷新！", echo=False)
         return
 
     if list:
         playlist_str = song_manager.get_full_playlist()
-        await send_message.send_group_merge_text(
-            group_id,
-            playlist_str,
-            source="查看歌单"
+        await message_data.send_client.send_group_merge_text(
+            group_id=group_id,
+            message=playlist_str,
+            source="查看歌单",
+            
         )
         return
 
@@ -71,7 +70,7 @@ async def handle_song_command(
             f"  /song --refresh  (刷新歌单)\n"
             f"  /song unravel --file (以文件发送)"
         )
-        await send_message.send_group_msg(group_id, help_message)
+        await message_data.send_client.send_group_msg(group_id, help_message, echo=False)
         return
 
     song_name = " ".join(song_name_parts)
@@ -79,14 +78,16 @@ async def handle_song_command(
 
     if song_path:
         if file:
-            await send_message.send_group_file(
-                group_id,
-                (config.file_path.audio / "sing" / song_path).as_posix()
+            await message_data.send_client.send_group_file(
+                group_id=group_id,
+                url_file=(config.file_path.audio / "sing" / song_path).as_posix(),
+                
             )
         else:
-            await send_message.send_group_audio(
-                group_id,
-                (config.file_path.audio / "sing" / song_path).as_posix()
+            await message_data.send_client.send_group_audio(
+                group_id=group_id,
+                url_audio=(config.file_path.audio / "sing" / song_path).as_posix(),
+                
             )
     else:
         similar_songs = song_manager.find_similar_songs(song_name)
@@ -95,4 +96,4 @@ async def handle_song_command(
             response = f"😥 未找到歌曲: '{song_name}'\n🤔 您是不是想找：\n{suggestions}"
         else:
             response = f"😥 未找到歌曲: '{song_name}',并且曲库中没有任何相似的歌曲。"
-        await send_message.send_group_msg(group_id, response)
+        await message_data.send_client.send_group_msg(group_id, response, echo=False)

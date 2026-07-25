@@ -2,12 +2,10 @@ from typing import Optional
 
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 perm_manager: PermissionsManagement = container.get("PermissionsManagement")
 
 
@@ -43,7 +41,7 @@ perm_manager: PermissionsManagement = container.get("PermissionsManagement")
     type=int
 )
 async def permission_command_handler(
-    message_data: ChatMessage,
+    message_data: MessageEventEnvelope,
     subcommand: str,
     role: Optional[str] = None,
     user_id: Optional[int] = None
@@ -55,7 +53,7 @@ async def permission_command_handler(
     operator_id = message_data.user_id
 
     async def reply_func(msg):
-        await send_message.send_group_msg(group_id, msg)
+        await message_data.send_client.send_group_msg(group_id, msg, echo=False)
 
     if subcommand == "add":
         if not role or not user_id:

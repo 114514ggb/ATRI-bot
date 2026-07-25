@@ -1,12 +1,10 @@
 import time
 
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 
 
 @cmd_system.register_command(
@@ -25,17 +23,18 @@ send_message: QQAPIClient = container.get("SendMessage")
     metavar="qq_id",
     type=int
 )
-async def get_qq_profile(message_data: ChatMessage, qq_id: int = None):
+async def get_qq_profile(message_data: MessageEventEnvelope, qq_id: int = None):
 
     target_id = qq_id or message_data.user_id
 
-    resp: dict = await send_message.get_stranger_info(target_id)
+    resp: dict = await message_data.send_client.get_stranger_info(target_id)
     
     if not resp or not isinstance(resp, dict) or not resp.get('data'):
-        await send_message.send_group_merge_text(
+        await message_data.send_client.send_group_merge_text(
             group_id=message_data.group_id,
             message=f"⚠️ 哎呀？找不到 QQ:{target_id} 的资料呢，是不是被外星人抓走了？",
-            source="系统提示"
+            source="系统提示",
+            
         )
         return
 
@@ -77,8 +76,9 @@ async def get_qq_profile(message_data: ChatMessage, qq_id: int = None):
         f"║ {sign}\n"
     )
 
-    await send_message.send_group_merge_text(
+    await message_data.send_client.send_group_merge_text(
         group_id=message_data.group_id,
         message=card,
-        source="QQ账号信息"
+        source="QQ账号信息",
+        
     )

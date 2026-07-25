@@ -1,12 +1,10 @@
 import shlex
 
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 
 sand_box: DockerSandbox = container.get("SandBox")
-send_message:QQAPIClient = container.get("SendMessage")
 
 _MAX_OUTPUT_CHARS = 3000
 
@@ -52,7 +50,7 @@ async def main(command: str, message_data: atriMessageEvent, path: str | None = 
     timeout = max(1, min(timeout, 300))
     full_cmd = f"cd {shlex.quote(path)} && {command}"
 
-    await send_message.send_group_merge_text(
+    await message_data.send_client.send_group_merge_text(
         group_id=message_data.group_id,
         message=f"在 {path} 目录执行命令:\n{command}",
         source="执行Shell命令"

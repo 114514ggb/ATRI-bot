@@ -2,12 +2,10 @@ from bilibili_api import video
 
 from atribot.commands.bromidic.get_bilibili import BiliBiliCrawler
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 crawler = BiliBiliCrawler()
 
 
@@ -60,7 +58,7 @@ crawler = BiliBiliCrawler()
     metavar="URL/BV"
 )
 async def bili_crawler_command(
-        message_data: ChatMessage,
+        message_data: MessageEventEnvelope,
         url_or_bv: str,
         info: bool = False,
         stats: bool = False,
@@ -78,7 +76,7 @@ async def bili_crawler_command(
 
         if all or not any([info, stats, online, danmaku, charging]):
             result = await crawler.get_video_information(bvid)
-            await send_message.send_group_merge_forward(group_id, [result], source="爬取返回值")
+            await message_data.send_client.send_group_merge_forward(group_id, [result], source="爬取返回值", echo=False)
             return
 
         result = []
@@ -120,9 +118,9 @@ async def bili_crawler_command(
             result.extend(charging_info)
 
         if result:
-            await send_message.send_group_merge_forward(group_id, [result], source="爬取返回值")
+            await message_data.send_client.send_group_merge_forward(group_id, [result], source="爬取返回值", echo=False)
         else:
-            await send_message.send_group_merge_text(group_id, "❌ 未获取到任何信息", source="爬取返回值")
+            await message_data.send_client.send_group_merge_text(group_id=group_id, message="❌ 未获取到任何信息", source="爬取返回值", echo=False)
 
     except Exception as e:
         raise ValueError(f"❌爬取失败!\n{e}")

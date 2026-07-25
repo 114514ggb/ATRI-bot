@@ -1,9 +1,6 @@
 from atribot.commands.audio.TTS import TTSService
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 
-send_message:QQAPIClient = container.get("SendMessage")
 tts_main = TTSService()
 
 tool_json = {
@@ -35,6 +32,6 @@ async def main(text: str, message_data: atriMessageEvent, emotion: str = "高兴
         emotion = emotion,
         speed = speed
     )
-    await send_message.send_group_audio(message_data.group_id, audio_path, default=True)
+    await message_data.send_client.send_group_audio(message_data.group_id, audio_path, default=True)
 
     return f"已发送语音：{text}"

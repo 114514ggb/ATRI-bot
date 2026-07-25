@@ -1,4 +1,3 @@
-import asyncio
 import datetime
 import time
 import uuid
@@ -10,8 +9,9 @@ from typing import Coroutine, Dict, List
 from atribot.common_utils import download_text, extract_json_from_text, url_to_audio_base64, url_to_base64
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.platform.onebot.message_event import OneBotMessageEvent
+from atribot.core.platform.send_client import SendClientBase
+from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.chat_message_types import (
     ChatMessage,
     FileMessageSegment,
@@ -23,6 +23,7 @@ from atribot.core.type.chat_message_types import (
     VideoSegment,
 )
 from atribot.core.type.context_types import Context, MessageBuilder
+from atribot.core.type.onebot_event_types import GroupMessageEvent
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import (
     GenerationRequestSimplify,
@@ -71,7 +72,6 @@ class ChatBasics(ABC):
         llm_supplier: LLMConnectionManager,
         memory_system: MemorySystem,
         token_manager: TokenManager,
-        send_message: QQAPIClient,
         chat_manager: ChatManager,
         skills_manager: SkillsManager,
         user_system: UserSystem,
@@ -85,7 +85,6 @@ class ChatBasics(ABC):
         self.supplier: LLMConnectionManager = llm_supplier
         self.memory_system: MemorySystem = memory_system
         self.token_manager: TokenManager = token_manager
-        self.send_message: QQAPIClient = send_message
         self.chat_manager: ChatManager = chat_manager
         self.skills: SkillsManager = skills_manager
         self.user_system: UserSystem = user_system
@@ -111,12 +110,12 @@ class ChatBasics(ABC):
     async def trigger_internal_thought(
         self,
         custom_prompt: str,
-        user_id: int | None = None,
-        group_id: int | None = None,
+        event: GroupMessageEvent,
+        send_client:SendClientBase = None,
     ) -> None:
         """系统内部触发思考的入口"""
 
-    async def update_conduct(self, response_json: Dict, event: atriMessageEvent) -> None:
+    async def update_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """更新用户信息（通用）"""
         self.log.info(f"LLM决定更新用户信息理由:{response_json.get('reason')}")
 
@@ -134,13 +133,13 @@ class ChatBasics(ABC):
         else:
             self.log.info(f"用户信息无变化无需更新!user_id:{user_id}")
 
-    async def silence_conduct(self, response_json: Dict, event: atriMessageEvent) -> None:
+    async def silence_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """保持沉默（通用）"""
         self.log.info(f"LLM决定静默理由:{response_json.get('reason')}")
 
     async def append_message_segments_prompt(
         self,
-        event: atriMessageEvent,
+        event: MessageEventEnvelope,
         message_builder: MessageBuilder,
         including_pictures: bool,
         including_audios: bool = False,
@@ -223,7 +222,7 @@ class ChatBasics(ABC):
                 message_builder.add_text(segment.__str__())
 
         if isinstance(Segment, ReplySegment):
-            if reply_data := await self.send_message.get_msg_details(Segment.message_id):
+            if reply_data := await event.send_client.get_msg_details(Segment.message_id):
                 quote_message = ChatMessage.from_chat_event(reply_data["data"])
                 message_builder.add_text("<引用消息段>")
             else:
@@ -270,7 +269,6 @@ class GroupChat(ChatBasics):
         llm_supplier: LLMConnectionManager,
         memory_system: MemorySystem,
         token_manager: TokenManager,
-        send_message: QQAPIClient,
         chat_manager: ChatManager,
         skills_manager: SkillsManager,
         user_system: UserSystem,
@@ -285,7 +283,6 @@ class GroupChat(ChatBasics):
             llm_supplier=llm_supplier,
             memory_system=memory_system,
             token_manager=token_manager,
-            send_message=send_message,
             chat_manager=chat_manager,
             skills_manager=skills_manager,
             user_system=user_system,
@@ -331,7 +328,7 @@ class GroupChat(ChatBasics):
         
     async def step(
         self,
-        event: atriMessageEvent,
+        event: MessageEventEnvelope,
         prompt: str,
         group_id: int,
     ) -> None:
@@ -342,11 +339,12 @@ class GroupChat(ChatBasics):
         
         self.log.info(f"[{uid}]群LLM聊天json处理")
 
-        await self.send_message.set_msg_emoji_like(
+        await event.send_client.set_msg_emoji_like(
             message_id = event.event.message_id,
             # emoji_id = 183 #表情:我最可爱
             emoji_id = 66 #爱心❤
         )
+        #181 茶
         
         message_builder: MessageBuilder = await self.prompt_structure(
             message=event,
@@ -408,10 +406,10 @@ class GroupChat(ChatBasics):
                     
             else:
                 self.log.error(f"返回json解析不正确:{type(response_json)}")
-                self.send_message.send_group_merge_text(
+                event.send_client.send_group_merge_text(
                     group_id = group_id,
                     message = f"无法解析的错误返回值:\n{response_json}",
-                    source = "模型返回无法解析的格式"
+                    source = "模型返回无法解析的格式",
                 )
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
@@ -457,18 +455,20 @@ class GroupChat(ChatBasics):
     async def trigger_internal_thought(
         self,
         custom_prompt: str,
-        group_id: int,
-        user_id: int | None = None,
+        event: OneBotMessageEvent,
     ) -> None:
-        """系统内部触发思考的入口"""
+        """系统内部触发思考的入口
 
+        Args:
+            custom_prompt: 触发提示词
+            event: OneBotMessageEvent
+            send_client: 发送客户端，必须传入
+        """
         uid: str = uuid.uuid4().hex
         self.log.info(f"[{uid}]群LLM事件通知触发处理")
 
-        message = ChatMessage(
-            user_id = user_id,
-            group_id = group_id
-        )
+        group_id = event.group_id
+        user_id = event.user_id or None
 
         message_builder = MessageBuilder()
         group_history = await self.chat_manager.get_group_messages_str(group_id)
@@ -507,12 +507,12 @@ class GroupChat(ChatBasics):
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
             tool_json=self.tool_calls.get_func_desc_openai_style(preset="group_chat"),
-            message_data=message
+            message_data=event
         )
         
         response = await self._request_model_with_fallback_(
             request = request, 
-            event = message,
+            event = event,
             prompt = prompt, 
             uid = uid
         )
@@ -530,7 +530,7 @@ class GroupChat(ChatBasics):
                         
                         if fun := self.decision_function.get(decision):
                             
-                            await fun(response_json, message)
+                            await fun(response_json, event)
                             
                         else:
                             self.log.error(f"[{uid}]无效decision:{response_json}")
@@ -554,8 +554,8 @@ class GroupChat(ChatBasics):
             original_context.total_tokens = total_tokens#更新tiken计数
             try:
                 await self.token_manager.record_token_usage(
-                    user_id=message.user_id,
-                    group_id=message.group_id,
+                    user_id=event.user_id,
+                    group_id=event.group_id,
                     prompt_tokens=response.metadata.get("prompt_tokens", 0),
                     completion_tokens=response.metadata.get("completion_tokens", 0),
                     total_tokens=total_tokens,
@@ -582,7 +582,7 @@ class GroupChat(ChatBasics):
     
     async def prompt_structure(
         self,
-        event: atriMessageEvent,
+        event: MessageEventEnvelope,
         prompt: str,
         group_id: int,
         user_id: int,
@@ -635,7 +635,7 @@ class GroupChat(ChatBasics):
 
     async def append_message_segments_prompt(
         self, 
-        event: atriMessageEvent,
+        event: MessageEventEnvelope,
         message_builder: MessageBuilder,
         including_pictures: bool,
         including_audios: bool = False,
@@ -735,7 +735,7 @@ class GroupChat(ChatBasics):
                 message_builder.add_text(segment.__str__())
         
         if isinstance(Segment,ReplySegment):
-            if reply_data := await self.send_message.get_msg_details(Segment.message_id):
+            if reply_data := await event.send_client.get_msg_details(Segment.message_id):
                 quote_message = ChatMessage.from_chat_event(reply_data["data"])
                 message_builder.add_text("<引用消息段>")
         
@@ -766,7 +766,7 @@ class GroupChat(ChatBasics):
         ] if len(event.event.pure_text) >= 5 else False:#文本长度要大于一个值不然大概率没什么意义
             message_builder.add_text(f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>")
     
-    async def reply_conduct(self, response_json:Dict, event:atriMessageEvent)->None:
+    async def reply_conduct(self, response_json:Dict, event:MessageEventEnvelope)->None:
         
         self.log.info(f"LLM决定回复消息理由:{response_json.get("reason")}")
         group_id = event.group_id
@@ -782,15 +782,16 @@ class GroupChat(ChatBasics):
             message_id = response_json.get("reply_message_id"),
             group_id = group_id,
             since_llm = since,
+            send_client=event.send_client,
         )
     
-    async def use_tools_conduct(self, response_json:Dict, event:atriMessageEvent)->None:
+    async def use_tools_conduct(self, response_json:Dict, event:MessageEventEnvelope)->None:
         self.log.info(f"LLM决定调用工具理由:{response_json.get("reason")}")
 
     async def _request_model_with_fallback_(
         self,
         request: GenerationRequestSimplify,
-        event: atriMessageEvent,
+        event: MessageEventEnvelope,
         prompt: str,
         uid: str
     ) -> GenerationResponse:
@@ -798,7 +799,7 @@ class GroupChat(ChatBasics):
 
         Args:
             request (GenerationRequestSimplify): 请求体
-            event (atriMessageEvent): 原始消息事件
+            event (MessageEventEnvelope): 原始消息事件
             prompt (str): 响应提示词
             uid (str): 唯一响应的标识
 
@@ -891,6 +892,7 @@ class GroupChat(ChatBasics):
         group_id: int,
         since_llm: float,
         message_id: int = None,
+        send_client:SendClientBase = None,
     ) -> None:
         """发送群文本消息，支持表情标签
 
@@ -898,9 +900,10 @@ class GroupChat(ChatBasics):
             chat_text_list (List[str]): 要解析发送的文本list
             group_id (int): 群号
             message_id (int): 回复引用消息的id
-            trigger_message_id (int): 触发回复的消息id
             since_llm (float): 距离上一次llm发言时间
+            send_client: SendClientBase 发送客户端，必须传入
         """
+
         if not chat_text_list:
             return
 
@@ -910,30 +913,24 @@ class GroupChat(ChatBasics):
             and len("".join(chat_text_list)) <= STRING_LENGTH_LIMIT
             # or MESSAGE_DELIMITER in chat_text
         ):
-            # 分条发送
-            
-            for message in self.emoji_core.parse_list_to_cqcode_with_emotion(
-                chat_text_list,
-                self.emoji_file_dict,
-                reply_id = message_id 
-            ):
-                await self.send_message.send_group_msg(
-                    group_id,
-                    message,
-                )
-                await asyncio.sleep(MESSAGE_DELAY)
+            # 分条发送（含表情标签错误回退）
+            await self.emoji_core.send_list_with_emoji_fallback(
+                text_list=chat_text_list,
+                emoji_dict=self.emoji_file_dict,
+                send_func=lambda msg: send_client.send_group_msg(group_id, msg),
+                reply_id=message_id,
+                delay=MESSAGE_DELAY,
+            )
             return
-        
+
         else:
-            # 合并发送完
-            
-            await self.send_message.send_group_msg(
-                group_id,
-                self.emoji_core.parse_text_to_cqcode_with_emotion(
-                    text  = chat_text_list if isinstance(chat_text_list, str) else "\n".join(chat_text_list),
-                    emoji_dict = self.emoji_file_dict,
-                    reply_id = message_id 
-                )
+            # 合并发送（含表情标签错误回退）
+            text = chat_text_list if isinstance(chat_text_list, str) else "\n".join(chat_text_list)
+            await self.emoji_core.send_with_emoji_fallback(
+                text=text,
+                emoji_dict=self.emoji_file_dict,
+                send_func=lambda msg: send_client.send_group_msg(group_id, msg),
+                reply_id=message_id,
             )
             return
 
@@ -948,7 +945,6 @@ class PrivateChat(ChatBasics):
         llm_supplier: LLMConnectionManager,
         memory_system: MemorySystem,
         token_manager: TokenManager,
-        send_message: QQAPIClient,
         chat_manager: ChatManager,
         skills_manager: SkillsManager,
         user_system: UserSystem,
@@ -963,7 +959,6 @@ class PrivateChat(ChatBasics):
             llm_supplier=llm_supplier,
             memory_system=memory_system,
             token_manager=token_manager,
-            send_message=send_message,
             chat_manager=chat_manager,
             skills_manager=skills_manager,
             user_system=user_system,
@@ -995,7 +990,7 @@ class PrivateChat(ChatBasics):
             audio_sense=self.audio_sense,
         )
 
-    async def step(self, event: atriMessageEvent, prompt: str) -> None:
+    async def step(self, event: MessageEventEnvelope, prompt: str) -> None:
         """私聊 LLM 处理全流程"""
         user_id = event.user_id
         uid: str = uuid.uuid4().hex
@@ -1099,7 +1094,7 @@ class PrivateChat(ChatBasics):
 
     async def prompt_structure(
         self,
-        event: atriMessageEvent,
+        event: MessageEventEnvelope,
         prompt: str,
         user_id: int,
         including_pictures: bool,
@@ -1131,20 +1126,23 @@ class PrivateChat(ChatBasics):
         )
         return message_builder
 
-    async def _private_speak_conduct(self, response_json: Dict, event: atriMessageEvent) -> None:
+    async def _private_speak_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """发送消息决定"""
         self.log.info(f"私聊LLM决定回复 理由:{response_json.get('reason')}")
         await self.send_reply_message_separator(
             chat_text_list=response_json.get("content", []),
             user_id=event.user_id,
+            send_client=event.send_client,
         )
 
     async def send_reply_message_separator(
         self,
         chat_text_list: List[str],
         user_id: int,
+        send_client:SendClientBase = None,
     ) -> None:
         """发送私聊文本消息，支持表情标签"""
+
         if not chat_text_list:
             return
 
@@ -1152,25 +1150,23 @@ class PrivateChat(ChatBasics):
             len(chat_text_list) <= MAX_SINGLE_MESSAGE_LENGTH
             and len("".join(chat_text_list)) <= STRING_LENGTH_LIMIT
         ):
-            for msg in self.emoji_core.parse_list_to_cqcode_with_emotion(
-                chat_text_list,
-                self.emoji_file_dict
-            ):
-                await self.send_message.send_private_msg(user_id=user_id, message=msg)
-                await asyncio.sleep(MESSAGE_DELAY)
+            await self.emoji_core.send_list_with_emoji_fallback(
+                text_list=chat_text_list,
+                emoji_dict=self.emoji_file_dict,
+                send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
+                delay=MESSAGE_DELAY,
+            )
         else:
-            await self.send_message.send_private_msg(
-                user_id=user_id,
-                message=self.emoji_core.parse_text_to_cqcode_with_emotion(
-                    text="\n".join(chat_text_list),
-                    emoji_dict=self.emoji_file_dict
-                ),
+            await self.emoji_core.send_with_emoji_fallback(
+                text="\n".join(chat_text_list),
+                emoji_dict=self.emoji_file_dict,
+                send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
             )
 
     async def _request_model_with_fallback_private_(
         self,
         request: GenerationRequestSimplify,
-        event: atriMessageEvent,
+        event: MessageEventEnvelope,
         prompt: str,
         uid: str,
     ) -> GenerationResponse:

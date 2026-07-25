@@ -1,3 +1,4 @@
+import asyncio
 import os
 import random
 import re
@@ -411,6 +412,78 @@ class EmojiCore(ServiceBase):
         return result
         
         
+    async def send_with_emoji_fallback(
+        self,
+        text: str,
+        emoji_dict: dict,
+        send_func,
+        reply_id: int | None = None,
+    ) -> dict | None:
+        """发送单条带表情标签的消息，失败时自动去掉标签重试
+
+        Args:
+            text: 原始文本
+            emoji_dict: 表情标签字典
+            send_func: 发送消息的异步函数，接收 (message: str) -> dict | None
+            reply_id: 回复消息 ID
+
+        Returns:
+            dict | None: 最后一次发送的结果
+        """
+        cq_message = self.parse_text_to_cqcode_with_emotion(text, emoji_dict, reply_id)
+        result:dict = await send_func(cq_message)
+
+        if result and result.get("status") != "ok":
+            clean_text = re.sub(r'\[.*?\]', '', text).strip()
+            if clean_text:
+                if reply_id:
+                    clean_text = f"[CQ:reply,id={reply_id}]{clean_text}"
+                result = await send_func(clean_text)
+
+        return result
+
+    async def send_list_with_emoji_fallback(
+        self,
+        text_list: list[str],
+        emoji_dict: dict,
+        send_func,
+        reply_id: int | None = None,
+        delay: float = 0,
+    ) -> list[dict | None]:
+        """发送多条带表情标签的消息，每条失败时自动去掉标签重试
+
+        Args:
+            text_list: 原始文本列表
+            emoji_dict: 表情标签字典
+            send_func: 发送消息的异步函数，接收 (message: str) -> dict | None
+            reply_id: 回复消息 ID(仅附加到第一条
+            delay: 每条消息发送后的延迟（秒）
+
+        Returns:
+            list: 各条消息的发送结果列表
+        """
+        if not text_list:
+            return []
+
+        cq_messages = self.parse_list_to_cqcode_with_emotion(text_list, emoji_dict, reply_id)
+        results: list[dict | None] = []
+
+        for i, cq_msg in enumerate(cq_messages):
+            result:dict = await send_func(cq_msg)
+
+            if result and result.get("status") != "ok":
+                clean_text = re.sub(r'\[.*?\]', '', text_list[i]).strip()
+                if clean_text:
+                    if reply_id and i == 0:
+                        clean_text = f"[CQ:reply,id={reply_id}]{clean_text}"
+                    result = await send_func(clean_text)
+
+            results.append(result)
+
+            await asyncio.sleep(delay)
+
+        return results
+
     def _levenshtein_distance(self, s1: str, s2: str) -> int:
         """计算两个字符串的编辑距离
 

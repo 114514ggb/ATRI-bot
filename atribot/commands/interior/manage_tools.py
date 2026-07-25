@@ -2,9 +2,8 @@ import json
 
 from atribot.core.atri_config import atriConfig
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 
 cmd_system:CommandSystem = container.get("CommandSystem")
@@ -30,8 +29,8 @@ cmd_system:CommandSystem = container.get("CommandSystem")
 )
 @cmd_system.argument(name="target", description="预设名称", required=False,)
 @cmd_system.argument(name="extra_arg", description="工具列表", required=False)
-async def manage_tools(message_data: ChatMessage, action: str, target: str | None = None, extra_arg: str | None = None) -> None:
-    send_message:QQAPIClient = container.get("SendMessage")
+async def manage_tools(message_data: MessageEventEnvelope, action: str, target: str | None = None, extra_arg: str | None = None) -> None:
+    send_message = message_data.send_client
     config:atriConfig = container.get("config")
     tool_calls_instance: ToolCalls = container.get("ToolCalls")
     

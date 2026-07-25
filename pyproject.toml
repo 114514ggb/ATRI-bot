@@ -49,3 +49,8 @@ members = [
 [[tool.uv.index]]
 url = "https://mirrors.aliyun.com/pypi/simple"
 default = true
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.0",
+]

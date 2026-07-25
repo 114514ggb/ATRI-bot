@@ -1,7 +1,7 @@
 from atribot.commands.interior.query_statistics import UserActivityAnalyzer
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
 
@@ -21,7 +21,7 @@ cmd_system: CommandSystem = container.get("CommandSystem")
     required=False,
     type=int
 )
-async def query_database_command(message_data: ChatMessage, user_id: int = 0):
+async def query_database_command(message_data: MessageEventEnvelope, user_id: int = 0):
     """
     查询数据库并生成用户活跃度报告
     

@@ -1,16 +1,26 @@
 ﻿import time
 from abc import ABC
-from typing import TYPE_CHECKING, Any, NotRequired, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, Generic, NotRequired, Optional, TypedDict, TypeVar
 
 if TYPE_CHECKING:
     from atribot.core.platform.send_client import SendClientBase
 
 from atribot.core.type.chat_message_types import SendMessage
 from atribot.core.type.chat_types import GroupContext, PrivateContext
-from atribot.core.type.onebot_event_types import OneBotEvent
+from atribot.core.type.onebot_event_types import (
+    AnyMetaEvent,
+    AnyNoticeEvent,
+    AnyRequestEvent,
+    GroupMessageEvent,
+    MessageEvent,
+    OneBotEvent,
+    PrivateMessageEvent,
+)
+
+E = TypeVar("E", bound=OneBotEvent, default=OneBotEvent)
 
 
-class atriMessageEvent(ABC):
+class atriMessageEvent(ABC, Generic[E]):
     """消息事件基类
 
     携带:
@@ -53,7 +63,7 @@ class atriMessageEvent(ABC):
     """消息处理器首次接收到这次消息的时间(time.time())"""
     process_time: float
     """到达当前处理节点的时间(time.time())，每次进入新节点应调用 update_process_time()"""
-    event: OneBotEvent
+    event: E
     """平台事件对象"""
     send_client: SendClientBase
     """发送客户端，委托发消息到平台"""
@@ -68,7 +78,7 @@ class atriMessageEvent(ABC):
 
     def __init__(
         self,
-        event: OneBotEvent,
+        event: E,
         *,
         send_client: SendClientBase,
         direction: str = "incoming",
@@ -213,3 +223,17 @@ class extra(TypedDict):
     
     group_context:NotRequired[GroupContext]
     private_context:NotRequired[PrivateContext]
+
+
+MessageEventEnvelope = atriMessageEvent[MessageEvent]
+"""通用消息事件信封"""
+GroupMessageEnvelope = atriMessageEvent[GroupMessageEvent]
+"""群聊消息事件信封"""
+PrivateMessageEnvelope = atriMessageEvent[PrivateMessageEvent]
+"""私聊消息事件信封"""
+NoticeEnvelope = atriMessageEvent[AnyNoticeEvent]
+"""通知事件信封"""
+RequestEnvelope = atriMessageEvent[AnyRequestEvent]
+"""请求事件信封"""
+MetaEnvelope = atriMessageEvent[AnyMetaEvent]
+"""元事件信封"""

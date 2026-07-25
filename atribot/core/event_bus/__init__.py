@@ -3,6 +3,7 @@ from atribot.core.event_bus.listener import Listener
 from atribot.core.event_bus.rule import (
     AlwaysRule,
     AndRule,
+    AtCommandRule,
     CommandRule,
     GroupRule,
     NotRule,
@@ -25,4 +26,5 @@ __all__ = [
     "AndRule",
     "OrRule",
     "NotRule",
+    "AtCommandRule",
 ]

@@ -13,13 +13,13 @@ from atribot.core.cache.message_store import store_message_to_db
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
-from atribot.core.event_bus.rule import AtRule
+from atribot.core.event_bus.rule import AtCommandRule
 from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.pipeline.whitelist import WhitelistMiddleware
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
-from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.bot_types import MessageEventEnvelope, atriMessageEvent
 from atribot.LLMchat.chat import GroupChat, PrivateChat
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.initiative_chat import initiativeChat
@@ -153,21 +153,17 @@ class BotFramework:
     def _register_at_routes(self) -> None:
         """注册消息路由监听器到 EventBus
 
-        基于 AtRule + priority 实现优先级路由：
           10  @ + / 命令 → CommandSystem
-           1  任意消息   → initiativeChat（由 event.is_at 区分 @/非 @）
+           1  任意消息   → initiativeChat
         """
         bus = self._platform_manager.event_bus
         log = self.log
         _initiative_chat = initiativeChat()
+        cmd_system = container.get_by_type(CommandSystem)
 
-        @bus.on_message(rule=AtRule(), priority=10)
-        async def on_at_command(event:atriMessageEvent):
-            pure_text = getattr(event.event, "pure_text", "")
-            if not pure_text.startswith("/"):
-                return
+        @bus.on_message(rule=AtCommandRule(), priority=10)
+        async def on_at_command(event:MessageEventEnvelope):
             try:
-                cmd_system = container.get_by_type(CommandSystem)
                 await cmd_system.dispatch_command(event)
                 event.stop_propagation = True
             except Exception as e:
@@ -176,8 +172,7 @@ class BotFramework:
         @bus.on_message(priority=1)
         async def on_chat(event:atriMessageEvent):
             try:
-                group_context = event._extra["group_context"]
-                if group_context is not None:
+                if group_context := event._extra["group_context"]:
                     await _initiative_chat.decision(event, group_context, at=event.is_at)
                 event.stop_propagation = True
             except Exception as e:

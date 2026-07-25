@@ -2,13 +2,11 @@ import traceback
 from logging import Logger
 
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.LLMchat.token_manage import TokenManager
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 log: Logger = container.get_by_type(Logger).getChild("TokenCmd")
 token_manager:TokenManager = container.get("TokenManager")
 
@@ -30,7 +28,7 @@ def format_token_count(value: int | None) -> str:
 )
 @cmd_system.option(name="group", short="g", long="--group", description="查询指定群内近期汇总记录", type=int, required=False)
 @cmd_system.option(name="user", short="u", long="--user", description="查询指定用户记录", type=int, required=False)
-async def main(message_data: ChatMessage, group: int | None, user: int | None) -> None:
+async def main(message_data: MessageEventEnvelope, group: int | None, user: int | None) -> None:
     try:
         target_group = None
         target_user = None
@@ -89,10 +87,10 @@ async def main(message_data: ChatMessage, group: int | None, user: int | None) -
         reply = "\n".join(reply_lines)
 
         if message_data.group_id:
-            await send_message.send_group_merge_text(
-                message_data.group_id,
-                reply,
-                source= "查询token统计"
+            await message_data.send_client.send_group_merge_text(
+                group_id=message_data.group_id,
+                message=reply,
+                source="查询token统计",
             )
 
     except Exception as e:

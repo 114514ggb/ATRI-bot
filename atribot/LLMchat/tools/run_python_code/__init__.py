@@ -1,13 +1,11 @@
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.chat_message_types import FileMessageSegment
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
 from atribot.LLMchat.tools.run_python_code.run_code import run_python_code_with_segments
 
-send_message:QQAPIClient = container.get("SendMessage")
 chat_manager: ChatManager = container.get("ChatManager")
 config:atriConfig = container.get("config")
 
@@ -71,7 +69,7 @@ async def main(code: str, message_data: atriMessageEvent, files: list[str] | Non
     if len(output_text) > _MAX_OUTPUT_CHARS:
         output_text = f"[截取末尾{_MAX_OUTPUT_CHARS}字符]\n...{output_text[-_MAX_OUTPUT_CHARS:]}"
 
-    await send_message.send_group_merge_text(
+    await message_data.send_client.send_group_merge_text(
         group_id = group_id,
         message = f"{code}\n\n执行的输出:\n{output_text}",
         source = "执行的代码"
@@ -82,14 +80,14 @@ async def main(code: str, message_data: atriMessageEvent, files: list[str] | Non
         filename = file.path
         
         if (filename.rsplit('.', 1)[-1].lower() if '.' in filename else '') in {'png', 'jpg', 'jpeg', 'gif'}:
-            await send_message.send_group_pictures(
+            await message_data.send_client.send_group_pictures(
                 group_id = group_id,
                 url_img = "base64://" + file.to_base64(),
                 local_Path_type = False
             )
             return f"代码执行结果是:{output_text}\n并且已经发送代码生成图片:{filename}"
         else:
-            await send_message.send_group_file(
+            await message_data.send_client.send_group_file(
                 group_id = group_id,
                 url_file = "base64://" + file.to_base64(),
                 name = file.path,

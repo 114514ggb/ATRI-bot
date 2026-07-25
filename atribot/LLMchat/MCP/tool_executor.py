@@ -47,14 +47,14 @@ class ToolExecutionEngine:
         self,
         tool_calls: list[ToolCall],
         get_func: Callable[[str], FunctionTool | None],
-        message_data: atriMessageEvent | None = None,
+        message_data: atriMessageEvent,
     ) -> list[ToolCallResult]:
         """执行一批工具调用
 
         Args:
             tool_calls: LLM 返回的工具调用列表
             get_func: 按名称获取 :class:`FunctionTool` 的回调
-            message_data: 可选的聊天消息上下文(atriMessageEvent)
+            message_data: 聊天消息事件上下文
 
         Returns:
             所有工具的执行结果列表

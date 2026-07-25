@@ -1,6 +1,4 @@
 from atribot.common_utils import search_music
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 
 tool_json = {
@@ -19,8 +17,6 @@ tool_json = {
 }
 
 
-send_message:QQAPIClient = container.get("SendMessage")
-
 async def main(name:str, message_data: atriMessageEvent):
     """分享网易云歌曲
 
@@ -28,9 +24,8 @@ async def main(name:str, message_data: atriMessageEvent):
         name (str): 歌曲名称
         group_id (int | str): 群号
     """
-    message_data
     if music_lsit := await search_music(name):
-        await send_message.send_group_music(
+        await message_data.send_client.send_group_music(
             message_data.group_id,
             "163",
             str(music_lsit[0]["id"])

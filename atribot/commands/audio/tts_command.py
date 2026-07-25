@@ -2,12 +2,10 @@ from pathlib import Path
 
 from atribot.commands.audio.TTS import TTSService
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 
 
 @cmd_system.register_command(
@@ -46,7 +44,7 @@ send_message: QQAPIClient = container.get("SendMessage")
     type=float,
     metavar="SPEED"
 )
-async def tts_synthesis(message_data: ChatMessage, target_text: list[str], emotion: str = "高兴", speed: float = 1.0):
+async def tts_synthesis(message_data: MessageEventEnvelope, target_text: list[str], emotion: str = "高兴", speed: float = 1.0):
     """TTS文本合成语音
         
     Args:
@@ -61,7 +59,7 @@ async def tts_synthesis(message_data: ChatMessage, target_text: list[str], emoti
         emotion=emotion,
         speed=speed
     )
-    await send_message.send_group_audio(
+    await message_data.send_client.send_group_audio(
         group_id=message_data.group_id,
         url_audio=audio_path.as_posix(),
     )

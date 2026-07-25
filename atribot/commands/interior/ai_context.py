@@ -4,9 +4,8 @@ from logging import Logger
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.LLMchat.memory.user_info_system import UserSystem
 
 
@@ -17,7 +16,7 @@ class AIContextCommands:
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
         self.command_system: CommandSystem = container.get("CommandSystem")
         self.context_management: ChatManager = container.get("ChatManager")
-        self.send_message: QQAPIClient = container.get("SendMessage")
+        self.send_message = container.get("SendMessage")
         self.user_system: UserSystem = container.get("UserSystem")
         self.log: Logger = container.get_by_type(Logger).getChild("AICmd")
         
@@ -64,7 +63,7 @@ class AIContextCommands:
                 long="--detail", 
                 description="显示详细信息（适用于list操作）"
             )
-            async def ai_context_handler(message_data:ChatMessage, action: str, target: str = None, detail: bool = False):
+            async def ai_context_handler(message_data:MessageEventEnvelope, action: str, target: str = None, detail: bool = False):
                 group_id = message_data.group_id
                 
                 if action == "role":
@@ -120,7 +119,7 @@ class AIContextCommands:
                 long="--detail", 
                 description="显示详细信息（适用于list操作）"
             )
-            async def ai_context_handler(message_data:ChatMessage, action: str, target: str = None, detail: bool = False):
+            async def ai_context_handler(message_data:MessageEventEnvelope, action: str, target: str = None, detail: bool = False):
                 group_id = message_data.group_id
                 
                 if action == "role":

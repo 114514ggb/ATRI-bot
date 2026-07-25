@@ -1,10 +1,8 @@
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 
 
 @cmd_system.register_command(
@@ -31,7 +29,7 @@ send_message: QQAPIClient = container.get("SendMessage")
     required=False,
     type=str
 )
-async def help_command(message_data: ChatMessage, command_name: str = None, list: bool = False):
+async def help_command(message_data: MessageEventEnvelope, command_name: str = None, list: bool = False):
     """
     显示帮助信息
     
@@ -42,17 +40,19 @@ async def help_command(message_data: ChatMessage, command_name: str = None, list
     """
     if list:
         help_text = cmd_system.get_help_text()
-        await send_message.send_group_merge_text(
+        await message_data.send_client.send_group_merge_text(
             group_id=message_data.group_id,
             message=help_text,
-            source="命令list"
+            source="命令list",
+            
         )
     elif command_name:
         help_text = cmd_system.get_help_text(command_name)
-        await send_message.send_group_merge_text(
+        await message_data.send_client.send_group_merge_text(
             group_id=message_data.group_id,
             message=help_text,
-            source=f"命令{command_name}帮助"
+            source=f"命令{command_name}帮助",
+            
         )
     else:
         basic_help = (
@@ -67,4 +67,4 @@ async def help_command(message_data: ChatMessage, command_name: str = None, list
             "3.会对群出现的一些词进行反应。\n"
             "4.会对交互数据进行存储，可能会对其用于分析，服务质量优化和功能迭代。\n"
         )
-        await send_message.send_group_msg(message_data.group_id, basic_help)
+        await message_data.send_client.send_group_msg(message_data.group_id, basic_help, echo=False)

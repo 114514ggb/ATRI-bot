@@ -623,14 +623,14 @@ class ToolCalls(ServiceBase):
 
 
     async def calls(
-        self, tool_name: str, arguments_str: str, message_data: Any = None
+        self, tool_name: str, arguments_str: str, message_data: atriMessageEvent
     ) -> CallToolResult | Any:
         """调用工具
 
         Args:
             tool_name: 工具名
             arguments_str: JSON 字符串参数
-            message_data: 可选的聊天消息上下文
+            message_data: 聊天消息事件上下文
 
         Returns:
             工具执行结果
@@ -644,7 +644,7 @@ class ToolCalls(ServiceBase):
         return await self._execute_tool(func_tool, arguments_str, message_data)
 
     async def _execute_tool(
-        self, func_tool: FunctionTool, arguments_str: str, message_data: Any = None
+        self, func_tool: FunctionTool, arguments_str: str, message_data: atriMessageEvent
     ) -> Any:
         """统一工具执行分发 —— 委托给 func_tool.execute() 多态方法
 

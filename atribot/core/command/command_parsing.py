@@ -7,10 +7,8 @@ from typing import Any, Callable, Dict, List, Optional, Type
 
 from atribot.common_utils import jaro_winkler_similarity
 from atribot.core.command.async_permissions_management import PermissionsManagement
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import atriMessageEvent
-from atribot.core.type.onebot_event_types import MessageEvent
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 
 class ParamType(Enum):
@@ -172,7 +170,6 @@ class CommandSystem:
     def __init__(self):
         self.log: Logger = container.get_by_type(Logger).getChild("CmdSystem")
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
-        self.send_message:QQAPIClient = container.get("SendMessage")
         self.command_registry: Dict[str, Command] = {}
         self.alias_registry: Dict[str, str] = {}  # 别名映射
         self.log.info("CommandSystem已初始化!")
@@ -538,10 +535,9 @@ class CommandSystem:
         
         return [cmd for cmd, _ in matches[:max_suggestions]]
     
-    async def dispatch_command(self, event:atriMessageEvent) -> bool:
+    async def dispatch_command(self, event:MessageEventEnvelope) -> bool:
         """解析并分发指令，会直接抛出命令执行的错误"""
-        inner_event: MessageEvent = event.event
-        tokens = shlex.split(inner_event.pure_text[1:])
+        tokens = shlex.split(event.event.pure_text[1:])
         if not tokens:
             raise TypeError("空命令,请输入有效命令哦！")
         
@@ -550,10 +546,11 @@ class CommandSystem:
         command = self.command_registry[command_name]
         
         if parsed.get("_help"):
-            await self.send_message.send_group_merge_text(
-                group_id = event.group_id,
-                message = self._get_command_help(command),
-                source = "命令的帮助信息"
+            await event.send_client.send_group_merge_text(
+                group_id=event.group_id,
+                message=self._get_command_help(command),
+                source="命令的帮助信息",
+                
             )
             return 
         

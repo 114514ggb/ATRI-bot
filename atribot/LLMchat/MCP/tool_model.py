@@ -59,12 +59,12 @@ class FunctionTool:
         """是否启用"""
 
     async def execute(
-        self, message_data: atriMessageEvent | None = None, **kwargs: Any
+        self, message_data: atriMessageEvent, **kwargs: Any
     ) -> str | CallToolResult:
         """执行工具 —— 子类必须覆盖此方法
 
         Args:
-            message_data: 可选的聊天消息上下文(atriMessageEvent)
+            message_data: 聊天消息事件上下文
             **kwargs: 工具参数
         """
         ...
@@ -121,7 +121,7 @@ class LocalTool(FunctionTool):
         """异步处理函数"""
 
     async def execute(
-        self, message_data: atriMessageEvent | None = None, **kwargs: Any
+        self, message_data: atriMessageEvent, **kwargs: Any
     ) -> str | CallToolResult:
         """执行本地工具
 
@@ -129,7 +129,7 @@ class LocalTool(FunctionTool):
         然后调用 ``await self.handler(**kwargs)``
 
         Args:
-            message_data: 可选的聊天消息上下文(atriMessageEvent)
+            message_data: 聊天消息事件上下文
             **kwargs: 工具参数
 
         Returns:
@@ -140,7 +140,7 @@ class LocalTool(FunctionTool):
         """
         if not self.handler:
             raise Exception(f"本地工具 {self.name} 没有绑定处理函数")
-        if message_data is not None and "message_data" in inspect.signature(
+        if "message_data" in inspect.signature(
             self.handler
         ).parameters:
             kwargs["message_data"] = message_data
@@ -197,7 +197,7 @@ class MCPTool(FunctionTool):
         """MCP 服务名称"""
 
     async def execute(
-        self, message_data: atriMessageEvent | None = None, **kwargs: Any
+        self, message_data: atriMessageEvent, **kwargs: Any
     ) -> str | CallToolResult:
         """执行 MCP 工具
 

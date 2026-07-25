@@ -2,13 +2,11 @@ import time
 from datetime import datetime as dt
 
 from atribot.core.command.command_parsing import CommandSystem
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.LLMchat.memory.memory_system import MemorySystem
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 memory_system: MemorySystem = container.get("MemorySystem")
 
 
@@ -133,7 +131,7 @@ async def cmd_query_memories(
     category: str,
     min_importance: int,
     min_credibility: int,
-    message_data: ChatMessage,
+    message_data: MessageEventEnvelope,
     query_text: list[str] = None,
 ):
     """查询记忆命令处理函数"""
@@ -180,7 +178,7 @@ async def cmd_query_memories(
         )
 
     if not results:
-        await send_message.send_group_merge_text(
+        await message_data.send_client.send_group_merge_text(
             message_data.group_id,
             message=f"🔍 未找到与「{query_string or '最近记忆'}」相关的记忆",
             source="记忆查询结果"
@@ -237,8 +235,9 @@ async def cmd_query_memories(
 
     result_lines.append("=" * 10)
 
-    await send_message.send_group_merge_text(
+    await message_data.send_client.send_group_merge_text(
         group_id=message_data.group_id,
         message="\n".join(result_lines),
-        source="记忆查询结果"
+        source="记忆查询结果",
+        
     )

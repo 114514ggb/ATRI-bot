@@ -337,3 +337,49 @@ class SendClientBase(ABC):
     ) -> dict | None:
         """获取语音消息详情"""
         raise NotImplementedError(f"{type(self).__name__} 未实现 get_recordg_details")
+
+    async def send_group_merge_text(
+        self,
+        group_id: int,
+        message: str,
+        source: str = "ATRI",
+        preview: str = "ATRI:点击查看消息",
+        user_id: int = 3889393615,
+        nickname: str = "ATRI-亚托莉",
+        echo: bool = True,
+    ) -> dict | None:
+        """发送群合并转发消息(单文本)
+
+        Args:
+            group_id: 群号
+            message: 消息内容
+            source: 消息来源标题
+            preview: 预览文本
+            user_id: 发送者 QQ
+            nickname: 发送者昵称
+            echo: 是否等待并返回结果
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_group_merge_text")
+
+    async def send_group_merge_forward(
+        self,
+        group_id: int,
+        input_messages: list[list[dict]],
+        source: str = "ATRI",
+        preview: str = "ATRI:点击查看消息",
+        user_id: int = 3889393615,
+        nickname: str = "ATRI-亚托莉",
+        echo: bool = True,
+    ) -> dict | None:
+        """发送群合并转发消息(多节点)
+
+        Args:
+            group_id: 群号
+            input_messages: 多条消息内容，每条为 OneBot 消息段列表
+            source: 消息来源标题
+            preview: 预览文本
+            user_id: 发送者 QQ
+            nickname: 发送者昵称
+            echo: 是否等待并返回结果
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_group_merge_forward")

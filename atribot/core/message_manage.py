@@ -7,7 +7,6 @@ from atribot.core.command.async_permissions_management import PermissionsManagem
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.event_trigger.event_trigger import EventTrigger
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import AtSegment, ChatMessage
 from atribot.core.type.chat_types import GroupContext
@@ -21,7 +20,7 @@ class message_router():
     def __init__(self):
         self.log: Logger = container.get_by_type(Logger).getChild("MsgRouter")
         self.db:AsyncDatabaseBase = container.get("database")
-        self.send_message:QQAPIClient = container.get("SendMessage")
+        self.send_message = container.get("SendMessage")
         self.group_manage = group_manage()
         self.private_manage = private_manage()
         self.group_set = {None}
@@ -88,7 +87,7 @@ class message_manage(ABC):
     def __init__(self):
         self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
         self.command_system:CommandSystem = container.get("CommandSystem")
-        self.send_message:QQAPIClient = container.get("SendMessage")
+        self.send_message = container.get("SendMessage")
         self.chat_manager:ChatManager = container.get("ChatManager")
         self.log: Logger = container.get_by_type(Logger).getChild("MsgManage")
         self.initiative_chat = initiativeChat()
@@ -159,19 +158,11 @@ class group_manage(message_manage):
     
     async def _handle_mentioned_message(self,has_permission, chat_message:ChatMessage, group_context):
         """处理被 @ 的消息逻辑"""
-        # 指令处理
+        # 聊天处理
         if chat_message.pure_text.startswith("/"):
-            try:
-                await self.command_system.dispatch_command(chat_message)
-            except Exception as e:
-                self.error_occurred(e, "命令处理模块")
-                await self.send_message.send_group_msg(
-                    chat_message.group_id, 
-                    f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"
-                )
-            return 
+            # 命令处理已迁移到 EventBus 路径 (bot_framework._register_at_routes)
+            return
 
-        #聊天处理
         if has_permission:
             try:
                 # await self.group_chet.step(message)

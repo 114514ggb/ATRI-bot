@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
-from atribot.core.network_connections.qq_send_message import QQAPIClient
+
 from atribot.core.service_container import container
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -278,7 +278,7 @@ async def api_send_message(
     body: SendMsgBody,
     _: None = Depends(_auth),
 ) -> Dict[str, Any]:
-    send: QQAPIClient = container.get("SendMessage")
+    send = container.get("SendMessage")
     payload = {"group_id": body.group_id, "message": body.message}
     result = await send.async_send("send_group_msg", payload, echo=True)
     return {"status": "ok", "result": result}

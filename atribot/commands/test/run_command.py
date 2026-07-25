@@ -2,12 +2,11 @@ import textwrap
 
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import ChatMessage, File, GroupMessage, PrivateMessage
+from atribot.core.type.bot_types import MessageEventEnvelope
+from atribot.core.type.chat_message_types import File, GroupMessage, PrivateMessage
 
 cmd_system: CommandSystem = container.get("CommandSystem")
-send_message: QQAPIClient = container.get("SendMessage")
 db: AsyncPostgreSQL = container.get("database")
 
 
@@ -19,7 +18,7 @@ db: AsyncPostgreSQL = container.get("database")
     ],
     authority_level=3
 )
-async def run_async_code(message_data: ChatMessage):
+async def run_async_code(message_data: MessageEventEnvelope):
     """
     异步执行代码的测试命令
     """
@@ -53,7 +52,7 @@ async def run_async_code(message_data: ChatMessage):
     # text = format_memory_records(record)
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_node(text))
     
-    raw = message_data.pure_text.strip()
+    raw = message_data.event.pure_text.strip()
     src = f"""
 async def function(message_data,container):
 {textwrap.indent(raw[raw.find(' ') + 1:].strip(), "  ")}

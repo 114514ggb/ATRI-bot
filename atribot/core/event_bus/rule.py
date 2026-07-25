@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from atribot.core.type.bot_types import atriMessageEvent
+    from atribot.core.type.onebot_event_types import MessageEvent
 
 
 class Rule(ABC):
@@ -214,6 +215,25 @@ class NotRule(Rule):
 
     def __repr__(self) -> str:
         return f"NotRule({self._rule!r})"
+
+
+class AtCommandRule(Rule):
+    """@ 命令规则：匹配 bot 被 @ 且消息以 / 开头的命令消息(用于消息事件处理)
+
+    Usage::
+        AtCommandRule()       # 匹配 @bot /xxx 的消息
+    """
+
+    rule_type: ClassVar[str] = "at_command"
+
+    async def match(self, msg: atriMessageEvent[MessageEvent]) -> bool:
+        if not msg.is_at:
+            return False
+        
+        return msg.event.pure_text.strip().startswith("/")
+
+    def __repr__(self) -> str:
+        return "AtCommandRule()"
 
 
 class AtRule(Rule):

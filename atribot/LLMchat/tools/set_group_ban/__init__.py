@@ -1,5 +1,3 @@
-from atribot.core.network_connections.qq_send_message import QQAPIClient
-from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 
 tool_json = {
@@ -18,10 +16,8 @@ tool_json = {
 }
 
 
-send_message:QQAPIClient = container.get("SendMessage")
-
 async def main(user_id:int, duration:int, message_data: atriMessageEvent):
-    return (f"执行禁言返回值:{await send_message.set_group_ban(
+    return (f"执行禁言返回值:{await message_data.send_client.set_group_ban(
         message_data.group_id,
         user_id,
         duration

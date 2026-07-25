@@ -2,8 +2,8 @@ from datetime import datetime, timedelta
 
 from atribot.common_utils import is_qq
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import MessageEventEnvelope
 
 
 class UserActivityAnalyzer:
@@ -15,9 +15,9 @@ class UserActivityAnalyzer:
     
     def __init__(self):
         self.db:AsyncDatabaseBase = container.get("database")
-        self.send_message:QQAPIClient = container.get("SendMessage")
+        self.send_message = container.get("SendMessage")
     
-    async def query_mysql(self, message_data: dict, user_id:int = 0)->None:
+    async def query_mysql(self, message_data: MessageEventEnvelope, user_id:int = 0)->None:
         """查询MySQL数据库并生成用户活跃度报告
 
         Args:
@@ -27,8 +27,8 @@ class UserActivityAnalyzer:
         Raises:
             ValueError: user_id参数错误
         """
-        user_id = user_id if user_id else message_data['user_id']
-        group_id = message_data["group_id"]
+        user_id = user_id if user_id else message_data.user_id
+        group_id = message_data.group_id
         
         if not is_qq(user_id):
             raise ValueError("请输入正确的QQ号")
