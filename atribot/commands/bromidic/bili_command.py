@@ -76,7 +76,7 @@ async def bili_crawler_command(
 
         if all or not any([info, stats, online, danmaku, charging]):
             result = await crawler.get_video_information(bvid)
-            await message_data.send_client.send_group_merge_forward(group_id, [result], source="爬取返回值", echo=False)
+            await message_data.send_client.send_group_merge_forward(group_id, [result], source="爬取返回值")
             return
 
         result = []
@@ -118,9 +118,9 @@ async def bili_crawler_command(
             result.extend(charging_info)
 
         if result:
-            await message_data.send_client.send_group_merge_forward(group_id, [result], source="爬取返回值", echo=False)
+            await message_data.send_client.send_group_merge_forward(group_id, [result], source="爬取返回值")
         else:
-            await message_data.send_client.send_group_merge_text(group_id=group_id, message="❌ 未获取到任何信息", source="爬取返回值", echo=False)
+            await message_data.send_client.send_group_merge_text(group_id=group_id, message="❌ 未获取到任何信息", source="爬取返回值")
 
     except Exception as e:
         raise ValueError(f"❌爬取失败!\n{e}")

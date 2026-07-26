@@ -169,7 +169,7 @@ class CommandSystem:
     
     def __init__(self):
         self.log: Logger = container.get_by_type(Logger).getChild("CmdSystem")
-        self.permissions_management:PermissionsManagement = container.get("PermissionsManagement")
+        self.permissions_management = container.get_by_type(PermissionsManagement)
         self.command_registry: Dict[str, Command] = {}
         self.alias_registry: Dict[str, str] = {}  # 别名映射
         self.log.info("CommandSystem已初始化!")
@@ -361,7 +361,7 @@ class CommandSystem:
             return str(value)
     
     def _parse_command(self, tokens: List[str]) -> tuple[str, Dict[str, Any]]:
-        """解析命令tokens，返回命令名和参数字典"""
+        """解析命令tokens,返回命令名和参数字典"""
         if not tokens:
             raise ValueError("空命令")
         

@@ -10,7 +10,7 @@ from atribot.common_utils.http_client import HTTPClient
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
-from atribot.core.command.command_loader import command_loader
+from atribot.core.command.command_loader import CommandLoader
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.event_trigger.event_trigger import EventTrigger
@@ -166,7 +166,7 @@ class BotFramework:
         for tgt in self._RESOLVE_TARGETS:
             await container.resolve(tgt)
         
-        container.register("CommandLoader", command_loader(self.config.file_path.commands))
+        container.register("CommandLoader", CommandLoader(self.config.file_path.commands))
 
     async def _start_runtime_services(self) -> None:
         """启动依赖容器完成后的运行期服务"""

@@ -24,15 +24,14 @@ class PlatformAdapter(ABC):
         ...
 
     @abstractmethod
-    async def send(self, message: SendMessage, echo: bool = False) -> Any:
+    async def send(self, message: SendMessage) -> Any:
         """发送消息到平台
 
         Args:
             message: 已构建好的消息对象 (GroupMessage / PrivateMessage)
-            echo: 是否等待并返回发送结果
 
         Returns:
-            平台响应(echo=True 时返回响应结果)
+            平台响应结果
         """
         ...
 
@@ -57,7 +56,7 @@ class PlatformAdapter(ABC):
         """
         ...
 
-    async def call_api(self, action: str, params: dict, echo: bool = False) -> Any:
+    async def call_api(self, action: str, params: dict) -> Any:
         """通用 API 调用
 
         当平台特有操作未在客户端对象中暴露时，
@@ -68,7 +67,6 @@ class PlatformAdapter(ABC):
         Args:
             action: API 动作名称（如 "set_group_ban"
             params: 请求参数字典
-            echo: 是否等待并返回结果
 
         Returns:
             API 响应，或 None

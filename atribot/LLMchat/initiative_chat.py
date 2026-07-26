@@ -3,7 +3,7 @@ from typing import List, Literal, Optional
 
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
-from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition
 from atribot.LLMchat.chat import GroupChat
 
@@ -17,25 +17,25 @@ class initiativeChat:
         self.group_chat:GroupChat = container.get("GroupChat")
         self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
     
-    async def decision(self, event: atriMessageEvent, group_context:GroupContext, at: bool = False) -> bool:
+    async def decision(self, event: MessageEventEnvelope, group_context:GroupContext) -> bool:
         """决策是否应该发言"""
         # if not event.segments:
         #     return False
 
-        if not event.event.pure_text:#你不输入文本内容在那里@什么呢
+        # if not event.event.pure_text:#你不输入文本内容在那里@什么呢
+        #     return False
+        
+        if group_context.time_window.get_recent_avg_interval(4) < 0.7:
+            #如果消息间隔过低不考虑
+            self.log.info(f"群{event.group_id}消息超过限制~不考虑回复")
             return False
 
         group_id: int = event.group_id
         user_id: int = event.user_id
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
-        
-        if group_context.time_window.get_recent_avg_interval(4) < 0.7:
-            #如果消息间隔过低不考虑
-            self.log.info(f"群{group_id}消息超过限制~不考虑回复")
-            return False
-        
+
         #被@检测
-        if at:
+        if event.is_at:
             decision =  await self._execute_reply(
                 event, group_id, params,
                 log_msg=f"Bot was @ed by user {user_id}, preparing to respond.",
@@ -85,7 +85,7 @@ class initiativeChat:
     
     async def _execute_reply(
         self, 
-        event: atriMessageEvent, 
+        event: MessageEventEnvelope, 
         group_id:int,  
         decision_params:LLMGroupChatCondition,
         log_msg:str, 

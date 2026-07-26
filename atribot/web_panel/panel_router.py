@@ -280,7 +280,7 @@ async def api_send_message(
 ) -> Dict[str, Any]:
     send = container.get("SendMessage")
     payload = {"group_id": body.group_id, "message": body.message}
-    result = await send.async_send("send_group_msg", payload, echo=True)
+    result = await send.async_send("send_group_msg", payload)
     return {"status": "ok", "result": result}
 
 

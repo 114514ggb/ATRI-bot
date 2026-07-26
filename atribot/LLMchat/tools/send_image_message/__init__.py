@@ -17,7 +17,6 @@ async def main(url: str, message_data: atriMessageEvent) -> str:
             message_data.group_id,
             url,
             local_Path_type = False,
-            echo=True
         )
 
     return f"发送图像执行结果:{text}"

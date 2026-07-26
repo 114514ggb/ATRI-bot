@@ -121,23 +121,22 @@ class OneBotAdapter(PlatformAdapter):
         self._started = False
         self._log.info("已停止")
 
-    async def send(self, message: SendMessage, echo: bool = False) -> Any:
+    async def send(self, message: SendMessage) -> Any:
         """发送消息到 OneBot 平台
 
         Args:
             message: 已构建好的 GroupMessage 或 PrivateMessage
-            echo: 是否等待并返回发送结果
 
         Returns:
             API 响应，或 None
         """
-        return await self._send_client.send(message, echo=echo)
+        return await self._send_client.send(message)
 
     def get_client(self) -> object:
         """获取 OneBotSendClient 实例"""
         return self._send_client
 
-    async def call_api(self, action: str, params: dict, echo: bool = False) -> Any:
+    async def call_api(self, action: str, params: dict) -> Any:
         """通用 OneBot API 调用
 
         直接调用任意 OneBot API 动作
@@ -145,19 +144,18 @@ class OneBotAdapter(PlatformAdapter):
         Args:
             action: API 动作名称
             params: 请求参数字典
-            echo: 是否等待并返回结果
 
         Returns:
             API 响应，或 None
         """
-        return await self._send_client.async_send(action, params, echo=echo)
+        return await self._send_client.async_send(action, params)
 
     async def _on_raw_message(self, data: dict) -> None:
         """收到原始 OneBot 事件后的回调(WS / HTTP)
 
-        将原始事件字典转换为类型化的 Message 并推入队列。
+        将原始事件字典转换为类型化的 Message 并推入队列
         """
-        self._log.debug(f"事件:{data}")
+        # self._log.debug(f"事件:{data}")
         try:
             event = OneBotEvent.from_dict(data)
         except (ValueError, Exception) as e:
@@ -168,8 +166,6 @@ class OneBotAdapter(PlatformAdapter):
             )
             return
 
-        print(event)
-
         msg = OneBotMessageEvent(
             event=event,
             source=self._source_name,
@@ -178,9 +174,7 @@ class OneBotAdapter(PlatformAdapter):
         )
         pushed = await self._queue.push(msg)
 
-        if pushed:
-            self._log.debug("事件已入队 (queue_depth=%d)", self._queue.depth)
-        else:
+        if not pushed:
             self._log.warning(
                 "❌ 消息未能入队(队列满): %s post_type=%s",
                 type(event).__name__,

@@ -31,7 +31,7 @@ async def handle_status_command(message_data: MessageEventEnvelope, components: 
     info_str = await SystemMonitor().view_list(components)
 
     if not info_str.strip():
-        await message_data.send_client.send_group_msg(group_id, "ℹ️ 未生成任何信息，请检查您的输入参数。", echo=False)
+        await message_data.send_client.send_group_msg(group_id, "ℹ️ 未生成任何信息，请检查您的输入参数。")
         return
 
     await message_data.send_client.send_group_merge_text(

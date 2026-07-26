@@ -1553,7 +1553,7 @@ class MessageEvent(OneBotEvent):
             if isinstance(s, AtSegment) and str(s.user_id) == str(self.self_id):
                 is_at = True
                 
-        self.pure_text = "".join(pure_text)
+        self.pure_text = "".join(pure_text).strip()
         self.cq_code = "".join(cq_parts)
         self.is_at = is_at
 

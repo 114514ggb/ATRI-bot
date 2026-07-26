@@ -11,6 +11,7 @@ from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.cache.message_store import store_message_to_db
 from atribot.core.command.async_permissions_management import PermissionsManagement
+from atribot.core.command.command_loader import CommandLoader
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.event_bus.rule import AtCommandRule
@@ -54,6 +55,8 @@ class BotFramework:
         EmojiCore,
         ChatManager,
         PermissionsManagement,
+        CommandSystem,
+        CommandLoader,
         PluginManager,
     )
 
@@ -81,6 +84,8 @@ class BotFramework:
         # QQAPIClient,
         ToolCalls,
         MediaProcessor,
+        CommandSystem,
+        CommandLoader,
         LLMCoordinator,
         GroupChat,
         PrivateChat,
@@ -168,13 +173,14 @@ class BotFramework:
                 event.stop_propagation = True
             except Exception as e:
                 log.exception("命令处理失败: %s", e)
+                await event.send(event.reply_text(f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"))
+                event.stop_propagation = True
 
         @bus.on_message(priority=1)
         async def on_chat(event:atriMessageEvent):
             try:
                 if group_context := event._extra["group_context"]:
-                    await _initiative_chat.decision(event, group_context, at=event.is_at)
-                event.stop_propagation = True
+                    event.stop_propagation = await _initiative_chat.decision(event, group_context)
             except Exception as e:
                 log.exception("聊天处理失败: %s", e)
 
@@ -198,7 +204,7 @@ class BotFramework:
     async def _resolve_services(self) -> None:
         """提前解析启动阶段需要的服务实例
 
-        PluginManager 在此步被 resolve，其 initialize() 会自动：
+        PluginManager 在此步被 resolve,其 initialize() 会自动：
         1. 从容器获取 PlatformManager
         2. 创建 PluginLoader 扫描 atribot/plugins/
         3. 加载所有插件，插件自动将 handlers 注册到 EventBus

@@ -9,17 +9,18 @@ from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.service_container import container
 
 
-class command_loader:
+class CommandLoader:
     """命令加载器 - 用于动态加载指定目录下的命令模块"""
     
-    def __init__(self, commands_dir: Path | None = None):
+    def __init__(self, command_system: CommandSystem, commands_dir: Path | None = None):
         """初始化命令加载器，并立即加载命令目录。
 
         Args:
+            command_system: 命令系统实例（由容器自动注入）
             commands_dir: 命令目录的绝对路径；如果不传，则默认使用
-                `config.file_path.commands`。
+                `config.file_path.commands`
         """
-        self.command_system:CommandSystem = container.get("CommandSystem")
+        self.command_system = command_system
         self.log: Logger = container.get_by_type(Logger).getChild("CmdLoader")
         self.config:atriConfig = container.get("config")
         self.loaded_modules = []

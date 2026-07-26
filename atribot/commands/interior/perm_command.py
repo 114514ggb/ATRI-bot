@@ -53,7 +53,7 @@ async def permission_command_handler(
     operator_id = message_data.user_id
 
     async def reply_func(msg):
-        await message_data.send_client.send_group_msg(group_id, msg, echo=False)
+        await message_data.send_client.send_group_msg(group_id, msg)
 
     if subcommand == "add":
         if not role or not user_id:

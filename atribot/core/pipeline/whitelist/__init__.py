@@ -2,6 +2,7 @@ from logging import Logger
 from typing import TYPE_CHECKING, ClassVar
 
 from atribot.core.atri_config import atriConfig
+from atribot.core.cache.message_store import store_message_to_db
 from atribot.core.pipeline.middleware import PipelineMiddleware
 from atribot.core.service_container import container
 
@@ -46,6 +47,9 @@ class WhitelistMiddleware(PipelineMiddleware):
             return msg
 
         if msg.group_id in self._group_white_list:
+            self._log.debug("群相关事件:%s",msg.event.primeval)
             return msg
+
+        await store_message_to_db(msg)#不在也存吧
 
         return None

@@ -13,53 +13,54 @@ if TYPE_CHECKING:
     from atribot.core.pipeline.pipeline import Pipeline
     from atribot.core.type.bot_types import atriMessageEvent
 
-_RULE_TYPE_ORDER: tuple[str, ...] = (
-    "command",
-    "regex",
-    "group",
-    "user",
-    "permission",
-    "at",
-    "always",
-    "composite",
-    "base",
-)
+MAX_PIPELINE_CONCURRENCY = 50
+"""最大并发 pipeline 处理数"""
+
+MAX_DISPATCH_CONCURRENCY = 50
+"""最大并发分发数"""
 
 
 class EventBus:
     """事件总线
 
-    两级索引结构::
+    扁平索引结构::
 
-        _index[PostType][rule_type] → [Listener(priority=10), Listener(priority=0), ...]
+        _dispatch_index[PostType] → [Listener(order=10, priority=10), ...]
+
+    注册时:
+        1. 追加到对应 PostType 的列表
+        2. 按 (rule.order, -priority) 排序
 
     分发时:
-        1. 取出对应 PostType 的所有 rule_type 桶
-        2. 按 _RULE_TYPE_ORDER 顺序遍历各桶
-        3. 桶内已按 priority 降序排列
-        4. 逐个执行 rule.match(msg)，匹配则调用 handler
-        5. handler 返回后检查 msg.stop_propagation,为 True 则停止
-
-    Usage::
-
-        bus = EventBus(queue)
-
-        @bus.on(PostType.MESSAGE, rule=CommandRule("help"), priority=10)
-        async def help_handler(msg: Message) -> None:
-            msg.stop_propagation = True   # 中断后续传播
-            ...
+        1. 取出对应 PostType 的已排序列表，创建 tuple 快照
+        2. 逐个执行 rule.match(msg)，匹配则调用 handler
+        3. handler 返回后检查 msg.stop_propagation,为 True 则停止
     """
 
-    def __init__(self, queue: MessageQueue) -> None:
+    def __init__(
+        self,
+        queue: MessageQueue,
+        pipeline:Pipeline,
+        process_concurrency: int = MAX_PIPELINE_CONCURRENCY,
+        dispatch_concurrency: int = MAX_DISPATCH_CONCURRENCY,
+    ) -> None:
         self._queue = queue
         self._log: Logger = container.get_by_type(Logger).getChild("EventBus")
         self._running = False
 
-        # 两级索引
-        self._index: dict[PostType, dict[str, list[Listener]]] = defaultdict(
-            lambda: defaultdict(list)
-        )
+        #扁平索引
+        self._dispatch_index: dict[PostType, list[Listener]] = defaultdict(list)
         self._listener_set: set[Listener] = set()
+
+        #并发控制
+        self._process_semaphore = asyncio.Semaphore(process_concurrency)
+        self._dispatch_semaphore = asyncio.Semaphore(dispatch_concurrency)
+
+        self._pending_tasks: set[asyncio.Task[None]] = set()
+        """任务追踪（一条消息一个 task,pipeline+dispatch 全走完才算完成）"""
+
+        self.pipeline = pipeline
+        """分发前管道"""
 
 
     def on(
@@ -89,11 +90,10 @@ class EventBus:
         def decorator(
             func: Callable[[atriMessageEvent], Awaitable[None]],
         ) -> Callable[[atriMessageEvent], Awaitable[None]]:
-            r = rule if rule is not None else AlwaysRule()
             listener = Listener(
                 handler=func,
                 event_type=event_type,
-                rule=r,
+                rule= rule if rule is not None else AlwaysRule(),
                 priority=priority,
                 once=once,
             )
@@ -103,11 +103,11 @@ class EventBus:
         return decorator
 
     def _add_listener(self, listener: Listener) -> None:
-        """添加监听器并维护索引排序"""
+        """添加监听器并维护排序"""
         self._listener_set.add(listener)
-        bucket = self._index[listener.event_type][listener.rule.rule_type]
+        bucket = self._dispatch_index[listener.event_type]
         bucket.append(listener)
-        bucket.sort(key=lambda lsnr: -lsnr.priority)  # 降序
+        bucket.sort(key=lambda lsnr: (lsnr.rule.order, -lsnr.priority))
         self._log.debug("注册: %s", listener)
 
     def on_message(
@@ -153,7 +153,7 @@ class EventBus:
             event_type: 为 None 时清空全部；否则只清空该类型
         """
         if event_type is None:
-            self._index.clear()
+            self._dispatch_index.clear()
             self._listener_set.clear()
             self._log.info("已清空全部监听器")
         else:
@@ -174,59 +174,51 @@ class EventBus:
     def _remove_one(self, listener: Listener) -> None:
         """从索引和集合中移除单个监听器"""
         self._listener_set.discard(listener)
-        bucket = self._index.get(listener.event_type, {}).get(
-            listener.rule.rule_type, []
-        )
-        if listener in bucket:
-            bucket.remove(listener)
+        if bucket := self._dispatch_index.get(listener.event_type):
+            try:
+                bucket.remove(listener)
+            except ValueError:
+                pass  # 并发场景下可能已被其他 task 移除
 
     async def dispatch(self, msg: atriMessageEvent) -> None:
         """将消息分发给所有匹配的监听器
 
-        Args:
-            msg: 待分发的消息信封
+        使用 tuple 快照防止 _dispatch_index 在迭代中被修改。
         """
         if msg.stop_propagation:
             return
 
         post_type = msg.event.post_type
-        buckets = self._index.get(post_type, {})
-        if not buckets:
-            self._log.debug("无监听器处理 %s 事件", post_type.value)
+        listeners = self._dispatch_index.get(post_type)
+        if not listeners:
             return
 
-        expired: list[Listener] = []
-
-        for rule_type in _RULE_TYPE_ORDER:
-
-            for listener in buckets.get(rule_type, []):
-                if msg.stop_propagation:
-                    break
-                try:
-                    if await listener.rule.match(msg):
-                        self._log.debug(
-                            "触发 %s → %s (rule=%s)",
-                            post_type.value,
-                            getattr(listener.handler, "__name__", listener.handler),
-                            listener.rule,
-                        )
-                        await listener.handler(msg)
-                        if listener.once:
-                            expired.append(listener)
-                except Exception:
-                    self._log.exception(
-                        "监听器 %s 执行失败",
-                        getattr(listener.handler, "__name__", listener.handler),
-                    )
-
+        for listener in tuple(listeners):
             if msg.stop_propagation:
                 break
+            try:
+                if not await listener.rule.match(msg):
+                    continue
 
-        # 清理一次性监听器
-        for listener in expired:
-            self._remove_one(listener)
+                #执行前从索引移除，防止并发重复触发
+                if listener.once:
+                    self._remove_one(listener)
 
-    async def run(self, pipeline: Pipeline | None = None) -> None:
+                self._log.debug(
+                    "触发 %s → %s (rule=%s)",
+                    post_type.value,
+                    getattr(listener.handler, "__name__", listener.handler),
+                    listener.rule,
+                )
+                await listener.handler(msg)
+
+            except Exception:
+                self._log.exception(
+                    "监听器 %s 执行失败",
+                    getattr(listener.handler, "__name__", listener.handler),
+                )
+
+    async def run(self) -> None:
         """启动事件总线主循环
 
         Args:
@@ -240,23 +232,58 @@ class EventBus:
         self._log.info("EventBus 启动，开始消费消息队列")
 
         try:
-            if pipeline:
-                async for msg in self._queue.consume():
-                    if msg := await pipeline.process(msg):
-                        await self.dispatch(msg)
-                    continue
-            else:
-                #这样性能会好些？虽然不太可能会走这边
-                async for msg in self._queue.consume():
-                    await self.dispatch(msg)
-            
+            async for msg in self._queue.consume():
+                await self._process_semaphore.acquire()
+                self._start_message_task(msg)
+
         except asyncio.CancelledError:
             self._log.info("EventBus 主循环被取消")
         except Exception:
             self._log.exception("EventBus 主循环异常")
         finally:
             self._running = False
-            self._log.info("EventBus 已停止")
+            self._log.info(
+                "EventBus 主循环已退出（尚有 %d 个任务正在运行）", len(self._pending_tasks)
+            )
+
+    async def wait_pending(self) -> None:
+        """等待所有正在处理的任务完成"""
+        if self._pending_tasks:
+            self._log.info("等待 %d 个任务完成...", len(self._pending_tasks))
+            await asyncio.gather(*self._pending_tasks, return_exceptions=True)
+            self._log.info("所有任务已完成")
+
+    def _start_message_task(self, msg: atriMessageEvent) -> None:
+        """为单条消息启动处理任务"""
+        task = asyncio.create_task(self._handle_message(msg))
+        self._pending_tasks.add(task)
+        task.add_done_callback(self._on_task_done)
+
+    async def _handle_message(self, msg: atriMessageEvent) -> None:
+        """处理单条消息"""
+        try:
+            try:
+                msg = await self.pipeline.process(msg)
+            except Exception:
+                self._log.exception("Pipeline 处理消息失败")
+                return
+        finally:
+            self._process_semaphore.release()
+
+        if msg is None:
+            return
+
+        async with self._dispatch_semaphore:
+            await self.dispatch(msg)
+
+    def _on_task_done(self, task: asyncio.Task[None]) -> None:
+        """消息处理任务完成回调"""
+        self._pending_tasks.discard(task)
+        if task.cancelled():
+            return
+        exc: BaseException | None = task.exception()
+        if exc:
+            self._log.exception("消息处理任务异常: %s", exc)
 
     @property
     def is_running(self) -> bool:

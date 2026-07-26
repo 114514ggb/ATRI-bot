@@ -67,4 +67,4 @@ async def help_command(message_data: MessageEventEnvelope, command_name: str = N
             "3.会对群出现的一些词进行反应。\n"
             "4.会对交互数据进行存储，可能会对其用于分析，服务质量优化和功能迭代。\n"
         )
-        await message_data.send_client.send_group_msg(message_data.group_id, basic_help, echo=False)
+        await message_data.send_client.send_group_msg(message_data.group_id, basic_help)

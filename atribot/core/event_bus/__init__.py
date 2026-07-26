@@ -19,6 +19,7 @@ __all__ = [
     # 规则
     "Rule",
     "AlwaysRule",
+    "AtCommandRule",
     "CommandRule",
     "RegexRule",
     "GroupRule",
@@ -26,5 +27,4 @@ __all__ = [
     "AndRule",
     "OrRule",
     "NotRule",
-    "AtCommandRule",
 ]

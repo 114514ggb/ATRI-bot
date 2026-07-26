@@ -347,7 +347,7 @@ class GroupChat(ChatBasics):
         #181 茶
         
         message_builder: MessageBuilder = await self.prompt_structure(
-            message=event,
+            event=event,
             prompt=prompt,
             group_id=group_id,
             user_id=user_id,
@@ -406,7 +406,7 @@ class GroupChat(ChatBasics):
                     
             else:
                 self.log.error(f"返回json解析不正确:{type(response_json)}")
-                event.send_client.send_group_merge_text(
+                await event.send_client.send_group_merge_text(
                     group_id = group_id,
                     message = f"无法解析的错误返回值:\n{response_json}",
                     source = "模型返回无法解析的格式",

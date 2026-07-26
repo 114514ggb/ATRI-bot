@@ -45,7 +45,7 @@ async def handle_song_command(
 
     if refresh:
         song_manager.refresh()
-        await message_data.send_client.send_group_msg(group_id, "✅ 歌曲列表已成功刷新！", echo=False)
+        await message_data.send_client.send_group_msg(group_id, "✅ 歌曲列表已成功刷新！")
         return
 
     if list:
@@ -70,7 +70,7 @@ async def handle_song_command(
             f"  /song --refresh  (刷新歌单)\n"
             f"  /song unravel --file (以文件发送)"
         )
-        await message_data.send_client.send_group_msg(group_id, help_message, echo=False)
+        await message_data.send_client.send_group_msg(group_id, help_message)
         return
 
     song_name = " ".join(song_name_parts)
@@ -96,4 +96,4 @@ async def handle_song_command(
             response = f"😥 未找到歌曲: '{song_name}'\n🤔 您是不是想找：\n{suggestions}"
         else:
             response = f"😥 未找到歌曲: '{song_name}',并且曲库中没有任何相似的歌曲。"
-        await message_data.send_client.send_group_msg(group_id, response, echo=False)
+        await message_data.send_client.send_group_msg(group_id, response)

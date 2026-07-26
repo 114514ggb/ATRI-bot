@@ -17,13 +17,13 @@ cmd_system: CommandSystem = container.get("CommandSystem")
     ]
 )
 async def reload_commands_handler(message_data: MessageEventEnvelope) -> None:
-    from atribot.core.command.command_loader import command_loader as LoaderType
+    from atribot.core.command.command_loader import CommandLoader as LoaderType
 
     loader: LoaderType = container.get("CommandLoader")
     log = container.get_by_type(Logger).getChild("Reload")
     group_id = message_data.group_id
 
-    await message_data.send_client.send_group_msg(group_id, "⏳ 正在重载全部命令模块...", echo=False)
+    await message_data.send_client.send_group_msg(group_id, "⏳ 正在重载全部命令模块...")
 
     try:
         loaded_count = loader.reload_commands()

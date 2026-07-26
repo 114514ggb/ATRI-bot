@@ -50,13 +50,13 @@ class MessageQueue:
         self.total_pushed += 1
         try:
             self._queue.put_nowait(msg)
-            self._log.debug(
-                "depth=%d source=%s post_type=%s%s",
-                self._queue.qsize(),
-                msg.source,
-                msg.event.post_type.value,
-                f" group={msg.group_id}" if msg.group_id else "",
-            )
+            # self._log.debug(
+            #     "depth=%d source=%s post_type=%s%s",
+            #     self._queue.qsize(),
+            #     msg.source,
+            #     msg.event.post_type.value,
+            #     f" group={msg.group_id}" if msg.group_id else "",
+            # )
             return True
         except asyncio.QueueFull:
             post_type = msg.event.post_type

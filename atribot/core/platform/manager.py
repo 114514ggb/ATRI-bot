@@ -27,7 +27,7 @@ class PlatformManager:
 
         self._queue = MessageQueue()
         self._pipeline = Pipeline()
-        self._event_bus = EventBus(self._queue)
+        self._event_bus = EventBus(self._queue,self._pipeline)
         self._bus_task: asyncio.Task[None] | None = None
 
         self._discover_adapters()
@@ -99,7 +99,7 @@ class PlatformManager:
                 self._log.exception("启动平台 '%s' 失败", name)
 
         self._bus_task = asyncio.create_task(
-            self._event_bus.run(pipeline=self._pipeline),
+            self._event_bus.run(),
             name="EventBus.main_loop",
         )
 
@@ -110,6 +110,7 @@ class PlatformManager:
         """停止所有适配器及 EventBus"""
         self._running = False
 
+        #停止消费新消息
         if self._bus_task and not self._bus_task.done():
             self._bus_task.cancel()
             try:
@@ -117,6 +118,9 @@ class PlatformManager:
             except asyncio.CancelledError:
                 pass
         self._bus_task = None
+
+        #等待正在分发中的任务完成
+        await self._event_bus.wait_pending()
 
         for name, adapter in self._adapters.items():
             self._log.info("停止平台 '%s'...", name)

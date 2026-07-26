@@ -19,7 +19,9 @@ class Rule(ABC):
     """
 
     rule_type: ClassVar[str] = "base"
-    """规则类型标识，供 EventBus 两级索引用"""
+    """规则类型标识"""
+    order: ClassVar[int] = 100
+    """排序顺序（越小越先执行）"""
 
     @abstractmethod
     async def match(self, msg: atriMessageEvent) -> bool:
@@ -38,6 +40,7 @@ class AlwaysRule(Rule):
     """始终匹配的规则"""
 
     rule_type: ClassVar[str] = "always"
+    order: ClassVar[int] = 80
 
     async def match(self, msg: atriMessageEvent) -> bool:
         return True
@@ -52,6 +55,7 @@ class CommandRule(Rule):
     """
 
     rule_type: ClassVar[str] = "command"
+    order: ClassVar[int] = 20
 
     def __init__(self, command: str, prefix: str = "/") -> None:
         self._command = command
@@ -85,6 +89,7 @@ class RegexRule(Rule):
     """
 
     rule_type: ClassVar[str] = "regex"
+    order: ClassVar[int] = 30
 
     def __init__(self, pattern: str, flags: int = 0) -> None:
         self._re = re.compile(pattern, flags)
@@ -109,6 +114,7 @@ class GroupRule(Rule):
     """群组规则：匹配指定群号"""
 
     rule_type: ClassVar[str] = "group"
+    order: ClassVar[int] = 40
 
     def __init__(self, group_id: int) -> None:
         self._group_id = group_id
@@ -129,6 +135,7 @@ class UserRule(Rule):
     """用户规则：匹配指定用户"""
 
     rule_type: ClassVar[str] = "user"
+    order: ClassVar[int] = 50
 
     def __init__(self, user_id: int) -> None:
         self._user_id = user_id
@@ -149,6 +156,7 @@ class AndRule(Rule):
     """逻辑与：所有子规则都匹配时才匹配"""
 
     rule_type: ClassVar[str] = "composite"
+    order: ClassVar[int] = 90
 
     def __init__(self, *rules: Rule) -> None:
         if not rules:
@@ -175,6 +183,7 @@ class OrRule(Rule):
     """逻辑或：任一子规则匹配时即匹配"""
 
     rule_type: ClassVar[str] = "composite"
+    order: ClassVar[int] = 90
 
     def __init__(self, *rules: Rule) -> None:
         if not rules:
@@ -201,6 +210,7 @@ class NotRule(Rule):
     """逻辑非：子规则不匹配时匹配"""
 
     rule_type: ClassVar[str] = "composite"
+    order: ClassVar[int] = 90
 
     def __init__(self, rule: Rule) -> None:
         self._rule = rule
@@ -225,12 +235,13 @@ class AtCommandRule(Rule):
     """
 
     rule_type: ClassVar[str] = "at_command"
+    order: ClassVar[int] = 10
 
     async def match(self, msg: atriMessageEvent[MessageEvent]) -> bool:
         if not msg.is_at:
             return False
         
-        return msg.event.pure_text.strip().startswith("/")
+        return msg.event.pure_text.startswith("/")
 
     def __repr__(self) -> str:
         return "AtCommandRule()"
@@ -247,6 +258,7 @@ class AtRule(Rule):
     """
 
     rule_type: ClassVar[str] = "at"
+    order: ClassVar[int] = 70
 
     def __init__(self, is_at: bool = True) -> None:
         self._expect_at = is_at
