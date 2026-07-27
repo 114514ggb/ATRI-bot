@@ -40,7 +40,7 @@ class AlwaysRule(Rule):
     """始终匹配的规则"""
 
     rule_type: ClassVar[str] = "always"
-    order: ClassVar[int] = 80
+    order: ClassVar[int] = 50
 
     async def match(self, msg: atriMessageEvent) -> bool:
         return True

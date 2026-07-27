@@ -13,7 +13,7 @@ class EmojiLikeNoticeRule(Rule):
     """仅匹配非自身的表情回应添加通知"""
 
     rule_type = "emoji_like_notice"
-    order = 40
+    order = 60
 
     async def match(self, msg: atriMessageEvent) -> bool:
         ev = msg.event

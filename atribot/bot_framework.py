@@ -176,7 +176,7 @@ class BotFramework:
                 await event.send(event.reply_text(f"ATRI用手挠了挠脑袋,这个指令执行出现了问题😕\nType Error:\n{e}"))
                 event.stop_propagation = True
 
-        @bus.on_message(priority=1)
+        @bus.on_message(priority=100)
         async def on_chat(event:atriMessageEvent):
             try:
                 if group_context := event._extra["group_context"]:

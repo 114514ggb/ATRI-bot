@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Optional
 
+from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 
 
@@ -290,7 +291,7 @@ class SendClientBase(ABC):
         """
         raise NotImplementedError(f"{type(self).__name__} 未实现 get_stranger_info")
 
-    async def get_msg_details(self, message_id: int | str) -> Any | None:
+    async def get_msg_details(self, message_id: int | str) -> MessageEventEnvelope | None:
         """获取消息详情
 
         Args:

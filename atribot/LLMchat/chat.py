@@ -13,7 +13,6 @@ from atribot.core.platform.onebot.message_event import OneBotMessageEvent
 from atribot.core.platform.send_client import SendClientBase
 from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.chat_message_types import (
-    ChatMessage,
     FileMessageSegment,
     FileSegment,
     ImageSegment,
@@ -147,7 +146,6 @@ class ChatBasics(ABC):
     ) -> None:
         """为当前用户输入附加结构化的消息片段"""
         Segment = event.event.segments[0]
-        quote_message = None
         message_builder.add_text(
             f"最新用户消息:\n<MESSAGE>"
             f"<user_id>{event.user_id}</user_id>"
@@ -221,15 +219,16 @@ class ChatBasics(ABC):
                                 continue
                 message_builder.add_text(segment.__str__())
 
+        quote_message = None
+
         if isinstance(Segment, ReplySegment):
-            if reply_data := await event.send_client.get_msg_details(Segment.message_id):
-                quote_message = ChatMessage.from_chat_event(reply_data["data"])
+            if quote_message := await event.send_client.get_msg_details(Segment.message_id):
                 message_builder.add_text("<引用消息段>")
             else:
                 message_builder.add_text("<引用消息段>[引用消息解析失败]</引用消息段>")
 
         if quote_message:
-            await append_segments(quote_message.segments)
+            await append_segments(quote_message.event.segments)
             message_builder.add_text("</引用消息段>")
             await append_segments(event.event.segments[1:])
         else:
@@ -651,7 +650,6 @@ class GroupChat(ChatBasics):
         """
         
         Segment = event.event.segments[0]
-        quote_message = None
 
         message_builder.add_text(
             f"最新用户消息:\n<MESSAGE>"
@@ -733,13 +731,14 @@ class GroupChat(ChatBasics):
                 
                 message_builder.add_text(segment.__str__())
         
+        quote_message = None
+        
         if isinstance(Segment,ReplySegment):
-            if reply_data := await event.send_client.get_msg_details(Segment.message_id):
-                quote_message = ChatMessage.from_chat_event(reply_data["data"])
+            if quote_message := await event.send_client.get_msg_details(Segment.message_id):
                 message_builder.add_text("<引用消息段>")
         
         if quote_message:
-            await append_segments(quote_message.segments)
+            await append_segments(quote_message.event.segments)
             
             message_builder.add_text("</引用消息段>")
             
