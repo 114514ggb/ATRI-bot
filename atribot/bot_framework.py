@@ -217,7 +217,7 @@ class BotFramework:
         trigger = container.get_by_type(TimeTriggerSupervisor)
         await trigger.start()
 
-        self.create_background_task(self._start_admin_panel(), name="BotFramework.admin_panel")
+        # self.create_background_task(self._start_admin_panel(), name="BotFramework.admin_panel")
 
     async def _start_admin_panel(self) -> None:
         """在独立端口启动 Web 管理面板"""

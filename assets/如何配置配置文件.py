@@ -1,19 +1,43 @@
 
-#先把文件config copy.json,supplier_config copy.json重名成onfig.json,supplier_config.json再根据注释填写
+#先把文件config copy.json,supplier_config copy.json重命名成config.json,supplier_config.json再根据注释填写
 {
-    "network":
-    {
-        "connection_type":"WebSocket_server", #和napcat的连接类型支持连接类型有["http","WebSocket_client","WebSocket_server"]注意http废弃很久了没测试不一定能用
-        "access_token":"ATRI114514", #和napcat连接要的验证token
-        "url":"127.0.0.1:8888", #连接端口在WebSocket_client和http的时候需要
-        "host":"127.0.0.1", #作为服务端的时候开的端口
-        "server_port":8888, #作为服务端的时候开的端口号
-        "admin_port":1314 #Web管理面板端口号
+    "platforms": {
+        # connection_type 决定用哪个配置, 三种模式:
+        #WebSocket_client
+        "napcat": {#这个目前只有napcat
+            "adapter": "onebot",
+            "connection_type": "WebSocket_client",
+            "access_token": "ATRI114514",
+            "url": "127.0.0.1:8888",       # 连接地址
+            "enabled": True,               # 可选,默认 true
+            "source_name": ""              # 可选,空=取平台名
+        },
+        #WebSocket_server
+        "napcat_server": {#如果要用这个连接方式记得把napcat_server改成napcat
+            "adapter": "onebot",
+            "connection_type": "WebSocket_server",
+            "access_token": "ATRI114514",
+            "host": "0.0.0.0",           # 监听地址
+            "port": 8888,                # 监听端口
+            "enabled": False,
+            "source_name": ""
+        },
+        #http
+        "napcat_http": {#如果要用这个连接方式记得把napcat_http改成napcat
+            "adapter": "onebot",
+            "connection_type": "http",
+            "access_token": "ATRI114514",
+            "url": "http://127.0.0.1:8888",
+            "host": "127.0.0.1",
+            "port": 8888,
+            "enabled": False,
+            "source_name": ""
+        }
     },
-    "root_user_id": 114514,#root用户的qq号，有执行命令的最高权限，不管在哪个群都会无视其他配置名单强制接受这个qq号的消息
+    "root_user_id": 2631018780,#root用户的qq号，有执行命令的最高权限，不管在哪个群都会无视其他配置名单强制接受这个qq号的消息
     "account":{
-        "id":3930909243, #bot的qq号
-        "name":"ATRI-bot" #bot的账号名称
+        "id":2430843831, #bot的qq号
+        "name":"atri~" #bot的账号名称
     },
     "file_path":{#没事的话可以不配置目录,使用默认的即可,注意如果没有对应目录的话会自动创建
         "resolve_paths": False,#是否强制将相对路径转为绝对路径
@@ -26,7 +50,8 @@
             "supplier_config_path":"assets/supplier_config.json", #供应商配置文件路径
             "tool_calls":"atribot/LLMchat/tools",#供ai调用工具实现文件夹
             "mcp_config":"atribot/LLMchat/MCP/mcp_server.json", #MCP 配置文件路径
-            "agent_skills":"atribot/LLMchat/skills/agent_skills" #读取skills的目录
+            "agent_skills":"atribot/LLMchat/skills/agent_skills", #读取skills的目录
+            "plugins":"atribot/plugins" #插件目录
         },
         "relative_to_document":{#相对于 document_root 的目录
             "audio":"audio", #音频目录
@@ -39,64 +64,65 @@
     "model":{ 
         "connect":
         {
-            "supplier":"deepseek",#配置的聊天模型来自的供应商
-            "model_name":"deepseek-chat",#配置的聊天模型名称
-            "user_global_context":True #决定了上下文的存在在形式,是一个群共用一个上下文，还是每个user单独的上下文
+            "supplier":"zaxprisのapi",#配置的聊天模型来自的供应商(对应 supplier_config.json 中 api[].name)
+            "model_name":"Nvidia/deepseek-ai/deepseek-v4-flash",#配置的聊天模型名称(对应 supplier_config.json 中 models 的 key)
+            "user_global_context":True #上下文模式: True=每个群/人共享一个上下文, False=每个人独立上下文
         },
         "chat_parameter":{#聊天模型会使用的参数配置
             "thinking_level":"high",#minimal,low,medium,high
             "temperature":0.3,
             "max_tokens": 8000,
+            "response_format":{ "type": "json_object" },#我还挺支持用这个参数的这样效果还行一般不会出现无法解析的格式
             "stream":False,
             "tool_choice": "auto"
         },
         "tavily_search_API_key":"",#一个网络搜索的api挺好用的(免费) https://docs.tavily.com/
-        "detection_image":{#用于视觉辅助,给没有的视觉的模型提供文字描述使用的模型
+        "detection_image":{#用于视觉辅助,给没有视觉的模型提供文字描述使用的模型
             "supplier":"bigModel",
-            "model_name":"GLM-4.1V-Thinking-Flash"
+            "model_name":"GLM-4.6V-Flash"
         },
-        "detection_audio":{#给没有的输入音频的模型提供文字描述使用的模型
+        "detection_audio":{#给没有输入音频能力的模型提供文字描述使用的模型
             "supplier":"",
             "model_name":""
         },
-        "detection_video":{
-            "supplier":"",
-            "model_name":""
+        "detection_video":{#给没有输入视频能力的模型提供文字描述使用的模型
+            "supplier":"bigModel",
+            "model_name":"GLM-4.6V-Flash"
         },
         "memory":{#总结群聊天内容做为模型记忆的模型
             "summarize_model":{
                 "supplier":"zaxprisのapi",
-                "model_name":"GeminiCLI/gemini-2.5-flash-search"
+                "model_name":"Nvidia/moonshotai/kimi-k2-instruct-0905"
             }
         },
         "agency_Agent":{#给ai子代理使用的模型
-            "supplier":"",
-            "model_name":""
+            "supplier":"zaxprisのapi",
+            "model_name":"Nvidia/moonshotai/kimi-k2.6"
         },
         "standby_model":[#当主聊天模型尝试失败后会使用的其他供应商或其他的模型,但是备用模型会使用的model参数是一个默认的通用参数硬编码在里面
+            {            
+                "supplier":"星见雅api",
+                "model_name":"z-ai/glm-5.1"
+            },            
             {
                 "supplier":"zaxprisのapi",
-                "model_name":"GeminiCLI/gemini-2.5-flash-search"
+                "model_name":"Nvidia/deepseek-ai/deepseek-v4-pro"
             },
             {
                 "supplier":"zaxprisのapi",
-                "model_name":"GeminiCLI/gemini-2.5-pro-nothinking"
+                "model_name":"Nvidia/moonshotai/kimi-k2-instruct"
             },
             {
                 "supplier":"zaxprisのapi",
                 "model_name":"Nvidia/moonshotai/kimi-k2-instruct-0905"
             },
             {
-                "supplier":"kourichat",
-                "model_name":"gpt-5-chat-latest"
-            },
-            {
                 "supplier":"deepseek",
-                "model_name":"deepseek-chat"
+                "model_name":"deepseek/DeepSeek-V4-Flash"
             },
             {
                 "supplier":"bigModel",
-                "model_name":"GLM-4.6-Flash"
+                "model_name":"GLM-4.6V-Flash"
             }
         ],
         "RAG":{#对模型提供记忆搜索支持的嵌入式模型
@@ -116,37 +142,40 @@
         }
     },
     "ai_chat":{
-        "playRole":"ATRI",#聊天采用的人设名要是前面chat_manager里面有的人物，不然就是没有人设
-        "ai_max_record":20,#上下文的消息存储的消息轮数
+        "playRole":"ATRI_simplify",#聊天采用的人设名要是前面chat_manager里面有的人物，不然就是没有人设
+        "ai_max_record":10,#上下文的消息存储的消息轮数
         "group_max_record":20,#群消息缓存的消息条数量为ai上下文的
         "private_max_record":20#user上下文消息轮数限制
     },#注意消息轮数是指你输入一条消息然后等到ai回复一次这就是一轮,这一轮里面可能包含ai多次工具调用什么的
     "sand_box":{#这个是沙盒的的配置参数，需要看具体使用的沙盒实例来传递参数,默认使用的是docker，可以去atribot\LLMchat\sandbox\docker_sandbox.py看看class接受的参数
         "image":"atri-sandbox:latest"#启动的镜像名称
     },
-    "tool_presets": {#各个聊天模块所使用的工具列表,可以配置列表是空代表没有工具,配置为空值代表使用全部工具
-        "group_chat": [#群聊使用的
+    "tool_presets": {#各个聊天模块所使用的工具列表, 每一项对应 LLMchat/tools/ 下的一个工具目录名
+        # 列表为空代表没有工具; 若要使用全部工具, 把该模块的列表值设为 null 或省略
+        "group_chat": [#群聊使用的工具
             "web_search", "web_extract",
             "memory_search", "memory_storage",
             "run_python_code",
-            "send_image_message", "send_speech_message",
+            "run_command",
+            "send_file","add_file",
+            "send_image_message",
             "load_skill_prompt", "get_user_info",
-            "schedule_self_trigger"
+            "schedule_self_trigger", "sub_agent"
         ],
-        "private_chat": [#私聊使用的
+        "private_chat": [#私聊使用的工具
             "web_search", "memory_search",
             "load_skill_prompt", "get_user_info"
         ],
-        "agency_Agent": [#子agent使用的
+        "agency_Agent": [#子代理(子 agent)使用的工具
             "run_command",
             "send_file","add_file",
-            "run_python_code", 
+            "get_user_info", "memory_search",
             "web_search", "web_extract"
-        ],
-        "使用全部工具": None
+        ]
+        # 如需某个模块使用全部工具: "模块名": null
     },
     "group_white_list":[
-        984466158#有效的群白名单
+        2169027872#有效的群白名单
     ],
     "group_initiative_chat_white_list":[#默认的启动主动聊天的名单，首先这个名单出现过的要也在group_white_list出现过，才有效
     ],
@@ -157,7 +186,7 @@
         "host":"127.0.0.1",#数据库连接ip地址
         "port":5432,#连接的端口号
         "user":"postgres",#连接数据库的user名称
-        "password":"atri"#密码
+        "password":"180710"#密码
     }
 }
 

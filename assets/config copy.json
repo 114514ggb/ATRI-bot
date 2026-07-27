@@ -1,12 +1,13 @@
 {
-    "network":
-    {
-        "connection_type":"WebSocket_server",
-        "access_token":"ATRI",
-        "url":"127.0.0.1:8888",
-        "host":"127.0.0.1",
-        "server_port":8888,
-        "admin_port":1314
+    "platforms": {
+        "napcat": {
+            "adapter": "onebot",
+            "connection_type": "WebSocket_client",
+            "access_token": "ATRI114514",
+            "url": "127.0.0.1:8888",
+            "enabled": true,
+            "source_name": ""
+        }
     },
     "root_user_id": 114514,
     "account":{
@@ -22,9 +23,10 @@
             "commands":"atribot/commands",
             "chat_manager":"atribot/LLMchat/character_setting",
             "supplier_config_path":"assets/supplier_config.json",
-            "tool_calls":"atribot/LLMchat/tools",
             "mcp_config":"atribot/LLMchat/MCP/mcp_server.json",
-            "agent_skills":"atribot/LLMchat/skills/agent_skills"
+            "tool_calls":"atribot/LLMchat/tools",
+            "agent_skills":"atribot/LLMchat/skills/agent_skills",
+            "plugins":"atribot/plugins"
         },
         "relative_to_document":{
             "audio":"audio",
@@ -43,8 +45,11 @@
             "user_global_context":true
         },
         "chat_parameter":{
-            "temperature":0.3,
-            "max_tokens": 8000,
+            "temperature":0.6,
+            "top_p":0.90,
+            "max_tokens": 65536,
+            "response_format":{ "type": "json_object" },
+            "stream":false,
             "tool_choice": "auto"
         },
         "tavily_search_API_key":"",
@@ -69,7 +74,7 @@
             },
             {
                 "supplier":"bigModel",
-                "model_name":"GLM-4.5-Flash"
+                "model_name":"GLM-4.6V-Flash"
             }
         ],
         "RAG":{
@@ -115,7 +120,7 @@
         "agency_Agent": [
             "run_command",
             "send_file","add_file",
-            "run_python_code", 
+            "get_user_info", "memory_search",
             "web_search", "web_extract"
         ],
         "使用全部工具": null
