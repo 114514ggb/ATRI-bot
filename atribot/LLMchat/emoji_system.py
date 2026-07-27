@@ -327,7 +327,8 @@ class EmojiCore(ServiceBase):
         self,
         text: str,
         emoji_dict: dict,
-        reply_id: str | int = None
+        reply_id: str | int = None,
+        max_emoji: int = 3,
     ) -> str:
         """把字符串中的表情标签替换成CQ码
 
@@ -335,6 +336,7 @@ class EmojiCore(ServiceBase):
             text (str): 要处理的文本
             emoji_dict (dict): 可用的表情标签字典
             reply_id (str | int, optional): 回复消息 ID
+            max_emoji (int, optional): 最大表情数量
 
         Returns:
             str: 转换后的带有CQ码的字符串。
@@ -352,6 +354,7 @@ class EmojiCore(ServiceBase):
         parts = []
         append_part = parts.append
         get_complete_file_path = self.get_complete_file_path
+        emoji_count = 0
 
         while current_pos < text_len:
             bracket_start = text.find('[', current_pos)
@@ -369,6 +372,10 @@ class EmojiCore(ServiceBase):
             tag_content = text[bracket_start + 1:bracket_end]
 
             if tag_content in emoji_set:
+                emoji_count += 1
+                if emoji_count > max_emoji:
+                    text_start = current_pos = bracket_end + 1
+                    continue
                 if bracket_start > text_start:
                     append_part(text[text_start:bracket_start])
                 append_part(f"[CQ:image,file=file://{get_complete_file_path(tag_content)}]")
@@ -386,7 +393,8 @@ class EmojiCore(ServiceBase):
         self, 
         text_list: list[str], 
         emoji_dict: dict,
-        reply_id: str|int = None
+        reply_id: str|int = None,
+        max_emoji: int = 3,
     )->list[str]:
         """把字符串列表中的表情标签替换成CQ码
 
@@ -394,6 +402,7 @@ class EmojiCore(ServiceBase):
             text_list (list[str]): 要处理的文本列表。每个元素都会原位替换其中的表情标签
             emoji_dict (dict): 可用的表情标签字典
             reply_id (str | int, optional): 回复消息 ID
+            max_emoji (int, optional): 最大表情数量，0 表示不限制
             
         Returns:
             list[str]: 转换后的带有CQ码的列表，顺序与输入一致。
@@ -402,7 +411,7 @@ class EmojiCore(ServiceBase):
             return []
 
         result = [
-            self.parse_text_to_cqcode_with_emotion(text, emoji_dict)
+            self.parse_text_to_cqcode_with_emotion(text, emoji_dict, max_emoji=max_emoji)
             for text in text_list
         ]
 
@@ -418,6 +427,7 @@ class EmojiCore(ServiceBase):
         emoji_dict: dict,
         send_func,
         reply_id: int | None = None,
+        max_emoji: int = 3,
     ) -> dict | None:
         """发送单条带表情标签的消息，失败时自动去掉标签重试
 
@@ -426,11 +436,12 @@ class EmojiCore(ServiceBase):
             emoji_dict: 表情标签字典
             send_func: 发送消息的异步函数，接收 (message: str) -> dict | None
             reply_id: 回复消息 ID
+            max_emoji: 最大表情数量，超出部分自动移除，默认 3
 
         Returns:
             dict | None: 最后一次发送的结果
         """
-        cq_message = self.parse_text_to_cqcode_with_emotion(text, emoji_dict, reply_id)
+        cq_message = self.parse_text_to_cqcode_with_emotion(text, emoji_dict, reply_id, max_emoji=max_emoji)
         result:dict = await send_func(cq_message)
 
         if result and result.get("status") != "ok":
@@ -449,6 +460,7 @@ class EmojiCore(ServiceBase):
         send_func,
         reply_id: int | None = None,
         delay: float = 0,
+        max_emoji: int = 3,
     ) -> list[dict | None]:
         """发送多条带表情标签的消息，每条失败时自动去掉标签重试
 
@@ -458,6 +470,7 @@ class EmojiCore(ServiceBase):
             send_func: 发送消息的异步函数，接收 (message: str) -> dict | None
             reply_id: 回复消息 ID(仅附加到第一条
             delay: 每条消息发送后的延迟（秒）
+            max_emoji: 最大表情数量，超出部分自动移除，默认 3
 
         Returns:
             list: 各条消息的发送结果列表
@@ -465,7 +478,7 @@ class EmojiCore(ServiceBase):
         if not text_list:
             return []
 
-        cq_messages = self.parse_list_to_cqcode_with_emotion(text_list, emoji_dict, reply_id)
+        cq_messages = self.parse_list_to_cqcode_with_emotion(text_list, emoji_dict, reply_id, max_emoji=max_emoji)
         results: list[dict | None] = []
 
         for i, cq_msg in enumerate(cq_messages):

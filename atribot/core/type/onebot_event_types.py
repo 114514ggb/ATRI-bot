@@ -3,7 +3,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TypedDict
 
 from atribot.core.type.chat_message_types import (
     AtSegment,
@@ -14,6 +14,59 @@ from atribot.core.type.chat_message_types import (
 )
 
 TEXT_LENGTH_LIMIT = 5000
+
+
+class SenderInfo(TypedDict, total=False):
+    """发送者信息
+
+    OneBot 事件中的 sender 字段结构
+    """
+    user_id: int
+    """QQ 号"""
+    nickname: str
+    """昵称"""
+    card: str
+    """群名片"""
+    role: str
+    """群角色: owner / admin / member"""
+    title: str
+    """专属头衔"""
+    level: str
+    """成员等级"""
+    sex: str
+    """性别"""
+    age: int
+    """年龄"""
+    area: str
+    """地区"""
+
+
+class HeartbeatStatus(TypedDict, total=False):
+    """心跳状态信息"""
+    online: bool
+    """是否在线"""
+    good: bool
+    """状态是否良好"""
+
+
+class UploadFileInfo(TypedDict, total=False):
+    """群文件上传的文件信息"""
+    id: str
+    """文件 ID"""
+    name: str
+    """文件名"""
+    size: int
+    """文件大小(字节)"""
+    busid: int
+    """业务 ID"""
+
+
+class EmojiLike(TypedDict):
+    """表情回应条目"""
+    emoji_id: str
+    """表情 ID"""
+    count: int
+    """使用次数"""
 
 
 class PostType(str, Enum):
@@ -295,24 +348,25 @@ class OneBotEvent(ABC):
         sub_type = data.get("sub_type", "")
 
         #群通知基类路由
-        if notice_type == NoticeType.GROUP_INCREASE:
-            return GroupIncreaseEvent.from_data(data)
-        elif notice_type == NoticeType.GROUP_MSG_EMOJI_LIKE:
+        if notice_type == NoticeType.GROUP_MSG_EMOJI_LIKE:
             return GroupMsgEmojiLikeEvent.from_data(data)
+        elif notice_type == NoticeType.GROUP_INCREASE:
+            return GroupIncreaseEvent.from_data(data)
         elif notice_type == NoticeType.GROUP_UPLOAD:
             return GroupUploadNoticeEvent.from_data(data)
         elif notice_type == NoticeType.GROUP_DECREASE:
             return GroupDecreaseEvent.from_data(data)
         elif notice_type == NoticeType.GROUP_RECALL:
             return GroupRecallNoticeEvent.from_data(data)
-        elif notice_type == NoticeType.GROUP_ADMIN:
-            return GroupAdminNoticeEvent.from_data(data)
         elif notice_type == NoticeType.GROUP_BAN:
             return GroupBanEvent.from_data(data)
-        elif notice_type == NoticeType.GROUP_CARD:
-            return GroupCardEvent.from_data(data)
         elif notice_type == NoticeType.ESSENCE:
             return GroupEssenceEvent.from_data(data)
+        elif notice_type == NoticeType.GROUP_ADMIN:
+            return GroupAdminNoticeEvent.from_data(data)
+        elif notice_type == NoticeType.GROUP_CARD:
+            return GroupCardEvent.from_data(data)
+
 
         #notify
         elif notice_type == NoticeType.NOTIFY:
@@ -395,7 +449,7 @@ class HeartbeatEvent(MetaEvent):
 
     NapCat 定期发送，用于确认连接状态
     """
-    status: Dict[str, Any] = field(default_factory=dict)
+    status: HeartbeatStatus = field(default_factory=dict)
     """状态信息 {"online": bool, "good": bool}"""
     interval: int = 0
     """心跳间隔(毫秒)"""
@@ -780,7 +834,7 @@ class GroupBanEvent(GroupNoticeEvent):
 @dataclass(slots=True)
 class GroupUploadNoticeEvent(GroupNoticeEvent):
     """群文件上传通知"""
-    file: Dict[str, Any] = field(default_factory=dict)
+    file: UploadFileInfo = field(default_factory=dict)
     """文件信息"""
 
     notice_type: str = field(default=NoticeType.GROUP_UPLOAD, init=False)
@@ -1010,7 +1064,7 @@ class GroupMsgEmojiLikeEvent(GroupNoticeEvent):
     """表情回应通知"""
     message_id: int = 0
     """消息 ID"""
-    likes: List[Dict[str, Any]] = field(default_factory=list)
+    likes: List[EmojiLike] = field(default_factory=list)
     """表情信息列表"""
 
     notice_type: str = field(default=NoticeType.GROUP_MSG_EMOJI_LIKE, init=False)
@@ -1528,7 +1582,7 @@ class MessageEvent(OneBotEvent):
     """解析后的消息段对象列表"""
     raw_message: str = ""
     """原始 CQ 码文本"""
-    sender: Dict[str, Any] = field(default_factory=dict)
+    sender: SenderInfo = field(default_factory=dict)
     """发送者信息字典"""
 
     cq_code: str = field(default="", init=False)

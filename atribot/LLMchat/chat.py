@@ -344,7 +344,6 @@ class GroupChat(ChatBasics):
             # emoji_id = 183 #表情:我最可爱
             emoji_id = 66 #爱心❤
         )
-        #181 茶
         
         message_builder: MessageBuilder = await self.prompt_structure(
             event=event,
@@ -408,7 +407,7 @@ class GroupChat(ChatBasics):
                 self.log.error(f"返回json解析不正确:{type(response_json)}")
                 await event.send_client.send_group_merge_text(
                     group_id = group_id,
-                    message = f"无法解析的错误返回值:\n{response_json}",
+                    message = f"{response_json}",
                     source = "模型返回无法解析的格式",
                 )
         
@@ -913,7 +912,7 @@ class GroupChat(ChatBasics):
             and len("".join(chat_text_list)) <= STRING_LENGTH_LIMIT
             # or MESSAGE_DELIMITER in chat_text
         ):
-            # 分条发送（含表情标签错误回退）
+            #分条发送
             await self.emoji_core.send_list_with_emoji_fallback(
                 text_list=chat_text_list,
                 emoji_dict=self.emoji_file_dict,
@@ -924,7 +923,7 @@ class GroupChat(ChatBasics):
             return
 
         else:
-            # 合并发送（含表情标签错误回退）
+            #合并发送
             text = chat_text_list if isinstance(chat_text_list, str) else "\n".join(chat_text_list)
             await self.emoji_core.send_with_emoji_fallback(
                 text=text,

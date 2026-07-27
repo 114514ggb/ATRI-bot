@@ -35,9 +35,7 @@ class PluginRuntime:
         self._definition = definition
         self._event_bus = event_bus
         self._pipeline = pipeline
-        self._log: Logger = log or logging.getLogger(
-            f"Plugin.{plugin.__class__.__name__}"
-        )
+        self.log: Logger = log
         self._listener_handlers: list[Callable[..., Any]] = []
         self._middleware_instances: list[PipelineMiddleware] = []
 
@@ -61,7 +59,7 @@ class PluginRuntime:
             )(handler)
             self._listener_handlers.append(handler)
 
-            self._log.debug(
+            self.log.debug(
                 "注册处理器: %s.%s → %s%s",
                 self._plugin.__class__.__name__,
                 h.method_name,
@@ -91,7 +89,7 @@ class PluginRuntime:
             await self._pipeline.add_middleware(mw)
             self._middleware_instances.append(mw)
 
-            self._log.debug(
+            self.log.debug(
                 "注册中间件: %s.%s (stage=%s) → %s",
                 self._plugin.__class__.__name__,
                 m.method_name,
@@ -105,22 +103,17 @@ class PluginRuntime:
             try:
                 self._event_bus.remove_listener(handler)
             except (ValueError, Exception):
-                self._log.debug("注销处理器时出错（可能已移除）: %s", handler)
+                self.log.debug("注销处理器时出错（可能已移除）: %s", handler)
         self._listener_handlers.clear()
 
         for mw in self._middleware_instances:
             try:
                 await self._pipeline.remove_middleware(mw.name)
             except (ValueError, Exception):
-                self._log.debug("移除中间件时出错（可能已移除）: %s", mw.name)
+                self.log.debug("移除中间件时出错（可能已移除）: %s", mw.name)
         self._middleware_instances.clear()
 
-        self._log.info("已清理所有 EventBus 监听器和 Pipeline 中间件")
-
-    @property
-    def log(self) -> Logger:
-        """运行时日志器"""
-        return self._log
+        self.log.info("已清理所有 EventBus 监听器和 Pipeline 中间件")
 
     @property
     def event_bus(self) -> EventBus:
