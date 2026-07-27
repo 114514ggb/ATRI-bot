@@ -10,6 +10,7 @@ from mcp.types import CallToolResult
 
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import ServiceBase, container
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.MCP.mcp_tool_manager import ToolManager
 from atribot.LLMchat.MCP.tool_executor import ToolExecutionEngine
 from atribot.LLMchat.MCP.tool_model import FunctionTool, LocalTool, MCPTool

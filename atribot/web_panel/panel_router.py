@@ -1,5 +1,4 @@
-﻿"""ATRI Web 管理面板"""
-import asyncio
+﻿import asyncio
 import json
 import os
 import sys
@@ -15,7 +14,6 @@ from pydantic import BaseModel
 
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
-
 from atribot.core.service_container import container
 
 router = APIRouter(prefix="/admin", tags=["admin"])

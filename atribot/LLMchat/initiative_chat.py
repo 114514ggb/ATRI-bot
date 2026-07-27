@@ -2,6 +2,7 @@ from logging import Logger
 from typing import List, Literal, Optional
 
 from atribot.core.cache.management_chat_example import ChatManager
+from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition
@@ -13,17 +14,23 @@ class initiativeChat:
     
     def __init__(self):
         self.log: Logger = container.get_by_type(Logger).getChild("InitChat")
-        self.chat_manager:ChatManager = container.get("ChatManager")
-        self.group_chat:GroupChat = container.get("GroupChat")
+        self.permissions_management = container.get_by_type(PermissionsManagement)
+        self.chat_manager = container.get_by_type(ChatManager)
+        self.group_chat = container.get_by_type(GroupChat)
         self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
     
     async def decision(self, event: MessageEventEnvelope, group_context:GroupContext) -> bool:
         """决策是否应该发言"""
-        # if not event.segments:
+        # if not event.event.segments:
         #     return False
 
         # if not event.event.pure_text:#你不输入文本内容在那里@什么呢
         #     return False
+        
+        try:
+            self.permissions_management.has_permission(event.user_id, 1)
+        except Exception:
+            return False
         
         if group_context.time_window.get_recent_avg_interval(4) < 0.7:
             #如果消息间隔过低不考虑
