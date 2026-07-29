@@ -13,8 +13,8 @@ if TYPE_CHECKING:
 class WhitelistMiddleware(PipelineMiddleware):
     """群白名单预处理中间件
 
-    检查消息来源群是否在白名单中，非白名单群的消息会被丢弃。
-    但 root_user_id 可以绕过白名单限制（用于调试/管理）。
+    检查消息来源群是否在白名单中，非白名单群的消息会被丢弃
+    但 root_user_id 可以绕过白名单限制（用于调试/管理）
     """
 
     name: ClassVar[str] = "whitelist"
@@ -43,10 +43,7 @@ class WhitelistMiddleware(PipelineMiddleware):
         if msg.group_id is None:
             return msg
 
-        if msg.user_id == self._root_user_id:
-            return msg
-
-        if msg.group_id in self._group_white_list:
+        if msg.group_id in self._group_white_list or msg.user_id == self._root_user_id:
             self._log.debug("群相关事件:%s",msg.event.primeval)
             return msg
 

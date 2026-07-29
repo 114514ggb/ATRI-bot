@@ -14,7 +14,7 @@ class initiativeChat:
     
     def __init__(self):
         self.log: Logger = container.get_by_type(Logger).getChild("InitChat")
-        self.permissions_management = container.get_by_type(PermissionsManagement)
+        self.blacklist = container.get_by_type(PermissionsManagement).blacklist
         self.chat_manager = container.get_by_type(ChatManager)
         self.group_chat = container.get_by_type(GroupChat)
         self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
@@ -27,19 +27,19 @@ class initiativeChat:
         # if not event.event.pure_text:#你不输入文本内容在那里@什么呢
         #     return False
         
-        try:
-            self.permissions_management.has_permission(event.user_id, 1)
-        except Exception:
-            return False
-        
         if group_context.time_window.get_recent_avg_interval(4) < 0.7:
             #如果消息间隔过低不考虑
             self.log.info(f"群{event.group_id}消息超过限制~不考虑回复")
             return False
 
-        group_id: int = event.group_id
         user_id: int = event.user_id
+        group_id: int = event.group_id
         params: LLMGroupChatCondition = group_context.LLM_chat_decision_parameters
+
+        #过滤
+        if user_id in self.blacklist:
+            await params.add_turns_since_last_llm()
+            return False
 
         #被@检测
         if event.is_at:
@@ -52,7 +52,7 @@ class initiativeChat:
             return decision
 
         #要存在文本
-        if event.event.pure_text.strip():
+        if event.event.pure_text:
             
             #追问检测
             if params.get_seconds_since_user_time() < 7 and user_id == params.last_trigger_user_id:#这个看起来不太对,好像包括了响应时间

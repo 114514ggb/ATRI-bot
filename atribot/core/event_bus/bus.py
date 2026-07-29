@@ -204,12 +204,12 @@ class EventBus:
                 if listener.once:
                     self._remove_one(listener)
 
-                self._log.debug(
-                    "触发 %s → %s (rule=%s)",
-                    post_type.value,
-                    getattr(listener.handler, "__name__", listener.handler),
-                    listener.rule,
-                )
+                # self._log.debug(
+                #     "触发 %s → %s (rule=%s)",
+                #     post_type.value,
+                #     getattr(listener.handler, "__name__", listener.handler),
+                #     listener.rule,
+                # )
                 await listener.handler(msg)
 
             except Exception:

@@ -64,7 +64,6 @@ class BotFramework:
         (AsyncPostgreSQL, "database"),
         (ToolManager, "MCP"),
         (LLMConnectionManager, "LLMSupplier"),
-        # (QQAPIClient, "SendMessage"),
         (ToolCalls, "ToolCalls"),
     )
 
@@ -81,7 +80,6 @@ class BotFramework:
         ChatManager,
         EmojiCore,
         PermissionsManagement,
-        # QQAPIClient,
         ToolCalls,
         MediaProcessor,
         CommandSystem,

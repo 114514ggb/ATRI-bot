@@ -1,5 +1,6 @@
 import re
 
+from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import (
@@ -32,6 +33,7 @@ class GroupManagerPlugin(Plugin):
     def __init__(self) -> None:
         super().__init__()
         self.keyword_rsp = KeywordResponder()
+        self.blacklist = container.get_by_type(PermissionsManagement).blacklist
 
     @Plugin.on_message(priority=0)
     async def on_keyword_response(self, event: MessageEventEnvelope) -> None:
@@ -40,7 +42,8 @@ class GroupManagerPlugin(Plugin):
         处理纯文本/图片/音频/混合消息的自动回复。
         """
         try:
-            await self.keyword_rsp.handle(event)
+            if event.user_id not in self.blacklist:#过滤
+                await self.keyword_rsp.handle(event)
         except Exception as e:
             self.log.exception("关键词回复处理异常: %s", e)
 
