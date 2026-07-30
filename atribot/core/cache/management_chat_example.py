@@ -1,3 +1,4 @@
+import datetime
 from logging import Logger
 from typing import TYPE_CHECKING, Dict, List
 
@@ -8,15 +9,27 @@ from atribot.core.pipeline.middleware import PipelineMiddleware
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.service_container import ServiceBase, container
 from atribot.core.time_trigger import TimeTriggerSupervisor
+from atribot.core.type.chat_message_types import (
+    ImageSegment,
+    RecordSegment,
+    TextSegment,
+    VideoSegment,
+)
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition, PrivateContext
-from atribot.core.type.context_types import Context
+from atribot.core.type.context_types import Context, MessageBuilder
 from atribot.core.type.onebot_event_types import (
     GroupMessageEvent,
     MessageSentEvent,
     PostType,
     PrivateMessageEvent,
 )
+from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import MemorySystem
+
+# 多模态历史消息默认保留数量
+DEFAULT_INCLUDING_PICTURES = 2
+DEFAULT_INCLUDING_AUDIOS = 1
+DEFAULT_INCLUDING_VIDEOS = 1
 
 if TYPE_CHECKING:
     from atribot.core.type.bot_types import atriMessageEvent
@@ -30,11 +43,13 @@ class ChatManager(ServiceBase):
         cls,
         config: atriConfig,
         time_trigger: TimeTriggerSupervisor,
+        media_processor: MediaProcessor,
         log: Logger,
     ) -> ChatManager:
         return cls(
             log=log,
             time_trigger=time_trigger,
+            media_processor=media_processor,
             default_play_role=config.ai_chat.playRole,
             group_messages_max_limit=config.ai_chat.group_max_record,
             private_messages_max_limit=config.ai_chat.private_max_record,
@@ -48,6 +63,7 @@ class ChatManager(ServiceBase):
         self,
         log: Logger,
         time_trigger: TimeTriggerSupervisor,
+        media_processor: MediaProcessor | None = None,
         default_play_role: str = "none",
         group_messages_max_limit: int = 20,
         private_messages_max_limit: int = 20,
@@ -59,6 +75,7 @@ class ChatManager(ServiceBase):
     ):
         self.logger = log
         self.time_trigger = time_trigger
+        self.media_processor: MediaProcessor | None = media_processor
         self.group_dict: Dict[int, GroupContext] = {}
         """存储群组上下文实例"""
         self.private_dict:Dict[int, PrivateContext] = {}
@@ -303,8 +320,132 @@ class ChatManager(ServiceBase):
         (await self.get_private_context(user_id)).chat_context = context
     
     async def get_group_messages_str(self, group_id: int) -> str:
-        """返回群消息上下文"""
+        """返回群消息上下文(纯文本)"""
         return (await self.get_group_context(group_id)).build_context()
+
+    async def add_group_messages_builder(
+        self, 
+        group_id: int, 
+        builder: MessageBuilder,
+        *,
+        including_pictures: bool = False,
+        including_audios: bool = False,
+        including_videos: bool = False,
+    ) -> MessageBuilder:
+        """添加群消息，附带构造
+
+        将群聊消息上下文转换为 MessageBuilder 多模态消息
+        支持按类型控制保留的实际多媒体数量（不包括自己账号的多模态消息），超出数量的多模态项转为 CQ 码文本描述
+
+        Args:
+            group_id: 群组ID
+            builder: 消息构建器
+            including_pictures: True = 保留 DEFAULT_INCLUDING_PICTURES 条实际图片；
+                                False = 使用 MediaProcessor 转为文本描述
+            including_audios: True = 保留 DEFAULT_INCLUDING_AUDIOS 条实际音频；
+                              False = 使用 MediaProcessor 转为文本描述
+            including_videos: True = 保留 DEFAULT_INCLUDING_VIDEOS 条实际视频；
+                              False = 使用 MediaProcessor 转为文本描述
+
+        Returns:
+            MessageBuilder: 构造完成的消息构建器
+        """
+
+        messages = (await self.get_group_context(group_id)).messages
+
+        remaining_pictures = DEFAULT_INCLUDING_PICTURES if including_pictures else 0
+        remaining_audios = DEFAULT_INCLUDING_AUDIOS if including_audios else 0
+        remaining_videos = DEFAULT_INCLUDING_VIDEOS if including_videos else 0
+
+        builder.add_text_left('</group_history>')
+
+        for event in reversed(messages):
+            
+            # if not isinstance(event, MessageEvent):
+            #     event:OneBotEvent
+            #     builder.add_text_left(event.format_event_simple)
+            #这段目前没什么用，感觉以后这个消息段不止会放消息
+
+            if isinstance(event, MessageSentEvent):
+                builder.add_text_left(event.llm_formatted_message)
+                continue
+            
+            builder.add_text_left('\n</user_message>\n</MESSAGE>')
+
+            for segment in reversed(event.segments):
+                if isinstance(segment, TextSegment):
+                    builder.add_text_left(segment.text)
+
+                elif isinstance(segment, ImageSegment):
+                    if remaining_pictures > 0:
+                        if url := segment.url or segment.file.file:
+                            builder.add_image_left(url)
+                        remaining_pictures -= 1
+                        cq_text = (
+                            f"[CQ:image,file={segment.file_name or 'unknown'}]"
+                        )
+                        builder.add_text_left(cq_text)
+                    else:
+                        if not segment.text_description:
+                            url = segment.url or segment.file.file
+                            try:
+                                desc = await self.media_processor.image_to_text(url)
+                                segment.text_description = desc
+                            except Exception:
+                                segment.text_description = "<描述获取失败>"
+                        builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+
+                elif isinstance(segment, RecordSegment):
+                    if remaining_audios > 0:
+                        if data:=segment.file.file:
+                            builder.add_audio_left(data)
+                        remaining_audios -= 1
+                        cq_text = (
+                            f"[CQ:record,file={segment.file_name or 'unknown'}]"
+                        )
+                        builder.add_text_left(cq_text)
+                    else:
+                        if not segment.text_description:
+                            audio_url = segment.url or segment.file.file
+                            try:
+                                desc = await self.media_processor.audio_to_text(audio_url)
+                                segment.text_description = desc
+                            except Exception:
+                                segment.text_description = "<描述获取失败>"
+                        builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+
+                elif isinstance(segment, VideoSegment):
+                    if remaining_videos > 0:
+                        if url:=segment.url or segment.file.file:
+                            builder.add_video_left(url)
+                        remaining_videos -= 1
+                        cq_text = (
+                            f"[CQ:video,file={segment.file_name or 'unknown'}]"
+                        )
+                        builder.add_text_left(cq_text)
+                    else:
+                        if not segment.text_description:
+                            video_url = segment.url or segment.file.file
+                            try:
+                                desc = await self.media_processor.video_to_text(video_url)
+                                segment.text_description = desc
+                            except Exception:
+                                segment.text_description = "<描述获取失败>"
+                        builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+
+                else:
+                    builder.add_text_left(segment.__str__())
+
+            builder.add_text_left(
+                f'<MESSAGE user_id={event.user_id}'
+                f' nick_name={event.sender_nickname}'
+                f' time={datetime.datetime.fromtimestamp(event.time).strftime('%Y-%m-%d %H:%M:%S')}>'
+                f'\n<user_message>'
+            )
+
+        builder.add_text_left('<group_history>')
+
+        return builder
 
     async def get_group_LLM_decision_parameters(self, group_id:int)->LLMGroupChatCondition:
         """返回LLM聊天决策参数对象"""

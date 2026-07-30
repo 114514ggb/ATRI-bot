@@ -59,7 +59,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     nameservers=['8.8.8.8', '8.8.4.4', '114.114.114.114'] #DNS相关
                 )
             ),
-            timeout=aiohttp.ClientTimeout(total=360, connect=20),  # 总超时设置
+            timeout=aiohttp.ClientTimeout(total=180, connect=20),  # 总超时设置
             headers=self.headers
         )
         

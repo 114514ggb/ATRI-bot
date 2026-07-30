@@ -64,7 +64,7 @@ class SendClientBase(ABC):
 
         Args:
             group_id: 目标群号
-            message: 文本字符串或消息段列表
+            message: 文本字符串或消息段列表,发送到qq的话会解析cq码
         """
         ...
 

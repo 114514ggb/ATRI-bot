@@ -175,7 +175,7 @@ class FaceSegment(MessageSegment):
 
 
 class ReplySegment(MessageSegment):
-    """回复"""
+    """回复/引用消息"""
     __slots__ = ['message_id']
     
     def __init__(self, message_id: str):
@@ -234,7 +234,8 @@ class ForwardSegment(MessageSegment):
     
     def __str__(self) -> str:
         if self.content:
-            content_str = "".join(ChatMessage.from_chat_event(m).llm_formatted_message for m in self.content)
+            from atribot.core.type.onebot_event_types import OneBotEvent
+            content_str = "".join(OneBotEvent.from_dict(m).llm_formatted_message for m in self.content)
             return f"[CQ:转发消息,id={self.id},content={content_str[:5000]}]"
         return f"[CQ:forward,id={self.id}]"
     
@@ -442,7 +443,27 @@ class FileMessageSegment(MessageSegment, ABC):
         pass
 
 
-class ImageSegment(FileMessageSegment):
+class TextDescriptableMixin:
+    """为媒体消息段提供文本描述缓存功能
+
+    由 MediaProcessor 生成识别文本，供不支持多模态的 LLM 使用
+    """
+
+    def __init__(self, *args, text_description: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._text_description: str | None = text_description
+
+    @property
+    def text_description(self) -> str:
+        """获取媒体识别文本描述缓存"""
+        return self._text_description or ""
+
+    @text_description.setter
+    def text_description(self, value: str) -> None:
+        self._text_description = value
+
+
+class ImageSegment(TextDescriptableMixin, FileMessageSegment):
     """图片"""
     __slots__ = ["summary"]
     
@@ -454,8 +475,12 @@ class ImageSegment(FileMessageSegment):
         path: Optional[str] = None,
         file_size: int = 0,
         summary: Optional[str] = None,
+        text_description: str | None = None,
     ):
-        super().__init__(MessageSegmentType.IMAGE.value, file, file_name, url, path, file_size)
+        super().__init__(
+            MessageSegmentType.IMAGE.value, file, file_name, url, path, file_size,
+            text_description=text_description,
+        )
         self.summary:str = summary
         """图片描述(可选)"""
     
@@ -473,7 +498,7 @@ class ImageSegment(FileMessageSegment):
         return f"[CQ:image,{summary_part}file={self.file_name},url={self.url}]"
 
 
-class RecordSegment(FileMessageSegment):
+class RecordSegment(TextDescriptableMixin, FileMessageSegment):
     """语音"""
     __slots__ = []
     
@@ -484,13 +509,17 @@ class RecordSegment(FileMessageSegment):
         url: Optional[str] = None,
         path: Optional[str] = None,
         file_size: int = 0,
+        text_description: str | None = None,
     ):
-        super().__init__(MessageSegmentType.RECORD.value, file, file_name, url, path, file_size)
+        super().__init__(
+            MessageSegmentType.RECORD.value, file, file_name, url, path, file_size,
+            text_description=text_description,
+        )
     
     def __str__(self) -> str:
         return f"[CQ:record,file={self.file_name}]"
 
-class VideoSegment(FileMessageSegment):
+class VideoSegment(TextDescriptableMixin, FileMessageSegment):
     """视频"""
     __slots__ = ["thumb"]
     
@@ -501,9 +530,13 @@ class VideoSegment(FileMessageSegment):
         url: Optional[str] = None,
         path: Optional[str] = None,
         file_size: int = 0,
-        thumb:str = None
+        thumb:str = None,
+        text_description: str | None = None,
     ):
-        super().__init__(MessageSegmentType.VIDEO.value, file, file_name, url, path, file_size)
+        super().__init__(
+            MessageSegmentType.VIDEO.value, file, file_name, url, path, file_size,
+            text_description=text_description,
+        )
         self.thumb = thumb
         """视频缩略图(可选)"""
     

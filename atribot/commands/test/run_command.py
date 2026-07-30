@@ -25,10 +25,20 @@ async def run_async_code(message_data: MessageEventEnvelope):
     
     PrivateMessage
     GroupMessage
-    File
+    File 
+    
+    # send_message = message_data.send_client
+    # Segment = message_data.event.segments[0]
+    # from atribot.core.type.chat_message_types import ReplySegment
+    # if isinstance(Segment, ReplySegment):
+    #     if quote_message := await send_message.get_msg_details(Segment.message_id):
+    #         cqc= quote_message.event.cq_code
+    #         a = await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text(cqc))
+    #         await send_message.send_group_msg(984466158, str(a))
+            
+    # await send_message.send_group_msg(984466158, '你好')
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text('消息'))
-    # await send_message.send_group_message(984466158, '你好[CQ:image,file=file:///home/atri/py_project/ATRI-main/document/img/ATGRI_在瑶亚.gif]')
-    # await send_message.send_group_message(984466158,'[CQ:json,data={ "app": "com.tencent.map"&#44; "config": { "autoSize": 1&#44; "forward": 1&#44; "height": "60"&#44; "type": "normal"&#44; "width": "666" }&#44; "desc": ""&#44; "meta": { "Location.Search": { "address": "你已被群主强奸"&#44; "enum_relation_type": 1&#44; "from": "plusPanel"&#44; "from_account": 2147483647&#44; "id": ""&#44; "lat": "1"&#44; "lng": "1"&#44; "name": "你已被群主强奸"&#44; "uint64_peer_account": "chaijun" } }&#44; "prompt": "你已被移除群聊"&#44; "ver": "1.1.2.21"&#44; "view": "LocationShare" }]')
+    # await send_message.send_group_msg(984466158,'[CQ:json,data={ "app": "com.tencent.map"&#44; "config": { "autoSize": 1&#44; "forward": 1&#44; "height": "60"&#44; "type": "normal"&#44; "width": "666" }&#44; "desc": ""&#44; "meta": { "Location.Search": { "address": "你已被群主强奸"&#44; "enum_relation_type": 1&#44; "from": "plusPanel"&#44; "from_account": 2147483647&#44; "id": ""&#44; "lat": "1"&#44; "lng": "1"&#44; "name": "你已被群主强奸"&#44; "uint64_peer_account": "chaijun" } }&#44; "prompt": "你已被移除群聊"&#44; "ver": "1.1.2.21"&#44; "view": "LocationShare" }]')
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text(str(container.get("ChatManager").get_private_context(168238719).chat_context)))
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_record(File.from_local_path("/home/atri/音乐/Boblues Remix.mp3")))
     # await send_message.send(PrivateMessage(user_id=1317196420).add_record(File.from_local_path("/home/atri/音乐/彩叶.mp3")))

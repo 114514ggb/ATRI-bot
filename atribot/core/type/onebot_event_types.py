@@ -3,7 +3,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict, List, Literal, Optional, TypedDict
 
 from atribot.core.type.chat_message_types import (
     AtSegment,
@@ -269,6 +269,7 @@ class OneBotEvent(ABC):
         """返回详细 XML 格式化文本"""
         ...
 
+    @property
     def format_event_simple(self) -> str:
         """获取简洁 AI 可读事件描述"""
         if not self._cached_simple:
@@ -283,7 +284,7 @@ class OneBotEvent(ABC):
         return self._cached_detailed
 
     def __str__(self) -> str:
-        return self.format_event_simple()
+        return self.format_event_simple
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> OneBotEvent:
@@ -435,11 +436,12 @@ class MetaEvent(OneBotEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>meta</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<meta_event_type>{self.meta_event_type}</meta_event_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"meta\""
+            f" time=\"{self._fmt_time()}\""
+            f" meta_event_type=\"{self.meta_event_type}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -482,13 +484,14 @@ class HeartbeatEvent(MetaEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>heartbeat</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<status_online>{self.is_online}</status_online>"
-            f"<status_good>{self.is_good}</status_good>"
-            f"<interval>{self.interval}</interval>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"heartbeat\""
+            f" time=\"{self._fmt_time()}\""
+            f" status_online=\"{self.is_online}\""
+            f" status_good=\"{self.is_good}\""
+            f" interval=\"{self.interval}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -520,11 +523,12 @@ class LifeCycleEvent(MetaEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>lifecycle</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<sub_type>{self.sub_type.value}</sub_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"lifecycle\""
+            f" time=\"{self._fmt_time()}\""
+            f" sub_type=\"{self.sub_type.value}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -554,11 +558,12 @@ class NoticeEvent(OneBotEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>notice</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<notice_type>{self.notice_type}</notice_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"notice\""
+            f" time=\"{self._fmt_time()}\""
+            f" notice_type=\"{self.notice_type}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -589,13 +594,14 @@ class GroupNoticeEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_notice</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<notice_type>{self.notice_type}</notice_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_notice\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" notice_type=\"{self.notice_type}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -627,14 +633,15 @@ class GroupRecallNoticeEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_recall</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<operator_id>{self.operator_id}</operator_id>"
-            f"<message_id>{self.message_id}</message_id>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_recall\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" operator_id=\"{self.operator_id}\""
+            f" message_id=\"{self.message_id}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -675,14 +682,15 @@ class GroupIncreaseEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_increase</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<operator_id>{self.operator_id}</operator_id>"
-            f"<sub_type>{self.sub_type.value}</sub_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_increase\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" operator_id=\"{self.operator_id}\""
+            f" sub_type=\"{self.sub_type.value}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -725,14 +733,15 @@ class GroupDecreaseEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_decrease</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<operator_id>{self.operator_id}</operator_id>"
-            f"<sub_type>{self.sub_type.value}</sub_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_decrease\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" operator_id=\"{self.operator_id}\""
+            f" sub_type=\"{self.sub_type.value}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -770,13 +779,14 @@ class GroupAdminNoticeEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_admin</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<sub_type>{self.sub_type.value}</sub_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_admin\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" sub_type=\"{self.sub_type.value}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -819,15 +829,16 @@ class GroupBanEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_ban</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<operator_id>{self.operator_id}</operator_id>"
-            f"<duration>{self.duration}</duration>"
-            f"<sub_type>{self.sub_type.value}</sub_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_ban\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" operator_id=\"{self.operator_id}\""
+            f" duration=\"{self.duration}\""
+            f" sub_type=\"{self.sub_type.value}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -872,15 +883,16 @@ class GroupUploadNoticeEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_upload</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<file_id>{self.file_id}</file_id>"
-            f"<file_name>{self.file_name}</file_name>"
-            f"<file_size>{self.file_size}</file_size>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_upload\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" file_id=\"{self.file_id}\""
+            f" file_name=\"{self.file_name}\""
+            f" file_size=\"{self.file_size}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -912,14 +924,15 @@ class GroupCardEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_card</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<card_old>{self.card_old}</card_old>"
-            f"<card_new>{self.card_new}</card_new>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_card\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" card_old=\"{self.card_old}\""
+            f" card_new=\"{self.card_new}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -952,14 +965,15 @@ class GroupNameEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>群名变更</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<name_old>{self.name_old}</name_old>"
-            f"<name_new>{self.name_new}</name_new>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"群名变更\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" name_old=\"{self.name_old}\""
+            f" name_new=\"{self.name_new}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -992,14 +1006,15 @@ class GroupTitleEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>群头衔变更</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<title_old>{self.title_old}</title_old>"
-            f"<title>{self.title}</title>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"群头衔变更\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" title_old=\"{self.title_old}\""
+            f" title=\"{self.title}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1046,16 +1061,16 @@ class GroupEssenceEvent(GroupNoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_essence</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<message_id>{self.message_id}</message_id>"
-            f"<sender_id>{self.sender_id}</sender_id>"
-            f"<operator_id>{self.operator_id}</operator_id>"
-            f"<sub_type>{self.sub_type.value}</sub_type>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_essence\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" message_id=\"{self.message_id}\""
+            f" sender_id=\"{self.sender_id}\""
+            f" operator_id=\"{self.operator_id}\""
+            f" sub_type=\"{self.sub_type.value}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1088,14 +1103,14 @@ class GroupMsgEmojiLikeEvent(GroupNoticeEvent):
     def _format_event_detailed(self) -> str:
         import json
         return (
-            "<EVENT>"
-            f"<type>group_msg_emoji_like</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<message_id>{self.message_id}</message_id>"
+            "<MESSAGE"
+            f" type=\"group_msg_emoji_like\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" message_id=\"{self.message_id}\""
+            ">"
             f"<likes>{json.dumps(self.likes, ensure_ascii=False)}</likes>"
-            "</EVENT>"
+            "</MESSAGE>"
         )
 
 
@@ -1139,14 +1154,15 @@ class GroupGrayTipEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>gray_tip</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<message_id>{self.message_id}</message_id>"
+            "<MESSAGE"
+            f" type=\"gray_tip\""
+            f" time=\"{self._fmt_time()}\""
+            f" group_id=\"{self.group_id}\""
+            f" user_id=\"{self.user_id}\""
+            f" message_id=\"{self.message_id}\""
+            ">"
             f"<content>{self.content[:500]}</content>"
-            "</EVENT>"
+            "</MESSAGE>"
         )
 
 
@@ -1173,11 +1189,12 @@ class FriendAddNoticeEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>friend_add</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"friend_add\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1207,12 +1224,13 @@ class FriendRecallNoticeEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>消息撤回</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<message_id>{self.message_id}</message_id>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"消息撤回\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" message_id=\"{self.message_id}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1250,12 +1268,13 @@ class PokeEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>戳一戳</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<target_id>{self.target_id}</target_id>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"戳一戳\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" target_id=\"{self.target_id}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1284,11 +1303,12 @@ class FriendPokeEvent(PokeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>好友戳一戳你</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"好友戳一戳你\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1317,13 +1337,13 @@ class GroupPokeEvent(PokeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>群戳一戳/type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<target_id>{self.target_id}</target_id>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"群戳一戳\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" target_id=\"{self.target_id}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1360,13 +1380,14 @@ class ProfileLikeEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>profile_like</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<operator_id>{self.operator_id}</operator_id>"
-            f"<operator_nick>{self.operator_nick}</operator_nick>"
-            f"<times>{self.times}</times>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"profile_like\""
+            f" time=\"{self._fmt_time()}\""
+            f" operator_id=\"{self.operator_id}\""
+            f" operator_nick=\"{self.operator_nick}\""
+            f" times=\"{self.times}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1403,12 +1424,13 @@ class InputStatusEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>input_status</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<status_text>{self.status_text}</status_text>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"input_status\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" status_text=\"{self.status_text}\""
+            ">"
+            "</MESSAGE>"
         )
 
 
@@ -1441,12 +1463,13 @@ class BotOfflineEvent(NoticeEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>bot_offline</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
+            "<MESSAGE"
+            f" type=\"bot_offline\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            ">"
             f"<message>{self.message}</message>"
-            "</EVENT>"
+            "</MESSAGE>"
         )
 
 
@@ -1484,14 +1507,15 @@ class RequestEvent(OneBotEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>request</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<request_type>{self.request_type}</request_type>"
-            f"<user_id>{self.user_id}</user_id>"
+            "<MESSAGE"
+            f" type=\"request\""
+            f" time=\"{self._fmt_time()}\""
+            f" request_type=\"{self.request_type}\""
+            f" user_id=\"{self.user_id}\""
+            f" flag=\"{self.flag}\""
+            ">"
             f"<comment>{self.comment[:500]}</comment>"
-            f"<flag>{self.flag}</flag>"
-            "</EVENT>"
+            "</MESSAGE>"
         )
 
 
@@ -1517,12 +1541,13 @@ class FriendRequestEvent(RequestEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>friend_request</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
+            "<MESSAGE"
+            f" type=\"friend_request\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            ">"
             f"<comment>{self.comment[:500]}</comment>"
-            "</EVENT>"
+            "</MESSAGE>"
         )
 
 
@@ -1559,12 +1584,13 @@ class GroupRequestEvent(RequestEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_request</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
+            "<MESSAGE"
+            f" type=\"group_request\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            ">"
             f"<comment>{self.comment[:500]}</comment>"
-            "</EVENT>"
+            "</MESSAGE>"
         )
 
 
@@ -1634,13 +1660,15 @@ class MessageEvent(OneBotEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<message_id>{self.message_id}</message_id>"
-            f"<message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</message>"
-            f"<nickname>{self.sender_nickname}</nickname>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"message\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" message_id=\"{self.message_id}\""
+            f" nickname=\"{self.sender_nickname}\""
+            ">"
+            f"<user_message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</user_message>"
+            "</MESSAGE>"
         )
 
     def to_chat_message(self):
@@ -1701,15 +1729,15 @@ class PrivateMessageEvent(MessageEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>private_message</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<nickname>{self.sender_nickname}</nickname>"
-            f"<message_id>{self.message_id}</message_id>"
-            f"<sub_type>{self.sub_type}</sub_type>"
-            f"<message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</message>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"private_message\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" nickname=\"{self.sender_nickname}\""
+            f" message_id=\"{self.message_id}\""
+            ">"
+            f"<user_message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</user_message>"
+            "</MESSAGE>"
         )
 
 
@@ -1788,17 +1816,17 @@ class GroupMessageEvent(MessageEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<type>group_message</type>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<nickname>{self.sender_nickname}</nickname>"
-            f"<sender_card>{self.sender_card}</sender_card>"
-            f"<sender_role>{self.sender_role}</sender_role>"
-            f"<message_id>{self.message_id}</message_id>"
-            f"<message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</message>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"group_message\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" nickname=\"{self.sender_nickname}\""
+            f" sender_card=\"{self.sender_card}\""
+            f" sender_role=\"{self.sender_role}\""
+            f" message_id=\"{self.message_id}\""
+            ">"
+            f"<user_message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</user_message>"
+            "</MESSAGE>"
         )
 
 
@@ -1807,8 +1835,8 @@ class MessageSentEvent(MessageEvent):
     """自身消息发送事件(机器人发出的消息回执)"""
     group_id:int = None
     """群号(私聊时为 None)"""
-    message_type: str = ""
-    """消息类型:private 或 group"""
+    message_type: Literal["private","group"] = ""
+    """消息类型"""
     target_id: int = 0
     """目标 ID(好友 QQ 号或群号)"""
 
@@ -1862,14 +1890,16 @@ class MessageSentEvent(MessageEvent):
 
     def _format_event_detailed(self) -> str:
         return (
-            "<EVENT>"
-            f"<time>{self._fmt_time()}</time>"
-            f"<user_id>{self.user_id}</user_id>"
-            f"<group_id>{self.group_id}</group_id>"
-            f"<target_id>{self.target_id}</target_id>"
-            f"<message_id>{self.message_id}</message_id>"
-            f"<message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</message>"
-            "</EVENT>"
+            "<MESSAGE"
+            f" type=\"self_message\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" group_id=\"{self.group_id}\""
+            f" target_id=\"{self.target_id}\""
+            f" message_id=\"{self.message_id}\""
+            ">"
+            f"<user_message>{self.cq_code[:TEXT_LENGTH_LIMIT]}</user_message>"
+            "</MESSAGE>"
         )
 
 

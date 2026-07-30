@@ -164,9 +164,13 @@ class ChatBasics(ABC):
                     message_builder.add_text("[CQ:image,summary=图片出现问题]")
         else:
             async def dispose_img(message: ImageSegment):
-                Image_description_text = await self.media_processor.image_to_text(message.url)
-                self.log.info(f"图像识别文本结果:{Image_description_text}")
-                message_builder.add_text(f"[CQ:image,summary:{Image_description_text}]")
+                if message.text_description:
+                    desc = message.text_description
+                else:
+                    desc = await self.media_processor.image_to_text(message.url)
+                    message.text_description = desc
+                    self.log.info(f"图像识别文本结果:{desc}")
+                message_builder.add_text(f"[CQ:image,summary:{desc}]")
 
         if including_audios:
             async def dispose_audio(segment: RecordSegment) -> None:
@@ -176,14 +180,22 @@ class ChatBasics(ABC):
                     message_builder.add_audio(b64, fmt)
                 except Exception as e:
                     self.log.warning(f"音频下载失败，降级为文本识别: {e}")
-                    desc = await self.media_processor.audio_to_text(audio_url)
+                    if segment.text_description:
+                        desc = segment.text_description
+                    else:
+                        desc = await self.media_processor.audio_to_text(audio_url)
+                        segment.text_description = desc
                     self.log.info(f"音频识别文本结果:{desc}")
                     message_builder.add_text(f"[CQ:record,summary:{desc}]")
         else:
             async def dispose_audio(segment: RecordSegment) -> None:
                 audio_url = segment.url or segment.file.file
-                desc = await self.media_processor.audio_to_text(audio_url)
-                self.log.info(f"音频识别文本结果:{desc}")
+                if segment.text_description:
+                    desc = segment.text_description
+                else:
+                    desc = await self.media_processor.audio_to_text(audio_url)
+                    segment.text_description = desc
+                    self.log.info(f"音频识别文本结果:{desc}")
                 message_builder.add_text(f"[CQ:record,summary:{desc}]")
 
         if including_videos:
@@ -193,8 +205,12 @@ class ChatBasics(ABC):
         else:
             async def dispose_video(segment: VideoSegment) -> None:
                 video_url = segment.url or segment.file.file
-                desc = await self.media_processor.video_to_text(video_url)
-                self.log.info(f"视频识别文本结果:{desc}")
+                if segment.text_description:
+                    desc = segment.text_description
+                else:
+                    desc = await self.media_processor.video_to_text(video_url)
+                    segment.text_description = desc
+                    self.log.info(f"视频识别文本结果:{desc}")
                 message_builder.add_text(f"[CQ:video,summary:{desc}]")
 
         async def append_segments(segments:List[MessageSegment]) -> None:
@@ -217,6 +233,7 @@ class ChatBasics(ABC):
                             elif file_extension in TEXT_EXTENSIONS:
                                 message_builder.add_text(f"[CQ:file,file={segment.file_name},content={await download_text(segment.url)}]")
                                 continue
+                            
                 message_builder.add_text(segment.__str__())
 
         quote_message = None
@@ -469,13 +486,16 @@ class GroupChat(ChatBasics):
         user_id = event.user_id or None
 
         message_builder = MessageBuilder()
-        group_history = await self.chat_manager.get_group_messages_str(group_id)
 
-        message_builder.add_text(
-            self.skills.prompt #skills的提示词
+        await self.chat_manager.add_group_messages_builder(
+            group_id=group_id,
+            builder=message_builder,
+            including_pictures=self.visual_sense,
+            including_audios=self.audio_sense,
+            including_videos=self.video_sense,
         )
-        message_builder.add_text(
-            f"<group_history>{group_history[:10000]}</group_history>"
+        message_builder.add_text_left(
+            self.skills.prompt #skills的提示词
         )
 
         prompt =(
@@ -584,7 +604,7 @@ class GroupChat(ChatBasics):
         prompt: str,
         group_id: int,
         user_id: int,
-        including_pictures: bool,
+        including_pictures: bool = False,
         including_audios: bool = False,
         including_videos: bool = False,
     ) -> MessageBuilder:
@@ -603,13 +623,16 @@ class GroupChat(ChatBasics):
             MessageBuilder: 包含组装好的提示负载的构建器
         """
         message_builder = MessageBuilder()
-        group_history = await self.chat_manager.get_group_messages_str(group_id)
 
-        message_builder.add_text(
-            self.skills.prompt #skills的提示词
+        await self.chat_manager.add_group_messages_builder(
+            group_id=group_id,
+            builder=message_builder,
+            including_pictures=including_pictures,
+            including_audios=including_audios,
+            including_videos=including_videos,
         )
-        message_builder.add_text(
-            f"<group_history>{group_history[:10000]}</group_history>"
+        message_builder.add_text_left(
+            self.skills.prompt #skills的提示词
         )
         await self.append_message_segments_prompt(
             event,
@@ -671,9 +694,13 @@ class GroupChat(ChatBasics):
         else:
             async def dispose_img(message:ImageSegment):
                 """交给其他模型识别图像转换文字"""
-                Image_description_text = await self.media_processor.image_to_text(message.url)
-                self.log.info(f"输入图片描述:{Image_description_text}]")
-                message_builder.add_text(f"[CQ:image,summary:{Image_description_text}]")
+                if message.text_description:
+                    desc = message.text_description
+                else:
+                    desc = await self.media_processor.image_to_text(message.url)
+                    message.text_description = desc
+                    self.log.info(f"输入图片描述:{desc}]")
+                message_builder.add_text(f"[CQ:image,summary:{desc}]")
 
         if including_audios:
             async def dispose_audio(segment: RecordSegment) -> None:
@@ -684,14 +711,22 @@ class GroupChat(ChatBasics):
                     message_builder.add_audio(b64, fmt)
                 except Exception as e:
                     self.log.warning(f"音频下载失败，降级为文本识别: {e}")
-                    desc = await self.media_processor.audio_to_text(audio_url)
+                    if segment.text_description:
+                        desc = segment.text_description
+                    else:
+                        desc = await self.media_processor.audio_to_text(audio_url)
+                        segment.text_description = desc
                     message_builder.add_text(f"[CQ:record,summary:{desc}]")
         else:
             async def dispose_audio(segment: RecordSegment) -> None:
                 """交给其他模型将音频转为文字"""
                 audio_url = segment.url or segment.file.file
-                desc = await self.media_processor.audio_to_text(audio_url)
-                self.log.info(f"音频识别:{desc}]")
+                if segment.text_description:
+                    desc = segment.text_description
+                else:
+                    desc = await self.media_processor.audio_to_text(audio_url)
+                    segment.text_description = desc
+                    self.log.info(f"音频识别:{desc}]")
                 message_builder.add_text(f"[CQ:record,summary:{desc}]")
 
         if including_videos:
@@ -703,8 +738,12 @@ class GroupChat(ChatBasics):
             async def dispose_video(segment: VideoSegment) -> None:
                 """交给其他模型将视频转为文字"""
                 video_url = segment.url or segment.file.file
-                desc = await self.media_processor.video_to_text(video_url)
-                self.log.info(f"视频识别结果:{desc}")
+                if segment.text_description:
+                    desc = segment.text_description
+                else:
+                    desc = await self.media_processor.video_to_text(video_url)
+                    segment.text_description = desc
+                    self.log.info(f"视频识别结果:{desc}")
                 message_builder.add_text(f"[CQ:video,summary:{desc}]")
 
         async def append_segments(segments) -> None:

@@ -16,116 +16,301 @@ class ToolCallsStopIteration(Exception):
 
 
 class MessageBuilder:
-    """LLM使用的链式消息构建器,支持多模态内容自动合并相邻文本块"""
-    __slots__ = ['_role', '_parts']
+    """LLM 使用的链式消息构建器
+
+    基于 deque 支持双端添加多模态内容
+    支持自动合并连续文本块，最终生成 OpenAI 风格 message
+    """
+
+    __slots__ = ["_role", "_parts"]
 
     def __init__(self, role: str = "user"):
-        self._role = role
-        self._parts: list = []
+        """初始化消息构建器
+
+        Args:
+            role: 消息角色，例如 user、assistant、system
+        """
+        self._role: str = role
+        self._parts: Deque[dict[str, Any]] = deque()
 
     def _last_is_text(self) -> bool:
+        """判断最后一个内容是否为文本"""
         return bool(self._parts) and self._parts[-1]["type"] == "text"
 
-    def add_text(self, text: str) -> "MessageBuilder":
-        """添加文本，与前一个文本块自动合并"""
+    def _first_is_text(self) -> bool:
+        """判断第一个内容是否为文本"""
+        return bool(self._parts) and self._parts[0]["type"] == "text"
+
+    def add_text(self, text: str) -> MessageBuilder:
+        """添加文本到右侧
+
+        如果最后一个内容也是文本，则自动合并
+        """
         if self._last_is_text():
             self._parts[-1]["text"] += text
         else:
             self._parts.append({"type": "text", "text": text})
+
         return self
 
-    def add_image(self, url: str, detail: str = "auto") -> "MessageBuilder":
-        """添加图片 URL"""
+    def add_text_left(self, text: str) -> MessageBuilder:
+        """添加文本到左侧
+
+        如果第一个内容也是文本，则自动合并
+        """
+        if self._first_is_text():
+            self._parts[0]["text"] = text + self._parts[0]["text"]
+        else:
+            self._parts.appendleft({"type": "text", "text": text})
+
+        return self
+    
+    def add_image(
+        self,
+        url: str,
+        detail: str = "auto",
+    ) -> MessageBuilder:
+        """添加图片到右侧"""
         self._parts.append({
             "type": "image_url",
-            "image_url": {"url": url, "detail": detail}
+            "image_url": {"url": url, "detail": detail},
         })
+
         return self
 
-    def add_image_base64(self, data: str, mime: str = "image/png") -> "MessageBuilder":
-        """添加 base64 图片"""
-        self._parts.append({
+    def add_image_left(
+        self,
+        url: str,
+        detail: str = "auto",
+    ) -> MessageBuilder:
+        """添加图片到左侧"""
+        self._parts.appendleft({
             "type": "image_url",
-            "image_url": {"url": f"data:{mime};base64,{data}"}
+            "image_url": {"url": url, "detail": detail},
         })
+
         return self
 
-    def add_audio(self, data: str, fmt: str = "wav") -> "MessageBuilder":
-        """添加 base64 音频"""
+    def add_image_base64(
+        self,
+        data: str,
+        mime: str = "image/png",
+    ) -> MessageBuilder:
+        """添加 base64 图片到右侧"""
+        return self.add_image(
+            f"data:{mime};base64,{data}"
+        )
+
+    def add_image_base64_left(
+        self,
+        data: str,
+        mime: str = "image/png",
+    ) -> MessageBuilder:
+        """添加 base64 图片到左侧"""
+        return self.add_image_left(
+            f"data:{mime};base64,{data}"
+        )
+
+    def add_audio(
+        self,
+        data: str,
+        fmt: str = "wav",
+    ) -> MessageBuilder:
+        """添加 base64 音频到右侧"""
         self._parts.append({
             "type": "input_audio",
-            "input_audio": {"data": data, "format": fmt}
+            "input_audio": {"data": data, "format": fmt},
         })
+
         return self
 
-    def add_video(self, url: str) -> "MessageBuilder":
-        """添加视频 URL"""
-        self._parts.append({
-            "type": "video_url",
-            "video_url": {"url": url}
+    def add_audio_left(
+        self,
+        data: str,
+        fmt: str = "wav",
+    ) -> MessageBuilder:
+        """添加 base64 音频到左侧"""
+        self._parts.appendleft({
+            "type": "input_audio",
+            "input_audio": {"data": data, "format": fmt},
         })
+
+        return self
+    
+    def add_video(
+        self,
+        url: str,
+    ) -> MessageBuilder:
+        """添加视频到右侧"""
+        self._parts.append({"type": "video_url", "video_url": {"url": url}})
+
         return self
 
-    def add_video_base64(self, data: str, mime: str = "video/mp4") -> "MessageBuilder":
-        """添加 base64 视频"""
-        self._parts.append({
-            "type": "video_url",
-            "video_url": {"url": f"data:{mime};base64,{data}"}
-        })
+    def add_video_left(
+        self,
+        url: str,
+    ) -> MessageBuilder:
+        """添加视频到左侧"""
+        self._parts.appendleft({"type": "video_url", "video_url": {"url": url}})
+
         return self
 
-    def add_file(self, url: str, mime: str = "") -> "MessageBuilder":
-        """添加文件"""
-        self._parts.append({
-            "type": "file",
-            "file": {"url": url, **({"mime_type": mime} if mime else {})}
-        })
+    def add_video_base64(
+        self,
+        data: str,
+        mime: str = "video/mp4",
+    ) -> MessageBuilder:
+        """添加 base64 视频到右侧"""
+        return self.add_video(
+            f"data:{mime};base64,{data}"
+        )
+
+    def add_video_base64_left(
+        self,
+        data: str,
+        mime: str = "video/mp4",
+    ) -> MessageBuilder:
+        """添加 base64 视频到左侧"""
+        return self.add_video_left(
+            f"data:{mime};base64,{data}"
+        )
+
+    def add_file(
+        self,
+        url: str,
+        mime: str = "",
+    ) -> MessageBuilder:
+        """添加文件到右侧"""
+        file_data = {
+            "url": url,
+        }
+
+        if mime:
+            file_data["mime_type"] = mime
+
+        self._parts.append({"type": "file", "file": file_data})
+
         return self
 
-    def merge(self, other: "MessageBuilder") -> "MessageBuilder":
-        """和另一个构建合并"""
-        if not other._parts:
-            return self
+    def add_file_left(
+        self,
+        url: str,
+        mime: str = "",
+    ) -> MessageBuilder:
+        """添加文件到左侧"""
+        file_data = {
+            "url": url,
+        }
 
-        first = other._parts[0]
+        if mime:
+            file_data["mime_type"] = mime
 
-        start = 0
-        if first["type"] == "text":
-            self.add_text(first["text"])
-            start = 1
+        self._parts.appendleft({"type": "file", "file": file_data})
 
-        self._parts.extend(other._parts[start:])
         return self
 
-    def build_content(self) -> str | list:
-        """仅返回 content,纯文本时为 str,多模态时为 list"""
-        if len(self._parts) == 1 and self._parts[0]["type"] == "text":
+    def merge(
+        self,
+        other: MessageBuilder,
+    ) -> MessageBuilder:
+        """将另一个构建器内容合并到右侧
+
+        Args:
+            other: 需要合并的消息构建器
+
+        Returns:
+            当前构建器
+        """
+        for item in other._parts:
+            item = item.copy()
+
+            if (
+                item["type"] == "text"
+                and self._last_is_text()
+            ):
+                self._parts[-1]["text"] += item["text"]
+            else:
+                self._parts.append(item)
+
+        return self
+
+    def merge_left(
+        self,
+        other: MessageBuilder,
+    ) -> MessageBuilder:
+        """将另一个构建器内容合并到左侧
+
+        Args:
+            other: 需要合并的消息构建器
+
+        Returns:
+            当前构建器
+        """
+        for item in reversed(other._parts):
+            item = item.copy()
+
+            if (
+                item["type"] == "text"
+                and self._first_is_text()
+            ):
+                self._parts[0]["text"] = (
+                    item["text"] + self._parts[0]["text"]
+                )
+            else:
+                self._parts.appendleft(item)
+
+        return self
+
+    def build_content(self) -> str | list[dict[str, Any]]:
+        """构建消息 content
+
+        Returns:
+            纯文本时返回字符串
+            多模态内容返回列表
+        """
+        if (
+            len(self._parts) == 1
+            and self._parts[0]["type"] == "text"
+        ):
             return self._parts[0]["text"]
+
         return list(self._parts)
 
-    def build(self) -> Dict[str, Any]:
-        """构建消息 dict"""
-        if len(self._parts) == 1 and self._parts[0]["type"] == "text":
-            return {"role": self._role, "content": self._parts[0]["text"]}
-        return {"role": self._role, "content": list(self._parts)}
+    def build(self) -> dict[str, Any]:
+        """构建完整消息
 
-    def build_and_add(self, ctx: "Context") -> None:
-        """构建并直接追加到 Context"""
+        Returns:
+            包含 role 和 content 的消息对象
+        """
+        return {
+            "role": self._role,
+            "content": self.build_content(),
+        }
+
+    def build_and_add(self, ctx: list[dict[str, Any]]) -> None:
+        """构建消息并追加到上下文
+
+        Args:
+            ctx: 消息上下文列表
+        """
         ctx.append(self.build())
 
     @classmethod
-    def user(cls) -> "MessageBuilder":
+    def user(cls) -> MessageBuilder:
+        """创建 user 消息构建器"""
         return cls("user")
 
     @classmethod
-    def assistant(cls) -> "MessageBuilder":
+    def assistant(cls) -> MessageBuilder:
+        """创建 assistant 消息构建器"""
         return cls("assistant")
 
     @classmethod
-    def system(cls) -> "MessageBuilder":
+    def system(cls) -> MessageBuilder:
+        """创建 system 消息构建器"""
         return cls("system")
     
-
+    
 @dataclass(slots=True)
 class Context():
     """对话上下文"""
@@ -393,8 +578,8 @@ class ContextDeque:
 
     def record_validity_check(self) -> List[Dict[str, Any]]:
         """
-        针对消息条数的验证。
-        优化后：使用 popleft() 移除头部元素，避免了列表切片的内存拷贝和移动。
+        针对消息条数的验证
+        优化后：使用 popleft() 移除头部元素，避免了列表切片的内存拷贝和移动
         """
         removed_messages = []
 
