@@ -36,7 +36,6 @@
   - [🧠 Deep LLM Chat Integration](#-deep-llm-chat-integration)
   - [💻 Unix-like Command System](#-unix-like-command-system)
   - [🛠️ Other Practical Features](#-other-practical-features)
-  - [🖥️ Web Admin Panel](#-web-admin-panel)
 - [🚀 Quick Start (How to Run)](#-quick-start-how-to-run)
   - [1. Frontend Connection (NapCat)](#1-frontend-connection-napcat)
   - [2. Database Configuration (PostgreSQL)](#2-database-configuration-postgresql)
@@ -98,25 +97,13 @@ Features a usable command mechanism. Trigger by mentioning the bot followed by `
 - **Auto-generated help**: Simply use decorators in code and add argument descriptions to automatically generate detailed `--help` prompts.
 
 ### 🛠️ Other Practical Features
+- **Plugin system**: Plugins under `atribot/plugins/` are auto-loaded at startup, supporting message/notice/request event subscriptions and pipeline middleware, with hot-reload.
+- **Sub-agent collaboration**: The `sub_agent` tool can delegate complex multi-step tasks to an independent sub-agent (own toolset + LLM loop).
+- **Scheduled self-trigger**: The `schedule_self_trigger` tool lets the bot proactively start a new group chat thinking at a specified time.
 - **High-performance keyword matching**: Configuration files support keyword responses, using the **AC Automaton** algorithm underneath for millisecond-level response even with tens of thousands of entries.
 - **Group member change notifications**: Automatically notifies when someone joins or leaves the group.
 - **Poke interaction**: Reacts when poked, may even "poke back".
 - **Robust architecture**: Database uses connection pools, message reception introduces message queue mechanisms, maximizing stress resistance.
-
-### 🖥️ Web Admin Panel
-
-The project includes a lightweight web admin panel (built with FastAPI). Access it after startup at:
-
-```
-http://127.0.0.1:1314/admin/
-```
-
-- **Authentication**: Use the `access_token` (same as NapCat connection token) as a Bearer Token to log in.
-- **Runtime Status**: View bot account info, current model, uptime, sandbox/MCP status, etc.
-- **Data Statistics**: Group count, user count, message count, memory entry count at a glance.
-- **Group Management**: Browse joined groups with pagination and search support.
-
-> The panel listens on `127.0.0.1` by default for security. Do not expose it directly to the public internet. The port can be customized via `network.admin_port` in `config.json`.
 
 ---
 
@@ -179,10 +166,11 @@ Equips the AI model with a default **code sandbox environment** to safely execut
 #### ⚙️ Configuration Files
 Before starting, ensure to check the  `assets` folder:
 1.  Refer to `assets\如何配置配置文件.py` (Chinese guide) for configuration details.
-2.  Configure `supplier_config.json` (model supplier settings).
-3.  Configure `config.json` (project basic settings).
-4.  **MCP Configuration**：Default path is `atribot\LLMchat\MCP\mcp_server.json`. Specific MCP tools can be toggled via `"active": false`.
-5.  Under root `document/`, you can add corresponding audio, emoji, and file configurations according to the project structure.
+2.  **Platform connection**: `config.platforms.<name>` configures the connection to NapCat (`adapter` fixed as `onebot`, `connection_type` supports `WebSocket_client` / `WebSocket_server` / `http`, `access_token` must match NapCat, `url` is the address).
+3.  Configure `supplier_config.json` (model supplier settings).
+4.  Configure `config.json` (project basic settings).
+5.  **MCP Configuration**：Default path is `atribot\LLMchat\MCP\mcp_server.json`. Specific MCP tools can be toggled via `"active": false`.
+6.  Under root `document/`, you can add corresponding audio, emoji, and file configurations according to the project structure.
 ### 4. Start the Project
 The project requires **Python 3.14**. Using `uv` for package management is recommended.
 
@@ -238,7 +226,7 @@ cp .env.docker.example .env
 | `ATRI_ACCESS_TOKEN` | NapCat connection token | `ATRI114514` |
 | `ATRI_CONNECTION_TYPE` | Connection type (WebSocket_server/client) | `WebSocket_server` |
 | `ATRI_NAPCAT_URL` | NapCat WebSocket URL (client mode) | `host.docker.internal:3001` |
-| `ATRI_SANDBOX_IMAGE` | AI sandbox Docker image | `python:3.13-slim` |
+| `ATRI_SANDBOX_IMAGE` | AI sandbox Docker image | `python:3.14-slim` |
 | `TZ` | Container timezone | `Asia/Shanghai` |
 
 Then start:
@@ -272,7 +260,6 @@ Notes:
 - The container generates a runtime config based on `assets/config.json` without overwriting your local setup.
 - Host directories `assets/`, `document/`, `log/`, `temp/` are mounted into the container for easy configuration and data persistence.
 - AI sandbox only overrides the image name by default; to call Docker sandbox from within the container, you need to additionally mount the Docker socket.
-- **Web Admin Panel**: After startup, access via `http://host-ip:1314/admin/` using the `ATRI_ACCESS_TOKEN` from `.env` as the Bearer Token.
 
 ---
 ## 📂 Project Structure
@@ -301,9 +288,11 @@ ATRI-main/
 │  │  ├─cache/                  # Context cache & lifecycle management
 │  │  ├─command/                # Command system & permission management
 │  │  ├─db/                     # Database connection & data access
-│  │  ├─event_trigger/          # Event handling
-│  │  ├─network_connections/    # WebSocket & message I/O
-│  │  └─type/                   # Core type definitions
+│  │  ├─event_bus/              # Event bus (dispatch by PostType)
+│  │  ├─pipeline/               # Middleware pipeline (incl. group whitelist)
+│  │  ├─platform/               # Multi-platform adapter layer
+│  │  ├─network_connections/    # Send clients (QQAPIClient, etc.)
+│  │  └─type/                   # Core type definitions (event envelope / segments)
 │  ├─docs/                      # Development notes & documentation
 │  ├─LLMchat/                   # 🧠 LLM chat & Agent capabilities
 │  │  ├─character_setting/      # Character presets
@@ -314,8 +303,15 @@ ATRI-main/
 │  │  ├─RAG/                    # Retrieval-Augmented Generation logic
 │  │  ├─sandbox/                # Sandbox
 │  │  ├─skills/                 # Skills prompt modules
-│  │  └─tools/                  # Function calling toolset
-│  └─web_panel/                 # 🖥️ Web admin panel
+│  │  └─tools/                  # Function calling toolset (17 tools)
+│  ├─plugins/                   # 🔌 Plugin system
+│  │  ├─plugin.py               # Plugin base class (event / middleware decorators)
+│  │  ├─manager.py / loader.py  # Plugin manager & loader (hot-reload)
+│  │  ├─emoji_like/             # Message emoji mirror
+│  │  ├─group_manager/          # Group management + keyword replies + join approval
+│  │  └─poke_reaction/          # Poke feedback
+│  ├─log/                       # Runtime logs (daily rotation, 7 days)
+│  └─web_panel/                 # Web admin panel (currently disabled)
 ├─docker/                       # 🐳 Docker resources
 │  ├─db/                        # Database init scripts & images
 │  └─python/                    # Python container environment
@@ -329,7 +325,6 @@ ATRI-main/
 │  ├─video/                     # Video assets
 │  └─temp/                      # Temporary runtime files
 ├─privacy/                      # Development notes & private files
-└─log/                          # Runtime logs
 ```
 
 ---
@@ -340,19 +335,25 @@ ATRI-main/
 
 ```
 NapCat (QQ Client)
-      │  WebSocket
+      │  WebSocket / HTTP
       ▼
-WebSocketClient (singleton, message queue)
+Platform Adapter (OneBotAdapter, multi-platform)
       │
       ▼
-message_router.main()
+MessageQueue (message queue)
       │
-      ├──► EventTrigger       (keywords/poke/member change events)
-      ├──► CommandSystem       (@bot /cmd commands)
-      └──► LLMCoordinator      (LLM chat main pipeline)
+      ▼
+Pipeline (WhitelistMiddleware group whitelist filtering)
+      │
+      ▼
+EventBus (dispatch by PostType)
+      │
+      ├──► AtCommandRule route  (@bot /cmd commands → CommandSystem)
+      ├──► Plugin event handlers (Plugin.on_message / on_notice, etc.)
+      └──► initiativeChat route  (normal chat / proactive talk → LLM decision)
 ```
 
-The bot is purpose-built for chat. Only essential message processing is needed—no plugin system or unnecessary complexity. Messages are simply filtered into @-mentions (commands vs. chat) and others (dispatched to EventTrigger).
+Group chats are handled by `GroupChat`, private chats by `PrivateChat`. The command and chat routes are registered in `bot_framework._register_at_routes()`, and plugin handlers are auto-scanned and mounted by `PluginManager` at startup.
 
 ---
 
@@ -361,7 +362,7 @@ The bot is purpose-built for chat. Only essential message processing is needed�
 The core LLM chat pipeline resides in `atribot/LLMchat/` and follows a **fully asynchronous pipeline** design:
 
 ```
-User Message (ChatMessage)
+User Message (MessageEventEnvelope)
       │
       ▼
 chat.py → GroupChat.step()          ← Chat entry point
@@ -379,10 +380,10 @@ chat.py → GroupChat.step()          ← Chat entry point
       │     └─ Fallback to standby models on failure (_request_model_with_fallback_)
       │
       ├─③ Parse JSON response       Model outputs structured decisions
-      │     ├─ "reply"    → Send response (segmented / with emojis)
+      │     ├─ "speak"    → Send response (segmented / with emojis)
       │     ├─ "update"   → Update user profile
       │     ├─ "silence"  → No reply
-      │     └─ "use_tools"→ Invoke tools
+      │     └─ tool calls → Via Function Calling loop (MCP / local tools)
       │
       └─④ Post-processing
             ├─ Context write-back (ChatManager)

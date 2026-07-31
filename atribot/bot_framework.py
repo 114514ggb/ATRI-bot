@@ -181,6 +181,7 @@ class BotFramework:
                     event.stop_propagation = await _initiative_chat.decision(event, group_context)
             except Exception as e:
                 log.exception("聊天处理失败: %s", e)
+                await event.send(event.reply_text(f"有关聊天的路由出现了问题:\n{e}\n你不应该看到这个的,因为最近在迁移方面的原因，有很多小毛病,看到这建议联系开发者"))
 
     def _register_services(self) -> None:
         """注册可由容器解析的服务类型"""

@@ -36,7 +36,6 @@
   - [🧠 深度 LLM 聊天集成](#-深度-llm-聊天集成)
   - [💻 类 Unix 命令系统](#-类-unix-命令系统)
   - [🛠️ 其他实用功能](#-其他实用功能)
-  - [🖥️ Web 管理面板](#-web-管理面板)
 - [🚀 快速开始 (How to Run)](#-快速开始-how-to-run)
   - [1. 前端连接 (NapCat)](#1-前端连接-napcat)
   - [2. 数据库配置 (PostgreSQL)](#2-数据库配置-postgresql)
@@ -81,8 +80,8 @@
 完全自主实现的 LLM 聊天全链路，从输入处理到输出决策全部可控：
 
 - **全异步高并发**：回复流程完全异步，支持多供应商 Key 池轮询，多群并发场景下也能稳定运行。
-- **结构化决策输出**：模型以 JSON 格式返回结构化决策（回复 / 更新画像 / 静默 / 调用工具），行为完全可控且易于扩展。
-- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词。
+- **结构化决策输出**：模型以 JSON 格式返回结构化决策（`speak` 回复 / `update` 更新画像 / `silence` 静默），工具调用通过 Function Calling 循环执行，行为完全可控且易于扩展。
+- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词；内置 17 个工具（网页搜索、记忆读写、沙盒执行 Python/Shell、子代理、定时自触发等）。
 - **两级记忆系统**：
   - *短期*：每个群 / 用户维护独立的滑动上下文窗口，超限时由 LLM 自动压缩摘要、无损续接。
   - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让 Bot 有个比较可靠的长期记忆。
@@ -104,25 +103,13 @@
 
 ### 🛠️ 其他实用功能
 
+- **插件系统**：`atribot/plugins/` 下的插件启动时自动加载，支持消息/通知/请求事件订阅与管道中间件，可热重载。
+- **子 Agent 协作**：`sub_agent` 工具可将复杂多步任务委派给独立子代理（自带工具集 + LLM 循环）执行。
+- **定时自触发**：`schedule_self_trigger` 工具可让 Bot 在指定时间主动发起一次群聊思考。
 - **高性能关键词匹配**：关键词响应底层采用 **AC 自动机**，即使配置上万条规则也能保持毫秒级响应。
 - **群成员变动提醒**：成员加入或退出时自动通知。
 - **戳一戳互动**：被戳时不只会响应，还会「戳回去」。
 - **稳健架构基础**：数据库连接池 + 消息队列，从容应对并发压力。
-
-### 🖥️ Web 管理面板
-
-项目内置了一个轻量级的 Web 管理面板（基于 FastAPI），启动后在浏览器访问：
-
-```
-http://127.0.0.1:1314/admin/
-```
-
-- **认证方式**：使用 `access_token`（与 NapCat 连接 Token 相同）作为 Bearer Token 登录。
-- **运行状态**：查看 Bot 账号、当前模型、在线时长、沙盒/MCP 状态等。
-- **数据统计**：群组数、用户数、消息数、记忆条目数一目了然。
-- **群组管理**：分页浏览已接入的群组列表，支持检索。
-
-> 面板默认只监听 `127.0.0.1`，安全起见请勿直接暴露到公网。端口可通过 `config.json` 中的 `network.admin_port` 自定义。
 
 ---
 
@@ -188,16 +175,17 @@ ollama run Qwen3-Embedding-0.6B:F16
 
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
-1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.py`）。其中 `model.chat_parameter.thinking_level` 控制深度思考模式 (`minimal`/`low`/`medium`/`high`)，支持思维的模型可用此参数调节推理深度。
-2.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
+1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表。
+2.  **平台连接**：`config.platforms.<name>` 配置与 NapCat 的对接方式（`adapter` 固定为 `onebot`，`connection_type` 支持 `WebSocket_client` / `WebSocket_server` / `http`，`access_token` 需与 NapCat 一致，`url` 为地址）。
+3.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
     ```bash
     cp "assets/config copy.json" assets/config.json
     cp "assets/supplier_config copy.json" assets/supplier_config.json
     ```
-3.  **MCP 配置**：默认路径在 `atribot/LLMchat/MCP/mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用。
-4.  **Skills 文件夹**：默认路径在 `atribot/LLMchat/skills/agent_skills`。
-5.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
-6.  **表情包**：在 `document/img/emojis` 文件夹下新建**文件名代表内部表情的文件夹**，放入对应名称的图片（支持 .jpg, .jpeg, .png, .gif），LLM 即可在聊天中自然发送。
+4.  **MCP 配置**：默认路径在 `atribot/LLMchat/MCP/mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用。
+5.  **Skills 文件夹**：默认路径在 `atribot/LLMchat/skills/agent_skills`。
+6.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
+7.  **表情包**：在 `document/img/emojis` 文件夹下新建**文件名代表内部表情的文件夹**，放入对应名称的图片（支持 .jpg, .jpeg, .png, .gif），LLM 即可在聊天中自然发送。
 
 
 ### 4. 启动项目
@@ -247,7 +235,7 @@ cp .env.docker.example .env
 | `ATRI_ACCESS_TOKEN` | NapCat 连接验证 Token | `ATRI114514` |
 | `ATRI_CONNECTION_TYPE` | 连接类型（WebSocket_server/client） | `WebSocket_server` |
 | `ATRI_NAPCAT_URL` | NapCat WebSocket 地址（客户端模式） | `host.docker.internal:3001` |
-| `ATRI_SANDBOX_IMAGE` | AI 沙盒使用的 Docker 镜像 | `python:3.13-slim` |
+| `ATRI_SANDBOX_IMAGE` | AI 沙盒使用的 Docker 镜像 | `python:3.14-slim` |
 | `TZ` | 容器时区 | `Asia/Shanghai` |
 
 然后直接启动：
@@ -281,7 +269,6 @@ docker compose exec db psql -U postgres -d postgres
 - 容器启动时会基于 `assets/config.json` 生成一份运行时配置，不会覆盖你原本的本地配置。
 - 默认把宿主机的 `assets/`、`document/`、`log/`、`temp/` 挂进容器，便于直接改配置和保留运行数据。
 - 内置 AI 沙盒默认只做镜像名覆盖；如果你还想让容器内再调用 Docker 沙盒，需要额外挂载 Docker Socket。
-- **Web 管理面板**：启动后可通过 `http://宿主机IP:1314/admin/` 访问，使用 `.env` 中配置的 `ATRI_ACCESS_TOKEN` 作为 Bearer Token 登录。
 
 ---
 ## 📂 项目结构
@@ -323,15 +310,16 @@ ATRI-main/
 │  ├─core/                      # 核心架构
 │  │  ├─atri_config.py          # 配置加载与管理
 │  │  ├─logger.py               # 日志系统
-│  │  ├─message_manage.py       # 消息路由与管理
 │  │  ├─service_container.py    # 依赖注入容器 (DIContainer)
 │  │  ├─time_trigger.py         # 定时任务调度器
 │  │  ├─cache/                  # 上下文缓存与生命周期管理
 │  │  ├─command/                # 命令系统与权限管理
 │  │  ├─db/                     # 数据库连接与数据访问
-│  │  ├─event_trigger/          # 事件处理
-│  │  ├─network_connections/    # WebSocket 与消息收发
-│  │  └─type/                   # 核心类型定义
+│  │  ├─event_bus/              # 事件总线（按 PostType 分发监听器）
+│  │  ├─pipeline/               # 中间件管道（含群白名单 WhitelistMiddleware）
+│  │  ├─platform/               # 多平台适配层（适配器 / 消息队列 / 发送客户端）
+│  │  ├─network_connections/    # 发送客户端（QQAPIClient 等）
+│  │  └─type/                   # 核心类型定义（事件信封 / 消息段）
 │  ├─docs/                      # 开发文档与笔记
 │  ├─LLMchat/                   # 🧠 LLM 聊天与 Agent 能力
 │  │  ├─chat.py                 # 群聊/私聊对话处理入口
@@ -358,7 +346,7 @@ ATRI-main/
 │  │  │  ├─user_info_system.py  # 用户画像系统
 │  │  │  └─prompts.py           # 记忆提示词模板
 │  │  ├─model_api/              # 模型供应商接口
-│  │  ├─RAG/                    # 检索增强生成
+│  │  ├─RAG/                    # 检索增强生成（含 vector_store.py 向量存储 / MemoryCategory）
 │  │  ├─sandbox/                # 代码沙盒环境
 │  │  ├─skills/                 # Agent Skills 管理
 │  │  │  ├─skills_manager.py    # Skills 加载与管理
@@ -366,17 +354,28 @@ ATRI-main/
 │  │  │  ├─parser.py            # Markdown 解析
 │  │  │  ├─models.py            # 数据模型
 │  │  │  └─agent_skills/        # Skills 提示词文件
-│  │  └─tools/                  # 函数调用工具集
+│  │  └─tools/                  # 函数调用工具集（共 17 个）
 │  │     ├─web_search/          # 网页搜索
 │  │     ├─web_extract/         # 网页内容提取
-│  │     ├─run_python_code/     # 沙盒代码执行
+│  │     ├─run_python_code/     # 沙盒 Python 执行
+│  │     ├─run_command/         # 沙盒 Shell 命令
 │  │     ├─memory_search/       # 记忆检索
 │  │     ├─memory_storage/      # 记忆写入
 │  │     ├─send_image_message/  # 图片消息发送
 │  │     ├─send_speech_message/ # 语音消息发送
+│  │     ├─send_file / add_file  # 沙盒文件进出
+│  │     ├─schedule_self_trigger # 定时自触发
+│  │     ├─sub_agent/           # 子代理
 │  │     ├─load_skill_prompt/   # Skills 提示词加载
-│  │     └─...                  # 等 16 个工具
-│  └─web_panel/                 # 🖥️ Web 管理面板
+│  │     └─...                  # 其余工具
+│  ├─plugins/                   # 🔌 插件系统
+│  │  ├─plugin.py               # Plugin 基类（事件 / 中间件装饰器）
+│  │  ├─manager.py / loader.py  # 插件管理器与加载器（热重载）
+│  │  ├─emoji_like/             # 消息贴表情镜像
+│  │  ├─group_manager/          # 群管理 + 关键词回复 + 加群审批
+│  │  └─poke_reaction/          # 戳一戳反馈
+│  ├─log/                       # 运行时日志（每日轮转，保留 7 天）
+│  └─web_panel/                 # Web 管理面板（当前未启用）
 ├─docker/                       # 🐳 Docker 相关资源
 │  ├─db/                        # 数据库初始化脚本与镜像文件
 │  └─python/                    # Python 容器环境相关资源
@@ -389,7 +388,6 @@ ATRI-main/
 │  │  └─tmp/                    # 临时图片目录
 │  ├─video/                     # 视频资源
 │  └─temp/                      # 临时运行文件
-└─log/                          # 运行时日志
 ```
 
 ---
@@ -400,24 +398,32 @@ ATRI-main/
 
 ```
 NapCat (QQ客户端)
-      │  WebSocket
+      │  WebSocket / HTTP
       ▼
-WebSocketClient (单例，消息队列)
+平台适配器 (OneBotAdapter，支持多平台)
       │
       ▼
-message_router.main()
+MessageQueue (消息队列)
       │
-      ├──► EventTrigger       (关键词/戳一戳/群成员变动等事件)
-      ├──► CommandSystem       (@bot /cmd 命令)
-      └──► LLMCoordinator      (LLM 聊天主流程)
+      ▼
+Pipeline (WhitelistMiddleware 群白名单过滤)
+      │
+      ▼
+EventBus (按 PostType 分发)
+      │
+      ├──► AtCommandRule 路由    (@bot /cmd 命令 → CommandSystem)
+      ├──► 插件事件处理器        (Plugin.on_message / on_notice 等)
+      └──► initiativeChat 路由   (普通聊天 / 主动对话 → LLM 决策)
 ```
 
-因为是专门用来聊天的，只关心必要的消息处理不需要插件系统或其他复杂什么的过度设计,先简单过滤只处理群相关的消息简单分为@和其他,@就是区分命令和聊天,其他就会分发到一个简单的分发处理器EventTrigger
+群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理；命令与聊天两条路由在 `bot_framework._register_at_routes()` 注册，插件处理器由 `PluginManager` 在启动时自动扫描并挂载。
 
 **支撑系统**：除了消息主干，项目还包含以下后台支撑模块——
 
 | 模块 | 说明 |
 |------|------|
+| `PlatformManager` | 多平台适配器管理器，持有 MessageQueue + Pipeline + EventBus |
+| `PluginManager` | 插件系统：自动扫描加载 `atribot/plugins/`，支持热重载 |
 | `TimeTriggerSupervisor` | 定时任务调度器，支持延迟任务、固定间隔和 Cron 表达式 |
 | `MediaProcessor` | 多模态消息处理器，将图片 / 音频 / 视频统一转为文本供 LLM 理解 |
 | `agent/` 子 Agent 系统 | 用于委派复杂多步任务，支持上下文隔离与工具链编排 |
@@ -430,7 +436,7 @@ message_router.main()
 LLM 聊天的核心链路在 `atribot/LLMchat/` 目录下，整体采用**全异步流水线**设计：
 
 ```
-用户消息 (ChatMessage)
+用户消息 (MessageEventEnvelope)
       │
       ▼
 chat.py → GroupChat.step()          ← 聊天主入口
@@ -448,10 +454,10 @@ chat.py → GroupChat.step()          ← 聊天主入口
       │     └─ 主模型失败时降级备用模型 (_request_model_with_fallback_)
       │
       ├─③ 解析 JSON 响应            模型输出结构化决策
-      │     ├─ "reply"    → 回复消息 (分段发送 / 表情包)
+      │     ├─ "speak"    → 回复消息 (分段发送 / 表情包)
       │     ├─ "update"   → 更新用户画像
       │     ├─ "silence"  → 不回复
-      │     └─ "use_tools"→ 调用工具
+      │     └─ 工具调用    → 通过 Function Calling 循环执行 (MCP / 本地工具)
       │
       └─④ 事后处理
             ├─ 上下文写回 (ChatManager)
