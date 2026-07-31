@@ -40,6 +40,7 @@ ignore = ["E501", "E701"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.uv.workspace]
 members = [
@@ -53,4 +54,5 @@ default = true
 [dependency-groups]
 dev = [
     "ruff>=0.16.0",
+    "pytest-asyncio>=0.25.0",
 ]

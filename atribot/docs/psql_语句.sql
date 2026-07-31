@@ -102,7 +102,39 @@ GROUP BY m.user_id, u.nickname
 ORDER BY "次数" DESC;
 
 
--- 查询数据库中所有表的大小，并按大小降序排列
+SELECT
+    t.group_id AS "群号",
+    t.user_id AS "qq号",
+    u.nickname AS "网名",
+    COUNT(*) AS "调用次数",
+    SUM(t.prompt_tokens) AS "输入token",
+    SUM(t.completion_tokens) AS "输出token",
+    SUM(t.total_tokens) AS "总消耗token",
+    DENSE_RANK() OVER (ORDER BY SUM(t.total_tokens) DESC) AS "名次"
+FROM token_statistics t
+LEFT JOIN users u ON u.user_id = t.user_id
+GROUP BY
+    t.group_id,
+    t.user_id,
+    u.nickname
+ORDER BY "总消耗token" DESC;
+
+SELECT
+    t.user_id AS "qq号",
+    u.nickname AS "网名",
+    COUNT(*) AS "调用次数",
+    SUM(t.prompt_tokens) AS "输入token",
+    SUM(t.completion_tokens) AS "输出token",
+    SUM(t.total_tokens) AS "总消耗token",
+    DENSE_RANK() OVER (ORDER BY SUM(t.total_tokens) DESC) AS "名次"
+FROM token_statistics t
+LEFT JOIN users u ON u.user_id = t.user_id
+GROUP BY
+    t.user_id,
+    u.nickname
+ORDER BY "总消耗token" DESC;
+
+
 SELECT schemaname,
        tablename,
        pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size

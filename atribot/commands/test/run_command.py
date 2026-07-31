@@ -27,14 +27,14 @@ async def run_async_code(message_data: MessageEventEnvelope):
     GroupMessage
     File 
     
+    #执行mcp工具
+    # from atribot.LLMchat.MCP.tool_calls import ToolCalls
     # send_message = message_data.send_client
-    # Segment = message_data.event.segments[0]
-    # from atribot.core.type.chat_message_types import ReplySegment
-    # if isinstance(Segment, ReplySegment):
-    #     if quote_message := await send_message.get_msg_details(Segment.message_id):
-    #         cqc= quote_message.event.cq_code
-    #         a = await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text(cqc))
-    #         await send_message.send_group_msg(984466158, str(a))
+    # tool_management = container.get_by_type(ToolCalls)
+    # tool_name = "memory_storage"
+    # tool_input = """{"user_id": 2631018780,"content_text": "","category": "fact","importance": 8,"credibility": 10}"""
+    # tool_output= await tool_management.calls(tool_name, tool_input, message_data)
+    # await send_message.send_group_msg(message_data.group_id, str(tool_output))
             
     # await send_message.send_group_msg(984466158, '你好')
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text('消息'))

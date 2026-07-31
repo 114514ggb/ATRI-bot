@@ -389,7 +389,27 @@ class File:
         return self.detect_type(self.file)
 
 
-class FileMessageSegment(MessageSegment, ABC):
+class TextDescriptableMixin:
+    """为媒体消息段提供文本描述缓存功能
+
+    由 MediaProcessor 生成识别文本，供不支持多模态的 LLM 使用
+    """
+
+    def __init__(self, *args, text_description: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._text_description: str | None = text_description
+
+    @property
+    def text_description(self) -> str:
+        """获取媒体识别文本描述缓存"""
+        return self._text_description or ""
+
+    @text_description.setter
+    def text_description(self, value: str) -> None:
+        self._text_description = value
+
+
+class FileMessageSegment(TextDescriptableMixin, MessageSegment, ABC):
     """文件类消息基类,强制要求 file 字段,其余为可选元信息"""
 
     __slots__ = ['file', 'url', 'path', 'file_size', 'file_name']
@@ -402,6 +422,7 @@ class FileMessageSegment(MessageSegment, ABC):
         url: str | None = None,         # 接收时带过来的网络地址
         path: str | None = None,        # 接收时带过来的本地地址
         file_size: int = 0,
+        text_description: str | None = None,
     ):
         self.file_name = file_name
         """文件名"""
@@ -413,7 +434,7 @@ class FileMessageSegment(MessageSegment, ABC):
         """文件的本地绝对路径"""
         self.file_size = file_size
         """文件大小字节"""
-        super().__init__(type)
+        super().__init__(type, text_description=text_description)
 
     def get_path(self)->Path:
         """获取文件的路径,不会进行是否存在检测"""
@@ -443,27 +464,7 @@ class FileMessageSegment(MessageSegment, ABC):
         pass
 
 
-class TextDescriptableMixin:
-    """为媒体消息段提供文本描述缓存功能
-
-    由 MediaProcessor 生成识别文本，供不支持多模态的 LLM 使用
-    """
-
-    def __init__(self, *args, text_description: str | None = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._text_description: str | None = text_description
-
-    @property
-    def text_description(self) -> str:
-        """获取媒体识别文本描述缓存"""
-        return self._text_description or ""
-
-    @text_description.setter
-    def text_description(self, value: str) -> None:
-        self._text_description = value
-
-
-class ImageSegment(TextDescriptableMixin, FileMessageSegment):
+class ImageSegment(FileMessageSegment):
     """图片"""
     __slots__ = ["summary"]
     
@@ -498,7 +499,7 @@ class ImageSegment(TextDescriptableMixin, FileMessageSegment):
         return f"[CQ:image,{summary_part}file={self.file_name},url={self.url}]"
 
 
-class RecordSegment(TextDescriptableMixin, FileMessageSegment):
+class RecordSegment(FileMessageSegment):
     """语音"""
     __slots__ = []
     
@@ -519,7 +520,7 @@ class RecordSegment(TextDescriptableMixin, FileMessageSegment):
     def __str__(self) -> str:
         return f"[CQ:record,file={self.file_name}]"
 
-class VideoSegment(TextDescriptableMixin, FileMessageSegment):
+class VideoSegment(FileMessageSegment):
     """视频"""
     __slots__ = ["thumb"]
     

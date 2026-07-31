@@ -155,10 +155,10 @@ class LLMCoordinator():
     """获取LLM响应的主类,面向openAI的格式"""
     
     def __init__(self):
-        self.supplier:LLMConnectionManager = container.get("LLMSupplier")
-        self.tool_management: ToolCalls = container.get("ToolCalls")
+        self.supplier = container.get_by_type(LLMConnectionManager)
+        self.tool_management = container.get_by_type(ToolCalls)
         self.log: Logger = container.get_by_type(Logger).getChild("LLMCoord")
-        self._media_processor:MediaProcessor = container.get("MediaProcessor")
+        self._media_processor = container.get_by_type(MediaProcessor)
         
     async def step(self, request:GenerationRequest)->GenerationResponse:
         """对于GenerationRequest的主处理函数

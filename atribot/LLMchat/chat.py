@@ -6,7 +6,13 @@ from dataclasses import replace
 from logging import Logger
 from typing import Coroutine, Dict, List
 
-from atribot.common_utils import download_text, extract_json_from_text, url_to_audio_base64, url_to_base64
+from atribot.common_utils import (
+    download_text,
+    extract_json_from_text,
+    url_to_audio_mp3,
+    url_to_image_jpeg,
+    url_to_video_mp4,
+)
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.platform.onebot.message_event import OneBotMessageEvent
@@ -158,8 +164,9 @@ class ChatBasics(ABC):
 
         if including_pictures:
             async def dispose_img(message: ImageSegment):
-                if img := await url_to_base64(message.url, ""):
-                    message_builder.add_image_base64(img, "image/jpeg")
+                result = await url_to_image_jpeg(message.url, file_name=message.file_name)
+                if result is not None:
+                    message_builder.add_image_base64(result.data, result.mime)
                 else:
                     message_builder.add_text("[CQ:image,summary=图片出现问题]")
         else:
@@ -175,11 +182,11 @@ class ChatBasics(ABC):
         if including_audios:
             async def dispose_audio(segment: RecordSegment) -> None:
                 audio_url = segment.url or segment.file.file
-                try:
-                    b64, fmt = await url_to_audio_base64(audio_url, segment.file_name)
-                    message_builder.add_audio(b64, fmt)
-                except Exception as e:
-                    self.log.warning(f"音频下载失败，降级为文本识别: {e}")
+                result = await url_to_audio_mp3(audio_url, segment.file_name)
+                if result is not None:
+                    message_builder.add_audio(result.data, result.fmt)
+                else:
+                    self.log.warning("音频下载失败，降级为文本识别")
                     if segment.text_description:
                         desc = segment.text_description
                     else:
@@ -201,7 +208,11 @@ class ChatBasics(ABC):
         if including_videos:
             async def dispose_video(segment: VideoSegment) -> None:
                 video_url = segment.url or segment.file.file
-                message_builder.add_video(video_url)
+                result = await url_to_video_mp4(video_url, segment.file_name)
+                if result is not None:
+                    message_builder.add_video_base64(result.data, result.mime)
+                else:
+                    message_builder.add_video(video_url)
         else:
             async def dispose_video(segment: VideoSegment) -> None:
                 video_url = segment.url or segment.file.file
@@ -687,8 +698,9 @@ class GroupChat(ChatBasics):
         if including_pictures:
             async def dispose_img(message:ImageSegment):
                 """给自己解析图像"""
-                if img := await url_to_base64(message.url, ""):
-                    message_builder.add_image_base64(img,"image/jpeg")
+                result = await url_to_image_jpeg(message.url, file_name=message.file_name)
+                if result is not None:
+                    message_builder.add_image_base64(result.data, result.mime)
                 else:
                     message_builder.add_text("[CQ:image,summary=图片下载出现问题]")
         else:
@@ -704,13 +716,13 @@ class GroupChat(ChatBasics):
 
         if including_audios:
             async def dispose_audio(segment: RecordSegment) -> None:
-                """直接将音频以 base64 嵌入，下载失败时降级为文本识别"""
+                """直接将音频以 mp3 base64 嵌入，下载失败时降级为文本识别"""
                 audio_url = segment.url or segment.file.file
-                try:
-                    b64, fmt = await url_to_audio_base64(audio_url, segment.file_name)
-                    message_builder.add_audio(b64, fmt)
-                except Exception as e:
-                    self.log.warning(f"音频下载失败，降级为文本识别: {e}")
+                result = await url_to_audio_mp3(audio_url, segment.file_name)
+                if result is not None:
+                    message_builder.add_audio(result.data, result.fmt)
+                else:
+                    self.log.warning("音频下载失败，降级为文本识别")
                     if segment.text_description:
                         desc = segment.text_description
                     else:
@@ -731,9 +743,13 @@ class GroupChat(ChatBasics):
 
         if including_videos:
             async def dispose_video(segment: VideoSegment) -> None:
-                """直接传入视频 URL 供模型理解"""
+                """将视频转为 mp4 base64,失败时直接传入视频 URL 供模型理解"""
                 video_url = segment.url or segment.file.file
-                message_builder.add_video(video_url)
+                result = await url_to_video_mp4(video_url, segment.file_name)
+                if result is not None:
+                    message_builder.add_video_base64(result.data, result.mime)
+                else:
+                    message_builder.add_video(video_url)
         else:
             async def dispose_video(segment: VideoSegment) -> None:
                 """交给其他模型将视频转为文字"""

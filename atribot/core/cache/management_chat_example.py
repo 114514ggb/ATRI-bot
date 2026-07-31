@@ -2,6 +2,7 @@ import datetime
 from logging import Logger
 from typing import TYPE_CHECKING, Dict, List
 
+from atribot.common_utils import url_to_audio_mp3, url_to_image_jpeg, url_to_video_mp4
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
 from atribot.core.event_bus.rule import Rule
@@ -379,8 +380,12 @@ class ChatManager(ServiceBase):
                 elif isinstance(segment, ImageSegment):
                     if remaining_pictures > 0:
                         if url := segment.url or segment.file.file:
-                            builder.add_image_left(url)
-                        remaining_pictures -= 1
+                            result = await url_to_image_jpeg(url, file_name=segment.file_name)
+                            if result is not None:
+                                builder.add_image_base64_left(result.data, result.mime)
+                            else:
+                                builder.add_image_left(url)
+                            remaining_pictures -= 1
                         cq_text = (
                             f"[CQ:image,file={segment.file_name or 'unknown'}]"
                         )
@@ -397,13 +402,25 @@ class ChatManager(ServiceBase):
 
                 elif isinstance(segment, RecordSegment):
                     if remaining_audios > 0:
-                        if data:=segment.file.file:
-                            builder.add_audio_left(data)
-                        remaining_audios -= 1
-                        cq_text = (
-                            f"[CQ:record,file={segment.file_name or 'unknown'}]"
-                        )
-                        builder.add_text_left(cq_text)
+                        audio_url = segment.url or segment.file.file
+                        result = await url_to_audio_mp3(audio_url, segment.file_name)
+                        if result is not None:
+                            builder.add_audio_left(result.data, result.fmt)
+                            remaining_audios -= 1
+                            cq_text = (
+                                f"[CQ:record,file={segment.file_name or 'unknown'}]"
+                            )
+                            builder.add_text_left(cq_text)
+                        else:
+                            if not segment.text_description:
+                                try:
+                                    desc = await self.media_processor.audio_to_text(audio_url)
+                                    segment.text_description = desc
+                                except Exception:
+                                    segment.text_description = "<描述获取失败>"
+                            builder.add_text_left(
+                                f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]"
+                            )
                     else:
                         if not segment.text_description:
                             audio_url = segment.url or segment.file.file
@@ -416,8 +433,12 @@ class ChatManager(ServiceBase):
 
                 elif isinstance(segment, VideoSegment):
                     if remaining_videos > 0:
-                        if url:=segment.url or segment.file.file:
-                            builder.add_video_left(url)
+                        video_url = segment.url or segment.file.file
+                        result = await url_to_video_mp4(video_url, segment.file_name)
+                        if result is not None:
+                            builder.add_video_base64_left(result.data, result.mime)
+                        else:
+                            builder.add_video_left(video_url)
                         remaining_videos -= 1
                         cq_text = (
                             f"[CQ:video,file={segment.file_name or 'unknown'}]"

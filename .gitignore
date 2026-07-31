@@ -31,6 +31,8 @@ assets/supplier_config.json
 /document/**/*.docx
 /document/**/*.txt
 
+document/temp/
+
 # Virtual environments
 .venv
 .wslvenv
