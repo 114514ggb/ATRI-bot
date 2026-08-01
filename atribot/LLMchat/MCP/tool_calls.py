@@ -655,7 +655,6 @@ class ToolCalls(ServiceBase):
         args: dict = json.loads(arguments_str)
         return await func_tool.execute(message_data=message_data, **args)
 
-
     async def _on_mcp_tools_changed(
         self, server_name: str | None, mcp_func_list: List[FunctionTool]
     ) -> None:
@@ -672,6 +671,44 @@ class ToolCalls(ServiceBase):
         for func_tool in self._registry.func_list:
             toolset.add_tool(func_tool)
         return toolset
+
+    def resolve_toolset(
+        self,
+        full_toolset: ToolSetModel | None = None,
+        names: List[str] | None = None,
+        preset: str | None = None,
+    ) -> ToolSetModel:
+        """解析工具集合:preset 优先于 names,均未指定时返回全量集合
+
+        Args:
+            full_toolset: 全量工具集合（用于按 names 筛选），为 None 时自动从当前注册表构建
+            names: 工具名称列表
+            preset: 预设名称
+
+        Returns:
+            解析后的工具集合
+        """
+        if full_toolset is None:
+            full_toolset = self._build_full_toolset()
+        return self._preset_manager.resolve_toolset(full_toolset, names, preset)
+
+    def get_openai(
+        self,
+        toolset: ToolSetModel | None = None,
+        omit_empty_parameter_field: bool = False,
+    ) -> list:
+        """获取 OpenAI 格式工具描述，可按 ToolSet 过滤
+
+        Args:
+            toolset: 工具集合，为 None 时返回全量缓存
+            omit_empty_parameter_field: 是否省略空参数工具
+
+        Returns:
+            OpenAI 格式工具描述列表
+        """
+        return self._schema_cache.get_openai(
+            omit_empty_parameter_field, toolset=toolset
+        )
 
     def get_func_desc_openai_style(
         self,

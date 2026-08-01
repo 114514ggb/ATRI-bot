@@ -9,6 +9,7 @@ from atribot.core.service_container import container
 from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.context_types import Context, MessageBuilder, ToolCallsStopIteration
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
+from atribot.LLMchat.MCP.tool_model import ToolSet
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
@@ -59,8 +60,8 @@ class GenerationRequest():
     """如果有有的话会加入响应"""
     system_review:bool = False
     """prompt嵌入时是否单独使用system而不是采用直接拼接"""
-    tool_json: List[Dict] = None
-    """可供模型调用工具json"""
+    tool_json: ToolSet | None = None
+    """可供模型调用工具集合"""
     parameter: Dict = None
     """模型参数"""
     generation_response: GenerationResponse|None = None
@@ -90,8 +91,8 @@ class GenerationRequestSimplify():
     """增量上下文""" 
     model_api:model_api_basics|None = None
     """模型的api实例"""
-    tool_json: List[Dict] = None
-    """可供模型调用工具json"""
+    tool_json: ToolSet | None = None
+    """可供模型调用工具集合"""
     parameter: Dict = None
     """模型参数"""
     generation_response: GenerationResponse|None = None
@@ -647,8 +648,8 @@ class LLMCoordinator():
         else:
             return "", text
     
-    @staticmethod
     async def get_chat_json(
+        self,
         request:GenerationRequest|GenerationRequestSimplify, 
         messages:List[Dict[str, Any]], 
         model_api:model_api_basics
@@ -663,10 +664,15 @@ class LLMCoordinator():
         Returns:
             Dict: 请求回的json
         """
+        tools = (
+            self.tool_management.get_openai(toolset=request.tool_json)
+            if request.tool_json is not None
+            else None
+        )
         if request.parameter:
             parameter = {
                 "messages": request.messages + messages, 
-                "tools":  request.tool_json,
+                "tools":  tools,
                 **request.parameter
             }
             if request.parameter.get('stream'):
@@ -683,5 +689,5 @@ class LLMCoordinator():
             return await model_api.generate_text_tools(
                 model = request.model,
                 messages = request.messages + messages, 
-                tools = request.tool_json
+                tools = tools
             )

@@ -337,6 +337,7 @@ class GroupChat(ChatBasics):
             model=model_name,
             parameter=self.config.model.chat_parameter,
             messages=None,
+            tool_json=self.tool_calls.resolve_toolset(preset="group_chat"),
             visual_sense=self.visual_sense,
             audio_sense=self.audio_sense,
         )
@@ -391,7 +392,6 @@ class GroupChat(ChatBasics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.tool_calls.get_func_desc_openai_style(preset="group_chat"),
             message_data=event
         )
         
@@ -535,7 +535,6 @@ class GroupChat(ChatBasics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.tool_calls.get_func_desc_openai_style(preset="group_chat"),
             message_data=event
         )
         
@@ -1039,6 +1038,7 @@ class PrivateChat(ChatBasics):
             model=model_name,
             parameter=self.config.model.chat_parameter,
             messages=None,
+            tool_json=self.tool_calls.resolve_toolset(preset="private_chat"),
             visual_sense=self.visual_sense,
             audio_sense=self.audio_sense,
         )
@@ -1066,7 +1066,6 @@ class PrivateChat(ChatBasics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            tool_json=self.tool_calls.get_func_desc_openai_style(preset="private_chat"),
             message_data=event,
         )
 
