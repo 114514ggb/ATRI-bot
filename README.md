@@ -139,10 +139,10 @@
 ### 3. 模型与环境配置
 
 #### 🤖 嵌入模型 (Embedding)
-推荐优先使用本地的 `Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API（OpenAI 格式兼容），只是仓库里目前主要按 Ollama 的使用方式测试过。
+推荐优先使用本地的 `dengcao/Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API（OpenAI 格式兼容），只是仓库里目前主要按 Ollama 的使用方式测试过。
 推荐使用 [Ollama](https://ollama.com/) 进行本地部署：
 ```bash
-ollama run Qwen3-Embedding-0.6B:F16
+ollama run dengcao/Qwen3-Embedding-0.6B:F16
 ```
 
 > **注意**：如果更换 Embedding 模型，之前构建的向量数据需要重新构建。
