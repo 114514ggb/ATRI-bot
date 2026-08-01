@@ -1,5 +1,5 @@
 # from atribot.common import common
-from typing import List
+from typing import overload
 
 from atribot.core.service_container import container
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
@@ -17,6 +17,7 @@ class RAGManager:
         self.embedding_api:universal_ai_api = self.supplier.get_filtration_connection(
             supplier_name = self.config.model.RAG.use_embedding_model.supplier
         )[0].connection_object
+        self.dimensions:int = self.config.model.RAG.dimensions
         self.text_chunker = RecursiveCharacterTextSplitter(
             200,50
         )
@@ -48,19 +49,26 @@ class RAGManager:
         return self.text_chunker.split_text(text)
         
         
-    async def calculate_embedding(self, document:str|List[str])->list[list[float]]:
+    @overload
+    async def calculate_embedding(self, document: str) -> list[float]: ...
+
+    @overload
+    async def calculate_embedding(self, document: list[str]) -> list[list[float]]: ...
+
+    async def calculate_embedding(self, document: str | list[str]) -> list[list[float]] | list[float]:
         """用嵌入式模型把文本转换成向量
 
         Args:
-            document (str|List[str]): 要转换成向量的文本,或是要批量转换的文本列表
+            document (str | list[str]): 要转换成向量的文本,或是要批量转换的文本列表
 
         Returns:
-            list[list[float]]: 包含向量的列表
+            单条 str 输入 -> list[float]（单个向量）
+            多条 list[str] 输入 -> list[list[float]]（每个字符串对应一个向量）
         """
         return await self.embedding_api.generate_embedding_vector(
             model=self.embedding_model,
             input=document,
-            dimensions=1024,
+            dimensions=self.dimensions,
             encoding="float"
         )
         

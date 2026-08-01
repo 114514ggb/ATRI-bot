@@ -218,7 +218,7 @@ class MemoryConsolidator:
                     continue
 
                 try:
-                    embedding = (await self.rag.calculate_embedding([final_event]))[0]
+                    embedding = (await self.rag.calculate_embedding(final_event))
                 except Exception as e:
                     self.log.error(f"记忆重算 embedding 失败, memory_id={keeper['memory_id']}, error={e}")
                     continue
@@ -388,7 +388,7 @@ class MemoryConsolidator:
                     continue
 
                 try:
-                    embedding = (await self.rag.calculate_embedding([final_event]))[0]
+                    embedding = (await self.rag.calculate_embedding(final_event))
                 except Exception as e:
                     self.log.error(f"记忆重算 embedding 失败, memory_id={keeper['memory_id']}, error={e}")
                     continue

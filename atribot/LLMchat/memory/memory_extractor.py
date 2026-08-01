@@ -106,7 +106,7 @@ class MemoryExtractor:
                         group_id,
                         timestamp,
                         topic_text,
-                        str(topic_embeddings[0]),
+                        str(topic_embeddings),
                         "group_topic",
                         int(group_topic.get("importance", 5)),
                         int(group_topic.get("credibility", 5)),

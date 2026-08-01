@@ -101,7 +101,7 @@ class MemoryRetriever:
             async with self.vector_store.vector_database as db:
                 return await db.execute_with_pool(
                     query = sql,
-                    params = (str(embeddin_list[0]), limit),
+                    params = (str(embeddin_list), limit),
                     fetch_type = "all"
                 )
 
@@ -140,7 +140,7 @@ class MemoryRetriever:
             async with self.vector_store.vector_database as db:
                 return await db.execute_with_pool(
                     query = sql,
-                    params = (str(embeddin_list[0]), user_id, limit),
+                    params = (str(embeddin_list), user_id, limit),
                     fetch_type = "all"
                 )
 
@@ -188,7 +188,7 @@ class MemoryRetriever:
         """
 
         return await self.vector_store.query_memories(
-            (await self.rag.calculate_embedding(query_text))[0] if query_text else None,
+            await self.rag.calculate_embedding(query_text) if query_text else None,
             limit,
             group_id,
             user_id,
@@ -283,10 +283,10 @@ class MemoryRetriever:
         if not query_text or not query_text.strip():
             return []
 
-        embedding_list = await self.rag.calculate_embedding(query_text)
-        if not embedding_list:
+        # 单条 str 输入返回单个向量(List[float]),直接作为查询向量使用
+        query_vector = await self.rag.calculate_embedding(query_text)
+        if not query_vector:
             return []
-        query_vector = embedding_list[0]
 
         filter_clauses: List[str] = []
         filter_params: List[Any] = []

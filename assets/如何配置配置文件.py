@@ -126,8 +126,8 @@
             }
         ],
         "RAG":{#对模型提供记忆搜索支持的嵌入式模型
-            "enable":True,
-            "dimensions":1024,#嵌入模型的维度,这个目前配置了也没用，有些地方硬编码了没改
+            "enable":True,#这个目前没什么用修不修改不影响,整个项目需要依赖这个
+            "dimensions":1024,#这是嵌入模型的向量维度
             "use_embedding_model":{#一般配置这个就行了
                 "supplier":"ollama_embed",
                 "model_name":"dengcao/Qwen3-Embedding-0.6B:F16"

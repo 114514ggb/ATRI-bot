@@ -48,7 +48,7 @@ async def main(
     importance: int = 5,
     credibility: int = 5,
 ):
-    event_vector = str((await memory_system.rag.calculate_embedding(content_text))[0])
+    event_vector = str(await memory_system.rag.calculate_embedding(content_text))
 
     if user_id:
         await memory_system.vector_store.storage(

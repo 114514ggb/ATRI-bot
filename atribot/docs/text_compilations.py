@@ -60,7 +60,7 @@ async def db_sql():
     #     )
     #     await db.execute_with_pool(
     #       sql,
-    #       (None,None,int(time.time()), test, str(embedding[0]))
+    #       (None,None,int(time.time()), test, str(embedding))
     #     )
     
     async with psql_db as db:
@@ -71,7 +71,7 @@ async def db_sql():
       )
       ret = await db.execute_with_pool(
         sql,
-        (str(embedding[0]),5),
+        (str(embedding),5),
         fetch_type = "all"
       )
       pp(ret)

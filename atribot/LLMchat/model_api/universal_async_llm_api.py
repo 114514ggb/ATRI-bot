@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import AsyncGenerator, Dict, List
+from typing import AsyncGenerator, Dict, List, overload
 
 import aiohttp
 from aiohttp.resolver import AsyncResolver
@@ -212,37 +212,98 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     raise ValueError(f"LLM API请求为空，已重试 {max_retries} 次")
         
     
-    async def generate_embedding_vector(self, model:str, input:list[str]|str, dimensions:int=1024, encoding:str = "float")->List[List[float]]:
+    @overload
+    async def generate_embedding_vector(
+        self,
+        model: str,
+        input: str,
+        dimensions: int = 1024,
+        encoding: str = "float",
+    ) -> List[float]: ...
+
+    @overload
+    async def generate_embedding_vector(
+        self,
+        model: str,
+        input: list[str],
+        dimensions: int = 1024,
+        encoding: str = "float",
+    ) -> List[List[float]]: ...
+
+    async def generate_embedding_vector(
+        self,
+        model: str,
+        input: list[str] | str,
+        dimensions: int = 1024,
+        encoding: str = "float",
+    ) -> List[List[float]] | List[float]:
         """异步调用指定的嵌入模型，将输入的文本转换为向量表示。
 
         Args:
             model (str): 要使用的嵌入模型的编码
-            input (Union[str, List[str]]): 需要进行向量化的文本内容。可以是单个字符串，或一个字符串列表。
+            input (str | list[str]): 需要进行向量化的文本内容。可以是单个字符串，或一个字符串列表。
             dimensions (int): 输出向量的维度。默认为 1024
             encoding (str): 向量的编码格式。默认为 "float"。
 
         Returns:
-            List[List[float]]: 返回的向量list,每一个字符串对应一个list
+            单条 str 输入 -> List[float]（单个向量）
+            多条 list[str] 输入 -> List[List[float]]（每个字符串对应一个向量）
         """
         payload = {
-            "model" : model,
-            "input" : input,
-            "dimensions" : dimensions,
-            "encoding_format" : encoding,
+            "model": model,
+            "input": input,
+            "dimensions": dimensions,
+            "encoding_format": encoding,
         }
-        
+
         ret = await self._client_post(payload)
-        
+
         try:
-            if embeddings := ret.get('embeddings'):
-                return embeddings
-            else:
-                return [
-                    embedding["embedding"]
-                    for embedding in ret["data"]
-                ]
+            vectors = self._parse_embedding_response(ret)
         except Exception as e:
             self.log.exception(f"不兼容的嵌入返回值错误:{e},原始data:{ret}")
+            raise
+
+        if isinstance(input, str):
+            return vectors[0]
+        return vectors
+
+    def _parse_embedding_response(self, ret: Dict) -> List[List[float]]:
+        """从不同供应商的返回格式中统一提取向量列表
+        
+        支持的格式:
+        - OpenAI 标准:     {"data": [{"embedding": [...]}]}
+        - DashScope 原生:  {"output": {"embeddings": [{"embedding": [...], "text_index": 0}]}}
+        - Gemini 批量:     {"embeddings": [{"values": [...]}]}
+        - Cohere:          {"embeddings": [[...], [...]]}
+        - Gemini 单条:     {"embedding": {"values": [...]}}
+        - 直接单向量:       {"embedding": [...]}
+        """
+
+        if "embedding" in ret:
+            embedding = ret["embedding"]
+            if isinstance(embedding, dict) and "values" in embedding:
+                return [embedding["values"]]
+            return [embedding]
+
+        if ret.get("data"):
+            first = ret["data"][0]
+            if isinstance(first, dict) and "embedding" in first:
+                return [item["embedding"] for item in ret["data"]]
+
+        output = ret.get("output")
+        if isinstance(output, dict) and output.get("embeddings"):
+            embeddings = output["embeddings"]
+            if isinstance(embeddings[0], dict) and "embedding" in embeddings[0]:
+                return [item["embedding"] for item in embeddings]
+
+        if "embeddings" in ret:
+            embeddings = ret["embeddings"]
+            if embeddings and isinstance(embeddings[0], dict) and "values" in embeddings[0]:
+                return [item["values"] for item in embeddings]
+            return embeddings
+
+        raise ValueError("无法识别的嵌入返回格式")
 
     async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
         return await self.process_stream_simple(self.client_post_stream({"model": model, **remainder}))
