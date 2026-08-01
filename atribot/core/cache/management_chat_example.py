@@ -352,7 +352,7 @@ class ChatManager(ServiceBase):
             MessageBuilder: 构造完成的消息构建器
         """
 
-        messages = (await self.get_group_context(group_id)).messages
+        messages = list((await self.get_group_context(group_id)).messages)
 
         remaining_pictures = DEFAULT_INCLUDING_PICTURES if including_pictures else 0
         remaining_audios = DEFAULT_INCLUDING_AUDIOS if including_audios else 0
