@@ -173,6 +173,16 @@ ollama run Qwen3-Embedding-0.6B:F16
 - **扩展性**：如需支持其他类型的沙盒（如 Web 沙盒、系统命令沙盒），可继承 `atribot/LLMchat/sandbox/sandbox_base.py` 中的基类并实现相应接口。
 - **文件操作**：AI 上下文中能够看到的文件可以放到 Python 环境中进行简单处理。
 
+如果要使用默认的 Docker 沙盒，需要本机安装 Docker，并先在项目根目录构建沙盒镜像：
+
+```bash
+docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
+```
+
+然后在 `assets/config.json` 的 `sand_box` 中指定该镜像名（默认 `atri-sandbox:latest`）即可。沙盒为**可选**能力，初始化失败不会阻断 Bot 启动。
+
+> 关于沙盒镜像的构建、逐段解读、自定义扩展与常见问题，详见 [沙盒 Dockerfile 教程](atribot/docs/沙盒Dockerfile教程.md)。
+
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
 1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表。
