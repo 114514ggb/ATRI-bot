@@ -29,9 +29,9 @@
       "active": false
     },
     "MS-ImgGen-MCP": {
-      "command": "uvx", 
-      "args": ["ms_image_gen_mcp@latest"], 
-      "env": { "MODELSCOPE_API_KEY": "" } ,
+      "command": "uvx",
+      "args": ["--from", "ms_image_gen_mcp@latest", "--with", "mcp<2", "ms_image_gen_mcp"],
+      "env": { "MODELSCOPE_API_KEY": "" },
       "active": false
     },
     "bingcn": {
