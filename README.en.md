@@ -131,10 +131,10 @@ The project only supports PostgreSQL.
 
 ### 3. Model & Environment Configuration
 #### 🤖 Embedding Model
-It is recommended to use the local `Qwen3-Embedding-0.6B:F16`. Paid API alternatives are also possible (only tested with Ollama).  
+It is recommended to use the local `dengcao/Qwen3-Embedding-0.6B:F16`. Paid API alternatives are also possible (only tested with Ollama).  
 Recommended deployment via [Ollama](https://ollama.com/):
 ```bash
-ollama run Qwen3-Embedding-0.6B:F16
+ollama run dengcao/Qwen3-Embedding-0.6B:F16
 ```
 > **Note**: If you change the Embedding model, previously built vector data needs to be rebuilt.
 #### 🗣️ Text-to-Speech (TTS) - Optional
