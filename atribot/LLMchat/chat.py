@@ -37,6 +37,7 @@ from atribot.LLMchat.LLM_supervisor import (
     LLMSRequestFailed,
 )
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
+from atribot.LLMchat.MCP.tool_model import ToolSet
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
@@ -98,6 +99,20 @@ class ChatBasics(ABC):
         self.config: atriConfig = config
         self.log: Logger = log
         self.build_prompt = build_prompt()
+        
+        self.template_request_simplify :GenerationRequestSimplify
+        """构建请求缓存"""
+
+    def _prepare_round_toolset(self) -> ToolSet | None:
+        """为当前对话轮次创建独立的工具集合副本
+
+        Returns:
+            本轮独立的工具集合副本；模板无工具集合时返回 None
+        """
+        template_toolset = self.template_request_simplify.tool_json
+        return (
+            template_toolset.copy() if template_toolset is not None else None
+        )
 
     @abstractmethod
     async def step(self) -> None:
@@ -383,6 +398,8 @@ class GroupChat(ChatBasics):
             including_videos=self.video_sense,
         )
         
+        round_toolset = self._prepare_round_toolset()
+        
         original_context:Context = await self.get_chat_context(
             group_id = group_id,
             user_id = user_id
@@ -392,7 +409,8 @@ class GroupChat(ChatBasics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            message_data=event
+            message_data=event,
+            tool_json=round_toolset,
         )
         
         response = await self._request_model_with_fallback_(
@@ -430,13 +448,13 @@ class GroupChat(ChatBasics):
                 else:
                     await execute_response_json(response_json)
                     
-            else:
+            elif response_json:
                 self.log.error(f"返回json解析不正确:{type(response_json)}")
-                await event.send_client.send_group_merge_text(
-                    group_id = group_id,
-                    message = f"{response_json}",
-                    source = "模型返回无法解析的格式",
-                )
+                # await event.send_client.send_group_merge_text(
+                #     group_id = group_id,
+                #     message = f"{response_json}",
+                #     source = "模型返回无法解析的格式",
+                # )
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
         original_context.add_user_message(f"{prompt}\n最新用户消息:{event.llm_formatted_message}")
@@ -530,12 +548,15 @@ class GroupChat(ChatBasics):
             )
         else:
             original_context = self.chat_manager.get_group_context(group_id)
-            
+
+        round_toolset = self._prepare_round_toolset()
+
         request: GenerationRequestSimplify = replace(
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            message_data=event
+            message_data=event,
+            tool_json=round_toolset,
         )
         
         response = await self._request_model_with_fallback_(
@@ -641,9 +662,14 @@ class GroupChat(ChatBasics):
             including_audios=including_audios,
             including_videos=including_videos,
         )
-        message_builder.add_text_left(
-            self.skills.prompt #skills的提示词
-        )
+        
+        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("group_chat"):
+            message_builder.add_text_left(deferred_prompt+self.skills.prompt)#待发现工具的提示词
+        else:
+            message_builder.add_text_left(
+                self.skills.prompt#skills的提示词
+            )
+        
         await self.append_message_segments_prompt(
             event,
             message_builder,
@@ -1062,11 +1088,14 @@ class PrivateChat(ChatBasics):
         private_context_obj = await self.chat_manager.get_private_context(user_id)
         original_context: Context = private_context_obj.chat_context
 
+        round_toolset = self._prepare_round_toolset()
+
         request: GenerationRequestSimplify = replace(
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
             message_data=event,
+            tool_json=round_toolset,
         )
 
         response = await self._request_model_with_fallback_private_(
@@ -1163,6 +1192,13 @@ class PrivateChat(ChatBasics):
             including_audios,
             including_videos,
         )
+        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("group_chat"):
+            message_builder.add_text_left(deferred_prompt+self.skills.prompt)#待发现工具的提示词
+        else:
+            message_builder.add_text_left(
+                self.skills.prompt#skills的提示词
+            )
+        
         message_builder.add_text(
             f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
         )

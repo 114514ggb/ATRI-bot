@@ -44,7 +44,11 @@ async def manage_tools(message_data: MessageEventEnvelope, action: str, target: 
             
         msg = "当前工具预设:\n"
         for name, toolset in presets.items():
-            msg += f"- {name}: \n{', '.join(toolset.names())}\n\n"
+            msg += f"- {name}: \n{', '.join(toolset.names())}\n"
+            deferred_tools = tool_calls_instance.get_deferred_tools(name)
+            if deferred_tools:
+                msg += f"  待发现: {', '.join(t.name for t in deferred_tools)}\n"
+            msg += "\n"
         await send_message.send_group_merge_text(message_data.group_id, msg.strip(), source="工具预设列表")
         
     elif action == "add_tool":

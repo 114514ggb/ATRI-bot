@@ -7,7 +7,12 @@ from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import MessageEventEnvelope
-from atribot.core.type.context_types import Context, MessageBuilder, ToolCallsStopIteration
+from atribot.core.type.context_types import (
+    Context,
+    MessageBuilder,
+    ToolCallsStopIteration,
+    ToolSearchRequested,
+)
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import ToolSet
 from atribot.LLMchat.media_processor import MediaProcessor
@@ -350,13 +355,16 @@ class LLMCoordinator():
                         tool_output = await self._format_mcp_result_rich(tool_output, request.visual_sense, request.audio_sense)
                     else:
                         tool_output = str(tool_output)
-                    
+
+                except ToolSearchRequested as e:
+                    tool_output = self._handle_tool_search_request(request, e)
+
                 except ToolCallsStopIteration:
                     increase_context.add_tool_message(tool_name,tool_call['id'],tool_output)
                     self.log.info("模型主动结束工具调用!")
                     response.messages = increase_context.messages
                     return response
-                    
+
                 except Exception as e:
                     text = f"调用工具发生错误。\nErrors:{e}"
                     self.log.error(text,exc_info=True)
@@ -411,6 +419,52 @@ class LLMCoordinator():
         
         return self._update_response(response, assistant_message)
     
+    def _handle_tool_search_request(
+        self,
+        request: GenerationRequest | GenerationRequestSimplify,
+        search_req: ToolSearchRequested,
+    ) -> str:
+        """处理 tool_search 的发现请求：搜索待发现工具并启用至本轮 request.tool_json
+
+        命中工具加入本轮 request.tool_json 后，后续 API 请求（get_chat_json 每次
+        重新读取 request.tool_json）会自动携带其完整 schema，因此 LLM 可在本轮内直接调用。
+
+        Args:
+            request: 当前请求（其 tool_json 为本轮独立副本）
+            search_req: tool_search 抛出的发现请求
+
+        Returns:
+            给 LLM 的回执文本
+        """
+        if request.tool_json is None:
+            return "本轮对话未启用工具发现机制，无法启用新工具。"
+
+        preset_name = request.tool_json.name
+        try:
+            matched = self.tool_management.enable_deferred_tools(
+                preset_name=preset_name,
+                query=search_req.query,
+                limit=search_req.limit,
+                target_toolset=request.tool_json,
+            )
+        except Exception as e:
+            self.log.exception(f"tool_search 处理失败: {e}")
+            return f"tool_search 处理失败: {e}"
+
+        if not matched:
+            return (
+                f"未在待发现工具中找到匹配 '{search_req.query}' 的工具。"
+                "可尝试其他关键词，或查看<带发现执行工具>列表中的工具名。"
+            )
+
+        lines = [
+            f"找到 {len(matched)} 个匹配工具，已临时加入本轮可用工具"
+            "（仅本轮有效，下一轮对话自动还原）:"
+        ]
+        lines += [f"- {t.name}: {t.description}" for t in matched]
+        lines.append("如需使用，请直接调用对应工具。")
+        return "\n".join(lines)
+
     @staticmethod
     def get_init_context(request:GenerationRequest)->Context:
         """获取初始上下文"""

@@ -140,7 +140,7 @@ class BotFramework:
         
         #存储
         self._platform_manager.queue.set_overflow_handler(store_message_to_db)
-        self._platform_manager.event_bus.on_message(priority=-100)(store_message_to_db)
+        self._platform_manager.event_bus.on_message(priority=101)(store_message_to_db)
 
         await self._start_sandbox()
         await self._resolve_services()

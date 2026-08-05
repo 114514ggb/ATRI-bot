@@ -236,6 +236,8 @@ class ToolSet:
 
     tools: list[FunctionTool] = field(default_factory=list)
     """工具列表"""
+    name: str = ""
+    """工具集合标识"""
 
     def empty(self) -> bool:
         """检查工具集合是否为空
@@ -493,12 +495,23 @@ class ToolSet:
         Returns:
             仅包含匹配名称工具的新 ToolSet 实例
         """
-        result = ToolSet()
+        result = ToolSet(name=self.name)
         names_set = set(names)
         for tool in self.tools:
             if tool.name in names_set:
                 result.add_tool(tool)
         return result
+
+    def copy(self) -> ToolSet:
+        """返回包含相同工具引用的新 ToolSet 实例（浅拷贝）
+
+        用于为每个对话轮次创建独立的工具集合副本：在本轮内增删工具
+        不会影响共享的模板/预设集合。name 标识随副本保留。
+
+        Returns:
+            与当前集合工具列表相同的新 ToolSet 实例
+        """
+        return ToolSet(tools=list(self.tools), name=self.name)
 
     def __len__(self) -> int:
         """返回工具数量"""

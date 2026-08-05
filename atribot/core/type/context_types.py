@@ -15,6 +15,20 @@ class ToolCallsStopIteration(Exception):
             super().__init__("end tool call")
 
 
+class ToolSearchRequested(Exception):
+    """tool_search 工具抛出的约定错误：请求发现并启用待发现工具
+
+    Attributes:
+        query: 搜索关键词
+        limit: 最多启用工具数量
+    """
+
+    def __init__(self, query: str, limit: int = 5) -> None:
+        self.query = query
+        self.limit = limit
+        super().__init__(f"tool_search 请求发现工具: query={query}, limit={limit}")
+
+
 class MessageBuilder:
     """LLM 使用的链式消息构建器
 

@@ -2,6 +2,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import re
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, List
@@ -15,6 +16,57 @@ from atribot.LLMchat.MCP.mcp_tool_manager import ToolManager
 from atribot.LLMchat.MCP.tool_executor import ToolExecutionEngine
 from atribot.LLMchat.MCP.tool_model import FunctionTool, LocalTool, MCPTool
 from atribot.LLMchat.MCP.tool_model import ToolSet as ToolSetModel
+
+# 工具匹配评分权重
+SCORE_EXACT_NAME = 100      # 名称精确匹配
+SCORE_NAME_PREFIX = 75      # 名称前缀匹配
+SCORE_NAME_CONTAINS = 50    # 名称包含
+SCORE_DESC_CONTAINS = 25    # 描述包含
+SCORE_WORD_MATCH = 20       # 查询中每个词都出现在名称中（按比例）
+
+
+def score_tool(name: str, description: str, query: str) -> int:
+    """按名称与描述对工具进行匹配评分（大小写不敏感）
+
+    匹配规则（分数可叠加，权重见模块常量）：
+    - 名称精确匹配
+    - 名称前缀匹配
+    - 名称包含关键词
+    - 描述包含关键词
+    - 多词查询时每个词在名称中出现的比例加分
+
+    Args:
+        name: 工具名称
+        description: 工具描述
+        query: 搜索关键词
+
+    Returns:
+        匹配分数,0 表示不匹配
+    """
+    name_l = name.lower()
+    desc_l = description.lower()
+    q = query.lower().strip()
+    if not q:
+        return 0
+
+    score = 0
+    if name_l == q:
+        score += SCORE_EXACT_NAME
+    elif name_l.startswith(q):
+        score += SCORE_NAME_PREFIX
+    if q in name_l:
+        score += SCORE_NAME_CONTAINS
+    if q in desc_l:
+        score += SCORE_DESC_CONTAINS
+
+    # 多词查询：每个词在名称中出现则按比例加分
+    words = [w for w in re.split(r"[_\-.\s]+", q) if w]
+    if len(words) > 1:
+        matched = sum(1 for w in words if w in name_l)
+        if matched:
+            score += SCORE_WORD_MATCH * matched // len(words)
+
+    return score
 
 
 class ToolRegistry:
@@ -249,11 +301,14 @@ class ToolPresetManager:
     def __init__(self, logger: Logger) -> None:
         self.log = logger
         self.presets: Dict[str, ToolSetModel] = {}
+        self.deferred: Dict[str, List[str]] = {}
+        """预设名 -> 待发现(deferred)工具名单（仅 dict 型预设存在）"""
         self._registry: ToolRegistry | None = None
         self._preset_lock = asyncio.Lock()
 
     def register_preset(self, preset_name: str, toolset: ToolSetModel) -> None:
         """注册一个工具预设组"""
+        toolset.name = preset_name
         self.presets[preset_name] = toolset
         self.log.info(f"注册工具预设 '{preset_name}': {toolset.names()}")
 
@@ -261,20 +316,34 @@ class ToolPresetManager:
         """删除一个工具预设组"""
         self.presets.pop(preset_name, None)
 
-    def load_presets_from_config(self, presets_config: Dict[str, List[str]], registry: "ToolRegistry") -> None:
+    def load_presets_from_config(self, presets_config: Dict[str, Any], registry: "ToolRegistry") -> None:
         """从配置字典批量加载预设组
 
+        兼容两种配置形式：
+        - 列表：``{"group_chat": ["tool_a", ...]}`` → 全部作为默认启用工具，无待发现
+        - 字典：``{"group_chat": {"default": [...], "deferred": [...]}}`` → 拆分为默认启用与待发现两组
+
         Args:
-            presets_config: {{预设名: [工具名字符串列表]}}
+            presets_config: 预设配置（见上方说明）
             registry: 工具注册表，用于将工具名解析为 FunctionTool 实例
         """
         self._registry = registry
-        for name, tools in presets_config.items():
-            if not isinstance(tools, list):
-                self.log.warning(f"工具预设 '{name}' 的内容不是列表，将被跳过")
+        self.deferred = {}
+        for name, value in presets_config.items():
+            if isinstance(value, dict):
+                default_names = value.get("default", [])
+                deferred_names = value.get("deferred", [])
+                if not isinstance(default_names, list) or not isinstance(deferred_names, list):
+                    self.log.warning(f"工具预设 '{name}' 的 default/deferred 内容不是列表，将被跳过")
+                    continue
+                self.deferred[name] = list(deferred_names)
+            elif isinstance(value, list):
+                default_names = value
+            else:
+                self.log.warning(f"工具预设 '{name}' 的内容不是列表或字典，将被跳过")
                 continue
             toolset = ToolSetModel()
-            for tool_name in tools:
+            for tool_name in default_names:
                 func_tool = registry.get_func(tool_name)
                 if func_tool is not None:
                     toolset.add_tool(func_tool)
@@ -325,7 +394,13 @@ class ToolPresetManager:
             if "tool_presets" not in data or preset_name not in data["tool_presets"]:
                 raise ValueError(f"config.json 中找不到预设 '{preset_name}'")
 
-            data["tool_presets"][preset_name] = toolset.names()
+            if preset_name in self.deferred:
+                data["tool_presets"][preset_name] = {
+                    "default": toolset.names(),
+                    "deferred": list(self.deferred.get(preset_name, [])),
+                }
+            else:
+                data["tool_presets"][preset_name] = toolset.names()
 
             # 持久化
             with open(config_path, "w", encoding="utf-8") as f:
@@ -561,6 +636,8 @@ class ToolCalls(ServiceBase):
         self._preset_manager = ToolPresetManager(self.log)
         self._schema_cache = ToolSchemaCache(self.log)
         self._executor = ToolExecutionEngine(self.log)
+        self._deferred_prompt_cache: Dict[str, str] = {}
+        """待发现工具提示词段落缓存"""
 
         # 加载本地工具
         self._registry.get_files_in_folder(str(tool_path))
@@ -661,6 +738,7 @@ class ToolCalls(ServiceBase):
         """当 ToolManager 中 MCP 工具发生变更时触发"""
         self._registry.sync_mcp_tools(mcp_func_list, server_name=server_name)
         self._schema_cache.build_tool_description_cache(self._registry.func_list)
+        self._deferred_prompt_cache.clear()
         self.log.info(
             f"MCP 工具已同步 (server={server_name}, total={len(self._registry.func_list)})"
         )
@@ -741,6 +819,95 @@ class ToolCalls(ServiceBase):
         resolved = self._preset_manager.resolve_toolset(full, names, preset)
         return self._schema_cache.get_google(toolset=resolved)
 
+    def get_deferred_tools(self, preset_name: str) -> List[FunctionTool]:
+        """返回指定预设的待发现(deferred)工具列表
+
+        按预设配置的 deferred 名单从注册表解析，跳过未注册或未激活的工具。
+
+        Args:
+            preset_name: 预设名称
+
+        Returns:
+            待发现且可用的工具列表
+        """
+        names = self._preset_manager.deferred.get(preset_name, [])
+        return [
+            t
+            for n in names
+            if (t := self._registry.get_func(n)) is not None and t.active
+        ]
+
+    def enable_deferred_tools(
+        self,
+        query: str,
+        limit: int,
+        target_toolset: ToolSetModel,
+        preset_name: str = "",
+    ) -> List[FunctionTool]:
+        """搜索待发现工具并将命中项加入目标工具集合（本轮生效）
+
+        Args:
+            query: 搜索关键词
+            limit: 最多启用工具数量
+            target_toolset: 目标工具集合（本轮副本），命中工具将加入其中
+            preset_name: 预设名，用于定位待发现名单
+
+        Returns:
+            命中并已加入目标集合的工具列表
+        """
+        if preset_name:
+            deferred_tools = self.get_deferred_tools(preset_name)
+        else:
+            full = self._build_full_toolset()
+            deferred_tools = [t for t in full if t.active]
+
+        current_names = set(target_toolset.names())
+        candidates = [t for t in deferred_tools if t.name not in current_names]
+
+        scored = sorted(
+            ((score_tool(t.name, t.description, query), t) for t in candidates),
+            key=lambda item: -item[0],
+        )
+        matched = [t for score, t in scored if score > 0][:limit]
+
+        for t in matched:
+            target_toolset.add_tool(t)
+        return matched
+
+    def get_deferred_tools_prompt(self, preset_name: str) -> str:
+        """构建并缓存"待发现工具"提示词段落
+
+        Args:
+            preset_name: 预设名称
+
+        Returns:
+            提示词段落文本；无待发现工具时返回空字符串
+        """
+        if preset_name in self._deferred_prompt_cache:
+            return self._deferred_prompt_cache[preset_name]
+
+        deferred = self.get_deferred_tools(preset_name)
+        if not deferred:
+            text = ""
+        else:
+            lines = [
+                "<待发现执行工具>",
+                "以下工具当前未直接暴露给你，但可以通过 tool_search 工具发现并在后续轮次中使用：",
+            ]
+            lines += [
+                f"{i + 1}. {t.name}: {t.description}"
+                for i, t in enumerate(deferred)
+            ]
+            lines += [
+                "",
+                "如需其中某个工具，请先调用 tool_search。tool_search 只负责发现工具，不直接执行",
+                "</待发现执行工具>",
+            ]
+            text = "\n".join(lines)
+
+        self._deferred_prompt_cache[preset_name] = text
+        return text
+
     def build_tool_description_cache(self) -> None:
         """重建工具描述缓存"""
         self._schema_cache.build_tool_description_cache(self._registry.func_list)
@@ -753,9 +920,10 @@ class ToolCalls(ServiceBase):
         """删除一个工具预设组"""
         self._preset_manager.remove_preset(preset_name)
 
-    def load_presets_from_config(self, presets_config: Dict[str, List[str]]) -> None:
+    def load_presets_from_config(self, presets_config: Dict[str, Any]) -> None:
         """从配置字典批量加载预设组"""
         self._preset_manager.load_presets_from_config(presets_config, self._registry)
+        self._deferred_prompt_cache.clear()
 
     async def modify_preset_tools(
         self, preset_name: str, op: str, tools: List[str]

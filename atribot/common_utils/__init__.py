@@ -1,7 +1,13 @@
 from .cluster_utils import ClusterUtils
 from .db_format import format_memory_records
 from .file.file_utils import download_binary, resolve_file_to_bytes
-from .file.image_utils import compress_image, url_to_base64, url_to_image_jpeg, urls_list_to_base64
+from .file.image_utils import (
+    compress_image,
+    convert_to_jpeg,
+    url_to_base64,
+    url_to_image_jpeg,
+    urls_list_to_base64,
+)
 from .file.media_utils import (
     MediaConvertResult,
     url_to_audio_base64,
@@ -32,6 +38,7 @@ __all__ = [
     "ClusterUtils",
     "calculate_similarity",
     "compress_image",
+    "convert_to_jpeg",
     "construction_message_dict",
     "download_binary",
     "download_text",

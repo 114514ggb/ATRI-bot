@@ -151,20 +151,29 @@
         "image":"atri-sandbox:latest"#启动的镜像名称
     },
     "tool_presets": {#各个聊天模块所使用的工具列表, 每一项对应 LLMchat/tools/ 下的一个工具目录名
+        # 两种格式:
+        # 1) 列表: 全部作为默认工具直接暴露给模型 (如 private_chat / agency_Agent)
+        # 2) 字典: {"default": [...], "deferred": [...]} 拆分为"默认启用"与"待发现"两组 (如 group_chat)
         # 列表为空代表没有工具; 若要使用全部工具, 把该模块的列表值设为 null 或省略
-        "group_chat": [#群聊使用的工具
-            "web_search", "web_extract",
-            "memory_search", "memory_storage",
-            "run_python_code",
-            "run_command",
-            "send_file","add_file",
-            "send_image_message",
-            "load_skill_prompt", "get_user_info",
-            "schedule_self_trigger", "sub_agent"
-        ],
+        "group_chat": {#群聊使用的工具
+            "default": [#默认直接暴露, 模型可直接调用
+                "web_search", "web_extract",
+                "memory_search", "memory_storage",
+                "load_skill_prompt", "get_user_info",
+                "tool_search"#用于发现并临时启用 deferred 中的工具
+            ],
+            "deferred": [#待发现工具, 不会直接暴露; 模型可通过 tool_search 搜索后在本轮临时启用(仅本轮有效)
+                "run_python_code",
+                "run_command",
+                "send_file","add_file",
+                "send_image_message",
+                "schedule_self_trigger", "sub_agent"
+            ]
+        },
         "private_chat": [#私聊使用的工具
             "web_search", "memory_search",
-            "load_skill_prompt", "get_user_info"
+            "load_skill_prompt", "get_user_info",
+            "tool_search"
         ],
         "agency_Agent": [#子代理(子 agent)使用的工具
             "run_command",
@@ -173,6 +182,7 @@
             "web_search", "web_extract"
         ]
         # 如需某个模块使用全部工具: "模块名": null
+        #但是不推荐这么做,很多工具都是专有的
     },
     "group_white_list":[
         2169027872#有效的群白名单

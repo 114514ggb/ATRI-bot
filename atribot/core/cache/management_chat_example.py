@@ -141,7 +141,11 @@ class ChatManager(ServiceBase):
                 ))
 
         self._listener_fn = self._store_message_context
-        pm.event_bus.on(PostType.MESSAGE, rule=_StoreRule())(self._store_message_context)
+        pm.event_bus.on(
+            PostType.MESSAGE, 
+            rule=_StoreRule(),
+            priority = 60
+        )(self._store_message_context)
 
     async def cleanup(self) -> None:
         """清理：注销上下文处理器"""

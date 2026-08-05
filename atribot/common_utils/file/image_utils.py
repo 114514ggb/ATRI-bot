@@ -18,37 +18,44 @@ from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import File
 
 
-def compress_image(image_bytes: bytes, max_size_kb: int) -> bytes:
+def convert_to_jpeg(
+    image_bytes: bytes,
+    max_size_kb: int | None = None,
+    background: tuple[int, int, int] = (255, 255, 255),
+) -> bytes | None:
     """
-    压缩图片到指定大小以内(包含画质降低和尺寸缩放两种策略)
-    
-    先通过逐步降低画质(从90到20)来减小文件大小，
-    如果仍超过限制,则按比例缩小图片尺寸并固定画质为20继续压缩,
-    直到达到目标大小或尺寸过小(小于10像素)为止
-    
+    将任意图片字节强制统一转码为标准 JPEG(含动画 GIF 取首帧)。
+
+    特性:
+    - 动画(GIF/WebP 多帧)取第一帧转静态图
+    - RGBA/LA/P 等带透明通道的图片合成到指定背景色(默认白底),避免转 RGB 变黑
+    - 解码失败(数据损坏/截断/非图片)返回 None,供调用方判定失败
+    - max_size_kb 限制输出体积:先降画质(90→20),仍超限则等比例缩小尺寸并固定画质 20
+
     Args:
-        image_bytes: 原始图片的字节数据
-        max_size_kb: 目标大小上限,单位KB
-    
+        image_bytes: 原始图片字节数据
+        max_size_kb: 目标体积上限(KB);None 表示不限制(仍会统一转 JPEG)
+        background: 透明区域合成背景色,默认白色 (255, 255, 255)
+
     Returns:
-        bytes: 压缩后的图片字节数据如果压缩失败或原始图片已符合要求，返回原始数据
-    
-    Examples:
-        >>> with open('large.jpg', 'rb') as f:
-        ...     compressed = compress_image(f.read(), 500)
-        >>> print(f'压缩后大小: {len(compressed) / 1024:.2f}KB')
+        标准 JPEG 字节;解码/编码失败返回 None
     """
-    max_size_bytes = max_size_kb * 1024
-
-    if len(image_bytes) <= max_size_bytes:
-        return image_bytes
-
     try:
         image = Image.open(io.BytesIO(image_bytes))
+        image.load()
 
-        if image.mode != "RGB":
-            image = image.convert("RGB")
+        if getattr(image, "is_animated", False):
+            image.seek(0)
+            image.load()
 
+        image = _flatten_to_rgb(image, background)
+
+        if max_size_kb is None:
+            out = io.BytesIO()
+            image.save(out, format="JPEG", quality=90)
+            return out.getvalue()
+
+        max_size_bytes = max_size_kb * 1024
         quality = 90
         scale = 1.0
 
@@ -73,9 +80,51 @@ def compress_image(image_bytes: bytes, max_size_kb: int) -> bytes:
                 return out.getvalue()
 
         return out.getvalue()
-    except Exception as error:
-        print(f"图片压缩失败: {error}")
+    except Exception:
+        return None
+
+
+def _flatten_to_rgb(
+    image: Image.Image,
+    background: tuple[int, int, int] = (255, 255, 255),
+) -> Image.Image:
+    """将任意模式的图片转为 RGB,透明区域合成到指定背景色(默认白底)"""
+    if image.mode in ("RGBA", "LA"):
+        rgba = image.convert("RGBA")
+        bg = Image.new("RGB", rgba.size, background)
+        bg.paste(rgba, mask=rgba.split()[-1])
+        return bg
+
+    if image.mode == "P":
+        if "transparency" in image.info:
+            rgba = image.convert("RGBA")
+            bg = Image.new("RGB", rgba.size, background)
+            bg.paste(rgba, mask=rgba.split()[-1])
+            return bg
+        return image.convert("RGB")
+
+    return image.convert("RGB")
+
+
+def compress_image(image_bytes: bytes, max_size_kb: int) -> bytes:
+    """
+    压缩图片到指定大小以内(包含画质降低和尺寸缩放两种策略)
+
+    注意:自 v2 起,压缩前会统一将任意格式(含动画 GIF 取首帧)转码为标准 JPEG,
+    不再透传原始格式。此函数为 ``convert_to_jpeg`` 的兼容封装,
+    转码失败时回退返回原始字节。
+
+    Args:
+        image_bytes: 原始图片的字节数据
+        max_size_kb: 目标大小上限,单位KB
+
+    Returns:
+        bytes: 压缩转码后的 JPEG 字节;若转换失败返回原始数据
+    """
+    result = convert_to_jpeg(image_bytes, max_size_kb=max_size_kb)
+    if result is None:
         return image_bytes
+    return result
 
 
 async def urls_list_to_base64(
@@ -208,24 +257,25 @@ async def url_to_image_jpeg(
     """下载图片并统一转换为 JPEG base64(统一格式入口)
 
     支持 http(s)://、file://、base64:// 以及本地路径等来源，
-    下载后通过 ``compress_image`` 压缩为 JPEG 格式。
+    下载后通过 ``convert_to_jpeg`` 强制转码为标准 JPEG(动画 GIF 取首帧)。
     转换结果按 file_name(或来源)磁盘缓存，命中时跳过下载与压缩。
 
     Args:
         source: 图片来源(File 对象或字符串)
-        max_size_kb: 压缩后最大体积(KB),None 表示不压缩
+        max_size_kb: 压缩后最大体积(KB),None 表示不限制体积(仍统一转 JPEG)
         max_bytes: 最大允许下载字节数，默认 10MB
         file_name: 文件名(QQ 媒体为内容哈希),作为缓存键;None 时回退来源标识
 
     Returns:
         转换成功返回 MediaConvertResult(data, "jpeg", "image/jpeg", True)
-        下载或处理失败返回 None
+        下载失败或图片无法解码(损坏/截断)返回 None,且不会写入磁盘缓存
     """
     src = source.file if isinstance(source, File) else str(source)
     key = make_cache_key("image", src, file_name, f"kb={max_size_kb}")
 
     async with _get_lock(key):
         entry = await cache_get(key)
+
         if entry is not None:
             return MediaConvertResult(
                 data=entry.to_base64(),
@@ -239,14 +289,16 @@ async def url_to_image_jpeg(
         except Exception:
             return None
 
-        if max_size_kb is not None:
-            data = await asyncio.to_thread(compress_image, data, max_size_kb)
+        # 统一转码为 JPEG;解码失败(损坏/截断)返回 None,且不写入缓存
+        jpeg = await asyncio.to_thread(convert_to_jpeg, data, max_size_kb)
+        if jpeg is None:
+            return None
 
         result = MediaConvertResult(
-            data=base64.b64encode(data).decode(),
+            data=base64.b64encode(jpeg).decode(),
             fmt="jpeg",
             mime="image/jpeg",
             converted=True,
         )
-        await cache_put(key, data, result.fmt, result.mime, result.converted)
+        await cache_put(key, jpeg, result.fmt, result.mime, result.converted)
         return result
