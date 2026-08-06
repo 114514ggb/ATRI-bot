@@ -22,7 +22,7 @@ tool_json = {
 }
 
 
-async def main(query: str, limit: int = 5) -> str:
+async def main(query: str, limit: int = 1) -> str:
     """搜索待发现工具并启用
 
     本工具不直接执行搜索：抛出约定的 ToolSearchRequested 错误，
