@@ -395,14 +395,12 @@ class ChatManager(ServiceBase):
                         )
                         builder.add_text_left(cq_text)
                     else:
-                        if not segment.text_description:
-                            url = segment.url or segment.file.file
-                            try:
-                                desc = await self.media_processor.image_to_text(url)
-                                segment.text_description = desc
-                            except Exception:
-                                segment.text_description = "<描述获取失败>"
-                        builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+                        # 超配额图片不再调用 MediaProcessor 转文本(避免把过期/本地 URL 传给外部识别模型导致解析错误)，
+                        # 仅降级为 CQ 文本标记;已有文本描述缓存则复用
+                        if segment.text_description:
+                            builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+                        else:
+                            builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'}]" )
 
                 elif isinstance(segment, RecordSegment):
                     if remaining_audios > 0:
@@ -426,14 +424,11 @@ class ChatManager(ServiceBase):
                                 f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]"
                             )
                     else:
-                        if not segment.text_description:
-                            audio_url = segment.url or segment.file.file
-                            try:
-                                desc = await self.media_processor.audio_to_text(audio_url)
-                                segment.text_description = desc
-                            except Exception:
-                                segment.text_description = "<描述获取失败>"
-                        builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+                        # 超配额音频降级为 CQ 文本标记，不调用 MediaProcessor
+                        if segment.text_description:
+                            builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+                        else:
+                            builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'}]" )
 
                 elif isinstance(segment, VideoSegment):
                     if remaining_videos > 0:
@@ -449,14 +444,11 @@ class ChatManager(ServiceBase):
                         )
                         builder.add_text_left(cq_text)
                     else:
-                        if not segment.text_description:
-                            video_url = segment.url or segment.file.file
-                            try:
-                                desc = await self.media_processor.video_to_text(video_url)
-                                segment.text_description = desc
-                            except Exception:
-                                segment.text_description = "<描述获取失败>"
-                        builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+                        # 超配额视频降级为 CQ 文本标记，不调用 MediaProcessor
+                        if segment.text_description:
+                            builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
+                        else:
+                            builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'}]" )
 
                 else:
                     builder.add_text_left(segment.__str__())

@@ -1,6 +1,7 @@
 from logging import Logger
 from typing import Optional
 
+from atribot.common_utils.file.image_utils import url_to_image_jpeg
 from atribot.core.service_container import container
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 
@@ -59,8 +60,10 @@ class MediaProcessor:
             self._video_model = None
 
     async def image_to_text(self, image_url: str) -> str:
-        """将图片 URL 转换为文字描述。
+        """将图片转换为文字描述。
 
+        先本地下载并统一转码为 JPEG base64 再交由识别模型处理
+        
         Args:
             image_url: 图片地址(http/https 或 base64://)
 
@@ -69,20 +72,26 @@ class MediaProcessor:
         """
         if not self._image_api:
             return "图像识别失败"
+        if not image_url:
+            return "图片识别出现错误: 图片地址为空"
         try:
-            result = await self._image_api.generate_text_lightweight(
+            convert_result = await url_to_image_jpeg(image_url)
+            if convert_result is None:
+                return "图片识别出现错误: 图片下载或转码失败"
+            image_data = convert_result.data_uri
+            response = await self._image_api.generate_text_lightweight(
                 model=self._image_model,
                 messages=[{
                     "role": "user",
                     "content": [
-                        {"type": "image_url", "image_url": {"url": image_url}},
+                        {"type": "image_url", "image_url": {"url": image_data}},
                         {"type": "text", "text": "请详细描述你看到的东西，上面是什么、有什么、在什么地方，如果上面有文字也要详细说清楚，如果有什么自己的理解可以说出来，如果上面是什么你认识的可以介绍一下"}
                     ]
                 }]
             )
-            return result["choices"][0]["message"]["content"]
+            return response["choices"][0]["message"]["content"]
         except Exception as e:
-            return f"图片识别出现错误: {result if 'result' in locals() else e}"
+            return f"图片识别出现错误: {response if 'response' in locals() else e}"
 
     async def audio_to_text(self, audio_url: str) -> str:
         """将音频转换为文字

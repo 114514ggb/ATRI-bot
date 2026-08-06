@@ -78,7 +78,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     # proxy='http://127.0.0.1:7890' # 代理
                 ) as response:
                     try:
-                        self.log.debug(await response.text()) # 调试用
+                        # self.log.debug(await response.text()) # 调试用
                         response_json: Dict = await response.json()
                     except aiohttp.ContentTypeError:
                         # 处理返回头不是 application/json 但内容是 json 的情况
@@ -90,6 +90,14 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     
                     return response_json
                     
+            except aiohttp.ClientResponseError as e:
+                if 400 <= e.status < 500 and e.status != 429:
+                    self.log.warning(f"client_post请求被拒绝(不重试): {e}")
+                    raise
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
+                if attempt == max_retries - 1:
+                    raise
+                await asyncio.sleep(retry_delay * attempt)
             except Exception as e:
                 self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
                 if attempt == max_retries - 1:

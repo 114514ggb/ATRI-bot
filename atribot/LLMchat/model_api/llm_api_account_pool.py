@@ -42,16 +42,24 @@ class ai_api_account_pool(universal_ai_api):
                     except aiohttp.ContentTypeError:
                         response_json = json.loads(await response.text())
 
-                        
                     if response.status != 200:
                         self.log.warning(f"API Error {response.status}: {response_json}")
                         response.raise_for_status()
                         
                     return response_json
                 
-            except Exception as e:
+            except aiohttp.ClientResponseError as e:
+                if 400 <= e.status < 500 and e.status != 429:
+                    self.log.warning(f"client_post请求被拒绝(不重试): {e}")
+                    raise
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
                 if attempt == max_retries - 1:
-                    raise  e
+                    raise
+                await asyncio.sleep(retry_delay * attempt)
+            except Exception as e:
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
+                if attempt == max_retries - 1:
+                    raise e
                 await asyncio.sleep(retry_delay * attempt)
                 
     async def initialize(self):
