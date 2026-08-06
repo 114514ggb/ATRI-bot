@@ -151,7 +151,7 @@ async def test_tool_search_main_raises_request():
 async def test_tool_search_main_default_limit():
     with pytest.raises(ToolSearchRequested) as exc_info:
         await tool_search_main("run")
-    assert exc_info.value.limit == 5
+    assert exc_info.value.limit == 1
 
 
 async def test_tool_search_main_invalid_limit():

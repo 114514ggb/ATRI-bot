@@ -16,6 +16,7 @@ tool_json = {
         "limit": {
             "type": "integer",
             "description": "最多返回并启用多少个工具",
+            "default": 1,
             "minimum": 1,
         },
     },
