@@ -4,7 +4,7 @@ from typing import Literal, Optional
 import aiohttp
 
 from atribot.core.atri_config import FilePathConfig, atriConfig
-from atribot.core.platform.send_client import SendClientBase
+from atribot.core.platform.send_client import ImageDetails, SendClientBase
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 from atribot.core.type.onebot_event_types import OneBotEvent
@@ -354,9 +354,29 @@ class OneBotSendClient(SendClientBase):
             )
         return None
         
-    async def get_img_details(self, file_id: str) -> dict | None:
-        """获取图片消息详情"""
-        return await self.async_send("get_image", {"file_id": file_id})
+    async def get_img_details(
+        self,
+        file: str | None = None,
+        file_id: str | None = None,
+    ) -> ImageDetails | None:
+        """获取图片信息及路径
+
+        通过文件路径、URL、Base64 或文件 ID 获取图片的详细信息。
+        至少提供 ``file`` 或 ``file_id`` 其中之一。
+
+        Args:
+            file: 文件路径、URL 或 Base64 编码
+            file_id: 文件 ID
+
+        Returns:
+            ImageDetails 字典，包含 file / url / file_size / file_name / base64 五个字段。
+        """
+        params: dict = {}
+        if file is not None:
+            params["file"] = file
+        if file_id is not None:
+            params["file_id"] = file_id
+        return await self.async_send("get_image", params)
 
     async def get_recordg_details(
         self,

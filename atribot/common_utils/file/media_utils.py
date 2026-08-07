@@ -292,11 +292,11 @@ async def url_to_audio_mp3(
     *,
     max_bytes: int = AUDIO_MAX_BYTES,
     bitrate: str = AUDIO_BITRATE,
-) -> MediaConvertResult | None:
+) -> MediaConvertResult:
     """下载音频并统一转换为 mp3 base64(统一格式入口)
 
     回退链：
-    - 下载失败 → 返回 None(调用方回退 URL 或文本描述)
+    - 下载失败 -> 抛出异常(调用方捕获后回退 URL 或文本描述)
     - ffmpeg 转码成功 → ``converted=True`` 的 ``audio/mp3`` 结果
     - 转码失败(未安装 ffmpeg 等) → 保持原始格式 base64,``converted=False``
 
@@ -307,7 +307,10 @@ async def url_to_audio_mp3(
         bitrate: mp3 目标码率
 
     Returns:
-        MediaConvertResult 或 None
+        MediaConvertResult
+
+    Raises:
+        Exception: 下载失败时抛出
     """
     src = _source_str(source)
     key = make_cache_key("audio", src, file_name, f"mb={max_bytes};br={bitrate}")
@@ -322,10 +325,7 @@ async def url_to_audio_mp3(
                 converted=entry.converted,
             )
 
-        try:
-            name, data = await resolve_file_to_bytes(source, file_name or "audio", max_bytes=max_bytes)
-        except Exception:
-            return None
+        name, data = await resolve_file_to_bytes(source, file_name or "audio", max_bytes=max_bytes)
 
         fmt = _detect_audio_format(src, file_name or name)
         cache_bytes: bytes = data
@@ -356,11 +356,11 @@ async def url_to_video_mp4(
     max_bytes: int = VIDEO_MAX_BYTES,
     crf: int = VIDEO_CRF,
     max_dimension: int | None = None,
-) -> MediaConvertResult | None:
+) -> MediaConvertResult:
     """下载视频并统一转换为 mp4 base64(统一格式入口)
 
     回退链：
-    - 下载失败 → 返回 None(调用方回退 URL)
+    - 下载失败 -> 抛出异常(调用方捕获后回退 URL)
     - ffmpeg 转码成功 → ``converted=True`` 的 ``video/mp4`` 结果
     - 转码失败(未安装 ffmpeg 等) → 保持原始格式 base64,``converted=False``
 
@@ -372,7 +372,10 @@ async def url_to_video_mp4(
         max_dimension: 限制视频最长边像素,None 不缩放
 
     Returns:
-        MediaConvertResult 或 None
+        MediaConvertResult
+
+    Raises:
+        Exception: 下载失败时抛出
     """
     src = _source_str(source)
     key = make_cache_key("video", src, file_name, f"mb={max_bytes};crf={crf};dim={max_dimension}")
@@ -387,10 +390,7 @@ async def url_to_video_mp4(
                 converted=entry.converted,
             )
 
-        try:
-            name, data = await resolve_file_to_bytes(source, file_name or "video", max_bytes=max_bytes)
-        except Exception:
-            return None
+        name, data = await resolve_file_to_bytes(source, file_name or "video", max_bytes=max_bytes)
 
         mime = _detect_video_mime(src, file_name or name)
         cache_bytes: bytes = data

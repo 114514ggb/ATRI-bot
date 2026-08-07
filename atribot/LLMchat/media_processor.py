@@ -76,8 +76,6 @@ class MediaProcessor:
             return "图片识别出现错误: 图片地址为空"
         try:
             convert_result = await url_to_image_jpeg(image_url)
-            if convert_result is None:
-                return "图片识别出现错误: 图片下载或转码失败"
             image_data = convert_result.data_uri
             response = await self._image_api.generate_text_lightweight(
                 model=self._image_model,
@@ -91,7 +89,8 @@ class MediaProcessor:
             )
             return response["choices"][0]["message"]["content"]
         except Exception as e:
-            return f"图片识别出现错误: {response if 'response' in locals() else e}"
+            self.log.warning(f"图片识别失败 url={image_url}: {e}")
+            return f"图片识别出现错误: {e}"
 
     async def audio_to_text(self, audio_url: str) -> str:
         """将音频转换为文字

@@ -37,7 +37,7 @@ async def main(file_name: str, message_data: atriMessageEvent, dest: str = "") -
     group_id = message_data.group_id
 
     segment: FileMessageSegment | None = None
-    for message in set((await chat_manager.get_group_context(group_id)).messages):
+    for message in list((await chat_manager.get_group_context(group_id)).messages):
         for seg in message.segments:
             if isinstance(seg, FileMessageSegment) and seg.file_name == file_name:
                 segment = seg

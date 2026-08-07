@@ -1,7 +1,7 @@
 """图片统一转码(convert_to_jpeg / compress_image / url_to_image_jpeg)测试
 
 覆盖:任意格式强制转 JPEG、动画 GIF 取首帧、RGBA 透明白底合成、
-损坏/截断数据返回 None 且不入缓存。
+完全损坏数据抛出异常且不入缓存、尾部截断图片容忍处理、截断重试逻辑。
 """
 
 import io
@@ -53,15 +53,19 @@ def _animated_gif_bytes() -> bytes:
 
 
 def _corrupt_bytes() -> bytes:
-    """带 JPEG 魔数但内容损坏/截断的数据"""
+    """带 JPEG 魔数但内容完全损坏的数据（非截断,无法解码）"""
     return b"\xff\xd8\xff\xe0" + b"this-is-not-a-real-image" * 4
+
+
+def _truncated_jpeg_bytes(missing: int = 20) -> bytes:
+    """尾部截断的有效 JPEG（模拟 QQ CDN 下载不完整,仅缺尾部少量字节）"""
+    return _jpeg_bytes(size=128)[:-missing]
 
 
 def test_convert_to_jpeg_output_is_valid_jpeg():
     """JPEG/PNG/动画GIF 输入统一输出可被 PIL 打开的标准 JPEG"""
     for raw in (_jpeg_bytes(), _png_bytes(), _animated_gif_bytes()):
         result = convert_to_jpeg(raw, max_size_kb=1024)
-        assert result is not None
         with Image.open(io.BytesIO(result)) as img:
             assert img.format == "JPEG"
             img.verify()
@@ -70,7 +74,6 @@ def test_convert_to_jpeg_output_is_valid_jpeg():
 def test_convert_to_jpeg_animated_gif_takes_first_frame():
     """动画 GIF 转码后为单帧静态图"""
     result = convert_to_jpeg(_animated_gif_bytes())
-    assert result is not None
     with Image.open(io.BytesIO(result)) as img:
         assert img.format == "JPEG"
         assert getattr(img, "is_animated", False) is False
@@ -80,18 +83,28 @@ def test_convert_to_jpeg_animated_gif_takes_first_frame():
 def test_convert_to_jpeg_rgba_uses_white_background():
     """RGBA 透明图合成白底,避免转 RGB 变黑"""
     result = convert_to_jpeg(_rgba_transparent_png_bytes())
-    assert result is not None
     with Image.open(io.BytesIO(result)) as img:
         img.load()
         pixel = img.convert("RGB").getpixel((0, 0))
         assert pixel == (255, 255, 255)
 
 
-def test_convert_to_jpeg_corrupt_returns_none():
-    """损坏/截断/非图片数据返回 None"""
-    assert convert_to_jpeg(_corrupt_bytes(), max_size_kb=1024) is None
-    assert convert_to_jpeg(b"") is None
-    assert convert_to_jpeg(b"not an image at all") is None
+def test_convert_to_jpeg_corrupt_raises():
+    """完全损坏/非图片数据抛出异常"""
+    with pytest.raises(Exception):
+        convert_to_jpeg(_corrupt_bytes(), max_size_kb=1024)
+    with pytest.raises(Exception):
+        convert_to_jpeg(b"")
+    with pytest.raises(Exception):
+        convert_to_jpeg(b"not an image at all")
+
+
+def test_convert_to_jpeg_truncated_succeeds():
+    """尾部截断的 JPEG 在 LOAD_TRUNCATED_IMAGES=True 下可正常转码"""
+    result = convert_to_jpeg(_truncated_jpeg_bytes(), max_size_kb=1024)
+    with Image.open(io.BytesIO(result)) as img:
+        assert img.format == "JPEG"
+        img.verify()
 
 
 def test_compress_image_falls_back_to_raw_on_corrupt():
@@ -127,7 +140,6 @@ async def test_url_to_image_jpeg_png_to_jpeg_and_cached(image_cache_dir):
     first = await url_to_image_jpeg(source, file_name="pic.png")
     second = await url_to_image_jpeg(source, file_name="pic.png")
 
-    assert first is not None and second is not None
     assert first.fmt == "jpeg"
     assert first.mime == "image/jpeg"
     assert first.data == second.data
@@ -137,12 +149,40 @@ async def test_url_to_image_jpeg_png_to_jpeg_and_cached(image_cache_dir):
 
 @pytest.mark.asyncio
 async def test_url_to_image_jpeg_corrupt_not_cached(image_cache_dir):
-    """损坏图片返回 None 且不写入磁盘缓存"""
+    """完全损坏图片抛出异常且不写入磁盘缓存"""
     path = image_cache_dir / "broken.jpg"
     path.write_bytes(_corrupt_bytes())
     source = File.from_local_path(str(path))
 
-    result = await url_to_image_jpeg(source, file_name="broken.jpg")
+    with pytest.raises(Exception):
+        await url_to_image_jpeg(source, file_name="broken.jpg")
 
-    assert result is None
     assert len(list(image_cache_dir.glob("*.bin"))) == 0
+
+
+@pytest.mark.asyncio
+async def test_url_to_image_jpeg_retries_on_truncated(image_cache_dir, monkeypatch):
+    """截断图片触发重试:第一次 OSError('truncated'),第二次成功"""
+    from atribot.common_utils.file import image_utils
+
+    # 准备一个有效 JPEG 本地文件
+    path = image_cache_dir / "pic.jpg"
+    path.write_bytes(_jpeg_bytes(size=128))
+    source = File.from_local_path(str(path))
+
+    call_count = 0
+    real_convert = image_utils.convert_to_jpeg
+
+    def flaky_convert(data, max_size_kb=None, **kw):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise OSError("image file is truncated (17 bytes not processed)")
+        return real_convert(data, max_size_kb=max_size_kb)
+
+    monkeypatch.setattr(image_utils, "convert_to_jpeg", flaky_convert)
+
+    result = await url_to_image_jpeg(source, file_name="retry.jpg")
+    assert result.fmt == "jpeg"
+    assert result.mime == "image/jpeg"
+    assert call_count == 2  # 第一次失败,重试成功

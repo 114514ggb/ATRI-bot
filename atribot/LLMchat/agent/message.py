@@ -161,7 +161,7 @@ class SystemMessage(BaseMessage):
 
 @dataclass(slots=True)
 class UserMessage(BaseMessage):
-    """用户消息实体,初始化了str就不要链式调用了"""
+    """用户消息实体,初始化了str就不要链式调用了,复杂格式添加后记得调用refresh_cache"""
     role: Literal["user"] = "user"
     content: str | List[MessageSegment] = field(default_factory=list)
     _cached_openai_dict: Dict[str, Any] = field(init=False)
@@ -169,7 +169,7 @@ class UserMessage(BaseMessage):
     def __post_init__(self):
         self.refresh_cache()
 
-    def refresh_cache(self) -> None:
+    def refresh_cache(self) -> UserMessage:
         """刷新内部缓存的 OpenAI 格式字典"""
         if isinstance(self.content, str):
             self._cached_openai_dict = {"role": self.role, "content": self.content}
@@ -178,6 +178,7 @@ class UserMessage(BaseMessage):
                 "role": self.role,
                 "content": [seg.to_dict() for seg in self.content]
             }
+        return self
 
     def to_openai_dict(self) -> Dict[str, Any]:
         return self._cached_openai_dict

@@ -143,7 +143,6 @@ async def test_url_to_image_jpeg_uses_cache(tmp_path, monkeypatch):
     first = await url_to_image_jpeg(source, file_name="stable.image")
     second = await url_to_image_jpeg(source, file_name="stable.image")
 
-    assert first is not None and second is not None
     assert first.data == second.data
     # 磁盘上只有 1 个缓存条目，说明第二次未重新下载/压缩
     assert len(list(tmp_path.glob("*.bin"))) == 1

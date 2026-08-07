@@ -179,10 +179,11 @@ class ChatBasics(ABC):
 
         if including_pictures:
             async def dispose_img(message: ImageSegment):
-                result = await url_to_image_jpeg(message.url, file_name=message.file_name)
-                if result is not None:
+                try:
+                    result = await url_to_image_jpeg(message.url, file_name=message.file_name)
                     message_builder.add_image_base64(result.data, result.mime)
-                else:
+                except Exception as e:
+                    self.log.warning(f"图片处理失败 url={message.url}: {e}")
                     message_builder.add_text("[CQ:image,summary=图片出现问题]")
         else:
             async def dispose_img(message: ImageSegment):
@@ -197,11 +198,11 @@ class ChatBasics(ABC):
         if including_audios:
             async def dispose_audio(segment: RecordSegment) -> None:
                 audio_url = segment.url or segment.file.file
-                result = await url_to_audio_mp3(audio_url, segment.file_name)
-                if result is not None:
+                try:
+                    result = await url_to_audio_mp3(audio_url, segment.file_name)
                     message_builder.add_audio(result.data, result.fmt)
-                else:
-                    self.log.warning("音频下载失败，降级为文本识别")
+                except Exception as e:
+                    self.log.warning(f"音频下载失败，降级为文本识别: {e}")
                     if segment.text_description:
                         desc = segment.text_description
                     else:
@@ -223,11 +224,12 @@ class ChatBasics(ABC):
         if including_videos:
             async def dispose_video(segment: VideoSegment) -> None:
                 video_url = segment.url or segment.file.file
-                result = await url_to_video_mp4(video_url, segment.file_name)
-                if result is not None:
+                try:
+                    result = await url_to_video_mp4(video_url, segment.file_name)
                     message_builder.add_video_base64(result.data, result.mime)
-                else:
-                    message_builder.add_video(video_url)
+                except Exception as e:
+                    self.log.warning(f"视频处理失败 url={video_url}: {e}")
+                    message_builder.add_text("[CQ:video,summary:错误内容]")
         else:
             async def dispose_video(segment: VideoSegment) -> None:
                 video_url = segment.url or segment.file.file
@@ -245,11 +247,11 @@ class ChatBasics(ABC):
                     if isinstance(segment, ImageSegment):
                         await dispose_img(segment)
                         continue
-                    if isinstance(segment, RecordSegment):
-                        await dispose_audio(segment)
-                        continue
                     if isinstance(segment, VideoSegment):
                         await dispose_video(segment)
+                        continue
+                    if isinstance(segment, RecordSegment):
+                        await dispose_audio(segment)
                         continue
                     if isinstance(segment, FileSegment):
                         if file_extension := segment.file_name.split('.')[-1].lower():
@@ -723,10 +725,11 @@ class GroupChat(ChatBasics):
         if including_pictures:
             async def dispose_img(message:ImageSegment):
                 """给自己解析图像"""
-                result = await url_to_image_jpeg(message.url, file_name=message.file_name)
-                if result is not None:
+                try:
+                    result = await url_to_image_jpeg(message.url, file_name=message.file_name)
                     message_builder.add_image_base64(result.data, result.mime)
-                else:
+                except Exception as e:
+                    self.log.warning(f"图片处理失败 url={message.url}: {e}")
                     message_builder.add_text("[CQ:image,summary=图片下载出现问题]")
         else:
             async def dispose_img(message:ImageSegment):
@@ -743,11 +746,11 @@ class GroupChat(ChatBasics):
             async def dispose_audio(segment: RecordSegment) -> None:
                 """直接将音频以 mp3 base64 嵌入，下载失败时降级为文本识别"""
                 audio_url = segment.url or segment.file.file
-                result = await url_to_audio_mp3(audio_url, segment.file_name)
-                if result is not None:
+                try:
+                    result = await url_to_audio_mp3(audio_url, segment.file_name)
                     message_builder.add_audio(result.data, result.fmt)
-                else:
-                    self.log.warning("音频下载失败，降级为文本识别")
+                except Exception as e:
+                    self.log.warning(f"音频下载失败，降级为文本识别: {e}")
                     if segment.text_description:
                         desc = segment.text_description
                     else:
@@ -770,10 +773,11 @@ class GroupChat(ChatBasics):
             async def dispose_video(segment: VideoSegment) -> None:
                 """将视频转为 mp4 base64,失败时直接传入视频 URL 供模型理解"""
                 video_url = segment.url or segment.file.file
-                result = await url_to_video_mp4(video_url, segment.file_name)
-                if result is not None:
+                try:
+                    result = await url_to_video_mp4(video_url, segment.file_name)
                     message_builder.add_video_base64(result.data, result.mime)
-                else:
+                except Exception as e:
+                    self.log.warning(f"视频处理失败 url={video_url}: {e}")
                     message_builder.add_video(video_url)
         else:
             async def dispose_video(segment: VideoSegment) -> None:

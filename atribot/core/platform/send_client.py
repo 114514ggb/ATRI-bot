@@ -1,8 +1,23 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, TypedDict
 
 from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
+
+
+class ImageDetails(TypedDict):
+    """get_image API 返回的图片信息"""
+
+    file: str
+    """图片在 NapCat 服务器的本地路径"""
+    url: str
+    """图片下载 URL"""
+    file_size: str
+    """图片大小（字节，字符串形式）"""
+    file_name: str
+    """图片文件名"""
+    base64: str
+    """图片 Base64 编码（不含 data:image 前缀）"""
 
 
 class SendClientBase(ABC):
@@ -302,8 +317,24 @@ class SendClientBase(ABC):
         """
         raise NotImplementedError(f"{type(self).__name__} 未实现 get_msg_details")
 
-    async def get_img_details(self, file_id: str) -> dict | None:
-        """获取图片消息详情"""
+    async def get_img_details(
+        self,
+        file: str | None = None,
+        file_id: str | None = None,
+    ) -> ImageDetails | None:
+        """获取图片信息及路径
+
+        通过文件路径、URL、Base64 或文件 ID 获取图片的详细信息。
+        至少提供 ``file`` 或 ``file_id`` 其中之一。
+
+        Args:
+            file: 文件路径、URL 或 Base64 编码（如收到的图片消息段中的 ``file`` 字段）
+            file_id: 文件 ID（如收到的图片消息段中的 ``file_id`` 字段）
+
+        Returns:
+            ImageDetails 字典，包含 file / url / file_size / file_name / base64 五个字段；
+            若请求失败或图片不存在则返回 None。
+        """
         raise NotImplementedError(f"{type(self).__name__} 未实现 get_img_details")
 
     async def get_recordg_details(

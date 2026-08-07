@@ -74,7 +74,7 @@ class ChatManager(ServiceBase):
         information_extraction: List = None,
         archival_after: float = 1800.0
     ):
-        self.logger = log
+        self.log = log.getChild("ChatManager")
         self.time_trigger = time_trigger
         self.media_processor: MediaProcessor | None = media_processor
         self.group_dict: Dict[int, GroupContext] = {}
@@ -188,7 +188,7 @@ class ChatManager(ServiceBase):
             context_obj:GroupContext
             async with context_obj.summarizing() as ctx:
                 if ctx is not None:
-                    self.logger.info("开始总结群 %d 消息", group_id)
+                    self.log.info("开始总结群 %d 消息", group_id)
                     await memory_system.extract_stored_group_message_advanced(
                         messages_str=messages_str,
                         bot_id=msg.event.self_id,
@@ -198,7 +198,7 @@ class ChatManager(ServiceBase):
             context_obj:PrivateContext
             async with context_obj.summarizing() as ctx:
                 if ctx is not None:
-                    self.logger.info("开始总结私聊 %d 消息", context_obj.user_id)
+                    self.log.info("开始总结私聊 %d 消息", context_obj.user_id)
                     msgs = [{"role": "user", "content": messages_str}]
                     await memory_system.extract_stored_message(
                         messages=msgs,
@@ -207,7 +207,7 @@ class ChatManager(ServiceBase):
 
     async def groom_context_storage(self):
         """整理上下文存储：归档不活跃项目"""
-        self.logger.info("正在对上下文进行检测归档!")
+        self.log.info("正在对上下文进行检测归档!")
         await self.lifecycle_manager.conduct_data_persistence(
             management_context_dict = self.group_dict,
             is_user_context = False
@@ -218,7 +218,7 @@ class ChatManager(ServiceBase):
 
     async def context_storage(self):
         """整理上下文存储：全部存储"""
-        self.logger.info("正在对上下文进行批量备份!")
+        self.log.info("正在对上下文进行批量备份!")
         await self.lifecycle_manager.backup_data(
             management_context_dict = self.group_dict,
             is_user_context = False
@@ -384,19 +384,17 @@ class ChatManager(ServiceBase):
                 elif isinstance(segment, ImageSegment):
                     if remaining_pictures > 0:
                         if url := segment.url or segment.file.file:
-                            result = await url_to_image_jpeg(url, file_name=segment.file_name)
-                            if result is not None:
+                            try:
+                                result = await url_to_image_jpeg(url, file_name=segment.file_name)
                                 builder.add_image_base64_left(result.data, result.mime)
-                            else:
-                                builder.add_image_left(url)
+                            except Exception as e:
+                                self.log.warning(f"图片转码失败 url={url}: {e}")
                             remaining_pictures -= 1
                         cq_text = (
                             f"[CQ:image,file={segment.file_name or 'unknown'}]"
                         )
                         builder.add_text_left(cq_text)
                     else:
-                        # 超配额图片不再调用 MediaProcessor 转文本(避免把过期/本地 URL 传给外部识别模型导致解析错误)，
-                        # 仅降级为 CQ 文本标记;已有文本描述缓存则复用
                         if segment.text_description:
                             builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
                         else:
@@ -405,15 +403,16 @@ class ChatManager(ServiceBase):
                 elif isinstance(segment, RecordSegment):
                     if remaining_audios > 0:
                         audio_url = segment.url or segment.file.file
-                        result = await url_to_audio_mp3(audio_url, segment.file_name)
-                        if result is not None:
+                        try:
+                            result = await url_to_audio_mp3(audio_url, segment.file_name)
                             builder.add_audio_left(result.data, result.fmt)
                             remaining_audios -= 1
                             cq_text = (
                                 f"[CQ:record,file={segment.file_name or 'unknown'}]"
                             )
                             builder.add_text_left(cq_text)
-                        else:
+                        except Exception as e:
+                            self.log.warning(f"音频下载失败，降级文本识别 url={audio_url}: {e}")
                             if not segment.text_description:
                                 try:
                                     desc = await self.media_processor.audio_to_text(audio_url)
@@ -424,7 +423,6 @@ class ChatManager(ServiceBase):
                                 f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]"
                             )
                     else:
-                        # 超配额音频降级为 CQ 文本标记，不调用 MediaProcessor
                         if segment.text_description:
                             builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
                         else:
@@ -433,18 +431,17 @@ class ChatManager(ServiceBase):
                 elif isinstance(segment, VideoSegment):
                     if remaining_videos > 0:
                         video_url = segment.url or segment.file.file
-                        result = await url_to_video_mp4(video_url, segment.file_name)
-                        if result is not None:
+                        try:
+                            result = await url_to_video_mp4(video_url, segment.file_name)
                             builder.add_video_base64_left(result.data, result.mime)
-                        else:
-                            builder.add_video_left(video_url)
+                        except Exception as e:
+                            self.log.warning(f"视频转码失败 url={video_url}: {e}")
                         remaining_videos -= 1
                         cq_text = (
                             f"[CQ:video,file={segment.file_name or 'unknown'}]"
                         )
                         builder.add_text_left(cq_text)
                     else:
-                        # 超配额视频降级为 CQ 文本标记，不调用 MediaProcessor
                         if segment.text_description:
                             builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
                         else:
@@ -518,7 +515,7 @@ class ChatManager(ServiceBase):
         context =await self.get_group_context(group_id)
         async with context.async_lock:
             context.chat_context.clear()
-            self.logger.info(f"已重置群{group_id}的聊天上下文")
+            self.log.info(f"已重置群{group_id}的聊天上下文")
             
 
     async def reset_private_chat(self, user_id: int) -> None:
@@ -530,7 +527,7 @@ class ChatManager(ServiceBase):
         context =await self.get_private_context(user_id)
         async with context.async_lock:
             context.chat_context.clear()
-            self.logger.info(f"已重置user:{user_id}的聊天上下文")
+            self.log.info(f"已重置user:{user_id}的聊天上下文")
     
     async def set_group_role(self, group_id: int, role_key: str) -> bool:
         """设置指定群的扮演角色
@@ -552,7 +549,7 @@ class ChatManager(ServiceBase):
                 raise ValueError("指定了不存在的角色键名!")
             
         await self.reset_group_chat(group_id)
-        self.logger.info(f"已设置群{group_id}的角色为: {role_key}")
+        self.log.info(f"已设置群{group_id}的角色为: {role_key}")
         return
 
     async def set_private_role(self, user_id: int, role_key: str) -> bool:
@@ -575,7 +572,7 @@ class ChatManager(ServiceBase):
                 raise ValueError("指定了不存在的角色键名!")
             
         await self.reset_private_chat(user_id)
-        self.logger.info(f"已设置user:{user_id}的聊天角色为: {role_key}")
+        self.log.info(f"已设置user:{user_id}的聊天角色为: {role_key}")
         return
     
     async def get_group_role_str(self, group_id: int)->str:
@@ -604,7 +601,7 @@ class ChatManager(ServiceBase):
                 self.play_role_list["none"]
             )
             await self.reset_group_chat(group_id)
-            self.logger.info(f"已清除群{group_id}的自定义角色，恢复为默认角色")
+            self.log.info(f"已清除群{group_id}的自定义角色，恢复为默认角色")
     
     
     def anew_character_settings(self) -> None:
@@ -618,7 +615,7 @@ class ChatManager(ServiceBase):
         import os
         
         if not os.path.exists(self.character_folder):
-            self.logger.warning(f"角色设定文件夹不存在: {self.character_folder}")
+            self.log.warning(f"角色设定文件夹不存在: {self.character_folder}")
             return
         
         for character_setting in os.listdir(self.character_folder):
@@ -629,16 +626,16 @@ class ChatManager(ServiceBase):
                 try:
                     file_size = os.path.getsize(file_path)
                     if file_size > 40 * 1024:
-                        self.logger.warning(f"文件过大({file_size/1024:.1f}KB)，跳过: {character_setting}")
+                        self.log.warning(f"文件过大({file_size/1024:.1f}KB)，跳过: {character_setting}")
                         continue
                     
                     with open(file_path, "r", encoding="utf-8") as f:
                         content = f.read()
                     
                     self.play_role_list[key] = content
-                    self.logger.debug(f"已加载角色设定: {key}")
+                    self.log.debug(f"已加载角色设定: {key}")
                     
                 except Exception as e:
-                    self.logger.error(f"加载角色设定文件 '{character_setting}' 失败: {e}")
+                    self.log.error(f"加载角色设定文件 '{character_setting}' 失败: {e}")
     
     

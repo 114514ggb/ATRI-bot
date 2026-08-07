@@ -44,7 +44,7 @@ async def main(code: str, message_data: atriMessageEvent, files: list[str] | Non
     if files:
         remaining_files = set(files)
 
-        for message in set((await chat_manager.get_group_context(group_id)).messages):
+        for message in list((await chat_manager.get_group_context(group_id)).messages):
             for segment in message.segments:
                 if not isinstance(segment, FileMessageSegment):
                     continue
