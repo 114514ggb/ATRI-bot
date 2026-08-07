@@ -4,6 +4,7 @@ from .file.file_utils import download_binary, resolve_file_to_bytes
 from .file.image_utils import (
     compress_image,
     convert_to_jpeg,
+    fetch_image_jpeg,
     url_to_base64,
     url_to_image_jpeg,
     urls_list_to_base64,
@@ -44,6 +45,7 @@ __all__ = [
     "download_text",
     "estimate_tokens",
     "extract_json_from_text",
+    "fetch_image_jpeg",
     "format_duration",
     "format_memory_records",
     "HTTPClient",

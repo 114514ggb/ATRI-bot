@@ -9,8 +9,8 @@ from typing import Coroutine, Dict, List
 from atribot.common_utils import (
     download_text,
     extract_json_from_text,
+    fetch_image_jpeg,
     url_to_audio_mp3,
-    url_to_image_jpeg,
     url_to_video_mp4,
 )
 from atribot.core.atri_config import atriConfig
@@ -180,7 +180,11 @@ class ChatBasics(ABC):
         if including_pictures:
             async def dispose_img(message: ImageSegment):
                 try:
-                    result = await url_to_image_jpeg(message.url, file_name=message.file_name)
+                    result = await fetch_image_jpeg(
+                        message.url,
+                        file_name=message.file_name,
+                        send_client=event.send_client,
+                    )
                     message_builder.add_image_base64(result.data, result.mime)
                 except Exception as e:
                     self.log.warning(f"图片处理失败 url={message.url}: {e}")
@@ -190,7 +194,11 @@ class ChatBasics(ABC):
                 if message.text_description:
                     desc = message.text_description
                 else:
-                    desc = await self.media_processor.image_to_text(message.url)
+                    desc = await self.media_processor.image_to_text(
+                        message.url,
+                        file_name=message.file_name,
+                        send_client=event.send_client,
+                    )
                     message.text_description = desc
                     self.log.info(f"图像识别文本结果:{desc}")
                 message_builder.add_text(f"[CQ:image,summary:{desc}]")
@@ -501,7 +509,7 @@ class GroupChat(ChatBasics):
     async def trigger_internal_thought(
         self,
         custom_prompt: str,
-        event: OneBotMessageEvent,
+        event: OneBotMessageEvent,    
     ) -> None:
         """系统内部触发思考的入口
 
@@ -521,6 +529,7 @@ class GroupChat(ChatBasics):
         await self.chat_manager.add_group_messages_builder(
             group_id=group_id,
             builder=message_builder,
+            send_client=event.send_client,
             including_pictures=self.visual_sense,
             including_audios=self.audio_sense,
             including_videos=self.video_sense,
@@ -660,6 +669,7 @@ class GroupChat(ChatBasics):
         await self.chat_manager.add_group_messages_builder(
             group_id=group_id,
             builder=message_builder,
+            send_client=event.send_client,
             including_pictures=including_pictures,
             including_audios=including_audios,
             including_videos=including_videos,
@@ -726,7 +736,11 @@ class GroupChat(ChatBasics):
             async def dispose_img(message:ImageSegment):
                 """给自己解析图像"""
                 try:
-                    result = await url_to_image_jpeg(message.url, file_name=message.file_name)
+                    result = await fetch_image_jpeg(
+                        message.url,
+                        file_name=message.file_name,
+                        send_client=event.send_client,
+                    )
                     message_builder.add_image_base64(result.data, result.mime)
                 except Exception as e:
                     self.log.warning(f"图片处理失败 url={message.url}: {e}")
@@ -737,7 +751,11 @@ class GroupChat(ChatBasics):
                 if message.text_description:
                     desc = message.text_description
                 else:
-                    desc = await self.media_processor.image_to_text(message.url)
+                    desc = await self.media_processor.image_to_text(
+                        message.url,
+                        file_name=message.file_name,
+                        send_client=event.send_client,
+                    )
                     message.text_description = desc
                     self.log.info(f"输入图片描述:{desc}]")
                 message_builder.add_text(f"[CQ:image,summary:{desc}]")

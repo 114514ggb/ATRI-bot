@@ -2,7 +2,7 @@ import datetime
 from logging import Logger
 from typing import TYPE_CHECKING, Dict, List
 
-from atribot.common_utils import url_to_audio_mp3, url_to_image_jpeg, url_to_video_mp4
+from atribot.common_utils import fetch_image_jpeg, url_to_audio_mp3, url_to_video_mp4
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
 from atribot.core.event_bus.rule import Rule
@@ -33,6 +33,7 @@ DEFAULT_INCLUDING_AUDIOS = 1
 DEFAULT_INCLUDING_VIDEOS = 1
 
 if TYPE_CHECKING:
+    from atribot.core.platform.send_client import SendClientBase
     from atribot.core.type.bot_types import atriMessageEvent
 
 
@@ -332,6 +333,7 @@ class ChatManager(ServiceBase):
         self, 
         group_id: int, 
         builder: MessageBuilder,
+        send_client: SendClientBase | None = None,
         *,
         including_pictures: bool = False,
         including_audios: bool = False,
@@ -345,6 +347,7 @@ class ChatManager(ServiceBase):
         Args:
             group_id: 群组ID
             builder: 消息构建器
+            send_client: 发送客户端，用于通过 NapCat get_image API 获取图片
             including_pictures: True = 保留 DEFAULT_INCLUDING_PICTURES 条实际图片；
                                 False = 使用 MediaProcessor 转为文本描述
             including_audios: True = 保留 DEFAULT_INCLUDING_AUDIOS 条实际音频；
@@ -364,20 +367,20 @@ class ChatManager(ServiceBase):
 
         builder.add_text_left('</group_history>')
 
-        for event in reversed(messages):
+        for message_event in reversed(messages):
             
             # if not isinstance(event, MessageEvent):
             #     event:OneBotEvent
             #     builder.add_text_left(event.format_event_simple)
             #这段目前没什么用，感觉以后这个消息段不止会放消息
 
-            if isinstance(event, MessageSentEvent):
-                builder.add_text_left(event.llm_formatted_message)
+            if isinstance(message_event, MessageSentEvent):
+                builder.add_text_left(message_event.llm_formatted_message)
                 continue
             
             builder.add_text_left('\n</user_message>\n</MESSAGE>')
 
-            for segment in reversed(event.segments):
+            for segment in reversed(message_event.segments):
                 if isinstance(segment, TextSegment):
                     builder.add_text_left(segment.text)
 
@@ -385,7 +388,11 @@ class ChatManager(ServiceBase):
                     if remaining_pictures > 0:
                         if url := segment.url or segment.file.file:
                             try:
-                                result = await url_to_image_jpeg(url, file_name=segment.file_name)
+                                result = await fetch_image_jpeg(
+                                    url,
+                                    file_name=segment.file_name,
+                                    send_client=send_client,
+                                )
                                 builder.add_image_base64_left(result.data, result.mime)
                             except Exception as e:
                                 self.log.warning(f"图片转码失败 url={url}: {e}")
@@ -451,9 +458,9 @@ class ChatManager(ServiceBase):
                     builder.add_text_left(segment.__str__())
 
             builder.add_text_left(
-                f'<MESSAGE user_id={event.user_id}'
-                f' nick_name={event.sender_nickname}'
-                f' time={datetime.datetime.fromtimestamp(event.time).strftime('%Y-%m-%d %H:%M:%S')}>'
+                f'<MESSAGE user_id={message_event.user_id}'
+                f' nick_name={message_event.sender_nickname}'
+                f' time={datetime.datetime.fromtimestamp(message_event.time).strftime('%Y-%m-%d %H:%M:%S')}>'
                 f'\n<user_message>'
             )
 

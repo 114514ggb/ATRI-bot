@@ -376,7 +376,10 @@ class OneBotSendClient(SendClientBase):
             params["file"] = file
         if file_id is not None:
             params["file_id"] = file_id
-        return await self.async_send("get_image", params)
+        resp = await self.async_send("get_image", params)
+        if resp and resp.get("status") == "ok":
+            return resp.get("data")
+        return None
 
     async def get_recordg_details(
         self,

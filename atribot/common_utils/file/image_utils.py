@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import io
+from typing import TYPE_CHECKING
 
 import aiohttp
 from PIL import Image, ImageFile
@@ -17,9 +18,15 @@ from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import File
 
+if TYPE_CHECKING:
+    from atribot.core.platform.send_client import ImageDetails, SendClientBase
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 _MAX_DOWNLOAD_RETRIES: int = 2
+
+_GET_IMAGE_MAX_BYTES: int = 1024 * 1024
+"""通过 get_image API 获取图片的原始体积上限(1MB)"""
 
 
 def convert_to_jpeg(
@@ -311,3 +318,71 @@ async def url_to_image_jpeg(
         )
         await cache_put(key, jpeg, result.fmt, result.mime, result.converted)
         return result
+
+
+async def fetch_image_jpeg(
+    source: str | File,
+    *,
+    file_name: str | None = None,
+    send_client: SendClientBase | None = None,
+    max_size_kb: int | None = 2048,
+    max_bytes: int = 10 * 1024 * 1024,
+) -> MediaConvertResult:
+    """获取图片并统一转换为 JPEG base64
+
+    当提供 ``send_client`` 和 ``file_name`` 时，优先通过 NapCat ``get_image`` API
+    获取图片 base64。但 WebSocket 单帧大小通常限制 1MB，因此仅对原始体积
+    小于 ``_GET_IMAGE_MAX_BYTES`` 的图片走此路径，避免大图导致 WS 连接异常关闭。
+
+    Args:
+        source: 图片来源(File 对象或字符串 URL/路径）
+        file_name: QQ 图片文件哈希 ImageSegment.file_name
+        send_client: 发送客户端实例，用于调用 get_img_details
+        max_size_kb: 压缩后最大体积 KB None 表示不限制（仍转 JPEG
+        max_bytes: 最大允许下载字节数（回退路径使用），默认 10MB
+
+    Returns:
+        转换成功返回 MediaConvertResult(data, "jpeg", "image/jpeg", True)
+
+    Raises:
+        Exception: 两条路径均失败时抛出
+    """
+    if send_client is not None and file_name:
+        src = source.file if isinstance(source, File) else str(source)
+        key = make_cache_key("image", src, file_name, f"kb={max_size_kb}")
+
+        async with _get_lock(key):
+            entry = await cache_get(key)
+            if entry is not None:
+                return MediaConvertResult(
+                    data=entry.to_base64(),
+                    fmt=entry.fmt,
+                    mime=entry.mime,
+                    converted=entry.converted,
+                )
+
+            try:
+                details: ImageDetails | None = await send_client.get_img_details(
+                    file=file_name
+                )
+                if details and details.get("base64"):
+                    raw_bytes = base64.b64decode(details["base64"])
+                    if len(raw_bytes) <= _GET_IMAGE_MAX_BYTES:
+                        jpeg = await asyncio.to_thread(convert_to_jpeg, raw_bytes, max_size_kb)
+                        result = MediaConvertResult(
+                            data=base64.b64encode(jpeg).decode(),
+                            fmt="jpeg",
+                            mime="image/jpeg",
+                            converted=True,
+                        )
+                        await cache_put(key, jpeg, result.fmt, result.mime, result.converted)
+                        return result
+            except Exception:
+                pass  # 回退到 url_to_image_jpeg
+
+    return await url_to_image_jpeg(
+        source,
+        max_size_kb=max_size_kb,
+        max_bytes=max_bytes,
+        file_name=file_name,
+    )
