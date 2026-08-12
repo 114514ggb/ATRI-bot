@@ -1,4 +1,6 @@
+import json
 import re
+from pathlib import Path
 
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
@@ -34,6 +36,20 @@ class GroupManagerPlugin(Plugin):
         super().__init__()
         self.keyword_rsp = KeywordResponder()
         self.blacklist = container.get_by_type(PermissionsManagement).blacklist
+        self._load_white_list_group()
+
+    def _load_white_list_group(self) -> None:
+        """加载群加群白名单 JSON 配置"""
+        json_path = Path(__file__).parent / "white_list_group.json"
+        try:
+            with open(json_path, encoding="utf-8") as f:
+                raw: dict[str, list[str]] = json.load(f)
+            self.white_list_group: dict[int, list[str]] = {
+                int(k): v for k, v in raw.items()
+            }
+        except Exception as e:
+            self.log.warning("加载 white_list_group.json 失败: %s", e)
+            self.white_list_group = {}
 
     @Plugin.on_message(priority=0)
     async def on_keyword_response(self, event: MessageEventEnvelope) -> None:
@@ -119,11 +135,6 @@ class GroupManagerPlugin(Plugin):
         comment = ev.comment
         flag = ev.flag
 
-        white_list_group: dict[int, list[str]] = {
-            1038698883: [r"ATRI"],
-            2169027872: [r"亚托莉|吖密|ATRI|b站"],
-        }
-
         if match := re.search(r"学习|交流|谢谢|同意|趣味相投|小白", comment):
             await send.set_group_add_request(flag, False)
             await send.send_group_msg(
@@ -132,10 +143,10 @@ class GroupManagerPlugin(Plugin):
             )
             return
 
-        if group_id in white_list_group:
+        if group_id in self.white_list_group:
             if answer_match := re.search(r"答案：\s*(.*)", comment):
                 answer = answer_match.group(1).strip()
-                for pattern in white_list_group[group_id]:
+                for pattern in self.white_list_group[group_id]:
                     if re.search(pattern, answer, re.IGNORECASE):
                         await send.set_group_add_request(flag, True)
                         return

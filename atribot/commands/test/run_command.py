@@ -35,7 +35,9 @@ async def run_async_code(message_data: MessageEventEnvelope):
     # tool_input = """{"user_id": 2631018780,"content_text": "","category": "fact","importance": 8,"credibility": 10}"""
     # tool_output= await tool_management.calls(tool_name, tool_input, message_data)
     # await send_message.send_group_msg(message_data.group_id, str(tool_output))
-            
+    
+    # send_message = message_data.send_client
+    # await send_message.send(GroupMessage(group_id=1020279799).add_image(File.from_local_path("/home/atri/图片/谁是废物.png")))
     # await send_message.send_group_msg(984466158, '你好')
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text('消息'))
     # await send_message.send_group_msg(984466158,'[CQ:json,data={ "app": "com.tencent.map"&#44; "config": { "autoSize": 1&#44; "forward": 1&#44; "height": "60"&#44; "type": "normal"&#44; "width": "666" }&#44; "desc": ""&#44; "meta": { "Location.Search": { "address": "你已被群主强奸"&#44; "enum_relation_type": 1&#44; "from": "plusPanel"&#44; "from_account": 2147483647&#44; "id": ""&#44; "lat": "1"&#44; "lng": "1"&#44; "name": "你已被群主强奸"&#44; "uint64_peer_account": "chaijun" } }&#44; "prompt": "你已被移除群聊"&#44; "ver": "1.1.2.21"&#44; "view": "LocationShare" }]')
