@@ -326,9 +326,6 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 **decision选择要求**
 1.思考**所有**的可用的decision中的**每个decision**是否符合当下条件,如果decision使用条件符合聊天内容就使用,不要使用不存在的silence
 2.如果相同的内容已经被执行，请不要重复执行
-3.请控制你的发言频率，不要太过频繁的发言
-4.如果有人对你感到厌烦，请减少回复
-5.如果有人对你进行攻击，或者情绪激动，请无视或劝阻，不要骂人
 
 输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON
 JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。

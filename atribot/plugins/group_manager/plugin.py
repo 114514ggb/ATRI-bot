@@ -153,9 +153,9 @@ class GroupManagerPlugin(Plugin):
 
             try:
                 stranger_info = await send.get_stranger_info(user_id)
-                qq_level = stranger_info.get("qqLevel", 0) if isinstance(stranger_info, dict) else 0
+                qq_level = stranger_info.get("data",{}).get("qqLevel", 0)
             except Exception:
-                qq_level = 0
+                qq_level = 10
 
             if qq_level and qq_level < 10:
                 await send.set_group_add_request(flag, False)
