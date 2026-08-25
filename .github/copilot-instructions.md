@@ -6,7 +6,7 @@
 - **实际初始化流程**（`BotFramework.initialize()`，见 `atribot/bot_framework.py`）:
   1. 注册 `config`（atriConfig）
   2. `_register_services()` — 分两组注册：`_SERVICE_CLASSES`（类名即服务名，含新增的 `CommandLoader`、`PluginManager`）和 `_NAMED_SERVICE_CLASSES`（显式指定服务名的类，如 `AsyncPostgreSQL`→`"database"`、`ToolManager`→`"MCP"`、`LLMConnectionManager`→`"LLMSupplier"`、`ToolCalls`→`"ToolCalls"`）
-  3. 创建 `PlatformManager`（`atribot/core/platform/manager.py`）并注册（cleanup=`stop_all`）；随后把第一个平台适配器的发送客户端**桥接**为 `SendMessage`（`container.register("SendMessage", _send_client)` 并维护 `_type_map[QQAPIClient]`），无适配器时仅 warning
+  3. 创建 `PlatformManager`（`atribot/core/platform/manager.py`）并注册（cleanup=`stop_all`）；发送能力入口统一走 `PlatformManager` / `atriMessageEvent.send_client`，**不再注册 `SendMessage` 服务**（旧桥接 `container.register("SendMessage", ...)` 已移除），无适配器时仅 warning
   4. 在 Pipeline 上挂载 `WhitelistMiddleware`（群白名单过滤），并挂载消息存储（`queue.set_overflow_handler(store_message_to_db)` + `event_bus.on_message(priority=-100)(store_message_to_db)`）
   5. `_start_sandbox()` — **在服务解析之前**启动 Docker 沙盒（可选，失败不阻断）
   6. `_resolve_services()` — 按以下 `_RESOLVE_TARGETS` 顺序解析（实例化 + 依赖注入 + `initialize()`）：
@@ -75,7 +75,6 @@
 | `HTTPClient` | `HTTPClient` | `get_by_type(HTTPClient)` | — | 异步 HTTP 客户端（`get_bytes`/`post_form`/`post_json`） |
 | `database` | `AsyncPostgreSQL` | `get_by_type(AsyncPostgreSQL)` 或 `get("database")` | ✅ `close_pool()` | 需 `async with` 使用 |
 | `TokenManager` | `TokenManager` | `get_by_type(TokenManager)` | — | Token 用量统计 |
-| `SendMessage` | `QQAPIClient`（`SendClientBase`） | `get_by_type(QQAPIClient)` 或 `get("SendMessage")`，事件内用 `event.send_client` | ✅ `cleanup()` | QQ 消息发送 API；由平台适配器**桥接**注册（非容器 resolve），shutdown 时自动关闭 |
 | `LLMSupplier` | `LLMConnectionManager` | `get_by_type(LLMConnectionManager)` 或 `get("LLMSupplier")` | ✅ `close()` | LLM 供应商连接管理 |
 | `LLMSupervisor` | `LLMCoordinator` | `get_by_type(LLMCoordinator)` | — | LLM 调度协调 |
 | `CommandSystem` | `CommandSystem` | `get_by_type(CommandSystem)` | — | 命令注册与解析 |
@@ -189,7 +188,7 @@ class File:
 ```
 
 ### SendMessage（多模态消息构建）
-> **注意**：此处的 `SendMessage` 是多模态消息构建器类（位于 `atribot/core/type/chat_message_types.py`），与发送服务 `QQAPIClient`（也注册为 `SendMessage`）不同
+> **注意**：此处的 `SendMessage` 是多模态消息构建器类（位于 `atribot/core/type/chat_message_types.py`），不再是发送服务。实际发送通过 `atriMessageEvent.send_client`（`SendClientBase`）或 `PlatformManager.send()` 完成
 
 ```python
 from atribot.core.type.chat_message_types import SendMessage
@@ -380,12 +379,12 @@ async def main(**kwargs) -> Any:
 - **内置插件**：`emoji_like`（消息贴表情镜像）、`group_manager`（关键词回复 + 群成员变动通知 + 加群审批）、`poke_reaction`（戳一戳反馈）
 - 插件可通过 `container.get_by_type(...)` 访问全部核心服务
 
-## SendMessage API（QQAPIClient / SendClientBase）
-> `SendMessage` 服务由平台适配器**桥接**注册：`container.get_by_type(QQAPIClient)` 或 `container.get("SendMessage")`；在事件处理函数中可直接用 `event.send_client`
+## SendMessage API（SendClientBase / event.send_client）
+> ~~`SendMessage` 服务~~（旧 `QQAPIClient` / `container.get("SendMessage")` 已废弃删除）。发送能力统一走 `atriMessageEvent` 信封体系：事件处理函数中用 `event.send_client`（`MessageEventEnvelope`），或用 `container.get_by_type(PlatformManager).send(GroupMessage(...))` 广播发送
 
 ```python
-send_message = container.get_by_type(QQAPIClient)
-# 或在事件处理函数中：send_message = event.send_client
+# 在事件处理函数中：send_message = message_data.send_client  （atriMessageEvent 信封携带）
+send_message = container.get_by_type(PlatformManager)# 或用于广播发送 GroupMessage
 
 # 基础发送
 await send_message.send_group_msg(group_id, message)        # 发送群聊文本/混合消息（message 可为 str 或 list[dict]）

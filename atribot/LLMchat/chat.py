@@ -144,14 +144,23 @@ class ChatBasics(ABC):
         else:
             user_id = event.user_id
 
-        if await self.user_system.update_user_info(
-            user_id=user_id,
-            current_info=await self.user_system.get_user_info(user_id),
-            new_info_json=response_json.get("update_field"),
-        ):
-            self.log.info(f"用户信息更新成功!user_id:{user_id}")
+        update_field = response_json.get("update_field")
+        
+        if isinstance(update_field, dict):
+            if await self.user_system.update_user_info(
+                user_id=user_id,
+                current_info=await self.user_system.get_user_info(user_id),
+                new_info_json=update_field,
+            ):
+                self.log.info(f"用户信息更新成功!user_id:{user_id}")
+            else:
+                self.log.info(f"用户信息无变化无需更新!user_id:{user_id}")
         else:
-            self.log.info(f"用户信息无变化无需更新!user_id:{user_id}")
+            self.log.warning(
+                f"忽略无效的 update_field(期望 dict,实际 {type(update_field).__name__}):"
+                f" user_id={user_id} value={update_field}"
+            )
+            return
 
     async def silence_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """保持沉默（通用）"""

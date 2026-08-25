@@ -1,5 +1,7 @@
 import time
 
+from asyncpg.exceptions import UniqueViolationError
+
 from atribot.core.service_container import container
 from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.RAG.vector_store import MemoryCategory
@@ -48,29 +50,39 @@ async def main(
     importance: int = 5,
     credibility: int = 5,
 ):
+
+    target_user_id = int(user_id) if user_id else None
+
     event_vector = str(await memory_system.rag.calculate_embedding(content_text))
 
-    if user_id:
-        await memory_system.vector_store.storage(
-            group_id=None,
-            user_id=int(user_id),
-            event_time=int(time.time()),
-            event=content_text,
-            event_vector=event_vector,
-            category=category,
-            importance=importance,
-            credibility=credibility,
-        )
-    else:
-        await memory_system.vector_store.storage(
-            group_id=None,
-            user_id=None,
-            event_time=int(time.time()),
-            event=content_text,
-            event_vector=event_vector,
-            category=category,
-            importance=importance,
-            credibility=credibility,
+    try:
+        if target_user_id:
+            await memory_system.vector_store.storage(
+                group_id=None,
+                user_id=target_user_id,
+                event_time=int(time.time()),
+                event=content_text,
+                event_vector=event_vector,
+                category=category,
+                importance=importance,
+                credibility=credibility,
+            )
+        else:
+            await memory_system.vector_store.storage(
+                group_id=None,
+                user_id=None,
+                event_time=int(time.time()),
+                event=content_text,
+                event_vector=event_vector,
+                category=category,
+                importance=importance,
+                credibility=credibility,
+            )
+    except UniqueViolationError:
+        prefix = f"用户:{target_user_id}," if target_user_id else "知识库,"
+        return (
+            f"该记忆已存在({prefix}内容与现有记忆重复)，无需重复存储。"
+            f"如需修改或补充请使用对应的更新操作，避免浪费 token。"
         )
 
     return "存储记忆成功"

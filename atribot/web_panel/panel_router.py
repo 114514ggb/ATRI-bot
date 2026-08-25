@@ -276,7 +276,12 @@ async def api_send_message(
     body: SendMsgBody,
     _: None = Depends(_auth),
 ) -> Dict[str, Any]:
-    send = container.get("SendMessage")
+    from atribot.core.platform.manager import PlatformManager
+
+    platform = container.get_by_type(PlatformManager)
+    if not platform.adapters:
+        return {"status": "error", "result": "没有可用适配器"}
+    send = next(iter(platform.adapters.values())).get_client()
     payload = {"group_id": body.group_id, "message": body.message}
     result = await send.async_send("send_group_msg", payload)
     return {"status": "ok", "result": result}

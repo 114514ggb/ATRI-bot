@@ -15,7 +15,6 @@ from atribot.core.command.command_loader import CommandLoader
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.event_bus.rule import AtCommandRule
-from atribot.core.network_connections.qq_send_message import QQAPIClient
 from atribot.core.pipeline.whitelist import WhitelistMiddleware
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.service_container import container
@@ -122,18 +121,8 @@ class BotFramework:
         container.register("PlatformManager", self._platform_manager, cleanup=self._platform_manager.stop_all)
         container._type_map[PlatformManager] = "PlatformManager"
 
-        if self._platform_manager.adapters:
-            _first_adapter = next(iter(self._platform_manager.adapters.values()))
-            _send_client = _first_adapter.get_client()
-            container.register("SendMessage", _send_client)
-            container._type_map[QQAPIClient] = "SendMessage"
-            self.log.info(
-                "SendMessage 已桥接到适配器 '%s' (%s)",
-                next(iter(self._platform_manager.adapters.keys())),
-                type(_send_client).__name__,
-            )
-        else:
-            self.log.warning("没有可用适配器,SendMessage 未注册")
+        if not self._platform_manager.adapters:
+            self.log.warning("没有可用适配器,系统处于不可以状态")
 
         #白名单
         await self._platform_manager.pipeline.add_middleware(WhitelistMiddleware())

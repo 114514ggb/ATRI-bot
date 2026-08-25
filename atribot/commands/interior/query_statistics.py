@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from atribot.common_utils import is_qq
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
+from atribot.core.platform.send_client import SendClientBase
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import MessageEventEnvelope
 
@@ -15,7 +16,6 @@ class UserActivityAnalyzer:
     
     def __init__(self):
         self.db: AsyncDatabaseBase = container.get("database")
-        self.send_message = container.get("SendMessage")
     
     async def query_mysql(self, message_data: MessageEventEnvelope, user_id: int) -> None:
         """查询MySQL数据库并生成用户活跃度报告
@@ -33,10 +33,10 @@ class UserActivityAnalyzer:
         if not is_qq(user_id):
             raise ValueError("请输入正确的QQ号")
             
-        if not await self._process_user_data(user_id, group_id):
-            await self.send_message.send_group_msg(group_id, f"数据库中未找到qq:{user_id}")
+        if not await self._process_user_data(message_data.send_client, user_id, group_id):
+            await message_data.send_client.send_group_msg(group_id, f"数据库中未找到qq:{user_id}")
     
-    async def _process_user_data(self, user_id: str, group_id: int) -> bool:
+    async def _process_user_data(self, send_client: SendClientBase, user_id: str, group_id: int) -> bool:
         """
         处理用户数据并生成报告
         
@@ -65,9 +65,9 @@ class UserActivityAnalyzer:
                 
             stats_data = await db.execute_SQL(sql=sql_combined, argument=(user_id,))
         
-        return await self._generate_report(group_id, my_tuple, stats_data)
+        return await self._generate_report(send_client, group_id, my_tuple, stats_data)
     
-    async def _generate_report(self, group_id: int, user_data: tuple, stats_data: tuple):
+    async def _generate_report(self, send_client: SendClientBase, group_id: int, user_data: tuple, stats_data: tuple):
         """
         生成并发送用户活跃度报告
         
@@ -108,7 +108,7 @@ class UserActivityAnalyzer:
 
         trend = self._evaluate_trend(number_days, week_daye, month_daye)
 
-        await self.send_message.send_group_msg(
+        await send_client.send_group_msg(
             group_id,
             f"✨ QQ用户活跃报告 ✨\n"
             f"----------------------------------------\n"
