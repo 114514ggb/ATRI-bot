@@ -347,11 +347,20 @@ class OneBotSendClient(SendClientBase):
 
     async def get_msg_details(self, message_id: int | str) -> OneBotMessageEvent | None:
         """获取消息详情"""
-        if data := (await self.async_send("get_msg", {"message_id": message_id})).get("data"):
-            return OneBotMessageEvent(
-                event=OneBotEvent.from_dict(data),
-                send_client=self,
-            )
+        try:
+            data = (await self.async_send("get_msg", {"message_id": message_id})).get("data")
+        except Exception as e:
+            self.log.warning("获取消息详情失败 (message_id=%s): %s", message_id, e)
+            return None
+        if data:
+            try:
+                return OneBotMessageEvent(
+                    event=OneBotEvent.from_dict(data),
+                    send_client=self,
+                )
+            except Exception as e:
+                self.log.warning("解析消息详情失败 (message_id=%s): %s", message_id, e)
+                return None
         return None
         
     async def get_img_details(
