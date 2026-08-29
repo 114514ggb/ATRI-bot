@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Literal, Optional
+from typing import Literal, Optional
 
 import aiohttp
 
