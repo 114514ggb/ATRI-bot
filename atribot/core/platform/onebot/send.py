@@ -1,5 +1,5 @@
 import logging
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import aiohttp
 
@@ -348,20 +348,23 @@ class OneBotSendClient(SendClientBase):
     async def get_msg_details(self, message_id: int | str) -> OneBotMessageEvent | None:
         """获取消息详情"""
         try:
-            data = (await self.async_send("get_msg", {"message_id": message_id})).get("data")
+            resp = await self.async_send("get_msg", {"message_id": message_id})
+            data:dict = (resp or {}).get("data")
         except Exception as e:
             self.log.warning("获取消息详情失败 (message_id=%s): %s", message_id, e)
             return None
-        if data:
-            try:
-                return OneBotMessageEvent(
-                    event=OneBotEvent.from_dict(data),
-                    send_client=self,
-                )
-            except Exception as e:
-                self.log.warning("解析消息详情失败 (message_id=%s): %s", message_id, e)
-                return None
-        return None
+        try:
+            if data.get("post_type"):
+                data["post_type"] = "message"
+                data.setdefault("self_id", 0)
+                
+            return OneBotMessageEvent(
+                event=OneBotEvent.from_dict(data),
+                send_client=self,
+            )
+        except Exception as e:
+            self.log.warning("解析消息详情失败 (message_id=%s): %s", message_id, e)
+            return None
         
     async def get_img_details(
         self,

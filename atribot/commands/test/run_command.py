@@ -37,6 +37,10 @@ async def run_async_code(message_data: MessageEventEnvelope):
     # await send_message.send_group_msg(message_data.group_id, str(tool_output))
     
     # send_message = message_data.send_client
+    # ReplySegment = message_data.event.segments[0]
+    # data = await send_message.async_send("get_msg", {"message_id": ReplySegment.message_id})
+    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text(str(data)))
+    
     # await send_message.send(GroupMessage(group_id=1020279799).add_image(File.from_local_path("/home/atri/图片/谁是废物.png")))
     # await send_message.send_group_msg(984466158, '你好')
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_text('消息'))
