@@ -99,18 +99,17 @@ def test_convert_to_jpeg_corrupt_raises():
         convert_to_jpeg(b"not an image at all")
 
 
-def test_convert_to_jpeg_truncated_succeeds():
-    """尾部截断的 JPEG 在 LOAD_TRUNCATED_IMAGES=True 下可正常转码"""
-    result = convert_to_jpeg(_truncated_jpeg_bytes(), max_size_kb=1024)
-    with Image.open(io.BytesIO(result)) as img:
-        assert img.format == "JPEG"
-        img.verify()
+def test_convert_to_jpeg_truncated_raises():
+    """尾部截断的 JPEG 抛出 OSError('truncated'),而非静默灰色填充,供上层重试"""
+    with pytest.raises(OSError) as excinfo:
+        convert_to_jpeg(_truncated_jpeg_bytes(), max_size_kb=1024)
+    assert "truncated" in str(excinfo.value).lower()
 
 
-def test_compress_image_falls_back_to_raw_on_corrupt():
-    """compress_image 兼容封装:损坏数据回退原始字节"""
-    raw = _corrupt_bytes()
-    assert compress_image(raw, 1024) == raw
+def test_compress_image_raises_on_corrupt():
+    """compress_image 对损坏/截断数据抛 OSError,不静默回退为灰色填充"""
+    with pytest.raises(OSError):
+        compress_image(_corrupt_bytes(), 1024)
 
 
 def test_compress_image_transcodes_small_image():

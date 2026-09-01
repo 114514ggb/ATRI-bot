@@ -1,7 +1,6 @@
-"""统一 HTTP 客户端。
+"""统一异步 HTTP 客户端。
 
-通过单例 aiohttp.ClientSession + TCPConnector 复用 TCP 连接，
-避免在各模块中反复创建临时 Session 导致的资源浪费与连接泄漏。
+单例 aiohttp.ClientSession + TCPConnector 复用连接池，避免各模块重复创建 Session。
 
 使用方式：
     from atribot.core.service_container import container
@@ -29,10 +28,7 @@ _DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
 
 
 class HTTPClient:
-    """统一 HTTP 客户端，复用单一 TCP 连接池。
-
-    默认 headers 为 QQ 客户端 UA,各调用方可通过 headers 参数按需覆盖或追加
-    """
+    """统一 HTTP 客户端，复用单一 TCP 连接池，默认 QQ UA headers。"""
 
     def __init__(self) -> None:
         connector = aiohttp.TCPConnector(
@@ -50,7 +46,7 @@ class HTTPClient:
 
     @property
     def session(self) -> aiohttp.ClientSession:
-        """暴露底层 Session,供需要精细控制的调用方使用(如流式读取、Range请求等)"""
+        """暴露底层 ClientSession，供需要精细控制的调用方使用（如 Range/流式请求）。"""
         return self._session
 
     async def get_bytes(
@@ -61,28 +57,32 @@ class HTTPClient:
         headers: dict[str, str] | None = None,
         timeout: aiohttp.ClientTimeout | None = None,
     ) -> bytes:
-        """GET 请求，读取响应体为 bytes,支持大小上限
+        """GET 请求，读取响应体为 bytes，支持大小上限与 Content-Length 完整性校验。
 
         Args:
             url: 目标 URL。
-            max_bytes: 最大允许读取的字节数,None 表示不限制。
-            headers: 可选的请求头，会与 Session 默认 headers 合并。
-            timeout: 可选的超时配置，覆盖 Session 默认超时。
-
-        Returns:
-            响应体的 bytes。
+            max_bytes: 最大字节数，None 表示不限制。
+            headers/timeout: 可选，覆盖 Session 默认值。
 
         Raises:
-            ValueError: HTTP 状态码非 2xx 或超过 max_bytes 时抛出。
+            ValueError: 状态码非 2xx、下载不完整或超过 max_bytes 时抛出。
         """
         try:
             async with self._session.get(url, headers=headers, timeout=timeout) as resp:
                 if not (200 <= resp.status < 300):
                     raise ValueError(f"下载失败，状态码: {resp.status}")
-                if max_bytes is None:
-                    return await resp.read()
-                data = await resp.content.read(max_bytes + 1)
-                if len(data) > max_bytes:
+                data = await resp.read()
+                clen = resp.headers.get("Content-Length")
+                if clen and not resp.headers.get("Content-Encoding"):
+                    try:
+                        expected = int(clen)
+                    except (TypeError, ValueError):
+                        expected = None
+                    if expected is not None and len(data) != expected:
+                        raise ValueError(
+                            f"下载不完整: Content-Length={clen} 实际={len(data)} bytes"
+                        )
+                if max_bytes is not None and len(data) > max_bytes:
                     raise ValueError(f"下载文件超过大小限制 ({max_bytes} bytes)")
                 return data
         except (aiohttp.ClientError, asyncio.TimeoutError) as error:
@@ -95,12 +95,12 @@ class HTTPClient:
         *,
         headers: dict[str, str] | None = None,
     ) -> Any:
-        """POST 表单数据（application/x-www-form-urlencoded）返回 JSON 响应
+        """POST 表单数据（application/x-www-form-urlencoded），返回 JSON 响应。
 
         Args:
             url: 目标 URL。
             data: 表单字段字典。
-            headers: 可选的额外请求头。
+            headers: 可选额外请求头。
 
         Returns:
             解析后的 JSON 响应（dict/list）。
@@ -121,8 +121,8 @@ class HTTPClient:
         Args:
             url: 目标 URL。
             payload: 请求体字典，自动序列化为 JSON。
-            headers: 可选的额外请求头（如 Authorization）。
-            timeout: 可选的超时配置。
+            headers: 可选额外请求头。
+            timeout: 可选超时配置。
 
         Returns:
             解析后的 JSON 响应（dict/list）。

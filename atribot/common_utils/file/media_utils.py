@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Callable
+from typing import Awaitable, Callable
 
 from atribot.common_utils.file.file_utils import resolve_file_to_bytes
 from atribot.common_utils.file.media_cache import (
@@ -37,7 +37,7 @@ _AUDIO_FORMAT_MAP: dict[str, str] = {
 
 
 def _detect_audio_format(url: str, file_name: str | None = None) -> str:
-    """从 URL 或文件名推断音频格式，无法识别时默认返回 'mp3'"""
+    """从 URL 或文件名推断音频格式,无法识别时默认返回 'mp3'"""
     name = file_name or url.split("?")[0]
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     return _AUDIO_FORMAT_MAP.get(ext, "mp3")
@@ -48,30 +48,76 @@ def _source_str(source: str | File) -> str:
     return source.file if isinstance(source, File) else str(source)
 
 
+async def _to_base64(
+    source: str | File,
+    file_name: str | None,
+    default_name: str,
+    max_bytes: int,
+    detect_fn: Callable[[str, str | None], str],
+) -> tuple[str, str]:
+    """下载媒体并编码为 base64,格式由 detect_fn 推断
+
+    Args:
+        source: 媒体来源(http/https/file/base64 或本地路径)
+        file_name: 可选文件名,用于推断格式
+        default_name: 无文件名时的默认名
+        max_bytes: 最大允许字节数
+        detect_fn: 格式推断函数
+
+    Returns:
+        (base64 字符串, 格式标识) 元组
+    """
+    name, data = await resolve_file_to_bytes(source, default_name, max_bytes=max_bytes)
+    fmt = detect_fn(_source_str(source), file_name or name)
+    return base64.b64encode(data).decode(), fmt
+
+
+async def _load_with_cache(
+    key: str,
+    produce: Callable[[], Awaitable[tuple[bytes, MediaConvertResult]]],
+) -> MediaConvertResult:
+    """取锁→查缓存命中直接返回；未命中调 produce() 生成结果并写入缓存
+
+    Args:
+        key: 缓存键
+        produce: 生成 (待缓存字节, MediaConvertResult) 的异步回调
+
+    Returns:
+        MediaConvertResult,命中缓存或由 produce() 生成
+    """
+    async with _get_lock(key):
+        entry = await cache_get(key)
+        if entry is not None:
+            return MediaConvertResult(
+                data=entry.to_base64(),
+                fmt=entry.fmt,
+                mime=entry.mime,
+                converted=entry.converted,
+            )
+        cache_bytes, result = await produce()
+        await cache_put(key, cache_bytes, result.fmt, result.mime, result.converted)
+        return result
+
+
 async def url_to_audio_base64(
     source: str | File,
     file_name: str | None = None,
     max_bytes: int = AUDIO_MAX_BYTES,
 ) -> tuple[str, str]:
-    """下载音频并编码为 base64 字符串
-
-    支持 http(s)://、file://、base64:// 以及本地路径等来源
+    """下载音频并编码为 base64,返回 (base64 字符串, 音频格式如 'mp3')
 
     Args:
-        source: 音频来源，可以是 File 对象或字符串(http/https/file/base64 或本地路径)
-        file_name: 可选文件名，用于推断音频格式
-        max_bytes: 最大允许下载的字节数，默认 10MB
+        source: 音频来源
+        file_name: 可选文件名,用于推断格式
+        max_bytes: 最大允许字节数,默认 10MB
 
     Returns:
-        ``(base64_data, format_str)`` 元组：
-        - base64_data: 不带前缀的 base64 编码字符串
-        - format_str: 音频格式，如 ``'mp3'``、``'ogg'``、``'wav'`` 等
+        (base64 数据, 音频格式) 元组
 
     Raises:
-        ValueError: 下载失败或文件超过大小限制时抛出
+        ValueError: 下载失败或超过大小限制时抛出
     """
-    name, data = await resolve_file_to_bytes(source, file_name or "audio", max_bytes=max_bytes)
-    return base64.b64encode(data).decode(), _detect_audio_format(_source_str(source), file_name or name)
+    return await _to_base64(source, file_name, "audio", max_bytes, _detect_audio_format)
 
 
 _VIDEO_MIME_MAP: dict[str, str] = {
@@ -86,7 +132,7 @@ _VIDEO_MIME_MAP: dict[str, str] = {
 
 
 def _detect_video_mime(url: str, file_name: str | None = None) -> str:
-    """从 URL 或文件名推断视频 MIME 类型，无法识别时默认返回 'video/mp4'"""
+    """从 URL 或文件名推断视频 MIME 类型,无法识别时默认返回 'video/mp4'"""
     name = file_name or url.split("?")[0]
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     return _VIDEO_MIME_MAP.get(ext, "video/mp4")
@@ -97,27 +143,20 @@ async def url_to_video_base64(
     file_name: str | None = None,
     max_bytes: int = VIDEO_MAX_BYTES,
 ) -> tuple[str, str]:
-    """下载视频并编码为 base64 字符串
-
-    QQ CDN 等临时签名 URL 模型侧无法直接访问，应在 Bot 端下载后传 base64
-    支持 http(s)://、file://、base64:// 以及本地路径等来源
+    """下载视频并编码为 base64,返回 (base64 字符串, 视频 MIME 如 'video/mp4')
 
     Args:
-        source: 视频来源，可以是 File 对象或字符串(http/https/file/base64 或本地路径)
-        file_name: 可选文件名，用于推断 MIME 类型
-        max_bytes: 最大允许下载的字节数，默认 50MB
+        source: 视频来源
+        file_name: 可选文件名,用于推断格式
+        max_bytes: 最大允许字节数,默认 50MB
 
     Returns:
-        ``(base64_data, mime_type)`` 元组：
-        - base64_data: 不带前缀的 base64 编码字符串
-        - mime_type: 视频 MIME 类型，如 ``'video/mp4'``
+        (base64 数据, 视频 MIME) 元组
 
     Raises:
-        ValueError: 下载失败或文件超过大小限制时抛出
+        ValueError: 下载失败或超过大小限制时抛出
     """
-    name, data = await resolve_file_to_bytes(source, file_name or "video", max_bytes=max_bytes)
-    mime = _detect_video_mime(_source_str(source), file_name or name)
-    return base64.b64encode(data).decode(), mime
+    return await _to_base64(source, file_name, "video", max_bytes, _detect_video_mime)
 
 
 @dataclass(frozen=True)
@@ -126,7 +165,7 @@ class MediaConvertResult:
 
     Attributes:
         data: 纯 base64 编码字符串(不含前缀)
-        fmt: 格式标识：音频为 'mp3'/'ogg'/'wav' 等，图片/视频为 MIME(如 'image/jpeg'/'video/mp4')
+        fmt: 格式标识：音频为 'mp3'/'ogg'/'wav' 等,图片/视频为 MIME(如 'image/jpeg'/'video/mp4')
         mime: 完整 MIME 类型(如 'audio/mp3'、'image/jpeg'、'video/mp4')
         converted: 是否成功转换/压缩为目标格式(True=成功, False=保持原始格式)
     """
@@ -220,11 +259,11 @@ async def transcode_audio_to_mp3(
     input_suffix: str = ".audio",
     timeout: float = TRANSCODE_TIMEOUT,
 ) -> bytes | None:
-    """将音频字节转码为 mp3(依赖 ffmpeg)，失败或未安装 ffmpeg 时返回 None
+    """将音频字节转码为 mp3(依赖 ffmpeg),失败或未安装 ffmpeg 时返回 None
 
     Args:
         data: 原始音频字节数据
-        bitrate: 目标码率，如 '128k'
+        bitrate: 目标码率,如 '128k'
         input_suffix: 输入临时文件后缀(便于 ffmpeg 识别格式)
         timeout: 转码超时秒数
 
@@ -254,7 +293,7 @@ async def transcode_video_to_mp4(
     input_suffix: str = ".video",
     timeout: float = TRANSCODE_TIMEOUT,
 ) -> bytes | None:
-    """将视频字节转码为 mp4(H.264/AAC,依赖 ffmpeg)，失败或未安装 ffmpeg 时返回 None
+    """将视频字节转码为 mp4(H.264/AAC,依赖 ffmpeg),失败或未安装 ffmpeg 时返回 None
 
     Args:
         data: 原始视频字节数据
@@ -293,17 +332,12 @@ async def url_to_audio_mp3(
     max_bytes: int = AUDIO_MAX_BYTES,
     bitrate: str = AUDIO_BITRATE,
 ) -> MediaConvertResult:
-    """下载音频并统一转换为 mp3 base64(统一格式入口)
-
-    回退链：
-    - 下载失败 -> 抛出异常(调用方捕获后回退 URL 或文本描述)
-    - ffmpeg 转码成功 → ``converted=True`` 的 ``audio/mp3`` 结果
-    - 转码失败(未安装 ffmpeg 等) → 保持原始格式 base64,``converted=False``
+    """下载音频并统一转换为 mp3 base64转码失败回退原始格式(converted=False),下载失败抛异常
 
     Args:
-        source: 音频来源(http/https/file/base64 或本地路径)
-        file_name: 可选文件名，用于推断格式
-        max_bytes: 最大允许下载字节数，默认 10MB
+        source: 音频来源
+        file_name: 可选文件名,用于推断格式
+        max_bytes: 最大允许字节数,默认 10MB
         bitrate: mp3 目标码率
 
     Returns:
@@ -315,38 +349,24 @@ async def url_to_audio_mp3(
     src = _source_str(source)
     key = make_cache_key("audio", src, file_name, f"mb={max_bytes};br={bitrate}")
 
-    async with _get_lock(key):
-        entry = await cache_get(key)
-        if entry is not None:
-            return MediaConvertResult(
-                data=entry.to_base64(),
-                fmt=entry.fmt,
-                mime=entry.mime,
-                converted=entry.converted,
-            )
-
+    async def produce() -> tuple[bytes, MediaConvertResult]:
         name, data = await resolve_file_to_bytes(source, file_name or "audio", max_bytes=max_bytes)
-
         fmt = _detect_audio_format(src, file_name or name)
-        cache_bytes: bytes = data
         if converted := await transcode_audio_to_mp3(data, bitrate=bitrate, input_suffix=f".{fmt}"):
-            result = MediaConvertResult(
+            return converted, MediaConvertResult(
                 data=base64.b64encode(converted).decode(),
                 fmt="mp3",
                 mime="audio/mp3",
                 converted=True,
             )
-            cache_bytes = converted
-        else:
-            result = MediaConvertResult(
-                data=base64.b64encode(data).decode(),
-                fmt=fmt,
-                mime=f"audio/{fmt}",
-                converted=False,
-            )
+        return data, MediaConvertResult(
+            data=base64.b64encode(data).decode(),
+            fmt=fmt,
+            mime=f"audio/{fmt}",
+            converted=False,
+        )
 
-        await cache_put(key, cache_bytes, result.fmt, result.mime, result.converted)
-        return result
+    return await _load_with_cache(key, produce)
 
 
 async def url_to_video_mp4(
@@ -357,18 +377,13 @@ async def url_to_video_mp4(
     crf: int = VIDEO_CRF,
     max_dimension: int | None = None,
 ) -> MediaConvertResult:
-    """下载视频并统一转换为 mp4 base64(统一格式入口)
-
-    回退链：
-    - 下载失败 -> 抛出异常(调用方捕获后回退 URL)
-    - ffmpeg 转码成功 → ``converted=True`` 的 ``video/mp4`` 结果
-    - 转码失败(未安装 ffmpeg 等) → 保持原始格式 base64,``converted=False``
+    """下载视频并统一转换为 mp4 base64转码失败回退原始格式(converted=False),下载失败抛异常
 
     Args:
-        source: 视频来源(http/https/file/base64 或本地路径)
-        file_name: 可选文件名，用于推断格式
-        max_bytes: 最大允许下载字节数，默认 50MB
-        crf: 转码质量参数
+        source: 视频来源
+        file_name: 可选文件名,用于推断格式
+        max_bytes: 最大允许字节数,默认 50MB
+        crf: 转码质量参数(越小越清晰)
         max_dimension: 限制视频最长边像素,None 不缩放
 
     Returns:
@@ -380,40 +395,26 @@ async def url_to_video_mp4(
     src = _source_str(source)
     key = make_cache_key("video", src, file_name, f"mb={max_bytes};crf={crf};dim={max_dimension}")
 
-    async with _get_lock(key):
-        entry = await cache_get(key)
-        if entry is not None:
-            return MediaConvertResult(
-                data=entry.to_base64(),
-                fmt=entry.fmt,
-                mime=entry.mime,
-                converted=entry.converted,
-            )
-
+    async def produce() -> tuple[bytes, MediaConvertResult]:
         name, data = await resolve_file_to_bytes(source, file_name or "video", max_bytes=max_bytes)
-
         mime = _detect_video_mime(src, file_name or name)
-        cache_bytes: bytes = data
         if converted := await transcode_video_to_mp4(
             data,
             crf=crf,
             max_dimension=max_dimension,
             input_suffix=f".{mime.split('/')[-1]}",
         ):
-            result = MediaConvertResult(
+            return converted, MediaConvertResult(
                 data=base64.b64encode(converted).decode(),
                 fmt="mp4",
                 mime="video/mp4",
                 converted=True,
             )
-            cache_bytes = converted
-        else:
-            result = MediaConvertResult(
-                data=base64.b64encode(data).decode(),
-                fmt=mime,
-                mime=mime,
-                converted=False,
-            )
+        return data, MediaConvertResult(
+            data=base64.b64encode(data).decode(),
+            fmt=mime,
+            mime=mime,
+            converted=False,
+        )
 
-        await cache_put(key, cache_bytes, result.fmt, result.mime, result.converted)
-        return result
+    return await _load_with_cache(key, produce)
