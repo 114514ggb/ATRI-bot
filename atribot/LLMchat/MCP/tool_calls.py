@@ -526,10 +526,22 @@ class ToolSchemaCache:
                 return {"anyOf": [convert_schema(s) for s in schema["anyOf"]]}
 
             result: dict[str, Any] = {}
-            if "type" in schema and schema["type"] in supported_types:
-                result["type"] = schema["type"]
+            schema_type = schema.get("type")
+            if isinstance(schema_type, list):
+                supported = [t for t in schema_type if t in supported_types]
+                if "null" in supported:
+                    result["nullable"] = True
+                    supported = [t for t in supported if t != "null"]
+                if len(supported) == 1:
+                    result["type"] = supported[0]
+                elif len(supported) > 1:
+                    result["type"] = supported
+                else:
+                    result["type"] = "null"
+            elif schema_type in supported_types:
+                result["type"] = schema_type
                 if "format" in schema and schema["format"] in supported_formats.get(
-                    result["type"], set()
+                    schema_type, set()
                 ):
                     result["format"] = schema["format"]
             else:
