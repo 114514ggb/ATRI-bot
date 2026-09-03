@@ -4,7 +4,6 @@ from typing import Optional
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
 from atribot.core.type.bot_types import atriMessageEvent
-from atribot.core.type.onebot_event_types import GroupMessageEvent
 from atribot.LLMchat.chat import GroupChat
 
 tool_json = {
@@ -45,28 +44,14 @@ tool_json = {
 
 
 async def _trigger_self(
-    group_id: int,
-    user_id:int, 
     note: str,
     message_data:atriMessageEvent
     ) -> None:
     """定时触发时执行的协程"""
-    import time
-    inner_event = GroupMessageEvent(
-        user_id=user_id,
-        group_id=group_id,
-        self_id=0,
-        message_id=0,
-        time=int(time.time()),
-        segments=[],
-        raw_message="",
-        sender={},
-    )
     group_chat = container.get_by_type(GroupChat)
     await group_chat.trigger_internal_thought(
         custom_prompt=note,
-        event=inner_event,
-        send_client=message_data.send_client,
+        event=message_data
     )
 
 
@@ -96,9 +81,7 @@ async def main(
         func=_trigger_self,
         trigger_delta=total_seconds,
         timeout=120.0,
-        kwargs={
-            "group_id": group_id, 
-            "user_id":message_data.user_id, 
+        kwargs={ 
             "note": note,
             "message_data":message_data,
         },
