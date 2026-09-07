@@ -849,6 +849,18 @@ class GroupChat(ChatBasics):
                 message_builder.add_text("<引用消息段>")
         
         if quote_message:
+            quoted_ev = quote_message.event
+            quoted_sender = quoted_ev.sender if hasattr(quoted_ev, "sender") else {}
+            quoted_uid = getattr(quoted_ev, "user_id", None)
+            quoted_nick = quoted_sender.get("nickname") or (str(quoted_uid) if quoted_uid else "未知")
+            quoted_role = quoted_sender.get("role")
+            quoted_time = quoted_ev._fmt_time() if hasattr(quoted_ev, "_fmt_time") else ""
+            message_builder.add_text(
+                f"被引用消息 发送者:<user_id>{quoted_uid}</user_id>"
+                f"<nick_name>{quoted_nick}</nick_name>"
+                f"<group_role>{quoted_role or 'friend'}</group_role>"
+                f"<time>{quoted_time}</time>\n"
+            )
             await append_segments(quote_message.event.segments)
             
             message_builder.add_text("</引用消息段>")
