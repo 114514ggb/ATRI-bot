@@ -298,20 +298,11 @@ class ChatBasics(ABC):
                     f"time=\"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(quoted_event.time))}\" "
                     f"message_id=\"{quoted_event.message_id}\">"
                 )
-                quoted_event = quote_message.event
-                quoted_sender = quoted_event.sender or {}
-                message_builder.add_text(
-                    f"<quoted_message user_id=\"{quoted_event.user_id}\" "
-                    f"nickname=\"{quoted_sender.get('nickname', '')}\" "
-                    f"time=\"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(quoted_event.time))}\" "
-                    f"message_id=\"{quoted_event.message_id}\">"
-                )
             else:
                 message_builder.add_text("<引用消息段>[引用消息解析失败]</引用消息段>")
 
         if quote_message:
             await append_segments(quote_message.event.segments)
-            message_builder.add_text("</quoted_message></引用消息段>")
             message_builder.add_text("</quoted_message></引用消息段>")
             await append_segments(event.event.segments[1:])
         else:
