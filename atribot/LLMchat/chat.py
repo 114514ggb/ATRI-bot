@@ -9,8 +9,8 @@ from typing import Coroutine, Dict, List
 from atribot.common_utils import (
     download_text,
     extract_json_from_text,
+    fetch_audio_mp3,
     fetch_image_jpeg,
-    url_to_audio_mp3,
     url_to_video_mp4,
 )
 from atribot.core.atri_config import atriConfig
@@ -216,7 +216,11 @@ class ChatBasics(ABC):
             async def dispose_audio(segment: RecordSegment) -> None:
                 audio_url = segment.url or segment.file.file
                 try:
-                    result = await url_to_audio_mp3(audio_url, segment.file_name)
+                    result = await fetch_audio_mp3(
+                        audio_url,
+                        file_name=segment.file_name,
+                        send_client=event.send_client,
+                    )
                     message_builder.add_audio(result.data, result.fmt)
                 except Exception as e:
                     self.log.warning(f"音频下载失败，降级为文本识别: {e}")
@@ -286,12 +290,20 @@ class ChatBasics(ABC):
         if isinstance(Segment, ReplySegment):
             if quote_message := await event.send_client.get_msg_details(Segment.message_id):
                 message_builder.add_text("<引用消息段>")
+                quoted_event = quote_message.event
+                quoted_sender = quoted_event.sender or {}
+                message_builder.add_text(
+                    f"<quoted_message user_id=\"{quoted_event.user_id}\" "
+                    f"nickname=\"{quoted_sender.get('nickname', '')}\" "
+                    f"time=\"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(quoted_event.time))}\" "
+                    f"message_id=\"{quoted_event.message_id}\">"
+                )
             else:
                 message_builder.add_text("<引用消息段>[引用消息解析失败]</引用消息段>")
 
         if quote_message:
             await append_segments(quote_message.event.segments)
-            message_builder.add_text("</引用消息段>")
+            message_builder.add_text("</quoted_message></引用消息段>")
             await append_segments(event.event.segments[1:])
         else:
             await append_segments(event.event.segments)
@@ -711,170 +723,6 @@ class GroupChat(ChatBasics):
 
         return message_builder
 
-    async def append_message_segments_prompt(
-        self, 
-        event: MessageEventEnvelope,
-        message_builder: MessageBuilder,
-        including_pictures: bool,
-        including_audios: bool = False,
-        including_videos: bool = False,
-    ) -> None:
-        """为当前用户输入附加结构化的消息片段
-
-        Args:
-            event: 当前传入的聊天消息事件
-            message_builder: 用于附加内容的提示构建器
-            including_pictures: 目标模型是否能够接收图像
-            including_audios: 目标模型是否能够接收音频
-            including_videos: 目标模型是否能够接收视频
-        """
-        
-        Segment = event.event.segments[0]
-
-        message_builder.add_text(
-            f"最新用户消息:\n<MESSAGE>"
-            f"<user_id>{event.user_id}</user_id>"
-            f"<nick_name>{event.event.sender['nickname']}</nick_name>"
-            f"<group_role>{event.event.sender['role']}</group_role>"
-            f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-            f"<message_id>{event.event.message_id}</message_id>"
-            "<user_message>"
-        )
-        
-        if including_pictures:
-            async def dispose_img(message:ImageSegment):
-                """给自己解析图像"""
-                try:
-                    result = await fetch_image_jpeg(
-                        message.url,
-                        file_name=message.file_name,
-                        send_client=event.send_client,
-                    )
-                    message_builder.add_image_base64(result.data, result.mime)
-                except Exception as e:
-                    self.log.warning(f"图片处理失败 url={message.url}: {e}")
-                    message_builder.add_text("[CQ:image,summary=图片下载出现问题]")
-        else:
-            async def dispose_img(message:ImageSegment):
-                """交给其他模型识别图像转换文字"""
-                if message.text_description:
-                    desc = message.text_description
-                else:
-                    desc = await self.media_processor.image_to_text(
-                        message.url,
-                        file_name=message.file_name,
-                        send_client=event.send_client,
-                    )
-                    message.text_description = desc
-                    self.log.info(f"输入图片描述:{desc}]")
-                message_builder.add_text(f"[CQ:image,summary:{desc}]")
-
-        if including_audios:
-            async def dispose_audio(segment: RecordSegment) -> None:
-                """直接将音频以 mp3 base64 嵌入，下载失败时降级为文本识别"""
-                audio_url = segment.url or segment.file.file
-                try:
-                    result = await url_to_audio_mp3(audio_url, segment.file_name)
-                    message_builder.add_audio(result.data, result.fmt)
-                except Exception as e:
-                    self.log.warning(f"音频下载失败，降级为文本识别: {e}")
-                    if segment.text_description:
-                        desc = segment.text_description
-                    else:
-                        desc = await self.media_processor.audio_to_text(audio_url)
-                        segment.text_description = desc
-                    message_builder.add_text(f"[CQ:record,summary:{desc}]")
-        else:
-            async def dispose_audio(segment: RecordSegment) -> None:
-                """交给其他模型将音频转为文字"""
-                audio_url = segment.url or segment.file.file
-                if segment.text_description:
-                    desc = segment.text_description
-                else:
-                    desc = await self.media_processor.audio_to_text(audio_url)
-                    segment.text_description = desc
-                    self.log.info(f"音频识别:{desc}]")
-                message_builder.add_text(f"[CQ:record,summary:{desc}]")
-
-        if including_videos:
-            async def dispose_video(segment: VideoSegment) -> None:
-                """将视频转为 mp4 base64,失败时直接传入视频 URL 供模型理解"""
-                video_url = segment.url or segment.file.file
-                try:
-                    result = await url_to_video_mp4(video_url, segment.file_name)
-                    message_builder.add_video_base64(result.data, result.mime)
-                except Exception as e:
-                    self.log.warning(f"视频处理失败 url={video_url}: {e}")
-                    message_builder.add_video(video_url)
-        else:
-            async def dispose_video(segment: VideoSegment) -> None:
-                """交给其他模型将视频转为文字"""
-                video_url = segment.url or segment.file.file
-                if segment.text_description:
-                    desc = segment.text_description
-                else:
-                    desc = await self.media_processor.video_to_text(video_url)
-                    segment.text_description = desc
-                    self.log.info(f"视频识别结果:{desc}")
-                message_builder.add_text(f"[CQ:video,summary:{desc}]")
-
-        async def append_segments(segments) -> None:
-            """用来统一处理对各种不同类型的消息段的加入"""
-            for segment in segments:
-                if isinstance(segment, FileMessageSegment):
-                    if isinstance(segment, ImageSegment):
-                        await dispose_img(segment)
-                        continue
-                    if isinstance(segment, RecordSegment):
-                        await dispose_audio(segment)
-                        continue
-                    if isinstance(segment, VideoSegment):
-                        await dispose_video(segment)
-                        continue
-                    if isinstance(segment, FileSegment):
-                        if file_extension := segment.file_name.split('.')[-1].lower():
-                            if file_extension in IMAGE_EXTENSIONS:
-                                await dispose_img(segment)
-                                continue
-                            elif file_extension in TEXT_EXTENSIONS:
-                                message_builder.add_text(f"[CQ:file,file={segment.file_name},content={await download_text(segment.url)}]")
-                                continue
-                
-                message_builder.add_text(segment.__str__())
-        
-        quote_message = None
-        
-        if isinstance(Segment,ReplySegment):
-            if quote_message := await event.send_client.get_msg_details(Segment.message_id):
-                message_builder.add_text("<引用消息段>")
-        
-        if quote_message:
-            await append_segments(quote_message.event.segments)
-            
-            message_builder.add_text("</引用消息段>")
-            
-            await append_segments(event.event.segments[1:])
-
-        else:
-            await append_segments(event.event.segments)
-        
-        message_builder.add_text("</user_message></MESSAGE>")
-        
-        if memory := [
-            (
-                f"user:{r[0]}",
-                f"group:{r[1]}",
-                datetime.datetime.fromtimestamp(r[2]).strftime("%Y-%m-%d %H:%M:%S"),
-                r[2],
-                f"可信度:{r[3]}"
-            ) 
-            for r in await self.memory_system.query_recently_memory(
-                text = event.event.pure_text,
-                limit = 10
-            )
-        ] if len(event.event.pure_text) >= 5 else False:#文本长度要大于一个值不然大概率没什么意义
-            message_builder.add_text(f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>")
-    
     async def reply_conduct(self, response_json:Dict, event:MessageEventEnvelope)->None:
         
         self.log.info(f"LLM决定回复消息理由:{response_json.get("reason")}")

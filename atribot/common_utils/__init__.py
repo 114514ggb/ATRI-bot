@@ -11,6 +11,7 @@ from .file.image_utils import (
 )
 from .file.media_utils import (
     MediaConvertResult,
+    fetch_audio_mp3,
     url_to_audio_base64,
     url_to_audio_mp3,
     url_to_video_base64,
@@ -45,6 +46,7 @@ __all__ = [
     "download_text",
     "estimate_tokens",
     "extract_json_from_text",
+    "fetch_audio_mp3",
     "fetch_image_jpeg",
     "format_duration",
     "format_memory_records",

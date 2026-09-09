@@ -1850,7 +1850,7 @@ class MessageSentEvent(MessageEvent):
             self_id=data.get("self_id", 0),
             message_id=data.get("message_id", 0),
             user_id=data.get("user_id", 0),
-            group_id = data.get("group_id", 0),
+            group_id = data.get("group_id", None),
             segments=parse_onebot_segments(data.get("message", [])),
             raw_message=data.get("raw_message", ""),
             sender=data.get("sender", {}),

@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Awaitable, Callable
+from typing import TYPE_CHECKING, Awaitable, Callable
 
 from atribot.common_utils.file.file_utils import resolve_file_to_bytes
 from atribot.common_utils.file.media_cache import (
@@ -16,12 +16,21 @@ from atribot.common_utils.file.media_cache import (
 )
 from atribot.core.type.chat_message_types import File
 
+if TYPE_CHECKING:
+    from atribot.core.platform.send_client import SendClientBase
+
 AUDIO_MAX_BYTES = 10 * 1024 * 1024   # 10MB
 VIDEO_MAX_BYTES = 50 * 1024 * 1024   # 50MB
 AUDIO_BITRATE = "128k"               # 音频统一转码码率
-VIDEO_CRF = 28                       # 视频统一转码质量(CRF, 越小越清晰)
+VIDEO_CRF = 28                       # 视频统一转码质量(CRF)
 VIDEO_AUDIO_BITRATE = "128k"         # 视频中音轨码率
 TRANSCODE_TIMEOUT = 60.0             # ffmpeg 转码超时(秒)
+
+_MAX_DOWNLOAD_RETRIES: int = 2
+"""截断/损坏下载的最大重试次数"""
+
+_GET_RECORD_MAX_BYTES: int = 1024 * 1024
+"""通过 get_recordg API 获取音频的原始体积上限"""
 
 _AUDIO_FORMAT_MAP: dict[str, str] = {
     "mp3": "mp3",
@@ -97,6 +106,35 @@ async def _load_with_cache(
         cache_bytes, result = await produce()
         await cache_put(key, cache_bytes, result.fmt, result.mime, result.converted)
         return result
+
+
+async def _download_with_retry(
+    source: str | File,
+    default_name: str,
+    max_bytes: int,
+) -> tuple[str, bytes]:
+    """下载媒体字节,截断/损坏时自动重试(类比图片 url_to_image_jpeg)
+
+    Args:
+        source: 媒体来源
+        default_name: 无文件名时的默认名
+        max_bytes: 最大允许字节数
+
+    Returns:
+        (文件名, 二进制数据)
+
+    Raises:
+        Exception: 重试耗尽后仍失败时抛出
+    """
+    for attempt in range(_MAX_DOWNLOAD_RETRIES + 1):
+        try:
+            return await resolve_file_to_bytes(source, default_name, max_bytes=max_bytes)
+        except ValueError as exc:
+            # 仅对"下载不完整/截断"类错误重试,其余直接抛出
+            if attempt < _MAX_DOWNLOAD_RETRIES and "不完整" in str(exc):
+                await asyncio.sleep(0.5)
+                continue
+            raise
 
 
 async def url_to_audio_base64(
@@ -350,9 +388,13 @@ async def url_to_audio_mp3(
     key = make_cache_key("audio", src, file_name, f"mb={max_bytes};br={bitrate}")
 
     async def produce() -> tuple[bytes, MediaConvertResult]:
-        name, data = await resolve_file_to_bytes(source, file_name or "audio", max_bytes=max_bytes)
+        name, data = await _download_with_retry(
+            source, file_name or "audio", max_bytes=max_bytes
+        )
         fmt = _detect_audio_format(src, file_name or name)
-        if converted := await transcode_audio_to_mp3(data, bitrate=bitrate, input_suffix=f".{fmt}"):
+        if converted := await transcode_audio_to_mp3(
+            data, bitrate=bitrate, input_suffix=f".{fmt}"
+        ):
             return converted, MediaConvertResult(
                 data=base64.b64encode(converted).decode(),
                 fmt="mp3",
@@ -396,7 +438,9 @@ async def url_to_video_mp4(
     key = make_cache_key("video", src, file_name, f"mb={max_bytes};crf={crf};dim={max_dimension}")
 
     async def produce() -> tuple[bytes, MediaConvertResult]:
-        name, data = await resolve_file_to_bytes(source, file_name or "video", max_bytes=max_bytes)
+        name, data = await _download_with_retry(
+            source, file_name or "video", max_bytes=max_bytes
+        )
         mime = _detect_video_mime(src, file_name or name)
         if converted := await transcode_video_to_mp4(
             data,
@@ -418,3 +462,69 @@ async def url_to_video_mp4(
         )
 
     return await _load_with_cache(key, produce)
+
+
+async def fetch_audio_mp3(
+    source: str | File,
+    *,
+    file_name: str | None = None,
+    send_client: "SendClientBase | None" = None,
+    max_bytes: int = AUDIO_MAX_BYTES,
+    bitrate: str = AUDIO_BITRATE,
+) -> MediaConvertResult:
+    """获取音频并统一转换为 mp3 base64
+
+    提供 send_client 和 file_name 时优先走 get_recordg API(仅小音频)；失败或音频过大则回退下载
+
+    Args:
+        source: 音频来源(File 或字符串)
+        file_name: 音频文件名
+        send_client: 发送客户端,用于 get_recordg_details
+        max_bytes: 回退路径最大下载字节数,默认 10MB
+        bitrate: mp3 目标码率
+
+    Returns:
+        MediaConvertResult
+
+    Raises:
+        Exception: 两条路径均失败时抛出
+    """
+    if send_client is not None and file_name:
+        src = _source_str(source)
+        key = make_cache_key("audio", src, file_name, f"mb={max_bytes};br={bitrate}")
+
+        async def produce_via_details() -> tuple[bytes, MediaConvertResult]:
+            details = await send_client.get_recordg_details(
+                file=src, file_id=file_name, out_format="mp3"
+            )
+            if not details or not details.get("base64"):
+                raise ValueError("get_recordg 无 base64")
+            raw_bytes = base64.b64decode(details["base64"])
+            if len(raw_bytes) > _GET_RECORD_MAX_BYTES:
+                raise ValueError("音频过大,回退下载")
+            converted = await transcode_audio_to_mp3(raw_bytes, bitrate=bitrate)
+            if converted:
+                return converted, MediaConvertResult(
+                    data=base64.b64encode(converted).decode(),
+                    fmt="mp3",
+                    mime="audio/mp3",
+                    converted=True,
+                )
+            return raw_bytes, MediaConvertResult(
+                data=base64.b64encode(raw_bytes).decode(),
+                fmt="mp3",
+                mime="audio/mp3",
+                converted=False,
+            )
+
+        try:
+            return await _load_with_cache(key, produce_via_details)
+        except Exception:
+            pass  # 回退到 url_to_audio_mp3
+
+    return await url_to_audio_mp3(
+        source,
+        file_name=file_name,
+        max_bytes=max_bytes,
+        bitrate=bitrate,
+    )

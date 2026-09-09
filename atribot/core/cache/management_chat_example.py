@@ -163,7 +163,7 @@ class ChatManager(ServiceBase):
         ev = msg.event
         group_id = msg.group_id
 
-        if group_id is not None:
+        if group_id:
             ctx = await self.get_group_context(group_id)
             ctx.time_window.add()
             msg._extra["group_context"] = ctx
@@ -185,7 +185,7 @@ class ChatManager(ServiceBase):
         group_id = msg.group_id
         memory_system = container.get_by_type(MemorySystem)
 
-        if group_id is not None:
+        if group_id:
             context_obj:GroupContext
             async with context_obj.summarizing() as ctx:
                 if ctx is not None:
@@ -499,7 +499,7 @@ class ChatManager(ServiceBase):
         Returns:
             需要总结时返回 (消息文本, 上下文对象)
         """
-        if msg.group_id is not None:
+        if msg.group_id:
             group_context = msg._extra["group_context"]
 
             if isinstance(msg.event, MessageSentEvent):
