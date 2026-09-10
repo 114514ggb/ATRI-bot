@@ -275,14 +275,18 @@ class ChatBasics(ABC):
                         await dispose_audio(segment)
                         continue
                     if isinstance(segment, FileSegment):
-                        if file_extension := segment.file_name.split('.')[-1].lower():
+                        if segment.file_name and (
+                            file_extension := segment.file_name.split('.')[-1].lower()
+                        ):
                             if file_extension in IMAGE_EXTENSIONS:
                                 await dispose_img(segment)
                                 continue
-                            elif file_extension in TEXT_EXTENSIONS:
-                                message_builder.add_text(f"[CQ:file,file={segment.file_name},content={await download_text(segment.url)}]")
+                            elif file_extension in TEXT_EXTENSIONS and segment.url:
+                                message_builder.add_text(
+                                    f"[CQ:file,file={segment.file_name},content={await download_text(segment.url)}]"
+                                )
                                 continue
-                            
+
                 message_builder.add_text(segment.__str__())
 
         quote_message = None
@@ -321,7 +325,7 @@ class ChatBasics(ABC):
                     f"可信度:{r[3]}",
                 )
                 for r in await self.memory_system.query_user_recently_memory(
-                    user=event.user_id,
+                    user_id=event.user_id,
                     text=event.event.pure_text,
                     limit=10,
                 )

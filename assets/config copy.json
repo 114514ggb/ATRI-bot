@@ -103,19 +103,27 @@
         "image":"atri-sandbox:latest"
     },
     "tool_presets": {
-        "group_chat": [
-            "web_search", "web_extract",
-            "memory_search", "memory_storage",
-            "run_python_code",
-            "run_command",
-            "send_file","add_file",
-            "send_image_message",
-            "load_skill_prompt", "get_user_info",
-            "schedule_self_trigger", "sub_agent"
-        ],
+        "group_chat": {
+            "default": [
+                "web_search", 
+                "memory_search", "memory_storage",
+                "load_skill_prompt",
+                "tool_search", "sub_agent"
+            ],
+            "deferred": [
+                "run_python_code",
+                "run_command", "web_extract",
+                "get_user_info",
+                "set_group_ban",
+                "send_file","add_file",
+                "send_image_message","send_speech_message",
+                "schedule_self_trigger"
+            ]
+        },
         "private_chat": [
             "web_search", "memory_search",
-            "load_skill_prompt", "get_user_info"
+            "load_skill_prompt",
+            "tool_search"
         ],
         "agency_Agent": [
             "run_command",

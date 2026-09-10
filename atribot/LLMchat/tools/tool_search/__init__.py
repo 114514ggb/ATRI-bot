@@ -1,4 +1,4 @@
-"""tool_search 工具：搜索待发现工具并启用（抛约定错误交由 tool_calls_while 处理）"""
+from atribot.core.type.context_types import ToolSearchRequested
 
 tool_json = {
     "name": "tool_search",
@@ -37,8 +37,6 @@ async def main(query: str, limit: int = 1) -> str:
     Returns:
         不会正常返回（始终抛出 ToolSearchRequested）
     """
-    from atribot.core.type.context_types import ToolSearchRequested
-
     try:
         limit = max(1, int(limit))
     except (TypeError, ValueError):
