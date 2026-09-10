@@ -166,7 +166,7 @@ class BotFramework:
         @bus.on_message(priority=100)
         async def on_chat(event:atriMessageEvent):
             try:
-                if group_context := event._extra["group_context"]:
+                if group_context := event._extra.get("group_context"):
                     event.stop_propagation = await _initiative_chat.decision(event, group_context)
             except Exception as e:
                 log.exception("聊天处理失败: %s", e)
