@@ -387,3 +387,47 @@ class SendClientBase(ABC):
             nickname: 发送者昵称
         """
         raise NotImplementedError(f"{type(self).__name__} 未实现 send_group_merge_forward")
+
+    async def send_private_merge_text(
+        self,
+        qq_id: int,
+        message: str,
+        source: str = "ATRI",
+        preview: str = "ATRI:点击查看消息",
+        user_id: int = 3889393615,
+        nickname: str = "ATRI-亚托莉",
+    ) -> dict | None:
+        """发送私聊合并转发消息(单文本)
+
+        将单条文本包装为合并转发消息发送，用于防止长消息刷屏。
+
+        Args:
+            qq_id: 目标用户 QQ
+            message: 消息内容
+            source: 消息来源标题
+            preview: 预览文本
+            user_id: 发送者 QQ(用于合并转发节点)
+            nickname: 发送者昵称
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_private_merge_text")
+
+    async def send_private_merge_forward(
+        self,
+        qq_id: int,
+        input_messages: list[list[dict]],
+        source: str = "ATRI",
+        preview: str = "ATRI:点击查看消息",
+        user_id: int = 3889393615,
+        nickname: str = "ATRI-亚托莉",
+    ) -> dict | None:
+        """发送私聊合并转发消息(多节点)
+
+        Args:
+            qq_id: 目标用户 QQ
+            input_messages: 多条消息内容，每条为 OneBot 消息段列表
+            source: 消息来源标题
+            preview: 预览文本
+            user_id: 发送者 QQ(用于合并转发节点)
+            nickname: 发送者昵称
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_private_merge_forward")

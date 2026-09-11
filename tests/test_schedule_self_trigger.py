@@ -369,8 +369,12 @@ async def test_run_without_chat_service_does_not_raise(
 
     monkeypatch.setattr(scheduler, "_rebuild_event", lambda rec: object())
 
+    original_get_by_type = ts.container.get_by_type
+
     def _raise_not_found(cls: type) -> Any:
-        raise ValueError("not found")
+        if cls in (GroupChat, PrivateChat):
+            raise ValueError("not found")
+        return original_get_by_type(cls)
 
     monkeypatch.setattr(ts.container, "get_by_type", _raise_not_found)
 

@@ -6,12 +6,14 @@ from typing import List, Optional, Union
 
 import aiohttp
 
+from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
 
 
 class pictureProcessing:
     
     API_TOKEN = "sk_UqXz8BbTGFwO8YRfpfDdleZoBJxRopJp"
+    #对是我的那个请温柔点，不想用的话可以去 https://pollinations.ai/ 申请一个
     
     HEADERS = {
         "Authorization": f"Bearer {API_TOKEN}",
@@ -124,7 +126,7 @@ class pictureProcessing:
     
         last_exception = None
         
-        session:aiohttp.ClientSession = container.get("HTTPClient").session
+        session = container.get_by_type(HTTPClient).session
         for _ in range(3):
             try:
                 async with session.get(url, params=params, headers=cls.HEADERS, timeout=timeout) as response:

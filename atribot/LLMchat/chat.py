@@ -101,6 +101,13 @@ class ChatBasics(ABC):
         
         self.template_request_simplify :GenerationRequestSimplify
         """构建请求缓存"""
+        
+        self.decision_function:Dict[str,Coroutine[Dict]] = {
+            "speak" : self.reply_conduct,
+            "update" : self.update_conduct,
+            "silence" : self.silence_conduct,
+            # "use_tools" : self.use_tools_conduct,
+        }
 
     def _prepare_round_toolset(self) -> ToolSet | None:
         """为当前对话轮次创建独立的工具集合副本
@@ -133,6 +140,13 @@ class ChatBasics(ABC):
     ) -> None:
         """系统内部触发思考的入口"""
 
+    async def reply_conduct(self, response_json: Dict, event: MessageEventEnvelope):
+        """发送消息"""
+        ...
+    
+    async def use_tools_conduct(self, response_json:Dict, event:MessageEventEnvelope)->None:
+        self.log.info(f"LLM决定调用工具理由:{response_json.get("reason")}")
+
     async def update_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """更新用户信息（通用）"""
         self.log.info(f"LLM决定更新用户信息理由:{response_json.get('reason')}")
@@ -163,6 +177,82 @@ class ChatBasics(ABC):
     async def silence_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """保持沉默（通用）"""
         self.log.info(f"LLM决定静默理由:{response_json.get('reason')}")
+
+    async def _dispatch_response_actions(
+        self,
+        response: GenerationResponse,
+        event: MessageEventEnvelope,
+        uid: str,
+    ) -> bool:
+        """解析并分发模型返回的 action 决策
+
+        支持两种响应结构:
+        - {"actions": [{...}, ...]}: 逐个分发列表中的 action
+        - {"decision": ...}: 整体作为单个 action 分发
+
+        Returns:
+            是否至少执行了一个有效 action
+        """
+        executed = False
+
+        async def execute_action(action: dict) -> None:
+            nonlocal executed
+            if decision := action.get("decision"):
+
+                if fun := self.decision_function.get(decision):
+
+                    await fun(action, event)
+                    executed = True
+
+                else:
+                    self.log.error(f"[{uid}]无效decision:{action}")
+
+            else:
+                self.log.error(f"[{uid}]返回json错误:{action}")
+
+        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
+
+            if isinstance(response_json, dict):
+
+                if response_list := response_json.get("actions"):
+
+                    for action in response_list:
+
+                        await execute_action(action)
+
+                else:
+                    await execute_action(response_json)
+
+            elif response_json:
+                self.log.error(f"[{uid}]返回json解析不正确:{type(response_json)}")
+
+        return executed
+
+    async def _send_unparseable_fallback(
+        self,
+        event: MessageEventEnvelope,
+        raw_text: str,
+    ) -> None:
+        """整轮响应无任何有效 action 时，向用户发送兜底提示
+
+        群聊与私聊均使用合并转发消息，防止长消息刷屏
+        """
+        message = f"模型返回无法解析的格式:\n{raw_text}"
+        try:
+            if event.group_id:
+                await event.send_client.send_group_merge_text(
+                    group_id=event.group_id,
+                    message=message,
+                    source="模型返回无法解析的格式",
+                )
+            else:
+                await event.send_client.send_private_merge_text(
+                    qq_id=event.user_id,
+                    message=message,
+                    source="模型返回无法解析的格式",
+                )
+        except Exception as e:
+            self.log.error(f"发送'模型返回无法解析的格式'兜底消息失败: {e}")
 
     async def append_message_segments_prompt(
         self,
@@ -390,13 +480,6 @@ class GroupChat(ChatBasics):
             audio_sense=self.audio_sense,
         )
         
-        self.decision_function:Dict[str,Coroutine[Dict]] = {
-            "speak" : self.reply_conduct,
-            "update" : self.update_conduct,
-            "silence" : self.silence_conduct,
-            # "use_tools" : self.use_tools_conduct,
-        }
-        
         if self.config.model.connect.user_global_context:
             self.get_context = lambda group_id,user_id : self.chat_manager.get_private_context(user_id)
         else:
@@ -454,40 +537,9 @@ class GroupChat(ChatBasics):
         )
 
         self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
-        
-        async def execute_response_json(response_json:dict):
-            if decision := response_json.get("decision"):
-                
-                if fun := self.decision_function.get(decision):
-                    
-                    await fun(response_json, event)
-                    
-                else:
-                    self.log.error(f"[{uid}]无效decision:{response_json}")
-                
-            else:
-                self.log.error(f"[{uid}]返回json错误:{response_json}")
-        
-        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
-            
-            if isinstance(response_json, dict):
-                
-                if response_list := response_json.get("actions"):
-                
-                    for response_json in response_list:
-                        
-                        await execute_response_json(response_json)
-                        
-                else:
-                    await execute_response_json(response_json)
-                    
-            elif response_json:
-                self.log.error(f"返回json解析不正确:{type(response_json)}")
-                # await event.send_client.send_group_merge_text(
-                #     group_id = group_id,
-                #     message = f"{response_json}",
-                #     source = "模型返回无法解析的格式",
-                # )
+
+        if not await self._dispatch_response_actions(response, event, uid):
+            await self._send_unparseable_fallback(event, "".join(response.reply_text))
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
         original_context.add_user_message(f"{prompt}\n最新用户消息:{event.llm_formatted_message}")
@@ -601,27 +653,9 @@ class GroupChat(ChatBasics):
         )
 
         self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
-        
-        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
-            
-            if isinstance(response_json, dict):
-                
-                for response_json in response_json.get("actions",[]):
-                    
-                    response_json:dict[str,str|int]
-                    if decision := response_json.get("decision"):
-                        
-                        if fun := self.decision_function.get(decision):
-                            
-                            await fun(response_json, event)
-                            
-                        else:
-                            self.log.error(f"[{uid}]无效decision:{response_json}")
-                        
-                    else:
-                        self.log.error(f"[{uid}]返回json错误:{response_json}")
-            else:
-                self.log.error(f"返回json解析不正确:{type(response_json)}")
+
+        if not await self._dispatch_response_actions(response, event, uid):
+            await self._send_unparseable_fallback(event, "".join(response.reply_text))
 
         original_context.add_user_message(prompt)
         original_context.extend(
@@ -743,9 +777,6 @@ class GroupChat(ChatBasics):
             since_llm = since,
             send_client=event.send_client,
         )
-    
-    async def use_tools_conduct(self, response_json:Dict, event:MessageEventEnvelope)->None:
-        self.log.info(f"LLM决定调用工具理由:{response_json.get("reason")}")
 
     async def _request_model_with_fallback_(
         self,
@@ -1036,23 +1067,8 @@ class PrivateChat(ChatBasics):
         uid: str,
     ) -> None:
         """分发私聊模型返回的 action 决策"""
-        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
-            if isinstance(response_json, dict):
-                for action in response_json.get("actions", []):
-                    action: dict[str, str | int]
-                    if decision := action.get("decision"):
-                        if decision == "speak":
-                            await self._private_speak_conduct(action, event)
-                        elif decision == "update":
-                            await self.update_conduct(action, event)
-                        elif decision == "silence":
-                            await self.silence_conduct(action, event)
-                        else:
-                            self.log.error(f"[{uid}]无效decision:{action}")
-                    else:
-                        self.log.error(f"[{uid}]返回json错误:{action}")
-            else:
-                self.log.error(f"[{uid}]返回json解析不正确:{type(response_json)}")
+        if not await self._dispatch_response_actions(response, event, uid):
+            await self._send_unparseable_fallback(event, "".join(response.reply_text))
 
     async def trigger_internal_thought(
         self,
@@ -1187,7 +1203,7 @@ class PrivateChat(ChatBasics):
         )
         return message_builder
 
-    async def _private_speak_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
+    async def reply_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """发送消息决定"""
         self.log.info(f"私聊LLM决定回复 理由:{response_json.get('reason')}")
         await self.send_reply_message_separator(
