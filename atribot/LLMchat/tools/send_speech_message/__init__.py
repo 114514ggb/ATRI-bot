@@ -25,13 +25,23 @@ tool_json = {
     }
 }
 
-async def main(text: str, message_data: atriMessageEvent, emotion: str = "高兴", speed: float = 0.9) -> str:
+async def main(text: str, message_data: atriMessageEvent, emotion: str = "高兴", speed: float | str = 0.9) -> str:
     """发送语音消息"""
+    try:
+        speed = float(speed)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"语速参数无效,需为 0.6~1.65 的数字,当前值: {speed!r}") from e
+
     audio_path = await tts_main.get_tts_path(
         text = text,
         emotion = emotion,
         speed = speed
     )
-    await message_data.send_client.send_group_audio(message_data.group_id, audio_path, default=True)
+    if message_data.group_id is not None:
+        await message_data.send_client.send_group_audio(message_data.group_id, audio_path, default=True)
+    else:
+        await message_data.send_client.send_personal_audio(
+            message_data.user_id, audio_path, default=True, local_Path_type=True
+        )
 
     return f"已发送语音：{text}"

@@ -19,8 +19,8 @@ from atribot.core.type.chat_message_types import File
 if TYPE_CHECKING:
     from atribot.core.platform.send_client import SendClientBase
 
-AUDIO_MAX_BYTES = 10 * 1024 * 1024   # 10MB
-VIDEO_MAX_BYTES = 50 * 1024 * 1024   # 50MB
+AUDIO_MAX_BYTES = 50 * 1024 * 1024   
+VIDEO_MAX_BYTES = 200 * 1024 * 1024 
 AUDIO_BITRATE = "128k"               # 音频统一转码码率
 VIDEO_CRF = 28                       # 视频统一转码质量(CRF)
 VIDEO_AUDIO_BITRATE = "128k"         # 视频中音轨码率
@@ -147,7 +147,7 @@ async def url_to_audio_base64(
     Args:
         source: 音频来源
         file_name: 可选文件名,用于推断格式
-        max_bytes: 最大允许字节数,默认 10MB
+        max_bytes: 最大允许字节数,默认 50MB
 
     Returns:
         (base64 数据, 音频格式) 元组
@@ -186,7 +186,7 @@ async def url_to_video_base64(
     Args:
         source: 视频来源
         file_name: 可选文件名,用于推断格式
-        max_bytes: 最大允许字节数,默认 50MB
+        max_bytes: 最大允许字节数,默认 200MB
 
     Returns:
         (base64 数据, 视频 MIME) 元组
@@ -375,7 +375,7 @@ async def url_to_audio_mp3(
     Args:
         source: 音频来源
         file_name: 可选文件名,用于推断格式
-        max_bytes: 最大允许字节数,默认 10MB
+        max_bytes: 最大允许字节数,默认 50MB
         bitrate: mp3 目标码率
 
     Returns:
@@ -424,7 +424,7 @@ async def url_to_video_mp4(
     Args:
         source: 视频来源
         file_name: 可选文件名,用于推断格式
-        max_bytes: 最大允许字节数,默认 50MB
+        max_bytes: 最大允许字节数,默认 200MB
         crf: 转码质量参数(越小越清晰)
         max_dimension: 限制视频最长边像素,None 不缩放
 
@@ -480,7 +480,7 @@ async def fetch_audio_mp3(
         source: 音频来源(File 或字符串)
         file_name: 音频文件名
         send_client: 发送客户端,用于 get_recordg_details
-        max_bytes: 回退路径最大下载字节数,默认 10MB
+        max_bytes: 回退路径最大下载字节数,默认 50MB
         bitrate: mp3 目标码率
 
     Returns:

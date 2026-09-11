@@ -42,14 +42,15 @@ class TTSService:
             self.relative_output_prefix = Path("TTS_output/output")
             self._initialized = True
 
-    async def get_tts_path(self, text: str, emotion: str = "高兴", speed: float = 1) -> Path:
+    async def get_tts_path(self, text: str, emotion: str = "高兴", speed: float = 0.9) -> Path:
         """TTS文本合成语音
-        
+
         Args:
             text (str): 需要合成的文本,支持中日英韩，但是目前不要输入韩文
             emotion (str): 音频的情感,枚举值：高兴,机械,平静
-            speed (float): 语速,取值范围0.6~1.65,默认1
-            
+            speed (float | str): 语速,取值范围0.6~1.65,默认0.9;
+                兼容字符串数字(如 LLM 输出的 "1.0"),非法值抛出 ValueError
+
         Raises:
             ValueError: 抛出包含错误信息的json
 
@@ -57,7 +58,7 @@ class TTSService:
             Path: 返回wav文件的绝对路径
         """
         # raise ValueError("语音因为资源分配问题暂时被关了,不要再尝试使用")
-        
+
         self._validate_parameters(text, emotion, speed)
         
         payload = self._build_payload(text, emotion, speed)

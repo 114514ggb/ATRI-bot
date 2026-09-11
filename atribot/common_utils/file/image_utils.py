@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 _MAX_DOWNLOAD_RETRIES: int = 2
+IMAGE_MAX_BYTES = 30 * 1024 * 1024
 
 _GET_IMAGE_MAX_BYTES: int = 1024 * 1024
 """通过 get_image API 获取图片的原始体积上限(1MB)"""
@@ -307,7 +308,7 @@ async def fetch_image_jpeg(
     file_name: str | None = None,
     send_client: SendClientBase | None = None,
     max_size_kb: int | None = 2048,
-    max_bytes: int = 10 * 1024 * 1024,
+    max_bytes: int = IMAGE_MAX_BYTES,
 ) -> MediaConvertResult:
     """获取图片并统一转换为 JPEG base64
 

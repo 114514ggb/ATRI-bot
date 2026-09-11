@@ -59,7 +59,14 @@ async def tts_synthesis(message_data: MessageEventEnvelope, target_text: list[st
         emotion=emotion,
         speed=speed
     )
-    await message_data.send_client.send_group_audio(
-        group_id=message_data.group_id,
-        url_audio=audio_path.as_posix(),
-    )
+    if message_data.group_id is not None:
+        await message_data.send_client.send_group_audio(
+            group_id=message_data.group_id,
+            url_audio=audio_path.as_posix(),
+        )
+    else:
+        await message_data.send_client.send_personal_audio(
+            qq_id=message_data.user_id,
+            url_audio=audio_path.as_posix(),
+            local_Path_type=True,
+        )
