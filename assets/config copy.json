@@ -123,7 +123,8 @@
         "private_chat": [
             "web_search", "memory_search",
             "load_skill_prompt",
-            "tool_search"
+            "tool_search",
+            "schedule_self_trigger"
         ],
         "agency_Agent": [
             "run_command",

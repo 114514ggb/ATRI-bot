@@ -33,6 +33,11 @@ assets/supplier_config.json
 
 document/temp/
 
+# 定时自触发工具的持久化数据(运行期生成)
+atribot/LLMchat/tools/schedule_self_trigger/scheduled_triggers.json
+atribot/LLMchat/tools/schedule_self_trigger/*.tmp
+atribot/LLMchat/tools/schedule_self_trigger/*.bak
+
 # Virtual environments
 .venv
 .wslvenv

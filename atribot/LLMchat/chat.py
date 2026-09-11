@@ -28,7 +28,6 @@ from atribot.core.type.chat_message_types import (
     VideoSegment,
 )
 from atribot.core.type.context_types import Context, MessageBuilder
-from atribot.core.type.onebot_event_types import GroupMessageEvent
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import (
     GenerationRequestSimplify,
@@ -130,8 +129,7 @@ class ChatBasics(ABC):
     async def trigger_internal_thought(
         self,
         custom_prompt: str,
-        event: GroupMessageEvent,
-        send_client:SendClientBase = None,
+        event: MessageEventEnvelope,
     ) -> None:
         """系统内部触发思考的入口"""
 
@@ -990,23 +988,7 @@ class PrivateChat(ChatBasics):
 
         self.log.info(f"[{uid}]私聊模型返回json_list:\n{''.join(response.reply_text)}")
 
-        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
-            if isinstance(response_json, dict):
-                for action in response_json.get("actions", []):
-                    action: dict[str, str | int]
-                    if decision := action.get("decision"):
-                        if decision == "speak":
-                            await self._private_speak_conduct(action, event)
-                        elif decision == "update":
-                            await self.update_conduct(action, event)
-                        elif decision == "silence":
-                            await self.silence_conduct(action, event)
-                        else:
-                            self.log.error(f"[{uid}]无效decision:{action}")
-                    else:
-                        self.log.error(f"[{uid}]返回json错误:{action}")
-            else:
-                self.log.error(f"[{uid}]返回json解析不正确:{type(response_json)}")
+        await self._dispatch_private_actions(response, event, uid)
 
         original_context.add_user_message(f"{prompt}\n{event.llm_formatted_message}")
         original_context.extend(
@@ -1047,14 +1029,122 @@ class PrivateChat(ChatBasics):
             except Exception as e:
                 self.log.exception(f"[{uid}]私聊上下文信息总结出现了错误:{e}")
 
+    async def _dispatch_private_actions(
+        self,
+        response: GenerationResponse,
+        event: MessageEventEnvelope,
+        uid: str,
+    ) -> None:
+        """分发私聊模型返回的 action 决策"""
+        for response_json in (extract_json_from_text(s) for s in response.reply_text if s != ""):
+            if isinstance(response_json, dict):
+                for action in response_json.get("actions", []):
+                    action: dict[str, str | int]
+                    if decision := action.get("decision"):
+                        if decision == "speak":
+                            await self._private_speak_conduct(action, event)
+                        elif decision == "update":
+                            await self.update_conduct(action, event)
+                        elif decision == "silence":
+                            await self.silence_conduct(action, event)
+                        else:
+                            self.log.error(f"[{uid}]无效decision:{action}")
+                    else:
+                        self.log.error(f"[{uid}]返回json错误:{action}")
+            else:
+                self.log.error(f"[{uid}]返回json解析不正确:{type(response_json)}")
+
     async def trigger_internal_thought(
         self,
         custom_prompt: str,
-        user_id: int,
-        group_id: int | None = None,
+        event: MessageEventEnvelope,
     ) -> None:
-        """系统内部触发思考的入口"""
-        raise ValueError("未实现~")
+        """系统内部触发思考的入口(定时自触发等场景)"""
+        uid: str = uuid.uuid4().hex
+        user_id = event.user_id
+        self.log.info(f"[{uid}]私聊内部触发思考处理")
+
+        message_builder = MessageBuilder()
+
+        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("private_chat"):
+            message_builder.add_text_left(deferred_prompt + self.skills.prompt)  # 待发现工具的提示词
+        else:
+            message_builder.add_text_left(self.skills.prompt)  # skills 的提示词
+
+        prompt = custom_prompt
+        message_builder.add_text(
+            self.build_prompt.decision_whether_private_responses(
+                user_id=user_id,
+                prompt=prompt,
+                else_prompt=(
+                    self.emoji_core.prompt
+                    + self.skills.prompt
+                ),
+            )
+        )
+
+        private_context_obj = await self.chat_manager.get_private_context(user_id)
+        original_context: Context = private_context_obj.chat_context
+
+        round_toolset = self._prepare_round_toolset()
+
+        request: GenerationRequestSimplify = replace(
+            self.template_request_simplify,
+            increment_messages=[message_builder.build()],
+            messages=original_context.get_messages(),
+            message_data=event,
+            tool_json=round_toolset,
+        )
+
+        response = await self._request_model_with_fallback_private_(
+            request=request,
+            event=event,
+            prompt=prompt,
+            uid=uid,
+        )
+
+        self.log.info(f"[{uid}]私聊内部触发模型返回json_list:\n{''.join(response.reply_text)}")
+
+        await self._dispatch_private_actions(response, event, uid)
+
+        original_context.add_user_message(prompt)
+        original_context.extend(
+            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+        )
+
+        if response.reasoning_content:
+            self.log.info(f"[{uid}]推理内容:\n{''.join(response.reasoning_content)}")
+
+        self.log.info(f"[{uid}]私聊内部触发思考结束!")
+
+        if total_tokens := response.metadata.get("total_tokens"):
+            original_context.total_tokens = total_tokens
+            try:
+                await self.token_manager.record_token_usage(
+                    user_id=user_id,
+                    group_id=event.group_id,
+                    prompt_tokens=response.metadata.get("prompt_tokens", 0),
+                    completion_tokens=response.metadata.get("completion_tokens", 0),
+                    total_tokens=total_tokens,
+                    model_name=response.model
+                )
+            except Exception as e:
+                self.log.error(f"[{uid}]记录token使用失败: {e}")
+        else:
+            original_context.total_tokens = original_context.count_estimate_tokens()
+
+        if truncated_context := original_context.record_validity_check():
+            try:
+                if summarize_context := await self.memory_system.summarize_context(str(truncated_context)):
+                    original_context.messages.insert(
+                        0,
+                        {"role": "assistant", "content": summarize_context[:3000]},
+                    )
+                    self.log.info(f"[{uid}]私聊上下文总结完成 user:{user_id} 消息:{summarize_context}")
+                else:
+                    self.log.info(f"[{uid}]私聊上下文总结{user_id}消息为none")
+            except Exception as e:
+                self.log.exception(f"[{uid}]私聊上下文信息总结出现了错误:{e}")
 
     async def prompt_structure(
         self,
