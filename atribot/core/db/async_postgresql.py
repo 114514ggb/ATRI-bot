@@ -33,7 +33,16 @@ class AsyncPostgreSQL(AsyncDatabaseBase, ServiceBase):
         
     async def cleanup(self) -> None:
         await self.close_pool()
-    
+
+    async def initialize(self) -> None:
+        """连接池创建后自动执行数据库表结构迁移"""
+        from atribot.core.db.schema_migration import run_migrations
+
+        try:
+            await run_migrations(self, log=self.log)
+        except Exception as e:
+            self.log.warning(f"数据库表结构迁移执行失败（不阻断启动）: {e}")
+
     @classmethod
     async def create(
         cls, 

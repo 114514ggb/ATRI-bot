@@ -160,7 +160,7 @@
                 "web_search", "web_extract",
                 "memory_search", "memory_storage",
                 "load_skill_prompt", "get_user_info",
-                "tool_search"#用于发现并临时启用 deferred 中的工具
+                "tool_search"#用于发现并临时启用 deferred 中的工具,如果配置了deferred必须要配置这个工具不然发现不了
             ],
             "deferred": [#待发现工具, 不会直接暴露; 模型可通过 tool_search 搜索后在本轮临时启用(仅本轮有效)
                 "run_python_code",

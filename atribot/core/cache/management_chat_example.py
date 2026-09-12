@@ -242,15 +242,17 @@ class ChatManager(ServiceBase):
             return private_example
         else:
             
-            messages = await self.lifecycle_manager.get_user_context(
+            stored = await self.lifecycle_manager.get_user_context(
                 user_id
             )
+            messages, stored_role = (stored if stored else ([], None))
+            play_roles = self._resolve_play_role(stored_role)
             
             chat_context = Context(
                 messages = messages if messages else [],
                 user_max_record = self.private_max_record,
                 play_role = self.play_role_list.get(
-                    self.default_play_role, 
+                    play_roles, 
                     self.play_role_list["none"]
                 )
             )
@@ -259,7 +261,7 @@ class ChatManager(ServiceBase):
             PrivateContext(
                 user_id = user_id,
                 chat_context = chat_context,
-                play_roles = self.default_play_role,
+                play_roles = play_roles,
                 max_record = self.private_max_record,
             )
             return private_example
@@ -279,15 +281,17 @@ class ChatManager(ServiceBase):
             pass
         else:
             
-            messages = await self.lifecycle_manager.get_group_context(
+            stored = await self.lifecycle_manager.get_group_context(
                 group_id
             )
-                        
+            messages, stored_role = (stored if stored else ([], None))
+            play_roles = self._resolve_play_role(stored_role)
+            
             chat_context = Context(
                 messages = messages if messages else [],
                 user_max_record = self.LLM_max_record,
                 play_role = self.play_role_list.get(
-                    self.default_play_role, 
+                    play_roles, 
                     self.play_role_list["none"]
                 )
             )
@@ -295,7 +299,7 @@ class ChatManager(ServiceBase):
             group_example = self.group_dict[group_id] = \
             GroupContext(
                 group_id=group_id,
-                play_roles=self.default_play_role,
+                play_roles=play_roles,
                 chat_context=chat_context,
                 group_max_record=self.group_max_record,
                 initiative_chat = group_id in self.initiative_white_list,
@@ -303,8 +307,13 @@ class ChatManager(ServiceBase):
             )
         #因为这个群聊接收消息时会刷新时间，需要获取的时候更新时间了
         return group_example
-        
-        
+
+    def _resolve_play_role(self, stored_role: str | None) -> str:
+        """解析持久化的人设名称，不存在或已不在人设列表则回退默认"""
+        if stored_role and stored_role in self.play_role_list:
+            return stored_role
+        return self.default_play_role
+
     async def store_group_chat(self, group_id: str, context: Context) -> None:
         """存储指定群的LLM聊天上下文
         
@@ -555,6 +564,7 @@ class ChatManager(ServiceBase):
                 raise ValueError("指定了不存在的角色键名!")
             
         await self.reset_group_chat(group_id)
+        await self.lifecycle_manager.save_group_role(group_id, role_key)
         self.log.info(f"已设置群{group_id}的角色为: {role_key}")
         return
 
@@ -578,6 +588,7 @@ class ChatManager(ServiceBase):
                 raise ValueError("指定了不存在的角色键名!")
             
         await self.reset_private_chat(user_id)
+        await self.lifecycle_manager.save_user_role(user_id, role_key)
         self.log.info(f"已设置user:{user_id}的聊天角色为: {role_key}")
         return
     
@@ -607,6 +618,7 @@ class ChatManager(ServiceBase):
                 self.play_role_list["none"]
             )
             await self.reset_group_chat(group_id)
+            await self.lifecycle_manager.save_group_role(group_id, self.default_play_role)
             self.log.info(f"已清除群{group_id}的自定义角色，恢复为默认角色")
     
     
@@ -631,7 +643,7 @@ class ChatManager(ServiceBase):
                 
                 try:
                     file_size = os.path.getsize(file_path)
-                    if file_size > 40 * 1024:
+                    if file_size > 55 * 1024:
                         self.log.warning(f"文件过大({file_size/1024:.1f}KB)，跳过: {character_setting}")
                         continue
                     

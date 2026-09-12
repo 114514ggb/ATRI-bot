@@ -17,6 +17,7 @@ log = container.get_by_type(Logger).getChild("MessageStore")
 _seen_groups: Set[int] = set()
 """已处理过的群 ID 集合"""
 
+Asyncdb = container.get_by_type(AsyncPostgreSQL)
 
 async def store_message_to_db(msg: atriMessageEvent) -> None:
     """将消息持久化到数据库
@@ -29,9 +30,6 @@ async def store_message_to_db(msg: atriMessageEvent) -> None:
     Args:
         msg: 待存储的消息事件
     """
-    if msg.event.post_type not in (PostType.MESSAGE, PostType.MESSAGE_SENT):
-        return
-
     group_id = msg.group_id
     ev:MessageEvent = msg.event
 
@@ -43,14 +41,17 @@ async def store_message_to_db(msg: atriMessageEvent) -> None:
             else:
                 group_name = "[unknown]"
 
-            async with container.get_by_type(AsyncPostgreSQL) as db:
+            async with Asyncdb as db:
                 await db.add_group(group_id=group_id, group_name=group_name)
         except Exception as e:
             log.warning("群信息存储失败: group=%s, error=%s", group_id, e)
             return
 
+    if msg.event.post_type not in (PostType.MESSAGE, PostType.MESSAGE_SENT):
+        return
+
     try:
-        async with container.get_by_type(AsyncPostgreSQL) as db:
+        async with Asyncdb as db:
             await db.add_user(
                 user_id=msg.user_id, 
                 nickname=ev.sender['nickname']

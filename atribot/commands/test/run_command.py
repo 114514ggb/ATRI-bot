@@ -58,15 +58,21 @@ async def run_async_code(message_data: MessageEventEnvelope):
     
     # from atribot.common_utils import format_memory_records
     # sql="""
-    # SELECT *
-    # FROM atri_memory
-    # WHERE event &@ '星奴';
+    # SELECT
+    #     column_name,
+    #     data_type,
+    #     is_nullable,
+    #     column_default
+    # FROM information_schema.columns
+    # WHERE table_name = 'chat_context'
+    # ORDER BY ordinal_position;
     # """
     # async with db:
     #     record = await db.execute_SQL(sql)
 
-    # text = format_memory_records(record)
-    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_node(text))
+    # # text = format_memory_records(record)
+    # send_message = message_data.send_client
+    # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_node(str(record)))
     
     raw = message_data.event.pure_text.strip()
     src = f"""

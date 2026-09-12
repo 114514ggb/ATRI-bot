@@ -9,13 +9,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from atribot.common_utils.http_client import HTTPClient
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
-from atribot.core.cache.message_store import store_message_to_db
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.command.command_loader import CommandLoader
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.event_bus.rule import AtCommandRule
-from atribot.core.pipeline.whitelist import WhitelistMiddleware
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.service_container import container
 from atribot.core.time_trigger import TimeTriggerSupervisor
@@ -124,15 +122,11 @@ class BotFramework:
         if not self._platform_manager.adapters:
             self.log.warning("没有可用适配器,系统处于不可以状态")
 
-        #白名单
-        await self._platform_manager.pipeline.add_middleware(WhitelistMiddleware())
-        
-        #存储
-        self._platform_manager.queue.set_overflow_handler(store_message_to_db)
-        self._platform_manager.event_bus.on_message(priority=101)(store_message_to_db)
-
         await self._start_sandbox()
         await self._resolve_services()
+
+        # 注册消息持久化
+        await self._register_message_storage()
 
         # 注册 @ 路由监听器
         self._register_at_routes()
@@ -141,6 +135,18 @@ class BotFramework:
         await self._platform_manager.start_all()
 
         await self._start_runtime_services()
+
+    async def _register_message_storage(self) -> None:
+        """注册内部处理中间件什么的"""
+        from atribot.core.cache.message_store import store_message_to_db
+        from atribot.core.pipeline.whitelist import WhitelistMiddleware
+        
+        #白名单
+        await self._platform_manager.pipeline.add_middleware(WhitelistMiddleware())
+        
+        #存储
+        self._platform_manager.queue.set_overflow_handler(store_message_to_db)
+        self._platform_manager.event_bus.on_message(priority=101)(store_message_to_db)
 
     def _register_at_routes(self) -> None:
         """注册消息路由监听器到 EventBus

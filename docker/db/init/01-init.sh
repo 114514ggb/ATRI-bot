@@ -104,6 +104,7 @@ CREATE TABLE chat_context (
     group_id BIGINT,
     context_data JSONB NOT NULL DEFAULT '[]',
     total_tokens INT DEFAULT 0,
+    play_role VARCHAR(255),
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT chk_owner_exclusive CHECK (
         (user_id IS NOT NULL AND group_id IS NULL) OR
