@@ -66,7 +66,7 @@
         {
             "supplier":"zaxprisのapi",#配置的聊天模型来自的供应商(对应 supplier_config.json 中 api[].name)
             "model_name":"Nvidia/deepseek-ai/deepseek-v4-flash",#配置的聊天模型名称(对应 supplier_config.json 中 models 的 key)
-            "user_global_context":True #上下文模式: True=每个群/人共享一个上下文, False=每个人独立上下文
+            "user_global_context":True #上下文模式: True=群聊每个人独立上下文（使用自己的私聊上下文）, False=每个群的人共享一个群聊上下文
         },
         "chat_parameter":{#聊天模型会使用的参数配置
             "thinking_level":"high",#minimal,low,medium,high

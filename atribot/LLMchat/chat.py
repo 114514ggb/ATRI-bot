@@ -9,8 +9,8 @@ from typing import Coroutine, Dict, List
 from atribot.common_utils import (
     download_text,
     extract_json_from_text,
-    fetch_audio_mp3,
-    fetch_image_jpeg,
+    url_to_audio_mp3,
+    url_to_image_jpeg,
     url_to_video_mp4,
 )
 from atribot.core.atri_config import atriConfig
@@ -277,10 +277,9 @@ class ChatBasics(ABC):
         if including_pictures:
             async def dispose_img(message: ImageSegment):
                 try:
-                    result = await fetch_image_jpeg(
+                    result = await url_to_image_jpeg(
                         message.url,
                         file_name=message.file_name,
-                        send_client=event.send_client,
                     )
                     message_builder.add_image_base64(result.data, result.mime)
                 except Exception as e:
@@ -294,7 +293,6 @@ class ChatBasics(ABC):
                     desc = await self.media_processor.image_to_text(
                         message.url,
                         file_name=message.file_name,
-                        send_client=event.send_client,
                     )
                     message.text_description = desc
                     self.log.info(f"图像识别文本结果:{desc}")
@@ -304,10 +302,9 @@ class ChatBasics(ABC):
             async def dispose_audio(segment: RecordSegment) -> None:
                 audio_url = segment.url or segment.file.file
                 try:
-                    result = await fetch_audio_mp3(
+                    result = await url_to_audio_mp3(
                         audio_url,
                         file_name=segment.file_name,
-                        send_client=event.send_client,
                     )
                     message_builder.add_audio(result.data, result.fmt)
                 except Exception as e:
@@ -604,7 +601,6 @@ class GroupChat(ChatBasics):
         await self.chat_manager.add_group_messages_builder(
             group_id=group_id,
             builder=message_builder,
-            send_client=event.send_client,
             including_pictures=self.visual_sense,
             including_audios=self.audio_sense,
             including_videos=self.video_sense,
@@ -726,7 +722,6 @@ class GroupChat(ChatBasics):
         await self.chat_manager.add_group_messages_builder(
             group_id=group_id,
             builder=message_builder,
-            send_client=event.send_client,
             including_pictures=including_pictures,
             including_audios=including_audios,
             including_videos=including_videos,

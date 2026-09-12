@@ -4,17 +4,13 @@ from .file.file_utils import download_binary, resolve_file_to_bytes
 from .file.image_utils import (
     compress_image,
     convert_to_jpeg,
-    fetch_image_jpeg,
     url_to_base64,
     url_to_image_jpeg,
     urls_list_to_base64,
 )
 from .file.media_utils import (
     MediaConvertResult,
-    fetch_audio_mp3,
-    url_to_audio_base64,
     url_to_audio_mp3,
-    url_to_video_base64,
     url_to_video_mp4,
 )
 from .file.text_utils import download_text
@@ -46,8 +42,6 @@ __all__ = [
     "download_text",
     "estimate_tokens",
     "extract_json_from_text",
-    "fetch_audio_mp3",
-    "fetch_image_jpeg",
     "format_duration",
     "format_memory_records",
     "HTTPClient",
@@ -60,10 +54,8 @@ __all__ = [
     "search_music",
     "count_estimate_tokens",
     "MediaConvertResult",
-    "url_to_audio_base64",
     "url_to_audio_mp3",
     "url_to_image_jpeg",
-    "url_to_video_base64",
     "url_to_video_mp4",
     "timer",
     "url_to_base64",

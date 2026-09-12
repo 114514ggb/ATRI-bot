@@ -1,8 +1,7 @@
 from logging import Logger
 from typing import Optional
 
-from atribot.common_utils.file.image_utils import fetch_image_jpeg
-from atribot.core.platform.send_client import SendClientBase
+from atribot.common_utils.file.image_utils import url_to_image_jpeg
 from atribot.core.service_container import container
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 
@@ -64,7 +63,6 @@ class MediaProcessor:
         self,
         image_url: str,
         file_name: str | None = None,
-        send_client: SendClientBase | None = None,
     ) -> str:
         """将图片转换为文字描述。
 
@@ -73,7 +71,6 @@ class MediaProcessor:
         Args:
             image_url: 图片地址(http/https 或 base64://)
             file_name: QQ 图片文件哈希ImageSegment.file_name
-            send_client: 发送客户端实例，用于调用 get_img_details
 
         Returns:
             模型生成的图片内容描述
@@ -83,8 +80,8 @@ class MediaProcessor:
         if not image_url:
             return "图片识别出现错误: 图片地址为空"
         try:
-            convert_result = await fetch_image_jpeg(
-                image_url, file_name=file_name, send_client=send_client
+            convert_result = await url_to_image_jpeg(
+                image_url, file_name=file_name
             )
             image_data = convert_result.data_uri
             response = await self._image_api.generate_text_lightweight(

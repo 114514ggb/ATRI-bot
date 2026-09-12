@@ -18,8 +18,8 @@ def _format_pending(item: dict[str, Any]) -> list[str]:
     target = f"群 {item['group_id']}" if item["group_id"] else f"私聊(用户 {item['user_id']})"
     trigger_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(item["trigger_at"]))
     note: str = item["note"]
-    if len(note) > 50:
-        note = note[:50] + "..."
+    note = note[:100] + "..."
+    
     return [
         f"\n[任务 {item['record_id'][:8]}]",
         f"🎯 目标: {target}",

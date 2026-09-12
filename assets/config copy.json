@@ -11,7 +11,7 @@
     },
     "root_user_id": 114514,
     "account":{
-        "id":3930909243,
+        "id":168238719,
         "name":"ATRI-bot"
     },
     "file_path":{
@@ -41,7 +41,6 @@
         {
             "supplier":"deepseek",
             "model_name":"deepseek-chat",
-            "visual_sense":false,
             "user_global_context":true
         },
         "chat_parameter":{

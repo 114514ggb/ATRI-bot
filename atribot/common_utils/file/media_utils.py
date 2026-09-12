@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Awaitable, Callable
+from typing import Awaitable, Callable
 
 from atribot.common_utils.file.file_utils import resolve_file_to_bytes
 from atribot.common_utils.file.media_cache import (
@@ -16,9 +16,6 @@ from atribot.common_utils.file.media_cache import (
 )
 from atribot.core.type.chat_message_types import File
 
-if TYPE_CHECKING:
-    from atribot.core.platform.send_client import SendClientBase
-
 AUDIO_MAX_BYTES = 50 * 1024 * 1024   
 VIDEO_MAX_BYTES = 200 * 1024 * 1024 
 AUDIO_BITRATE = "128k"               # 音频统一转码码率
@@ -28,9 +25,6 @@ TRANSCODE_TIMEOUT = 60.0             # ffmpeg 转码超时(秒)
 
 _MAX_DOWNLOAD_RETRIES: int = 2
 """截断/损坏下载的最大重试次数"""
-
-_GET_RECORD_MAX_BYTES: int = 1024 * 1024
-"""通过 get_recordg API 获取音频的原始体积上限"""
 
 _AUDIO_FORMAT_MAP: dict[str, str] = {
     "mp3": "mp3",
@@ -55,30 +49,6 @@ def _detect_audio_format(url: str, file_name: str | None = None) -> str:
 def _source_str(source: str | File) -> str:
     """从统一来源参数中提取源字符串"""
     return source.file if isinstance(source, File) else str(source)
-
-
-async def _to_base64(
-    source: str | File,
-    file_name: str | None,
-    default_name: str,
-    max_bytes: int,
-    detect_fn: Callable[[str, str | None], str],
-) -> tuple[str, str]:
-    """下载媒体并编码为 base64,格式由 detect_fn 推断
-
-    Args:
-        source: 媒体来源(http/https/file/base64 或本地路径)
-        file_name: 可选文件名,用于推断格式
-        default_name: 无文件名时的默认名
-        max_bytes: 最大允许字节数
-        detect_fn: 格式推断函数
-
-    Returns:
-        (base64 字符串, 格式标识) 元组
-    """
-    name, data = await resolve_file_to_bytes(source, default_name, max_bytes=max_bytes)
-    fmt = detect_fn(_source_str(source), file_name or name)
-    return base64.b64encode(data).decode(), fmt
 
 
 async def _load_with_cache(
@@ -137,27 +107,6 @@ async def _download_with_retry(
             raise
 
 
-async def url_to_audio_base64(
-    source: str | File,
-    file_name: str | None = None,
-    max_bytes: int = AUDIO_MAX_BYTES,
-) -> tuple[str, str]:
-    """下载音频并编码为 base64,返回 (base64 字符串, 音频格式如 'mp3')
-
-    Args:
-        source: 音频来源
-        file_name: 可选文件名,用于推断格式
-        max_bytes: 最大允许字节数,默认 50MB
-
-    Returns:
-        (base64 数据, 音频格式) 元组
-
-    Raises:
-        ValueError: 下载失败或超过大小限制时抛出
-    """
-    return await _to_base64(source, file_name, "audio", max_bytes, _detect_audio_format)
-
-
 _VIDEO_MIME_MAP: dict[str, str] = {
     "mp4": "video/mp4",
     "webm": "video/webm",
@@ -174,27 +123,6 @@ def _detect_video_mime(url: str, file_name: str | None = None) -> str:
     name = file_name or url.split("?")[0]
     ext = name.rsplit(".", 1)[-1].lower() if "." in name else ""
     return _VIDEO_MIME_MAP.get(ext, "video/mp4")
-
-
-async def url_to_video_base64(
-    source: str | File,
-    file_name: str | None = None,
-    max_bytes: int = VIDEO_MAX_BYTES,
-) -> tuple[str, str]:
-    """下载视频并编码为 base64,返回 (base64 字符串, 视频 MIME 如 'video/mp4')
-
-    Args:
-        source: 视频来源
-        file_name: 可选文件名,用于推断格式
-        max_bytes: 最大允许字节数,默认 200MB
-
-    Returns:
-        (base64 数据, 视频 MIME) 元组
-
-    Raises:
-        ValueError: 下载失败或超过大小限制时抛出
-    """
-    return await _to_base64(source, file_name, "video", max_bytes, _detect_video_mime)
 
 
 @dataclass(frozen=True)
@@ -462,69 +390,3 @@ async def url_to_video_mp4(
         )
 
     return await _load_with_cache(key, produce)
-
-
-async def fetch_audio_mp3(
-    source: str | File,
-    *,
-    file_name: str | None = None,
-    send_client: "SendClientBase | None" = None,
-    max_bytes: int = AUDIO_MAX_BYTES,
-    bitrate: str = AUDIO_BITRATE,
-) -> MediaConvertResult:
-    """获取音频并统一转换为 mp3 base64
-
-    提供 send_client 和 file_name 时优先走 get_recordg API(仅小音频)；失败或音频过大则回退下载
-
-    Args:
-        source: 音频来源(File 或字符串)
-        file_name: 音频文件名
-        send_client: 发送客户端,用于 get_recordg_details
-        max_bytes: 回退路径最大下载字节数,默认 50MB
-        bitrate: mp3 目标码率
-
-    Returns:
-        MediaConvertResult
-
-    Raises:
-        Exception: 两条路径均失败时抛出
-    """
-    if send_client is not None and file_name:
-        src = _source_str(source)
-        key = make_cache_key("audio", src, file_name, f"mb={max_bytes};br={bitrate}")
-
-        async def produce_via_details() -> tuple[bytes, MediaConvertResult]:
-            details = await send_client.get_recordg_details(
-                file=src, file_id=file_name, out_format="mp3"
-            )
-            if not details or not details.get("base64"):
-                raise ValueError("get_recordg 无 base64")
-            raw_bytes = base64.b64decode(details["base64"])
-            if len(raw_bytes) > _GET_RECORD_MAX_BYTES:
-                raise ValueError("音频过大,回退下载")
-            converted = await transcode_audio_to_mp3(raw_bytes, bitrate=bitrate)
-            if converted:
-                return converted, MediaConvertResult(
-                    data=base64.b64encode(converted).decode(),
-                    fmt="mp3",
-                    mime="audio/mp3",
-                    converted=True,
-                )
-            return raw_bytes, MediaConvertResult(
-                data=base64.b64encode(raw_bytes).decode(),
-                fmt="mp3",
-                mime="audio/mp3",
-                converted=False,
-            )
-
-        try:
-            return await _load_with_cache(key, produce_via_details)
-        except Exception:
-            pass  # 回退到 url_to_audio_mp3
-
-    return await url_to_audio_mp3(
-        source,
-        file_name=file_name,
-        max_bytes=max_bytes,
-        bitrate=bitrate,
-    )

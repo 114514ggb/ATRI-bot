@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import io
-from typing import TYPE_CHECKING
 
 import aiohttp
 from PIL import Image, ImageFile
@@ -13,16 +12,10 @@ from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import File
 
-if TYPE_CHECKING:
-    from atribot.core.platform.send_client import SendClientBase
-
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 _MAX_DOWNLOAD_RETRIES: int = 2
 IMAGE_MAX_BYTES = 30 * 1024 * 1024
-
-_GET_IMAGE_MAX_BYTES: int = 1024 * 1024
-"""通过 get_image API 获取图片的原始体积上限(1MB)"""
 
 
 def convert_to_jpeg(
@@ -103,19 +96,11 @@ def _flatten_to_rgb(
     background: tuple[int, int, int] = (255, 255, 255),
 ) -> Image.Image:
     """将任意模式的图片转为 RGB,透明区域合成到指定背景色(默认白底)"""
-    if image.mode in ("RGBA", "LA"):
+    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
         rgba = image.convert("RGBA")
         bg = Image.new("RGB", rgba.size, background)
         bg.paste(rgba, mask=rgba.split()[-1])
         return bg
-
-    if image.mode == "P":
-        if "transparency" in image.info:
-            rgba = image.convert("RGBA")
-            bg = Image.new("RGB", rgba.size, background)
-            bg.paste(rgba, mask=rgba.split()[-1])
-            return bg
-        return image.convert("RGB")
 
     return image.convert("RGB")
 
@@ -225,7 +210,7 @@ async def url_to_base64(
         失败时返回空字符串
     """
     try:
-        http:HTTPClient = container.get("HTTPClient")
+        http = container.get_by_type(HTTPClient)
         async with http.session.get(
             url=url,
             headers={
@@ -259,7 +244,7 @@ async def url_to_image_jpeg(
     source: str | File,
     *,
     max_size_kb: int | None = 2048,
-    max_bytes: int = 10 * 1024 * 1024,
+    max_bytes: int = IMAGE_MAX_BYTES,
     file_name: str | None = None,
 ) -> MediaConvertResult:
     """下载图片并统一转换为 JPEG base64
@@ -267,7 +252,7 @@ async def url_to_image_jpeg(
     Args:
         source: 图片来源(File 或字符串)
         max_size_kb: 压缩后体积上限(KB),None 不限制(仍转 JPEG)
-        max_bytes: 最大下载字节数,默认 10MB
+        max_bytes: 最大下载字节数,默认 30MB
         file_name: 文件名(QQ 媒体为内容哈希),作为缓存键
 
     Returns:
@@ -280,81 +265,22 @@ async def url_to_image_jpeg(
     key = make_cache_key("image", src, file_name, f"kb={max_size_kb}")
 
     async def produce() -> tuple[bytes, MediaConvertResult]:
-        jpeg: bytes | None = None
         for attempt in range(_MAX_DOWNLOAD_RETRIES + 1):
             _, data = await resolve_file_to_bytes(source, "image", max_bytes=max_bytes)
             try:
                 jpeg = await asyncio.to_thread(convert_to_jpeg, data, max_size_kb)
-                break
             except OSError as exc:
+                # 仅对截断图重试下载,其余解码失败直接抛出且不入缓存
                 if attempt < _MAX_DOWNLOAD_RETRIES and "truncated" in str(exc).lower():
                     await asyncio.sleep(0.5)
                     continue
                 raise
-        result = MediaConvertResult(
-            data=base64.b64encode(jpeg).decode(),
-            fmt="jpeg",
-            mime="image/jpeg",
-            converted=True,
-        )
-        return jpeg, result
-
-    return await _load_with_cache(key, produce)
-
-
-async def fetch_image_jpeg(
-    source: str | File,
-    *,
-    file_name: str | None = None,
-    send_client: SendClientBase | None = None,
-    max_size_kb: int | None = 2048,
-    max_bytes: int = IMAGE_MAX_BYTES,
-) -> MediaConvertResult:
-    """获取图片并统一转换为 JPEG base64
-
-    提供 send_client 和 file_name 时优先走 get_image API(仅小图)；失败或图片过大则回退下载
-
-    Args:
-        source: 图片来源(File 或字符串)
-        file_name: QQ 图片文件哈希
-        send_client: 发送客户端,用于 get_img_details
-        max_size_kb: 压缩后体积上限(KB),None 不限制
-        max_bytes: 回退路径最大下载字节数,默认 10MB
-
-    Returns:
-        MediaConvertResult
-
-    Raises:
-        Exception: 两条路径均失败时抛出
-    """
-    if send_client is not None and file_name:
-        src = source.file if isinstance(source, File) else str(source)
-        key = make_cache_key("image", src, file_name, f"kb={max_size_kb}")
-
-        async def produce_via_details() -> tuple[bytes, MediaConvertResult]:
-            details = await send_client.get_img_details(file=file_name)
-            if not details or not details.get("base64"):
-                raise ValueError("get_image 无 base64")
-            raw_bytes = base64.b64decode(details["base64"])
-            if len(raw_bytes) > _GET_IMAGE_MAX_BYTES:
-                raise ValueError("图片过大,回退下载")
-            jpeg = await asyncio.to_thread(convert_to_jpeg, raw_bytes, max_size_kb)
-            result = MediaConvertResult(
+            return jpeg, MediaConvertResult(
                 data=base64.b64encode(jpeg).decode(),
                 fmt="jpeg",
                 mime="image/jpeg",
                 converted=True,
             )
-            return jpeg, result
+        raise AssertionError("unreachable")  # pragma: no cover
 
-        try:
-            return await _load_with_cache(key, produce_via_details)
-        except Exception:
-            pass  # 回退到 url_to_image_jpeg
-
-    return await url_to_image_jpeg(
-        source,
-        max_size_kb=max_size_kb,
-        max_bytes=max_bytes,
-        file_name=file_name,
-    )
+    return await _load_with_cache(key, produce)

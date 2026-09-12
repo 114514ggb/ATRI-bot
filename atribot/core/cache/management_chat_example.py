@@ -2,7 +2,7 @@ import datetime
 from logging import Logger
 from typing import TYPE_CHECKING, Dict, List
 
-from atribot.common_utils import fetch_image_jpeg, url_to_audio_mp3, url_to_video_mp4
+from atribot.common_utils import url_to_audio_mp3, url_to_image_jpeg, url_to_video_mp4
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.context_lifecycle_manager import ContextLifecycleManager
 from atribot.core.event_bus.rule import Rule
@@ -33,7 +33,6 @@ DEFAULT_INCLUDING_AUDIOS = 1
 DEFAULT_INCLUDING_VIDEOS = 1
 
 if TYPE_CHECKING:
-    from atribot.core.platform.send_client import SendClientBase
     from atribot.core.type.bot_types import atriMessageEvent
 
 
@@ -333,7 +332,6 @@ class ChatManager(ServiceBase):
         self, 
         group_id: int, 
         builder: MessageBuilder,
-        send_client: SendClientBase | None = None,
         *,
         including_pictures: bool = False,
         including_audios: bool = False,
@@ -347,7 +345,6 @@ class ChatManager(ServiceBase):
         Args:
             group_id: 群组ID
             builder: 消息构建器
-            send_client: 发送客户端，用于通过 NapCat get_image API 获取图片
             including_pictures: True = 保留 DEFAULT_INCLUDING_PICTURES 条实际图片；
                                 False = 使用 MediaProcessor 转为文本描述
             including_audios: True = 保留 DEFAULT_INCLUDING_AUDIOS 条实际音频；
@@ -388,10 +385,9 @@ class ChatManager(ServiceBase):
                     if remaining_pictures > 0:
                         if url := segment.url or segment.file.file:
                             try:
-                                result = await fetch_image_jpeg(
+                                result = await url_to_image_jpeg(
                                     url,
                                     file_name=segment.file_name,
-                                    send_client=send_client,
                                 )
                                 builder.add_image_base64_left(result.data, result.mime)
                             except Exception as e:
@@ -411,7 +407,10 @@ class ChatManager(ServiceBase):
                     if remaining_audios > 0:
                         audio_url = segment.url or segment.file.file
                         try:
-                            result = await url_to_audio_mp3(audio_url, segment.file_name)
+                            result = await url_to_audio_mp3(
+                                audio_url,
+                                file_name=segment.file_name,
+                            )
                             builder.add_audio_left(result.data, result.fmt)
                             remaining_audios -= 1
                             cq_text = (
