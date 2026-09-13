@@ -185,7 +185,7 @@ docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
-1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表。
+1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.md 或 如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表。
 2.  **平台连接**：`config.platforms.<name>` 配置与 NapCat 的对接方式（`adapter` 固定为 `onebot`，`connection_type` 支持 `WebSocket_client` / `WebSocket_server` / `http`，`access_token` 需与 NapCat 一致，`url` 为地址）。
 3.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
     ```bash

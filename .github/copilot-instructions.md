@@ -13,7 +13,7 @@
      `HTTPClient` → `TimeTriggerSupervisor` → `MCP`(ToolManager) → `database`(AsyncPostgreSQL) → `TokenManager` → `LLMSupplier`(LLMConnectionManager) → `SkillsManager` → `MemorySystem` → `UserSystem` → `ChatManager` → `EmojiCore` → `PermissionsManagement` → `ToolCalls` → `MediaProcessor` → `CommandSystem` → `CommandLoader` → `LLMSupervisor`(LLMCoordinator) → `GroupChat` → `PrivateChat` → `PluginManager`（最后解析，其 `initialize()` 会扫描并加载 `atribot/plugins/` 下全部插件）
   7. `_register_at_routes()` — 在 EventBus 上注册两条消息路由：
      - `@bus.on_message(rule=AtCommandRule(), priority=10)` → `CommandSystem.dispatch_command(event)`（`@` + `/` 开头的命令）
-     - `@bus.on_message(priority=100)` → `initiativeChat().decision(event, group_context)`（普通聊天 / 主动对话决策）
+     - `@bus.on_message(priority=100)` → `initiativeChat().decision(event, group_context)`（群聊普通聊天 / 主动对话决策）；私聊消息（`_extra` 含 `private_context`）→ `privateChatTrigger().decision(event)`（LLM 私聊，受 `private_chat_white_list` 白名单限制）
   8. `_platform_manager.start_all()` — 启动所有平台适配器 + EventBus 主循环
   9. `_start_runtime_services()` — 启动 `TimeTriggerSupervisor` 循环
   > 注：旧的 `_register_network()` / `_start_network()` 已删除；`EventTrigger`、`message_router`（`core/message_manage.py`）已成遗留代码（不再解析/调用）
@@ -488,7 +488,7 @@ async with db as db:
   }
   ```
 - **SandBox**: 使用前务必调用 `container.exists("SandBox")` 检查，`DockerSandbox` 初始化失败不阻断启动；沙盒镜像预装 numpy/pandas/matplotlib/pillow/opencv
-- **群组白名单**: `config.group_white_list` 控制哪些群接收消息处理（由 `WhitelistMiddleware` 在 Pipeline 层过滤，`root_user_id` 可绕过），`group_initiative_chat_white_list` 控制主动发起对话的群，`group_information_extraction` 指定自动提取话题的群
+- **群组白名单**: `config.group_white_list` 控制哪些群接收消息处理（由 `WhitelistMiddleware` 在 Pipeline 层过滤，`root_user_id` 可绕过），`group_initiative_chat_white_list` 控制主动发起对话的群，`group_information_extraction` 指定自动提取话题的群，`private_chat_white_list` 控制哪些用户可触发 LLM 私聊（由 `privateChatTrigger` 在 EventBus 路由层判定，非白名单用户的私聊消息仍会入库和执行命令，只是不进 LLM；`root_user_id` 可绕过）
 
 ````
 环境里面要运行py代码请使用uv

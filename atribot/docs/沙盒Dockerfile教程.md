@@ -139,7 +139,7 @@ container.register("SandBox", sand_box, cleanup=sand_box.stop)
 注意：
 - 沙盒是**可选**的，初始化失败不会阻断 Bot 启动（`_start_sandbox()` 失败只记 warning）
 - 使用前建议先 `container.exists("SandBox")` 检查是否启动成功
-- `DockerSandbox` 还支持其他参数（内存限制、CPU 配额、进程数限制、网络模式等），详见 `assets/如何配置配置文件.py` 与 `docker_sandbox.py` 的 `__init__` 注释
+- `DockerSandbox` 还支持其他参数（内存限制、CPU 配额、进程数限制、网络模式等），详见 `assets/如何配置配置文件.md` 与 `docker_sandbox.py` 的 `__init__` 注释
 
 ---
 

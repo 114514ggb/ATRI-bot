@@ -28,6 +28,7 @@ from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
+from atribot.LLMchat.private_chat_trigger import privateChatTrigger
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 from atribot.LLMchat.skills.skills_manager import SkillsManager
@@ -152,11 +153,12 @@ class BotFramework:
         """注册消息路由监听器到 EventBus
 
           10  @ + / 命令 → CommandSystem
-           1  任意消息   → initiativeChat
+           1  任意消息   → initiativeChat / privateChatTrigger
         """
         bus = self._platform_manager.event_bus
         log = self.log
         _initiative_chat = initiativeChat()
+        _private_chat_trigger = privateChatTrigger()
         cmd_system = container.get_by_type(CommandSystem)
 
         @bus.on_message(rule=AtCommandRule(), priority=10)
@@ -174,6 +176,8 @@ class BotFramework:
             try:
                 if group_context := event._extra.get("group_context"):
                     event.stop_propagation = await _initiative_chat.decision(event, group_context)
+                elif event._extra.get("private_context"):
+                    event.stop_propagation = await _private_chat_trigger.decision(event)
             except Exception as e:
                 log.exception("聊天处理失败: %s", e)
                 await event.send(event.reply_text(f"有关聊天的路由出现了问题:\n{e}\n你不应该看到这个的,因为最近在迁移方面的原因，有很多小毛病,看到这建议联系开发者"))

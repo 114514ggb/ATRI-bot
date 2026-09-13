@@ -139,6 +139,8 @@
     ],
     "group_information_extraction":[
     ],
+    "private_chat_white_list":[
+    ],
     "database":
     {
         "host":"127.0.0.1",

@@ -165,7 +165,7 @@ Equips the AI model with a default **code sandbox environment** to safely execut
 
 #### ⚙️ Configuration Files
 Before starting, ensure to check the  `assets` folder:
-1.  Refer to `assets\如何配置配置文件.py` (Chinese guide) for configuration details.
+1.  Refer to `assets\如何配置配置文件.md` (Chinese guide) for configuration details.
 2.  **Platform connection**: `config.platforms.<name>` configures the connection to NapCat (`adapter` fixed as `onebot`, `connection_type` supports `WebSocket_client` / `WebSocket_server` / `http`, `access_token` must match NapCat, `url` is the address).
 3.  Configure `supplier_config.json` (model supplier settings).
 4.  Configure `config.json` (project basic settings).
