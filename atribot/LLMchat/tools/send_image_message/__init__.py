@@ -2,7 +2,7 @@ from atribot.core.type.bot_types import atriMessageEvent
 
 tool_json = {
     "name": "send_image_message",
-    "description": "向群里发送一个url图像",
+    "description": "发送一个url图像到当前会话",
     "properties": {
         "url": {
             "type": "string",
@@ -13,8 +13,7 @@ tool_json = {
 
 async def main(url: str, message_data: atriMessageEvent) -> str:
 
-    text = await message_data.send_client.send_group_pictures(
-            message_data.group_id,
+    text = await message_data.deliver_image(
             url,
             local_Path_type = False,
         )

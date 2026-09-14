@@ -23,6 +23,7 @@ class FunctionTool:
         concurrent: 是否允许并发执行
         background: 是否为后台任务,执行后返回已执行标志，等待执行完成后回调返回结果
         active: 是否启用
+        chat_scope: 适用会话场景,"group"(仅群聊)/"private"(仅私聊)/"both"(通用,默认)
     """
 
     def __init__(
@@ -33,6 +34,7 @@ class FunctionTool:
         concurrent: bool = False,
         background: bool = False,
         active: bool = True,
+        chat_scope: str = "both",
     ) -> None:
         """初始化工具基类
 
@@ -44,6 +46,7 @@ class FunctionTool:
             concurrent: 是否允许并发执行,默认为 ``False``
             background: 是否为后台任务,默认为 ``False``,会返回一个结果标识,等待完成后触发回调函数给出结果
             active: 是否启用,默认为 ``True``
+            chat_scope: 适用会话场景,默认为 ``"both"``
         """
         self.name: str = name
         """工具名称,全局唯一标识"""
@@ -57,6 +60,8 @@ class FunctionTool:
         """是否为后台任务,为 ``True`` 时调用方不需要等待结果"""
         self.active: bool = active
         """是否启用"""
+        self.chat_scope: str = chat_scope if chat_scope in ("group", "private", "both") else "both"
+        """适用会话场景:"group"(仅群聊)/"private"(仅私聊)/"both"(通用)"""
 
     async def execute(
         self, message_data: atriMessageEvent, **kwargs: Any
@@ -96,6 +101,7 @@ class LocalTool(FunctionTool):
         concurrent: bool = False,
         background: bool = False,
         active: bool = True,
+        chat_scope: str = "both",
         handler_module_path: str | None = None,
     ) -> None:
         """初始化本地工具
@@ -116,6 +122,7 @@ class LocalTool(FunctionTool):
             concurrent=concurrent,
             background=background,
             active=active,
+            chat_scope=chat_scope,
         )
         self.handler: Awaitable = handler
         """异步处理函数"""
@@ -167,6 +174,7 @@ class MCPTool(FunctionTool):
         concurrent: bool = False,
         background: bool = False,
         active: bool = True,
+        chat_scope: str = "both",
     ) -> None:
         """初始化 MCP 工具
 
@@ -188,6 +196,7 @@ class MCPTool(FunctionTool):
             concurrent=concurrent,
             background=background,
             active=active,
+            chat_scope=chat_scope,
         )
         self.mcp_tool: mcp.Tool = mcp_tool
         """MCP SDK 中的原始工具对象"""
@@ -499,6 +508,23 @@ class ToolSet:
         names_set = set(names)
         for tool in self.tools:
             if tool.name in names_set:
+                result.add_tool(tool)
+        return result
+
+    def filter_by_chat_scope(self, chat_type: str) -> ToolSet:
+        """按会话场景筛选工具子集
+
+        保留 ``chat_scope`` 为 ``"both"`` 或与 ``chat_type`` 匹配的工具。
+
+        Args:
+            chat_type: 会话场景,``"group"`` 或 ``"private"``
+
+        Returns:
+            仅包含适用当前场景工具的新 ToolSet 实例
+        """
+        result = ToolSet(name=self.name)
+        for tool in self.tools:
+            if tool.chat_scope in ("both", chat_type):
                 result.add_tool(tool)
         return result
 

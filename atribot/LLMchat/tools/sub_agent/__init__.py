@@ -93,7 +93,11 @@ async def sub_agent_task(
     )
 
     context = AgentContext()
-    context.play_role = SUB_AGENT_SYSTEM_PROMPT + f"环境的群号是:{message_data.group_id}"
+    if message_data.group_id is not None:
+        environment_line = f"当前环境是群聊,群号是:{message_data.group_id}"
+    else:
+        environment_line = f"当前环境是与用户 {message_data.user_id} 的一对一私聊"
+    context.play_role = SUB_AGENT_SYSTEM_PROMPT + environment_line
     context.add_user_message(content=task)
 
     agent_data = AgentData(

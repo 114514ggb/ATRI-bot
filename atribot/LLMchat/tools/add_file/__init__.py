@@ -13,7 +13,7 @@ chat_manager: ChatManager = container.get("ChatManager")
 
 tool_json = {
     "name": "add_file",
-    "description": "将群聊上下文中的文件上传到沙盒容器内指定路径。自动在聊天历史中查找匹配文件名的文件",
+    "description": "将聊天上下文中的文件上传到沙盒容器内指定路径。自动在聊天历史中查找匹配文件名的文件",
     "properties": {
         "file_name": {
             "type": "string",
@@ -34,10 +34,13 @@ async def main(file_name: str, message_data: atriMessageEvent, dest: str = "") -
     if not sand_box.is_running:
         await sand_box.start()
 
-    group_id = message_data.group_id
+    if message_data.group_id is not None:
+        context_messages = (await chat_manager.get_group_context(message_data.group_id)).messages
+    else:
+        context_messages = (await chat_manager.get_private_context(message_data.user_id)).messages
 
     segment: FileMessageSegment | None = None
-    for message in list((await chat_manager.get_group_context(group_id)).messages):
+    for message in list(context_messages):
         for seg in message.segments:
             if isinstance(seg, FileMessageSegment) and seg.file_name == file_name:
                 segment = seg

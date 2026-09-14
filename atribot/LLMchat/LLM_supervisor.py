@@ -426,8 +426,8 @@ class LLMCoordinator():
     ) -> str:
         """处理 tool_search 的发现请求：搜索待发现工具并启用至本轮 request.tool_json
 
-        命中工具加入本轮 request.tool_json 后，后续 API 请求（get_chat_json 每次
-        重新读取 request.tool_json）会自动携带其完整 schema，因此 LLM 可在本轮内直接调用。
+        命中工具加入本轮 request.tool_json 后，后续 API 请求(get_chat_json 每次
+        重新读取 request.tool_json)会自动携带其完整 schema,因此 LLM 可在本轮内直接调用。
 
         Args:
             request: 当前请求（其 tool_json 为本轮独立副本）
@@ -436,16 +436,14 @@ class LLMCoordinator():
         Returns:
             给 LLM 的回执文本
         """
-        if request.tool_json is None:
-            return "本轮对话未启用工具发现机制，无法启用新工具。"
 
-        preset_name = request.tool_json.name
         try:
             matched = self.tool_management.enable_deferred_tools(
-                preset_name=preset_name,
+                preset_name=request.tool_json.name,
                 query=search_req.query,
                 limit=search_req.limit,
                 target_toolset=request.tool_json,
+                chat_type=request.message_data.chat_scope
             )
         except Exception as e:
             self.log.exception(f"tool_search 处理失败: {e}")

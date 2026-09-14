@@ -19,16 +19,32 @@ from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile
 sand_box:DockerSandbox = container.get("SandBox")
 
 
-def _group_dirs(group_id: int | None) -> tuple[str, str]:
-    """返回 (group_data_dir, shared_dir) 两个容器内绝对路径
+def session_dirs(group_id: int | None, user_id: int | None = None) -> tuple[str, str, str, str]:
+    """返回会话工作区路由信息
 
-    group_data_dir 是该群的持久化数据目录;shared_dir 是所有群共享目录
+    群聊按群号隔离: {work_dir}/groups/<群号>/
+    私聊按用户隔离: {work_dir}/private/<QQ号>/
     执行结束后只清理 tmp/run_{uuid} 临时目录,data/ 目录永久保留
+
+    Returns:
+        tuple: (data_dir, shared_dir, session_type, session_id)
+            data_dir 为该会话的持久化数据目录,shared_dir 为全局共享目录
     """
-    gid_str = str(group_id) if group_id is not None else "private"
-    group_data_dir = f"{sand_box.work_dir}/groups/{gid_str}/data"
-    shared_dir = f"{sand_box.work_dir}/shared"
-    return group_data_dir, shared_dir
+    if group_id is not None:
+        session_type = "group"
+        session_id = str(group_id)
+        session_root = f"{sand_box.work_dir}/groups/{session_id}"
+    else:
+        session_type = "private"
+        session_id = str(user_id) if user_id is not None else "anonymous"
+        session_root = f"{sand_box.work_dir}/private/{session_id}"
+    return f"{session_root}/data", f"{sand_box.work_dir}/shared", session_type, session_id
+
+
+def session_workspace(group_id: int | None, user_id: int | None = None) -> str:
+    """返回会话(群/私聊用户)的持久化数据目录(容器内绝对路径)"""
+    data_dir, _, _, _ = session_dirs(group_id, user_id)
+    return data_dir
 
 
 def _safe_filename(name: str) -> str:
@@ -279,6 +295,7 @@ async def run_python_code(
 async def run_python_code_with_segments(
     code: str,
     group_id: int | None = None,
+    user_id: int | None = None,
     file_segments: list[FileMessageSegment] | None = None,
     timeout: int = 30,
     max_file_size: int = 100 * 1024 * 1024,
@@ -294,9 +311,10 @@ async def run_python_code_with_segments(
 
     Args:
         code: 要执行的 Python 代码字符串。
-        group_id: 群号,用于隔离持久化工作区目录,None / 私聊 使用 'private' 目录
+        group_id: 群号,群聊时用于隔离持久化工作区目录。
+        user_id: 用户 QQ 号,私聊(group_id 为 None)时按用户隔离工作区目录。
         file_segments: 输入文件段列表。
-        timeout: 执行超时时间（秒）。
+        timeout: 执行超时（秒）。
         max_file_size: 单个文件大小限制。
         max_total_size: 生成文件总大小限制。
 
@@ -309,19 +327,19 @@ async def run_python_code_with_segments(
     if not sand_box.is_running:
         await sand_box.start()
 
-    group_data_dir, shared_dir = _group_dirs(group_id)
-    gid_str = str(group_id) if group_id is not None else "private"
+    data_dir, shared_dir, session_type, session_id = session_dirs(group_id, user_id)
+    session_root = f"{sand_box.work_dir}/{'groups' if session_type == 'group' else 'private'}/{session_id}"
 
     run_id = uuid.uuid4().hex
-    group_tmp_base = f"{sand_box.work_dir}/groups/{gid_str}/tmp"
-    run_dir = f"{group_tmp_base}/run_{run_id}"
+    session_tmp_base = f"{session_root}/tmp"
+    run_dir = f"{session_tmp_base}/run_{run_id}"
     script_name = "main.py"
     script_path = f"{run_dir}/{script_name}"
 
     ignored_names: set[str] = {script_name}
 
     try:
-        await sand_box.run_command(f"mkdir -p {group_data_dir} {shared_dir} {run_dir}")
+        await sand_box.run_command(f"mkdir -p {data_dir} {shared_dir} {run_dir}")
 
         for segment in file_segments or []:
             if not segment.file_name:
@@ -330,7 +348,7 @@ async def run_python_code_with_segments(
                 raise ValueError(f"文件 {segment.file_name} 缺少可下载的 url")
 
             await _upload_bytes_to_container(
-                content = await _download_https_file(segment.url), 
+                content = await _download_https_file(segment.url),
                 remote_path = f"{run_dir}/{segment.file_name}"
             )
             ignored_names.add(segment.file_name)
@@ -339,8 +357,11 @@ async def run_python_code_with_segments(
         await sand_box.run_command(f"echo {b64_code} | base64 -d > {script_path}")
 
         env_prefix = (
-            f"export GROUP_ID={gid_str} "
-            f"GROUP_WORKSPACE={group_data_dir} "
+            f"export GROUP_ID={session_id} "
+            f"GROUP_WORKSPACE={data_dir} "
+            f"SESSION_TYPE={session_type} "
+            f"SESSION_ID={session_id} "
+            f"SESSION_WORKSPACE={data_dir} "
             f"SHARED_DIR={shared_dir} && "
         )
         exec_result = await sand_box.run_command(
@@ -363,5 +384,5 @@ async def run_python_code_with_segments(
         return exec_result
 
     finally:
-        if run_dir.startswith(group_tmp_base) and "run_" in run_dir:
+        if run_dir.startswith(session_tmp_base) and "run_" in run_dir:
             await sand_box.run_command(f"rm -rf {run_dir}", timeout=5)

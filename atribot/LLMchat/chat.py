@@ -478,7 +478,7 @@ class GroupChat(ChatBasics):
             model=model_name,
             parameter=self.config.model.chat_parameter,
             messages=None,
-            tool_json=self.tool_calls.resolve_toolset(preset="group_chat"),
+            tool_json=self.tool_calls.resolve_toolset(preset="group_chat", chat_type="group"),
             visual_sense=self.visual_sense,
             audio_sense=self.audio_sense,
         )
@@ -733,7 +733,7 @@ class GroupChat(ChatBasics):
             including_videos=including_videos,
         )
         
-        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("group_chat"):
+        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("group_chat", chat_type="group"):
             message_builder.add_text_left(deferred_prompt+self.skills.prompt)#待发现工具的提示词
         else:
             message_builder.add_text_left(
@@ -977,7 +977,7 @@ class PrivateChat(ChatBasics):
             model=model_name,
             parameter=self.config.model.chat_parameter,
             messages=None,
-            tool_json=self.tool_calls.resolve_toolset(preset="private_chat"),
+            tool_json=self.tool_calls.resolve_toolset(preset="private_chat", chat_type="private"),
             visual_sense=self.visual_sense,
             audio_sense=self.audio_sense,
         )
@@ -1083,7 +1083,7 @@ class PrivateChat(ChatBasics):
 
         message_builder = MessageBuilder()
 
-        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("private_chat"):
+        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("private_chat", chat_type="private"):
             message_builder.add_text_left(deferred_prompt + self.skills.prompt)  # 待发现工具的提示词
         else:
             message_builder.add_text_left(self.skills.prompt)  # skills 的提示词
@@ -1182,7 +1182,7 @@ class PrivateChat(ChatBasics):
             including_audios,
             including_videos,
         )
-        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("group_chat"):
+        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("private_chat", chat_type="private"):
             message_builder.add_text_left(deferred_prompt+self.skills.prompt)#待发现工具的提示词
         else:
             message_builder.add_text_left(

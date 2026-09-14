@@ -39,7 +39,8 @@ class SendClientBase(ABC):
         - 互动: send_group_poke, set_msg_emoji_like
         - 富媒体: send_group_json, send_group_music, send_group_pictures,
                  send_group_image, send_group_video, send_group_audio, send_group_file
-        - 私聊媒体: send_personal_pictures, send_personal_audio
+        - 私聊媒体: send_personal_pictures, send_personal_audio,
+                   send_personal_file, send_personal_music
         - 查询: get_group_info, get_stranger_info, get_msg_details,
                get_img_details, get_recordg_details
     """
@@ -293,6 +294,50 @@ class SendClientBase(ABC):
     ) -> dict | None:
         """发送私聊语音"""
         raise NotImplementedError(f"{type(self).__name__} 未实现 send_personal_audio")
+
+    async def send_personal_file(
+        self,
+        qq_id: int,
+        url_file: str = "",
+        name: str | None = None,
+        default: bool = False,
+        local_Path_type: bool = True,
+    ) -> dict | None:
+        """发送私聊文件
+
+        Args:
+            qq_id: 目标用户 QQ 号
+            url_file: 文件 URL、路径或 Base64
+            name: 自定义文件名(可选)
+            default: 是否使用默认文件目录
+            local_Path_type: 是否按本地文件处理
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_personal_file")
+
+    async def send_personal_music(
+        self,
+        qq_id: int,
+        type: str,
+        id: str | None = None,
+        url: str | None = None,
+        image: str | None = None,
+        singer: str | None = None,
+        title: str | None = None,
+        content: str | None = None,
+    ) -> dict | None:
+        """分享音乐到私聊
+
+        Args:
+            qq_id: 目标用户 QQ 号
+            type: 音乐平台 (qq/163/kugou/kuwo/migu/custom)
+            id: 音乐 ID(非 custom 时必填)
+            url: 音乐链接(custom 时必填)
+            image: 封面图片(custom 时必填)
+            singer: 歌手(可选)
+            title: 标题(可选)
+            content: 内容描述(可选)
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_personal_music")
 
     async def get_group_info(self, group_id: int) -> dict | None:
         """获取群信息"""

@@ -33,8 +33,6 @@ async def main(path: str, message_data: atriMessageEvent) -> str:
     if not container.exists("SandBox") or not sand_box.is_running:
         return "[Error]沙盒未运行"
 
-    group_id = message_data.group_id
-
     check = await sand_box.run_command(
         f"test -f {shlex.quote(path)} && echo EXISTS || echo NOTFOUND", timeout=5
     )
@@ -63,19 +61,10 @@ async def main(path: str, message_data: atriMessageEvent) -> str:
         return f"[Error]读取容器文件失败:{e}"
 
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    b64_content = f"base64://{base64.b64encode(content).decode()}"
     if ext in _IMAGE_EXTS:
-        await message_data.send_client.send_group_pictures(
-            group_id=group_id,
-            url_img=f"base64://{base64.b64encode(content).decode()}",
-            local_Path_type=False,
-        )
+        await message_data.deliver_image(b64_content, local_Path_type=False)
         return f"已发送图片:{filename}"
     else:
-        await message_data.send_client.send_group_file(
-            group_id = group_id,
-            url_file = f"base64://{base64.b64encode(content).decode()}",
-            name = filename,
-            local_Path_type = False,
-        )
-        
+        await message_data.deliver_file(url_file=b64_content, name=filename, local_Path_type=False)
         return f"已发送文件: {filename}"

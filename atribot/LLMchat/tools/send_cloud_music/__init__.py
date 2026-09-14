@@ -5,10 +5,6 @@ tool_json = {
     "name": "send_cloud_music",
     "description": "分享来源网易云的歌曲,有人让你唱歌可以调用这个工具",
     "properties": {
-        "group_id": {
-            "type": "number",
-            "description": "要发送的当前群号",
-        },
         "name": {
             "type": "string",
             "description": "歌曲名称",
@@ -17,21 +13,15 @@ tool_json = {
 }
 
 
-async def main(name:str, message_data: atriMessageEvent):
+async def main(name: str, message_data: atriMessageEvent):
     """分享网易云歌曲
 
     Args:
         name (str): 歌曲名称
-        group_id (int | str): 群号
     """
     if music_lsit := await search_music(name):
-        await message_data.send_client.send_group_music(
-            message_data.group_id,
-            "163",
-            str(music_lsit[0]["id"])
-        )
-        
+        await message_data.deliver_music("163", str(music_lsit[0]["id"]))
+
         return f"已发送歌曲:{music_lsit[0]["name"]}"
     else:
         return "没有这首歌"
-

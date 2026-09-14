@@ -330,9 +330,7 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON
 JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。
 <example>
-<think>
-//让我来分析一下当前情况，这是自己对当前情况下做出的一些思考或是一些自己的理解和想法
-</think>
+
 ```json
 {
     "actions":[
@@ -346,9 +344,11 @@ JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对
         }
     ]
 }
+
 ```
-请根据情况灵活的进行工具调用完成任务最后给出你的actions的JSON
+
 </example>
+请根据情况灵活的进行工具调用完成任务最后给出你的actions的JSON
 """
             "</output_requirement>"
             "</context>"  
@@ -402,21 +402,19 @@ JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对
 
 规则:
 decision:string,多选一,必填
-reason:string,必填
-reply_message_id:integer,speak时选填
-content:list[str],speak时必填,其它决策禁止出现
+reason:string,必填 
+content:list[str],speak 时必填；其它决策禁止出现
+user_id:integer,update时选填
 update_field:dict[str,any],update时必填,其它决策禁止出现
 
 **decision选择要求**
-1.思考每个可用decision是否符合当下情况
-2.如果有人对你进行攻击或情绪激动,请耐心回应,不要骂人
+1.思考**所有**的可用的decision中的**每个decision**是否符合当下条件,如果decision使用条件符合聊天内容就使用,不要使用不存在的silence
+2.如果相同的内容已经被执行，请不要重复执行
 
-输出内容要包括一段被<think>包裹的思考文本接一个符合要求且合法的json(参考下面<example>标签内容)
-json里要求是包含"actions"键及其对应的决策列表,里面可以有多个decision
+输出内容要包括<think>内的思考文本接一个符合要求且合法的JSON
+JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。
 <example>
-<think>
-//让我来分析一下当前情况
-</think>
+
 ```json
 {
     "actions":[
@@ -425,14 +423,16 @@ json里要求是包含"actions"键及其对应的决策列表,里面可以有多
             //要求参数
         },
         {
-            "decision":"参数值",
-            //要求参数
-        },
+            "decision":"speak",
+            //对应参数
+        }
     ]
 }
+
 ```
+
 </example>
-不要直接给出答案,请根据情况灵活地进行工具调用完成任务,给出你的actions的json
+请根据情况灵活的进行工具调用完成任务最后给出你的actions的JSON
 """
             "</output_requirement>"
             "</context>"

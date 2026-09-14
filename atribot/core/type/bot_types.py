@@ -1,6 +1,6 @@
 ﻿import time
 from abc import ABC
-from typing import TYPE_CHECKING, Any, Generic, NotRequired, Optional, TypedDict, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, NotRequired, Optional, TypedDict, TypeVar
 
 if TYPE_CHECKING:
     from atribot.core.platform.send_client import SendClientBase
@@ -52,6 +52,7 @@ class atriMessageEvent(ABC, Generic[E]):
         "prevent_default",
         "_extra",
         "group_id",
+        "chat_scope",
         "user_id",
         "is_at",
         "send_client",
@@ -97,6 +98,7 @@ class atriMessageEvent(ABC, Generic[E]):
         ev = self.event
         self.group_id: Optional[int] = getattr(ev, "group_id", None)
         self.user_id: Optional[int] = getattr(ev, "user_id", None)
+        self.chat_scope: ChatScope = "group" if self.group_id else "private" #虽然这个不准确但是够用了
         self.is_at: bool = getattr(ev, "is_at", False)
 
     def update_process_time(self) -> None:
@@ -208,6 +210,120 @@ class atriMessageEvent(ABC, Generic[E]):
         msg.add_text(text)
         return msg
 
+    async def deliver_image(
+        self,
+        url_img: str,
+        default: bool = False,
+        local_Path_type: bool = True,
+    ) -> Any:
+        """发送图片到当前会话(群聊发群、私聊发私)
+
+        Args:
+            url_img: 图片 URL、本地路径或 Base64 字符串
+            default: 是否使用默认图片目录
+            local_Path_type: 是否按本地文件处理
+        """
+        if self.group_id is not None:
+            return await self.send_client.send_group_pictures(
+                self.group_id, url_img, default, local_Path_type
+            )
+        return await self.send_client.send_personal_pictures(
+            self.user_id, url_img, default, local_Path_type
+        )
+
+    async def deliver_file(
+        self,
+        url_file: str,
+        name: str | None = None,
+        default: bool = False,
+        local_Path_type: bool = True,
+    ) -> Any:
+        """发送文件到当前会话(群聊发群、私聊发私)
+
+        Args:
+            url_file: 文件 URL、本地路径或 Base64 字符串
+            name: 自定义文件名(可选)
+            default: 是否使用默认文件目录
+            local_Path_type: 是否按本地文件处理
+        """
+        if self.group_id is not None:
+            return await self.send_client.send_group_file(
+                self.group_id, url_file, name, default, local_Path_type
+            )
+        return await self.send_client.send_personal_file(
+            self.user_id, url_file, name, default, local_Path_type
+        )
+
+    async def deliver_merge_text(self, message: str, source: str = "ATRI") -> Any:
+        """发送合并转发文本到当前会话(用于长文本防刷屏)
+
+        Args:
+            message: 消息内容
+            source: 消息来源标题
+        """
+        if self.group_id is not None:
+            return await self.send_client.send_group_merge_text(
+                group_id=self.group_id, message=message, source=source
+            )
+        return await self.send_client.send_private_merge_text(
+            qq_id=self.user_id, message=message, source=source
+        )
+
+    async def deliver_audio(
+        self,
+        url_audio: str,
+        default: bool = False,
+        local_Path_type: bool = True,
+    ) -> Any:
+        """发送语音到当前会话(群聊发群、私聊发私)
+
+        Args:
+            url_audio: 语音 URL、本地路径或 Base64 字符串
+            default: 是否使用默认音频目录
+            local_Path_type: 是否按本地文件处理
+        """
+        if self.group_id is not None:
+            return await self.send_client.send_group_audio(
+                self.group_id, url_audio, default, local_Path_type
+            )
+        return await self.send_client.send_personal_audio(
+            self.user_id, url_audio, default, local_Path_type
+        )
+
+    async def deliver_music(
+        self,
+        type: str,
+        id: str | None = None,
+        url: str | None = None,
+        image: str | None = None,
+        singer: str | None = None,
+        title: str | None = None,
+        content: str | None = None,
+    ) -> Any:
+        """分享音乐卡片到当前会话(群聊发群、私聊发私)
+
+        Args:
+            type: 音乐平台 (qq/163/kugou/kuwo/migu/custom)
+            id: 音乐 ID(非 custom 时必填)
+            url: 音乐链接(custom 时必填)
+            image: 封面图片(custom 时必填)
+            singer: 歌手(可选)
+            title: 标题(可选)
+            content: 内容描述(可选)
+        """
+        kwargs = {
+            "type": type,
+            "id": id,
+            "url": url,
+            "image": image,
+            "singer": singer,
+            "title": title,
+            "content": content,
+        }
+        if self.group_id is not None:
+            return await self.send_client.send_group_music(self.group_id, **kwargs)
+        return await self.send_client.send_personal_music(self.user_id, **kwargs)
+
     def __repr__(self) -> str:
         ev_type = type(self.event).__name__
         return (
@@ -224,6 +340,7 @@ class extra(TypedDict):
     group_context:NotRequired[GroupContext]
     private_context:NotRequired[PrivateContext]
 
+ChatScope = Literal["group", "private"]
 
 MessageEventEnvelope = atriMessageEvent[MessageEvent]
 """通用消息事件信封"""

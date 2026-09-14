@@ -630,6 +630,46 @@ class OneBotSendClient(SendClientBase):
         message = [{"type": "file", "data": data_payload}]
         return await self.send_private_msg(qq_id, message)
 
+    async def send_personal_music(
+        self,
+        qq_id: int,
+        type: str,
+        id: str | None = None,
+        url: str | None = None,
+        image: str | None = None,
+        singer: str | None = None,
+        title: str | None = None,
+        content: str | None = None,
+    ) -> dict | None:
+        """分享音乐到私聊
+
+        Args:
+            qq_id: 目标 QQ 号
+            type: 音乐平台 (qq/163/kugou/kuwo/migu/custom)
+            id: 音乐 ID(非 custom 时必填)
+            url: 音乐链接(custom 时必填)
+            image: 封面图片(custom 时必填)
+            singer: 歌手(可选)
+            title: 标题(可选)
+            content: 内容描述(可选)
+        """
+        if type != "custom" and not id:
+            raise ValueError("当 type 不是 'custom' 时,id 必须提供")
+        if type == "custom" and (not url or not image):
+            raise ValueError("当 type 是 'custom' 时,url 和 image 必须提供")
+
+        data = {
+            "type": type,
+            "id": id,
+            "url": url,
+            "image": image,
+            "singer": singer,
+            "title": title,
+            "content": content,
+        }
+        message = [{"type": "music", "data": {k: v for k, v in data.items() if v is not None}}]
+        return await self.send_private_msg(qq_id, message)
+
     def __getattr__(self, item: str):
         """动态代理：将未定义的方法调用转换为 API 请求
         

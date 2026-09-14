@@ -3,6 +3,7 @@ import shlex
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
+from atribot.LLMchat.tools.run_python_code.run_code import session_workspace
 
 sand_box: DockerSandbox = container.get("SandBox")
 
@@ -12,7 +13,8 @@ tool_json = {
     "name": "run_command",
     "description": (
         "在沙盒中执行中执行Shell命令,环境是Python3.12-slim预装ffmpeg"
-        "拥有独立的持久化工作区：/workspace/groups/<群号>/data "
+        "拥有独立的持久化工作区：群聊为 /workspace/groups/<群号>/data,"
+        "私聊为 /workspace/private/<你的QQ号>/data,不填path时默认使用当前会话的持久化目录 "
         "输出超过限制时仅返回末尾部分,"
         "返回值包含退出码，可据此判断命令是否执行成功"
     ),
@@ -23,7 +25,7 @@ tool_json = {
         },
         "path": {
             "type": "string",
-            "description": "工作目录（容器内绝对路径）不填时默认使用当前群的持久化目录 /workspace/groups/<群号>/data",
+            "description": "执行命令的目录（容器内绝对路径）不填时默认使用当前会话(群聊按群/私聊按用户)的持久化目录",
         },
         "timeout": {
             "type": "integer",
@@ -42,7 +44,7 @@ async def main(command: str, message_data: atriMessageEvent, path: str | None = 
         await sand_box.start()
 
     if path is None:
-        path = f"/workspace/groups/{message_data.group_id}/data"
+        path = session_workspace(message_data.group_id, message_data.user_id)
 
     # 确保工作目录存在
     await sand_box.run_command(f"mkdir -p {shlex.quote(path)}", timeout=10)
@@ -50,8 +52,7 @@ async def main(command: str, message_data: atriMessageEvent, path: str | None = 
     timeout = max(1, min(timeout, 300))
     full_cmd = f"cd {shlex.quote(path)} && {command}"
 
-    await message_data.send_client.send_group_merge_text(
-        group_id=message_data.group_id,
+    await message_data.deliver_merge_text(
         message=f"在 {path} 目录执行命令:\n{command}",
         source="执行Shell命令"
     )

@@ -37,11 +37,6 @@ async def main(text: str, message_data: atriMessageEvent, emotion: str = "高兴
         emotion = emotion,
         speed = speed
     )
-    if message_data.group_id is not None:
-        await message_data.send_client.send_group_audio(message_data.group_id, audio_path, default=True)
-    else:
-        await message_data.send_client.send_personal_audio(
-            message_data.user_id, audio_path, default=True, local_Path_type=True
-        )
+    await message_data.deliver_audio(audio_path, default=True, local_Path_type=True)
 
     return f"已发送语音：{text}"

@@ -87,6 +87,7 @@ class ToolRegistry:
         concurrent: bool = False,
         background: bool = False,
         active: bool = True,
+        chat_scope: str = "both",
         handler_module_path: str | None = None,
     ) -> None:
         """添加本地函数调用工具
@@ -99,6 +100,7 @@ class ToolRegistry:
             concurrent: 是否允许并发执行
             background: 是否为后台任务
             active: 是否启用
+            chat_scope: 适用会话场景,"group"/"private"/"both"
             handler_module_path: handler 所在模块路径
         """
         self.remove_func(name)
@@ -115,10 +117,11 @@ class ToolRegistry:
             concurrent=concurrent,
             background=background,
             active=active,
+            chat_scope=chat_scope,
             handler_module_path=handler_module_path,
         )
         self.func_list.append(_func)
-        self.log.info(f"添加本地函数调用工具: {name}")
+        self.log.info(f"添加本地函数调用工具: {name} (chat_scope={_func.chat_scope})")
 
     def remove_func(self, name: str) -> None:
         """按名称删除工具"""
@@ -214,6 +217,7 @@ class ToolRegistry:
                 concurrent=tool_json.get("concurrent", False),
                 background=tool_json.get("background", False),
                 active=tool_json.get("active", True),
+                chat_scope=tool_json.get("chat_scope", "both"),
                 handler_module_path=spec.origin,
             )
 
@@ -230,6 +234,7 @@ class ToolRegistry:
                 concurrent=tool_json.get("concurrent", False),
                 background=tool_json.get("background", False),
                 active=tool_json.get("active", True),
+                chat_scope=tool_json.get("chat_scope", "both"),
             )
 
     @classmethod
@@ -264,6 +269,7 @@ class ToolRegistry:
         concurrent: bool = False,
         background: bool = False,
         active: bool = True,
+        chat_scope: str = "both",
     ):
         """工具注册装饰器（便捷版）
 
@@ -286,6 +292,7 @@ class ToolRegistry:
             "concurrent": concurrent,
             "background": background,
             "active": active,
+            "chat_scope": chat_scope,
         }
 
         def decorator(func: Any) -> Any:
@@ -426,6 +433,7 @@ class ToolPresetManager:
         full_toolset: ToolSetModel,
         names: List[str] | None = None,
         preset: str | None = None,
+        chat_type: str | None = None,
     ) -> ToolSetModel:
         """解析工具集合:preset 优先于 names,均未指定时返回全量集合
 
@@ -433,19 +441,25 @@ class ToolPresetManager:
             full_toolset: 全量工具集合（用于按 names 筛选）
             names: 工具名称列表
             preset: 预设名称
+            chat_type: 会话场景("group"/"private"),指定后剔除不适用该场景的工具
 
         Returns:
             解析后的工具集合
         """
         if preset is not None:
             if toolset := self.presets.get(preset):
-                return toolset
+                resolved = toolset
             else:
                 self.log.warning(f"工具预设 '{preset}' 不存在，将返回空工具集合")
                 return ToolSetModel()
-        if names is not None:
-            return full_toolset.filter_by_names(names)
-        return full_toolset
+        elif names is not None:
+            resolved = full_toolset.filter_by_names(names)
+        else:
+            resolved = full_toolset
+
+        if chat_type is not None:
+            resolved = resolved.filter_by_chat_scope(chat_type)
+        return resolved
 
 
 class ToolSchemaCache:
@@ -681,6 +695,7 @@ class ToolCalls(ServiceBase):
         concurrent: bool = False,
         background: bool = False,
         active: bool = True,
+        chat_scope: str = "both",
     ):
         """工具注册装饰器（便捷版）
 
@@ -709,6 +724,7 @@ class ToolCalls(ServiceBase):
             concurrent=concurrent,
             background=background,
             active=active,
+            chat_scope=chat_scope,
         )
 
 
@@ -767,6 +783,7 @@ class ToolCalls(ServiceBase):
         full_toolset: ToolSetModel | None = None,
         names: List[str] | None = None,
         preset: str | None = None,
+        chat_type: str | None = None,
     ) -> ToolSetModel:
         """解析工具集合:preset 优先于 names,均未指定时返回全量集合
 
@@ -774,13 +791,14 @@ class ToolCalls(ServiceBase):
             full_toolset: 全量工具集合（用于按 names 筛选），为 None 时自动从当前注册表构建
             names: 工具名称列表
             preset: 预设名称
+            chat_type: 会话场景("group"/"private"),指定后剔除不适用该场景的工具
 
         Returns:
             解析后的工具集合
         """
         if full_toolset is None:
             full_toolset = self._build_full_toolset()
-        return self._preset_manager.resolve_toolset(full_toolset, names, preset)
+        return self._preset_manager.resolve_toolset(full_toolset, names, preset, chat_type)
 
     def get_openai(
         self,
@@ -805,49 +823,59 @@ class ToolCalls(ServiceBase):
         omit_empty_parameter_field: bool = False,
         names: List[str] | None = None,
         preset: str | None = None,
+        chat_type: str | None = None,
     ) -> list:
         """获取 OpenAI 格式工具描述，支持按 preset 或 names 过滤"""
         full = self._build_full_toolset()
-        resolved = self._preset_manager.resolve_toolset(full, names, preset)
+        resolved = self._preset_manager.resolve_toolset(full, names, preset, chat_type)
         return self._schema_cache.get_openai(omit_empty_parameter_field, toolset=resolved)
 
     def get_func_desc_anthropic_style(
         self,
         names: List[str] | None = None,
         preset: str | None = None,
+        chat_type: str | None = None,
     ) -> list:
         """获取 Anthropic 格式工具描述，支持按 preset 或 names 过滤"""
         full = self._build_full_toolset()
-        resolved = self._preset_manager.resolve_toolset(full, names, preset)
+        resolved = self._preset_manager.resolve_toolset(full, names, preset, chat_type)
         return self._schema_cache.get_anthropic(toolset=resolved)
 
     def get_func_desc_google_genai_style(
         self,
         names: List[str] | None = None,
         preset: str | None = None,
+        chat_type: str | None = None,
     ) -> dict:
         """获取 Google GenAI 格式工具描述，支持按 preset 或 names 过滤"""
         full = self._build_full_toolset()
-        resolved = self._preset_manager.resolve_toolset(full, names, preset)
+        resolved = self._preset_manager.resolve_toolset(full, names, preset, chat_type)
         return self._schema_cache.get_google(toolset=resolved)
 
-    def get_deferred_tools(self, preset_name: str) -> List[FunctionTool]:
+    def get_deferred_tools(
+        self, preset_name: str, chat_type: str | None = None
+    ) -> List[FunctionTool]:
         """返回指定预设的待发现(deferred)工具列表
 
-        按预设配置的 deferred 名单从注册表解析，跳过未注册或未激活的工具。
+        按预设配置的 deferred 名单从注册表解析，跳过未注册或未激活的工具；
+        指定 ``chat_type`` 时同时剔除不适用该场景的工具。
 
         Args:
-            preset_name: 预设名称
+            preset_name: 预设名
+            chat_type: 会话场景("group"/"private"),None 表示不过滤
 
         Returns:
             待发现且可用的工具列表
         """
         names = self._preset_manager.deferred.get(preset_name, [])
-        return [
+        tools = [
             t
             for n in names
             if (t := self._registry.get_func(n)) is not None and t.active
         ]
+        if chat_type is not None:
+            tools = [t for t in tools if t.chat_scope in ("both", chat_type)]
+        return tools
 
     def enable_deferred_tools(
         self,
@@ -855,6 +883,7 @@ class ToolCalls(ServiceBase):
         limit: int,
         target_toolset: ToolSetModel,
         preset_name: str = "",
+        chat_type: str | None = None,
     ) -> List[FunctionTool]:
         """搜索待发现工具并将命中项加入目标工具集合（本轮生效）
 
@@ -863,15 +892,20 @@ class ToolCalls(ServiceBase):
             limit: 最多启用工具数量
             target_toolset: 目标工具集合（本轮副本），命中工具将加入其中
             preset_name: 预设名，用于定位待发现名单
+            chat_type: 会话场景("group"/"private"),None 表示不过滤
 
         Returns:
             命中并已加入目标集合的工具列表
         """
         if preset_name:
-            deferred_tools = self.get_deferred_tools(preset_name)
+            deferred_tools = self.get_deferred_tools(preset_name, chat_type)
         else:
             full = self._build_full_toolset()
             deferred_tools = [t for t in full if t.active]
+            if chat_type is not None:
+                deferred_tools = [
+                    t for t in deferred_tools if t.chat_scope in ("both", chat_type)
+                ]
 
         current_names = set(target_toolset.names())
         candidates = [t for t in deferred_tools if t.name not in current_names]
@@ -886,19 +920,23 @@ class ToolCalls(ServiceBase):
             target_toolset.add_tool(t)
         return matched
 
-    def get_deferred_tools_prompt(self, preset_name: str) -> str:
+    def get_deferred_tools_prompt(
+        self, preset_name: str, chat_type: str | None = None
+    ) -> str:
         """构建并缓存"待发现工具"提示词段落
 
         Args:
-            preset_name: 预设名称
+            preset_name: 预设名
+            chat_type: 会话场景("group"/"private"),None 表示不过滤
 
         Returns:
             提示词段落文本；无待发现工具时返回空字符串
         """
-        if preset_name in self._deferred_prompt_cache:
-            return self._deferred_prompt_cache[preset_name]
+        cache_key = f"{preset_name}|{chat_type or 'all'}"
+        if cache_key in self._deferred_prompt_cache:
+            return self._deferred_prompt_cache[cache_key]
 
-        deferred = self.get_deferred_tools(preset_name)
+        deferred = self.get_deferred_tools(preset_name, chat_type)
         if not deferred:
             text = ""
         else:
@@ -917,7 +955,7 @@ class ToolCalls(ServiceBase):
             ]
             text = "\n".join(lines)
 
-        self._deferred_prompt_cache[preset_name] = text
+        self._deferred_prompt_cache[cache_key] = text
         return text
 
     def build_tool_description_cache(self) -> None:

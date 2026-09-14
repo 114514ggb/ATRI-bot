@@ -3,6 +3,7 @@ from atribot.core.type.bot_types import atriMessageEvent
 tool_json = {
     "name": "set_group_ban",
     "description": "尝试禁言群里的一个user,不能禁言群主或是管理员而且你必须要是群管理员才能使用",
+    "chat_scope": "group",
     "properties": {
         "user_id": {
             "type": "string",
