@@ -1,0 +1,227 @@
+/* ============================================================
+   ATRI 管理面板 - 基础层：变量 / 亮暗主题 / 字体 / 滚动条 / 重置
+   ============================================================ */
+
+:root {
+  /* 亮色主题（Apple 风格） */
+  --bg: #f5f5f7;
+  --bg-card: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-input: #f5f5f7;
+  --bg-sidebar: rgba(255, 255, 255, 0.86);
+  --bg-topbar: rgba(245, 245, 247, 0.75);
+  --bg-code: #f5f5f7;
+  --bg-glass: rgba(255, 255, 255, 0.72);
+
+  --text: #1d1d1f;
+  --text-2: #515154;
+  --text-3: #86868b;
+  --text-caption: #a1a1a6;
+
+  --border: rgba(0, 0, 0, 0.09);
+  --border-strong: rgba(0, 0, 0, 0.16);
+
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: rgba(0, 113, 227, 0.1);
+  --on-accent: #ffffff;
+
+  --green: #34c759;
+  --green-soft: rgba(52, 199, 89, 0.14);
+  --red: #ff3b30;
+  --red-soft: rgba(255, 59, 48, 0.12);
+  --orange: #ff9500;
+  --orange-soft: rgba(255, 149, 0, 0.14);
+  --purple: #af52de;
+  --purple-soft: rgba(175, 82, 222, 0.12);
+  --teal: #5ac8fa;
+  --teal-soft: rgba(90, 200, 250, 0.14);
+  --yellow: #ffd60a;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.07), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.14);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.28);
+
+  /* 代码高亮 */
+  --code-key: #a12fae;
+  --code-str: #27815c;
+  --code-num: #1a5fb4;
+  --code-bool: #b64c00;
+  --code-null: #8a8a8e;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --sidebar-w: 248px;
+  --topbar-h: 60px;
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+[data-theme="dark"] {
+  --bg: #161618;
+  --bg-card: #212124;
+  --bg-elevated: #2c2c30;
+  --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-input: #2a2a2e;
+  --bg-sidebar: rgba(24, 24, 27, 0.9);
+  --bg-topbar: rgba(22, 22, 24, 0.78);
+  --bg-code: #1a1a1d;
+  --bg-glass: rgba(33, 33, 36, 0.78);
+
+  --text: #f5f5f7;
+  --text-2: #c7c7cc;
+  --text-3: #98989e;
+  --text-caption: #77777d;
+
+  --border: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.2);
+
+  --accent: #0a84ff;
+  --accent-hover: #3395ff;
+  --accent-soft: rgba(10, 132, 255, 0.16);
+  --on-accent: #ffffff;
+
+  --green: #30d158;
+  --green-soft: rgba(48, 209, 88, 0.16);
+  --red: #ff453a;
+  --red-soft: rgba(255, 69, 58, 0.16);
+  --orange: #ff9f0a;
+  --orange-soft: rgba(255, 159, 10, 0.16);
+  --purple: #bf5af2;
+  --purple-soft: rgba(191, 90, 242, 0.16);
+  --teal: #64d2ff;
+  --teal-soft: rgba(100, 210, 255, 0.16);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
+  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.55);
+  --shadow-modal: 0 24px 80px rgba(0, 0, 0, 0.7);
+
+  --code-key: #d670d6;
+  --code-str: #6adb92;
+  --code-num: #71a9f8;
+  --code-bool: #ff9f64;
+  --code-null: #8e8e93;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.35s var(--ease-out), color 0.35s var(--ease-out);
+  overflow: hidden;
+}
+
+::selection { background: var(--accent-soft); }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background-color: var(--text-caption); }
+
+a { color: var(--accent); text-decoration: none; }
+code, pre, .mono { font-family: var(--font-mono); }
+
+.hidden { display: none !important; }
+.muted { color: var(--text-3); }
+.small { font-size: 12.5px; }
+
+/* ---------- 通用动画 ---------- */
+
+@keyframes fade-slide-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.92) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes shake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-4px); }
+  40%, 60% { transform: translateX(4px); }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { box-shadow: 0 0 0 0 var(--green-soft); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+
+@keyframes bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes zoom-fade {
+  from { opacity: 0; transform: scale(1.06); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* 豁免：开关拨动等短促的交互反馈微动效，
+     减弱动画只应关闭装饰性大动效（视图滑入/脉冲/弹跳），不应让开关切换显得卡死 */
+  .toggle .track,
+  .toggle .thumb {
+    transition-duration: 0.22s !important;
+    transition-timing-function: ease !important; /* 不用带回弹的弹簧曲线 */
+  }
+}

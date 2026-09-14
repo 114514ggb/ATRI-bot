@@ -147,5 +147,10 @@
         "port":5432,
         "user":"postgres",
         "password":"atri"
+    },
+    "web_panel":{
+        "enable":true,
+        "port":5125,
+        "access_token":"ATRI"
     }
 }

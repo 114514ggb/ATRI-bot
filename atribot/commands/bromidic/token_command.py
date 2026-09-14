@@ -92,6 +92,12 @@ async def main(message_data: MessageEventEnvelope, group: int | None, user: int 
                 message=reply,
                 source="查询token统计",
             )
+        else:
+            await message_data.send_client.send_private_merge_text(
+                qq_id=message_data.user_id,
+                message=reply,
+                source="查询token统计",
+            )
 
     except Exception as e:
         log.error(f"查询Token消耗失败: {e}\n{traceback.format_exc()}")

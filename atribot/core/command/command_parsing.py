@@ -496,6 +496,7 @@ class CommandSystem:
                 if param.required and not remaining_positionals:
                     raise ValueError(f"缺少必需参数: {param.name}")
                 parsed_args[param.name] = [self._convert_value(val, param.type) for val in remaining_positionals]
+                pos_index = len(positionals)
                 break
             else:
                 if pos_index < len(positionals):
@@ -506,6 +507,11 @@ class CommandSystem:
                     pos_index += 1
                 elif param.required:
                     raise ValueError(f"缺少必需参数: {param.name}")
+
+        #多余的位置参数直接报错
+        if pos_index < len(positionals):
+            extra = " ".join(positionals[pos_index:])
+            raise ValueError(f"多余的参数: {extra}（该命令不接受这些参数，输入 /{command_name} --help 查看正确用法）")
         
         # 验证必需参数
         for name, param in command.params.items():

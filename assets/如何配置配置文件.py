@@ -199,6 +199,11 @@
         "port":5432,#连接的端口号
         "user":"postgres",#连接数据库的user名称
         "password":"180710"#密码
+    },
+    "web_panel":{#Web 管理面板的配置，可选；整个节点不写的话默认启用、端口 8090
+        "enable":True,#是否启动管理面板，启动后浏览器访问 http://127.0.0.1:端口/admin/
+        "port":5125,#面板监听的端口，只绑定本机 127.0.0.1，外部无法访问
+        "access_token":""#面板登录令牌，留空就用第一个平台的 access_token，也可以用环境变量 ATRI_PANEL_TOKEN 指定
     }
 }
 

@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from logging import Logger
 from typing import Any, Awaitable
 
@@ -97,6 +98,8 @@ class BotFramework:
         """标记是否已经完成关闭"""
         self._platform_manager: PlatformManager | None = None
         """平台管理器实例"""
+        self._admin_server: uvicorn.Server | None = None
+        """管理面板的 uvicorn 服务器，关闭时用于通知其平滑退出"""
 
     @classmethod
     async def create(cls):
@@ -215,29 +218,42 @@ class BotFramework:
         trigger = container.get_by_type(TimeTriggerSupervisor)
         await trigger.start()
 
-        # self.create_background_task(self._start_admin_panel(), name="BotFramework.admin_panel")
+        self.create_background_task(self._start_admin_panel(), name="BotFramework.admin_panel")
 
     async def _start_admin_panel(self) -> None:
-        """在独立端口启动 Web 管理面板"""
+        """在独立端口启动 Web 管理面板（web_panel.enable=false 时跳过）"""
+        panel_cfg = self.config._raw_config.get("web_panel") or {}
+        if panel_cfg.get("enable") is False:
+            self.log.info("管理面板已在配置中禁用（web_panel.enable = false），跳过启动")
+            return
+
+        from atribot.web_panel.panel_router import _ensure_log_handler, mount_static
         from atribot.web_panel.panel_router import router as admin_router
+
+        _ensure_log_handler()
 
         admin_app = FastAPI(title="ATRI Admin Panel", docs_url=None, redoc_url=None)
         admin_app.add_middleware(
             CORSMiddleware,
             allow_origins=["http://localhost", "http://127.0.0.1"],
-            allow_methods=["GET", "POST"],
+            allow_methods=["GET", "POST", "PUT", "DELETE"],
             allow_headers=["Authorization", "Content-Type"],
         )
         admin_app.include_router(admin_router)
+        mount_static(admin_app)
 
-        admin_port = getattr(self.config.network, "admin_port", self.config.network.server_port + 1)
+        admin_port = panel_cfg.get("port") or 8090
         cfg = uvicorn.Config(
             admin_app,
             host="127.0.0.1",
             port=admin_port,
             log_level="warning",
+            timeout_graceful_shutdown=3,
         )
         server = uvicorn.Server(cfg)
+
+        server.capture_signals = lambda: contextlib.nullcontext()
+        self._admin_server = server
         self.log.info(f"管理面板已就绪: http://127.0.0.1:{admin_port}/admin/")
         await server.serve()
 
@@ -280,10 +296,30 @@ class BotFramework:
 
         self.log.info("正在清理回收资源~")
 
+        await self._stop_admin_panel()
         await self._cancel_background_tasks()
         await container.shutdown()
 
         self._is_shutdown = True
+
+    async def _stop_admin_panel(self) -> None:
+        """通知管理面板平滑退出"""
+        server = self._admin_server
+        if server is None or server.should_exit:
+            return
+
+        server.should_exit = True
+        panel_task = next(
+            (t for t in self._background_tasks if t.get_name() == "BotFramework.admin_panel"),
+            None,
+        )
+        if panel_task is None:
+            return
+
+        try:
+            await asyncio.wait_for(asyncio.shield(panel_task), timeout=3.0)
+        except (TimeoutError, asyncio.CancelledError):
+            pass
 
     async def _cancel_background_tasks(self) -> None:
         """取消并等待所有受控后台任务"""

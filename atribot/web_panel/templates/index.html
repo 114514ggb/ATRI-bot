@@ -1,224 +1,98 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATRI Web 管理面板</title>
-    <link rel="stylesheet" href="/admin/static/style.css">
-    <!-- Using Apple system fonts as fallback -->
-    <style>
-        @font-face {
-            font-family: 'SF Pro Display';
-            font-weight: 400;
-            src: local('System Font');
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>ATRI 控制台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='24' fill='%230071e3'/%3E%3Ctext x='50' y='68' font-size='52' font-weight='bold' text-anchor='middle' fill='white' font-family='Arial'%3EA%3C/text%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/admin/static/css/base.css">
+  <link rel="stylesheet" href="/admin/static/css/layout.css">
+  <link rel="stylesheet" href="/admin/static/css/components.css">
+  <link rel="stylesheet" href="/admin/static/css/views.css">
+  <script>
+    /* 主题在 CSS 加载前应用，避免闪烁 */
+    (function () {
+      var saved = localStorage.getItem('atri_theme');
+      var theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
 </head>
 <body>
-    <div id="login-overlay" class="overlay active">
-        <div class="login-card">
-            <h2>ATRI 管理后台</h2>
-            <p class="caption">需要进行身份验证</p>
-            <div class="input-group">
-                <input type="password" id="access-token" class="apple-input" placeholder="输入访问令牌 (Access Token)" />
-            </div>
-            <button id="login-btn" class="btn btn-primary w-full">验证身份</button>
-            <p id="login-error" class="error-text" style="display: none;">无效的令牌</p>
+
+  <!-- 登录层 -->
+  <div id="login-overlay" class="login-overlay hidden">
+    <div class="login-card">
+      <div class="login-logo">A</div>
+      <h1 class="login-title">ATRI 控制台</h1>
+      <p class="login-sub">Web 管理面板 · 输入访问令牌登录</p>
+      <input class="input" id="access-token" type="password" placeholder="访问令牌（Access Token）"
+             autocomplete="current-password" style="text-align:center">
+      <button class="btn primary" id="login-btn" style="width:100%;margin-top:16px;padding:11px">登 录</button>
+      <div class="login-error" id="login-error"></div>
+      <p class="small" style="margin-top:22px;color:var(--text-caption)">
+        令牌来自 config.json 的 web_panel.access_token，未配置时为第一个平台的 access_token
+      </p>
+    </div>
+  </div>
+
+  <!-- 应用 -->
+  <div id="app" class="app hidden">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-badge">A</div>
+        <div class="brand-text">ATRI<small>管理控制台</small></div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-group-label">总览</div>
+        <a class="nav-item" data-view="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg>仪表盘</a>
+        <a class="nav-item" data-view="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>实时日志</a>
+
+        <div class="nav-group-label">数据</div>
+        <a class="nav-item" data-view="groups"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>群组列表</a>
+        <a class="nav-item" data-view="users"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>用户管理</a>
+        <a class="nav-item" data-view="messages"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>消息记录</a>
+        <a class="nav-item" data-view="memory"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/><path d="M9 21h6"/></svg>记忆管理</a>
+        <a class="nav-item" data-view="commands"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>命令列表</a>
+
+        <div class="nav-group-label">配置</div>
+        <a class="nav-item" data-view="config"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>主配置</a>
+        <a class="nav-item" data-view="supplier"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9z"/></svg>模型供应商</a>
+        <a class="nav-item" data-view="mcp"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>MCP 配置</a>
+        <a class="nav-item" data-view="personas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7z"/><path d="M9 21h6"/></svg>人设管理</a>
+
+        <div class="nav-group-label">操作</div>
+        <a class="nav-item" data-view="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4z"/><path d="M22 2 11 13"/></svg>发送消息</a>
+      </nav>
+      <div class="sidebar-footer">
+        <span class="bot-status"><span class="dot green"></span>ATRI</span>
+        <span class="small muted">Console</span>
+      </div>
+    </aside>
+
+    <div class="main-col">
+      <header class="topbar">
+        <button class="icon-btn" id="btn-sidebar-toggle" title="收起/展开侧栏">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+        </button>
+        <h1 id="view-title">仪表盘</h1>
+        <button class="icon-btn" id="btn-theme" title="切换浅色/暗色主题">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        </button>
+        <div class="menu-wrap" id="system-menu-wrap">
+          <button class="icon-btn" id="btn-system" title="系统操作">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg>
+          </button>
         </div>
+      </header>
+
+      <main class="view-scroll" id="view-scroll"></main>
     </div>
+  </div>
 
-    <div id="app" style="display: none;">
-        <nav class="sidebar">
-            <div class="sidebar-header">
-                <h2>ATRI</h2>
-            </div>
-            <ul class="nav-menu">
-                <li class="nav-item active" data-view="dashboard">仪表盘</li>
-                <li class="nav-item" data-view="groups">群组列表</li>
-                <li class="nav-item" data-view="users">用户列表</li>
-                <li class="nav-item" data-view="messages">消息记录</li>
-                <li class="nav-item" data-view="memory">系统记忆</li>
-                <li class="nav-item" data-view="commands">命令列表</li>
-                <li class="nav-item" data-view="config">配置文件</li>
-                <li class="nav-item" data-view="supplier">模型配置</li>
-                <li class="nav-item" data-view="send-msg">发送消息</li>
-            </ul>
-        </nav>
-        <main class="main-content">
-            <header class="topbar">
-                <h1 id="view-title">仪表盘</h1>
-                <div class="status-indicator">
-                    <span class="dot online" id="topbar-dot"></span>
-                    <span id="topbar-status">已连接</span>
-                    <button id="btn-logout" class="btn btn-secondary" style="margin-left: 10px;">退出</button>
-                </div>
-            </header>
-            
-            <div class="view-container">
-                <!-- Dashboard View -->
-                <div id="view-dashboard" class="view active">
-                    <div class="stats-grid" id="dashboard-stats">
-                        <!-- Stats cards will be injected here -->
-                    </div>
-                    <div class="card mt-4">
-                        <div class="card-header">
-                            <h3>系统运行状态</h3>
-                        </div>
-                        <div class="card-body" id="dashboard-status">
-                            <!-- System status will be injected here -->
-                        </div>
-                    </div>
-                </div>
+  <div id="modal-root"></div>
 
-                <!-- Groups View -->
-                <div id="view-groups" class="view">
-                    <div class="card">
-                        <div class="table-responsive">
-                            <table class="apple-table">
-                                <thead>
-                                    <tr>
-                                        <th>群组 ID</th>
-                                        <th>群组名称</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="groups-table-body"></tbody>
-                            </table>
-                        </div>
-                        <div class="pagination" id="groups-pagination"></div>
-                    </div>
-                </div>
-
-                <!-- Users View -->
-                <div id="view-users" class="view">
-                    <div class="card">
-                        <div class="table-responsive">
-                            <table class="apple-table">
-                                <thead>
-                                    <tr>
-                                        <th>用户 ID</th>
-                                        <th>昵称</th>
-                                        <th>权限级别</th>
-                                        <th>最近更新</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="users-table-body"></tbody>
-                            </table>
-                        </div>
-                        <div class="pagination" id="users-pagination"></div>
-                    </div>
-                </div>
-
-                <!-- Messages View -->
-                <div id="view-messages" class="view">
-                    <div class="filter-bar">
-                        <input type="number" id="filter-msg-group" placeholder="筛选 群组 ID" class="apple-input">
-                        <input type="number" id="filter-msg-user" placeholder="筛选 用户 ID" class="apple-input">
-                        <button id="btn-filter-msg" class="btn btn-secondary">筛选当前项</button>
-                    </div>
-                    <div class="card mt-4">
-                        <div class="table-responsive">
-                            <table class="apple-table">
-                                <thead>
-                                    <tr>
-                                        <th>时间戳</th>
-                                        <th>群组 ID</th>
-                                        <th>发信人</th>
-                                        <th>消息内容</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="messages-table-body"></tbody>
-                            </table>
-                        </div>
-                        <div class="pagination" id="messages-pagination"></div>
-                    </div>
-                </div>
-
-                <!-- Memory View -->
-                <div id="view-memory" class="view">
-                    <div class="filter-bar">
-                        <input type="text" id="filter-mem-cat" placeholder="键入记忆 分类" class="apple-input">
-                        <input type="number" id="filter-mem-user" placeholder="键入记忆 用户 ID" class="apple-input">
-                        <button id="btn-filter-mem" class="btn btn-secondary">执行筛选</button>
-                    </div>
-                    <div class="card mt-4">
-                        <div class="table-responsive">
-                            <table class="apple-table">
-                                <thead>
-                                    <tr>
-                                        <th>时间</th>
-                                        <th>类别</th>
-                                        <th>所属用户 ID</th>
-                                        <th>记忆事件明细</th>
-                                        <th>权重</th>
-                                        <th>可信度</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="memory-table-body"></tbody>
-                            </table>
-                        </div>
-                        <div class="pagination" id="memory-pagination"></div>
-                    </div>
-                </div>
-
-                <!-- Commands View -->
-                <div id="view-commands" class="view">
-                    <div class="grid-list" id="commands-list">
-                        <!-- Command cards injected here -->
-                    </div>
-                </div>
-
-                <!-- Config View -->
-                <div id="view-config" class="view">
-                    <div class="card">
-                        <div class="card-header flex-between">
-                            <h3>系统底层主配置 JSON</h3>
-                            <button id="btn-save-config" class="btn btn-primary">保存修改</button>
-                        </div>
-                        <div class="card-body">
-                            <p class="caption mb-2" id="config-path"></p>
-                            <textarea id="config-editor" class="apple-textarea code-bg"></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Supplier View -->
-                <div id="view-supplier" class="view">
-                    <div class="card">
-                        <div class="card-header flex-between">
-                            <h3>LLM 供应商模型配置 JSON</h3>
-                            <button id="btn-save-supplier" class="btn btn-primary">保存修改</button>
-                        </div>
-                        <div class="card-body">
-                            <p class="caption mb-2" id="supplier-path"></p>
-                            <textarea id="supplier-editor" class="apple-textarea code-bg"></textarea>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Send Message View -->
-                <div id="view-send-msg" class="view">
-                    <div class="card max-w-lg">
-                        <div class="card-header">
-                            <h3>构造发送消息测试</h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="input-group mb-3">
-                                <label>目标群组编号 ID</label>
-                                <input type="number" id="send-group-id" class="apple-input" placeholder="例如：123456789">
-                            </div>
-                            <div class="input-group mb-4">
-                                <label>需要发送的内容</label>
-                                <textarea id="send-msg-content" class="apple-textarea" rows="4" placeholder="在此输入需要主动发送的信息文本...(JSON/string)支持解析cq码"></textarea>
-                            </div>
-                            <button id="btn-send-msg" class="btn btn-primary w-full">确认发信</button>
-                            <p id="send-msg-result" class="mt-3 caption text-center"></p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </main>
-    </div>
-
-    <script src="/admin/static/script.js"></script>
+  <script type="module" src="/admin/static/js/main.js"></script>
 </body>
 </html>
