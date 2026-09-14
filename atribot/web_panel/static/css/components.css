@@ -268,7 +268,7 @@ table.tbl {
   vertical-align: middle;
 }
 
-.tbl tbody tr { transition: background-color 0.15s; animation: fade-in 0.3s; }
+.tbl tbody tr { transition: background-color 0.15s; animation: fade-in 0.3s backwards; }
 .tbl tbody tr:hover { background: var(--bg-hover); }
 .tbl tbody tr:last-child td { border-bottom: none; }
 
@@ -393,13 +393,65 @@ table.tbl {
 
 .skeleton {
   border-radius: 8px;
-  background: linear-gradient(100deg, var(--bg-hover) 40%, var(--bg-card) 50%, var(--bg-hover) 60%);
+  background: linear-gradient(100deg, var(--skeleton) 40%, var(--skeleton-hi) 50%, var(--skeleton) 60%);
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
 
 .skeleton-row { height: 40px; margin: 10px 16px; }
 .skeleton-card { height: 120px; margin-bottom: 16px; }
+
+/* ---------- 全局加载反馈：顶部进度条 / 加载胶囊 ---------- */
+
+.loadbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2.5px;
+  width: 0;
+  z-index: 600;
+  background: linear-gradient(90deg, var(--accent), var(--teal));
+  border-radius: 0 3px 3px 0;
+  box-shadow: 0 1px 6px var(--accent-soft);
+  opacity: 0;
+  transition: width 0.24s var(--ease-out), opacity 0.28s ease;
+  pointer-events: none;
+}
+
+.spinner-sm {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid var(--accent-soft);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+
+.loading-pill {
+  position: fixed;
+  top: calc(var(--topbar-h) + 16px);
+  left: 50%;
+  transform: translate(-50%, 0);
+  z-index: 450;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 20px;
+  border-radius: 980px;
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-float);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  animation: pill-in 0.32s var(--ease-spring);
+  pointer-events: none;
+}
+
+.loading-pill.out { animation: pill-out 0.24s var(--ease-out) forwards; }
 
 /* ---------- Toast ---------- */
 

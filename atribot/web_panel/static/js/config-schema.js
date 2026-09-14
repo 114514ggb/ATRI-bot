@@ -147,7 +147,7 @@ export const SCHEMA = [
     desc: 'Web 管理面板的访问设置。',
     fields: [
       { path: 'web_panel.enable', label: '启用管理面板', type: 'toggle', desc: '关闭后重启 bot 将不再启动面板' },
-      { path: 'web_panel.port', label: '面板端口', type: 'number', optional: true, desc: '默认 8090，修改后需重启 bot' },
+      { path: 'web_panel.port', label: '面板端口', type: 'number', optional: true, desc: '默认 5125，修改后需重启 bot' },
       { path: 'web_panel.access_token', label: '面板访问令牌', type: 'password', span: true, optional: true, desc: '未配置时回退使用第一个平台的 access_token' },
     ],
   },

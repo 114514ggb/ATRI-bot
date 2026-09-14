@@ -80,12 +80,79 @@
 
 .login-error.show { display: block; }
 
+/* ---------- 登录成功欢迎层（首次进入揭幕，JS 动态创建） ---------- */
+
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 450;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(1000px 500px at 15% -10%, var(--accent-soft), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, var(--purple-soft), transparent 55%),
+    var(--bg);
+}
+
+.welcome-logo {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 18px;
+  border-radius: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  font-weight: 800;
+  color: var(--on-accent);
+  background: linear-gradient(135deg, #0071e3, #64d2ff 60%, #bf5af2);
+  box-shadow: 0 16px 44px rgba(10, 132, 255, 0.4);
+  letter-spacing: -1px;
+  animation: welcome-pop 0.6s var(--ease-spring);
+}
+
+.welcome-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  animation: welcome-rise 0.5s var(--ease-out) 0.12s backwards;
+}
+
+.welcome-sub {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 14px;
+  animation: welcome-rise 0.5s var(--ease-out) 0.22s backwards;
+}
+
+/* 光圈收缩揭幕：应用从四周向中心显现 */
+.welcome-overlay.iris-out {
+  animation: welcome-iris 0.55s cubic-bezier(0.6, 0.05, 0.95, 0.5) forwards;
+  pointer-events: none;
+}
+
 /* ---------- 应用骨架 ---------- */
 
 .app {
   display: flex;
   height: 100vh;
   animation: fade-in 0.5s var(--ease-out);
+}
+
+/* 登录后的级联入场（showApp 加 .first-enter 触发，结束由 JS 移除） */
+.app.first-enter .sidebar {
+  animation: welcome-chrome-x 0.5s var(--ease-out) 0.25s backwards;
+}
+
+.app.first-enter .topbar {
+  animation: welcome-chrome-y 0.45s var(--ease-out) 0.35s backwards;
+}
+
+.app.first-enter .view-scroll {
+  animation: welcome-rise 0.5s var(--ease-out) 0.45s backwards;
 }
 
 /* ---------- 侧边栏 ---------- */

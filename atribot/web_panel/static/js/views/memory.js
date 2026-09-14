@@ -77,7 +77,7 @@ async function load(section) {
   const rows = data.items.length
     ? data.items
         .map(
-          (m) => `<tr data-mid="${m.memory_id}">
+          (m, i) => `<tr data-mid="${m.memory_id}" style="animation-delay:${Math.min(i * 30, 300)}ms">
             <td><label class="check-row"><input type="checkbox" data-sel="${m.memory_id}"></label></td>
             <td class="muted" style="white-space:nowrap">${escapeHtml(m.event_time_str || '-')}</td>
             <td><span class="badge teal">${CAT_LABEL[m.category] || escapeHtml(m.category)}</span></td>

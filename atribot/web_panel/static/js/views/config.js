@@ -58,7 +58,7 @@ function renderControl(field, value) {
 
     case 'number':
       return `<input class="input mono" type="number" data-path="${field.path}" data-ftype="number"
-        value="${escapeHtml(String(v))}" ${field.step ? `step="${field.step}"` : ''} ${field.min !== undefined ? `min="${field.min}"` : ''} ${field.max !== undefined ? `max="${field.max}"` : ''} placeholder="${field.optional ? '（可选）' : ''}>`;
+        value="${escapeHtml(String(v))}" ${field.step ? `step="${field.step}"` : ''} ${field.min !== undefined ? `min="${field.min}"` : ''} ${field.max !== undefined ? `max="${field.max}"` : ''} placeholder="${field.optional ? '（可选）' : ''}">`;
 
     case 'password':
       return `<input class="input mono" type="password" data-path="${field.path}" data-ftype="text" value="${escapeHtml(String(v))}" autocomplete="new-password">`;
@@ -67,7 +67,7 @@ function renderControl(field, value) {
       return renderChips(field.path, 'int', Array.isArray(value) ? value : []);
 
     default:
-      return `<input class="input" type="text" data-path="${field.path}" data-ftype="text" value="${escapeHtml(String(v))}" placeholder="${field.optional ? '（可选）' : ''}>`;
+      return `<input class="input" type="text" data-path="${field.path}" data-ftype="text" value="${escapeHtml(String(v))}" placeholder="${field.optional ? '（可选）' : ''}">`;
   }
 }
 
@@ -296,14 +296,26 @@ function renderForm(section) {
   updateChangedMarks();
 }
 
+let anchorLockUntil = 0; /* 点击锚点后的平滑滚动期间，不让 IntersectionObserver 抢走高亮 */
+
+function setAnchorActive(id) {
+  document.querySelectorAll('.config-anchor a').forEach((l) => l.classList.toggle('active', l.dataset.target === id));
+}
+
 function bindForm(section) {
-  /* 锚点滚动 */
+  /* 锚点点击：先高亮再滚动（锚点元素每次渲染都是新的，需要重复绑定） */
   section.querySelectorAll('.config-anchor a').forEach((a) => {
     a.addEventListener('click', () => {
+      anchorLockUntil = Date.now() + 900;
+      setAnchorActive(a.dataset.target);
       const target = document.getElementById(`cfgsec-${a.dataset.target}`);
       if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
+
+  /* 以下 section 级委托只绑一次：重复渲染（切换模式/回滚）时避免监听器累积 */
+  if (section.dataset.formBound) return;
+  section.dataset.formBound = '1';
 
   /* 字段变更 → 高亮 + dirty */
   section.addEventListener('input', onFieldInput);
@@ -662,18 +674,22 @@ function switchMode(next) {
 
 function setupSectionObserver(section) {
   if (observer) observer.disconnect();
-  const links = section.querySelectorAll('.config-anchor a');
-  const sectionEls = section.querySelectorAll('.config-section');
+  const sectionEls = [...section.querySelectorAll('.config-section')];
   observer = new IntersectionObserver(
     (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          const id = entry.target.id.replace('cfgsec-', '');
-          links.forEach((l) => l.classList.toggle('active', l.dataset.target === id));
+      if (Date.now() < anchorLockUntil) return;
+      if (!entries.some((e) => e.isIntersecting)) return;
+      /* 取第一个跨越视口 30% 线的分组（短分组如"沙盒"也能正确命中） */
+      const line = innerHeight * 0.3;
+      for (const s of sectionEls) {
+        const r = s.getBoundingClientRect();
+        if (r.top <= line && r.bottom > line) {
+          setAnchorActive(s.id.replace('cfgsec-', ''));
+          break;
         }
       }
     },
-    { rootMargin: '-20% 0px -70% 0px' }
+    { rootMargin: '0px 0px -70% 0px' }
   );
   sectionEls.forEach((s) => observer.observe(s));
 }

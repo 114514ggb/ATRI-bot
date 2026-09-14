@@ -2,7 +2,7 @@
 
 用法:
     python -m atribot.web_panel.dev_server
-    # 打开 http://127.0.0.1:8090/admin/ ，访问令牌: dev-token
+    # 打开 http://127.0.0.1:5125/admin/ ，访问令牌: dev-token
 """
 
 import asyncio
@@ -47,7 +47,7 @@ def _prepare_files() -> Path:
                 "url": "127.0.0.1:8888",
             }
         },
-        "web_panel": {"enable": True, "access_token": DEV_TOKEN, "port": 8090},
+        "web_panel": {"enable": True, "access_token": DEV_TOKEN, "port": 5125},
         "account": {"id": 10000, "name": "ATRI-dev"},
         "root_user_id": 10001,
         "file_path": {
@@ -311,12 +311,20 @@ def main() -> None:
             resp.headers["Cache-Control"] = "no-store"
         return resp
 
+    @app.middleware("http")
+    async def _slow_api_sim(request, call_next):
+        """可选的接口延迟模拟（ATRI_DEV_DELAY_MS=1500），用于调试面板加载态"""
+        delay = int(os.environ.get("ATRI_DEV_DELAY_MS", "0"))
+        if delay and request.url.path.startswith("/admin/api"):
+            await asyncio.sleep(delay / 1000)
+        return await call_next(request)
+
     @app.on_event("startup")
     async def _start_fake_logs() -> None:
         _ensure_log_handler()
         asyncio.get_event_loop().create_task(_fake_log_stream())
 
-    port = int(os.environ.get("ATRI_PANEL_PORT", "8090"))
+    port = int(os.environ.get("ATRI_PANEL_PORT", "5125"))
     print(f"[dev_server] 临时配置目录: {tmp}")
     print(f"[dev_server] 面板地址: http://127.0.0.1:{port}/admin/  访问令牌: {DEV_TOKEN}")
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

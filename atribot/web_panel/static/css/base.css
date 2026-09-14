@@ -39,6 +39,10 @@
   --teal-soft: rgba(90, 200, 250, 0.14);
   --yellow: #ffd60a;
 
+  /* 骨架屏占位色（需明显高于页面底色，一眼可辨"加载中"） */
+  --skeleton: rgba(0, 0, 0, 0.09);
+  --skeleton-hi: rgba(0, 0, 0, 0.035);
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.07), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
   --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.14);
@@ -101,6 +105,9 @@
   --purple-soft: rgba(191, 90, 242, 0.16);
   --teal: #64d2ff;
   --teal-soft: rgba(100, 210, 255, 0.16);
+
+  --skeleton: rgba(255, 255, 255, 0.14);
+  --skeleton-hi: rgba(255, 255, 255, 0.06);
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.06);
@@ -211,11 +218,34 @@ code, pre, .mono { font-family: var(--font-mono); }
   to { opacity: 1; transform: scale(1); }
 }
 
+/* 加载胶囊进出场（left:50% 布局，位移需携带 -50% 水平居中） */
+@keyframes pill-in {
+  from { opacity: 0; transform: translate(-50%, -8px) scale(0.94); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+@keyframes pill-out {
+  from { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -6px) scale(0.96); }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
-  }
+  /* 系统"减少动画"时不再一刀切冻结（动画全变 0.01ms 会像闪烁/卡死），
+     而是把位移/回弹类关键帧重声明为纯淡入：时长保留、过渡可见，只是不滑动不弹跳。
+     同名关键帧后声明者生效，因此放在文件末尾；旋转/流光/进度条为功能性反馈，不在覆盖范围 */
+  @keyframes fade-slide-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pop-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes toast-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes zoom-fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pill-in { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pill-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes bar-grow { from { opacity: 0.35; } to { opacity: 1; } }
+  @keyframes shake { 20%, 40%, 60%, 80%, from, to { transform: none; } }
+
+  /* 这两处用 transition 做位移，直接中和位移量 */
+  .view.leaving { transform: none; }
+  .modal-overlay.closing .modal { transform: none; }
 
   /* 豁免：开关拨动等短促的交互反馈微动效，
      减弱动画只应关闭装饰性大动效（视图滑入/脉冲/弹跳），不应让开关切换显得卡死 */
@@ -224,4 +254,50 @@ code, pre, .mono { font-family: var(--font-mono); }
     transition-duration: 0.22s !important;
     transition-timing-function: ease !important; /* 不用带回弹的弹簧曲线 */
   }
+}
+
+/* ---------- 主题切换圆形揭示（View Transitions） ---------- */
+
+/* 关掉默认的交叉淡入，让 clip-path 圆形动画独占揭示 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* 主题快照期间冻结颜色过渡，避免新主题快照拍到过渡中的旧颜色（见 ui.js toggleTheme） */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+}
+
+/* ---------- 登录欢迎揭幕（首次进入） ---------- */
+/* 用户主动触发的入场反馈，与主题圆形揭示同策略：不进 prefers-reduced-motion 降级清单 */
+
+@keyframes welcome-pop {
+  from { opacity: 0; transform: scale(0.55); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes welcome-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes welcome-chrome-x {
+  from { opacity: 0; transform: translateX(-28px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes welcome-chrome-y {
+  from { opacity: 0; transform: translateY(-18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 光圈收缩揭幕：先慢后快，与主题切换的揭示曲线同语言 */
+@keyframes welcome-iris {
+  from { clip-path: circle(120% at 50% 50%); }
+  to { clip-path: circle(0% at 50% 50%); }
 }

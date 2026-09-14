@@ -1,6 +1,6 @@
 /* hash 路由：#/view-name 注册与切换 */
 
-import { icon, escapeHtml } from './ui.js';
+import { icon, escapeHtml, showLoadingPill, hideLoadingPill } from './ui.js';
 
 const routes = new Map();
 let currentView = null;
@@ -54,11 +54,15 @@ async function showView(name) {
   currentSection = section;
   document.getElementById('view-scroll').scrollTop = 0;
 
+  /* 初始化超过 600ms 仍未完成时浮出"加载中"胶囊，避免慢加载像卡死 */
+  showLoadingPill();
   try {
     await route.init(section);
   } catch (e) {
     console.error(`视图 ${currentView} 初始化失败`, e);
     section.innerHTML = `<div class="notice danger">${icon('alert')}<div>加载失败：${escapeHtml(e.message)}</div></div>`;
+  } finally {
+    hideLoadingPill();
   }
 }
 

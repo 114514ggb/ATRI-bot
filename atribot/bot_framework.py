@@ -242,7 +242,7 @@ class BotFramework:
         admin_app.include_router(admin_router)
         mount_static(admin_app)
 
-        admin_port = panel_cfg.get("port") or 8090
+        admin_port = panel_cfg.get("port") or 5125
         cfg = uvicorn.Config(
             admin_app,
             host="127.0.0.1",

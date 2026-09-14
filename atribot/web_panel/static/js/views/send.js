@@ -22,7 +22,7 @@ async function init(section) {
         </div>
         <div class="field" id="send-platform-field">
           <div class="field-label">平台（多适配器时选择）</div>
-          <select class="select" id="send-platform"><option value="">默认（第一个可用平台）</option></select>
+          <select class="select" id="send-platform"><option value="" disabled selected>加载平台列表…</option><option value="">默认（第一个可用平台）</option></select>
         </div>
         <div class="field">
           <div class="field-label">消息内容</div>
@@ -53,6 +53,7 @@ async function init(section) {
   try {
     const res = await api.get('/platforms');
     const sel = section.querySelector('#send-platform');
+    sel.querySelector('option[disabled]')?.remove();
     for (const p of res.items || []) {
       const opt = document.createElement('option');
       opt.value = p.name;

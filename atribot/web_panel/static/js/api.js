@@ -1,4 +1,6 @@
-/* API 请求封装：token 管理、统一错误处理 */
+/* API 请求封装：token 管理、统一错误处理、全局加载进度条 */
+
+import { loadbarBegin, loadbarEnd } from './ui.js';
 
 const API_BASE = '/admin/api';
 const TOKEN_KEY = 'atri_admin_token';
@@ -19,39 +21,44 @@ export function setToken(token) {
 }
 
 async function request(method, path, body) {
-  const options = {
-    method,
-    headers: { Authorization: `Bearer ${getToken()}` },
-  };
-  if (body !== undefined) {
-    options.headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(body);
-  }
-
-  let res;
+  loadbarBegin();
   try {
-    res = await fetch(API_BASE + path, options);
-  } catch {
-    throw new Error('无法连接到面板服务，请确认 bot 正在运行');
-  }
+    const options = {
+      method,
+      headers: { Authorization: `Bearer ${getToken()}` },
+    };
+    if (body !== undefined) {
+      options.headers['Content-Type'] = 'application/json';
+      options.body = JSON.stringify(body);
+    }
 
-  if (res.status === 401) {
-    if (_unauthorizedHandler) _unauthorizedHandler();
-    throw new Error('登录令牌无效');
-  }
+    let res;
+    try {
+      res = await fetch(API_BASE + path, options);
+    } catch {
+      throw new Error('无法连接到面板服务，请确认 bot 正在运行');
+    }
 
-  let data = null;
-  try {
-    data = await res.json();
-  } catch {
-    /* 空 body */
-  }
+    if (res.status === 401) {
+      if (_unauthorizedHandler) _unauthorizedHandler();
+      throw new Error('登录令牌无效');
+    }
 
-  if (!res.ok) {
-    const detail = data && data.detail ? data.detail : `请求失败 (HTTP ${res.status})`;
-    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      /* 空 body */
+    }
+
+    if (!res.ok) {
+      const detail = data && data.detail ? data.detail : `请求失败 (HTTP ${res.status})`;
+      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+    }
+    return data;
+  } finally {
+    loadbarEnd();
   }
-  return data;
 }
 
 export const api = {

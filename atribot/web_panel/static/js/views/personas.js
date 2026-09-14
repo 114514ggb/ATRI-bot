@@ -26,11 +26,18 @@ async function init(section) {
 }
 
 async function reload(section) {
-  const res = await api.get('/personas');
-  list = res.items || [];
-  defaultRole = res.default || 'none';
-
   const listBox = section.querySelector('#persona-list');
+  if (listBox) listBox.innerHTML = '<div class="skeleton" style="height:56px;border-radius:12px;margin-bottom:8px"></div>'.repeat(4);
+  try {
+    const res = await api.get('/personas');
+    list = res.items || [];
+    defaultRole = res.default || 'none';
+  } catch (e) {
+    if (listBox) listBox.innerHTML = `<div class="notice danger">${icon('alert')}<div>加载人设列表失败：${escapeHtml(e.message)}</div></div>`;
+    toast(`加载人设列表失败：${e.message}`, 'error', 5000);
+    return;
+  }
+
   listBox.innerHTML =
     list
       .map(
@@ -51,14 +58,30 @@ async function reload(section) {
   else renderEditor(section);
 }
 
+let personaReqId = 0;
+
 async function openPersona(key) {
   currentKey = key;
+  const reqId = ++personaReqId;
+  const section = document.getElementById('view-personas');
+  const editorBox = section?.querySelector('#persona-editor');
+
+  /* 立即高亮选中项并在编辑区画骨架，读取期间有明确反馈 */
+  document.querySelectorAll('.persona-item').forEach((el) => el.classList.toggle('active', el.dataset.key === key));
+  if (editorBox) {
+    editorBox.innerHTML = `
+      <div class="skeleton" style="height:24px;width:200px;border-radius:8px;margin-bottom:16px"></div>
+      <div class="skeleton" style="height:300px;border-radius:12px"></div>`;
+  }
+
   try {
     const res = await api.get(`/personas/${encodeURIComponent(key)}`);
+    if (reqId !== personaReqId) return; /* 用户已点击其他人设，丢弃过期响应 */
     currentContent = res.content;
-    document.querySelectorAll('.persona-item').forEach((el) => el.classList.toggle('active', el.dataset.key === key));
-    renderEditor(document.getElementById('view-personas'));
+    renderEditor(section);
   } catch (e) {
+    if (reqId !== personaReqId) return;
+    if (editorBox) editorBox.innerHTML = `<div class="notice danger">${icon('alert')}<div>读取人设失败：${escapeHtml(e.message)}</div></div>`;
     toast(`读取人设失败：${e.message}`, 'error', 5000);
   }
 }

@@ -23,6 +23,8 @@ function emptyRow(cols, text = '暂无数据') {
    ============================================================ */
 
 const groupsState = { page: 1, limit: 20, search: '' };
+let groupsReqId = 0;
+let groupsLoadedOnce = false;
 
 async function initGroups(section) {
   section.innerHTML = `
@@ -31,7 +33,7 @@ async function initGroups(section) {
       <span class="spacer"></span>
       <span class="muted small" id="grp-count"></span>
     </div>
-    <div id="grp-table">${tableShell(['群号', '群名称'], `<tr><td colspan="2">${skeletonRows(5, 'skeleton-row')}</td></tr>`)}</div>`;
+    <div id="grp-table"></div>`;
 
   const searchInput = section.querySelector('#grp-search');
   searchInput.addEventListener('input', debounce(() => {
@@ -45,9 +47,24 @@ async function initGroups(section) {
 
 async function loadGroups(section) {
   const box = section.querySelector('#grp-table');
+  const reqId = ++groupsReqId;
+  /* 每次加载（含翻页/搜索）都先重画骨架，避免旧表格冻结无反馈 */
+  box.innerHTML = tableShell(['群号', '群名称'], `<tr><td colspan="2">${skeletonRows(5, 'skeleton-row')}</td></tr>`);
+
   const params = new URLSearchParams({ page: groupsState.page, limit: groupsState.limit });
   if (groupsState.search) params.set('search', groupsState.search);
-  const data = await api.get(`/groups?${params}`);
+
+  let data;
+  try {
+    data = await api.get(`/groups?${params}`);
+  } catch (e) {
+    if (reqId !== groupsReqId) return;
+    box.innerHTML = `<div class="notice danger">${icon('alert')}<div>加载群组列表失败：${escapeHtml(e.message)}</div></div>`;
+    if (groupsLoadedOnce) toast(`加载群组列表失败：${e.message}`, 'error', 5000);
+    return;
+  }
+  if (reqId !== groupsReqId) return; /* 已有更新的请求，丢弃过期响应 */
+  groupsLoadedOnce = true;
 
   section.querySelector('#grp-count').textContent = `${data.total} 个群`;
   const rows = data.items.length
@@ -74,6 +91,8 @@ async function loadGroups(section) {
    ============================================================ */
 
 const usersState = { page: 1, limit: 20, search: '' };
+let usersReqId = 0;
+let usersLoadedOnce = false;
 
 const PERM_BADGE = {
   administrator: '<span class="badge blue perm-badge">管理员</span>',
@@ -110,7 +129,7 @@ async function initUsers(section) {
       <input class="input" id="usr-search" placeholder="搜索 QQ 号或昵称…" value="${escapeHtml(usersState.search)}" style="width:260px">
       <span class="spacer"></span>
     </div>
-    <div id="usr-table">${tableShell(['QQ 号', '昵称', '权限', '最近活跃', '操作'], `<tr><td colspan="5">${skeletonRows(6)}</td></tr>`)}</div>`;
+    <div id="usr-table"></div>`;
 
   section.querySelector('#usr-search').addEventListener('input', debounce((e) => {
     usersState.search = e.target.value.trim();
@@ -150,9 +169,23 @@ async function initUsers(section) {
 
 async function loadUsers(section) {
   const box = section.querySelector('#usr-table');
+  const reqId = ++usersReqId;
+  box.innerHTML = tableShell(['QQ 号', '昵称', '权限', '最近活跃', '操作'], `<tr><td colspan="5">${skeletonRows(6)}</td></tr>`);
+
   const params = new URLSearchParams({ page: usersState.page, limit: usersState.limit });
   if (usersState.search) params.set('search', usersState.search);
-  const data = await api.get(`/users?${params}`);
+
+  let data;
+  try {
+    data = await api.get(`/users?${params}`);
+  } catch (e) {
+    if (reqId !== usersReqId) return;
+    box.innerHTML = `<div class="notice danger">${icon('alert')}<div>加载用户列表失败：${escapeHtml(e.message)}</div></div>`;
+    if (usersLoadedOnce) toast(`加载用户列表失败：${e.message}`, 'error', 5000);
+    return;
+  }
+  if (reqId !== usersReqId) return;
+  usersLoadedOnce = true;
 
   const rows = data.items.length
     ? data.items
@@ -181,6 +214,8 @@ async function loadUsers(section) {
    ============================================================ */
 
 const msgState = { page: 1, limit: 50, group: '', user: '', search: '' };
+let messagesReqId = 0;
+let messagesLoadedOnce = false;
 
 async function initMessages(section) {
   section.innerHTML = `
@@ -192,7 +227,7 @@ async function initMessages(section) {
       <button class="btn ghost sm" id="msg-reset">重置</button>
       <span class="spacer"></span>
     </div>
-    <div id="msg-table">${tableShell(['时间', '群号', '发送者', '内容'], `<tr><td colspan="4">${skeletonRows(7)}</td></tr>`)}</div>`;
+    <div id="msg-table"></div>`;
 
   const apply = () => {
     msgState.group = section.querySelector('#msg-group').value.trim();
@@ -215,11 +250,25 @@ async function initMessages(section) {
 
 async function loadMessages(section) {
   const box = section.querySelector('#msg-table');
+  const reqId = ++messagesReqId;
+  box.innerHTML = tableShell(['时间', '群号', '发送者', '内容'], `<tr><td colspan="4">${skeletonRows(7)}</td></tr>`);
+
   const params = new URLSearchParams({ page: msgState.page, limit: msgState.limit });
   if (msgState.group) params.set('group_id', msgState.group);
   if (msgState.user) params.set('user_id', msgState.user);
   if (msgState.search) params.set('search', msgState.search);
-  const data = await api.get(`/messages?${params}`);
+
+  let data;
+  try {
+    data = await api.get(`/messages?${params}`);
+  } catch (e) {
+    if (reqId !== messagesReqId) return;
+    box.innerHTML = `<div class="notice danger">${icon('alert')}<div>加载消息记录失败：${escapeHtml(e.message)}</div></div>`;
+    if (messagesLoadedOnce) toast(`加载消息记录失败：${e.message}`, 'error', 5000);
+    return;
+  }
+  if (reqId !== messagesReqId) return;
+  messagesLoadedOnce = true;
 
   const rows = data.items.length
     ? data.items

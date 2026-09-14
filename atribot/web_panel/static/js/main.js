@@ -39,6 +39,7 @@ function showLogin(message = null) {
   const overlay = loginOverlay();
   overlay.classList.remove('closing', 'hidden');
   app().classList.add('hidden');
+  resetLoginBtn();
   const err = document.getElementById('login-error');
   if (message) {
     err.textContent = message;
@@ -50,6 +51,31 @@ function showLogin(message = null) {
   }
 }
 
+/* 登录按钮的成功态（校验通过后短暂展示再进入应用） */
+function loginSuccessState() {
+  const btn = document.getElementById('login-btn');
+  btn.classList.remove('loading');
+  btn.disabled = true;
+  btn.innerHTML = `${icon('check')} 登录成功`;
+  btn.style.background = 'var(--green)';
+  btn.style.borderColor = 'var(--green)';
+  btn.style.color = '#fff';
+}
+
+/* 退出登录/校验失败重新回到登录层时，还原按钮 */
+function resetLoginBtn() {
+  const btn = document.getElementById('login-btn');
+  btn.disabled = false;
+  btn.classList.remove('loading');
+  btn.innerHTML = '登 录';
+  btn.style.background = '';
+  btn.style.borderColor = '';
+  btn.style.color = '';
+}
+
+/* 每个浏览器会话只在第一次进入时播完整欢迎揭幕，之后刷新只播轻量级联 */
+const WELCOMED_KEY = 'atri_welcomed';
+
 function showApp() {
   const overlay = loginOverlay();
   overlay.classList.add('closing');
@@ -57,9 +83,36 @@ function showApp() {
     overlay.classList.add('hidden');
     overlay.classList.remove('closing');
   }, 460);
-  app().classList.remove('hidden');
+
+  const appEl = app();
+  appEl.classList.remove('hidden');
+
+  const firstVisit = !sessionStorage.getItem(WELCOMED_KEY);
+  if (firstVisit) sessionStorage.setItem(WELCOMED_KEY, '1');
+
+  /* 骨架级联入场；路由同时启动，首屏数据在遮罩背后加载 */
+  appEl.classList.add('first-enter');
+  setTimeout(() => appEl.classList.remove('first-enter'), 1500);
+
   if (!document.getElementById('view-scroll').children.length || !document.querySelector('.view.active')) {
     startRouterOnce();
+  }
+
+  if (firstVisit) {
+    const welcome = document.createElement('div');
+    welcome.className = 'welcome-overlay';
+    welcome.innerHTML = `
+      <div class="welcome-logo">A</div>
+      <h1 class="welcome-title">欢迎回来</h1>
+      <p class="welcome-sub">ATRI 管理控制台</p>`;
+    document.body.appendChild(welcome);
+
+    setTimeout(() => {
+      welcome.classList.add('iris-out');
+      welcome.addEventListener('animationend', () => welcome.remove(), { once: true });
+      /* 兜底：动画事件未触发时也要移除节点 */
+      setTimeout(() => welcome.remove(), 800);
+    }, 830);
   }
 }
 
@@ -73,11 +126,18 @@ function startRouterOnce() {
 
 async function checkAuth() {
   const btn = document.getElementById('login-btn');
+  const fromLoginForm = !loginOverlay().classList.contains('hidden');
   btn.classList.add('loading');
   try {
     await api.get('/status');
-    btn.classList.remove('loading');
-    showApp();
+    if (fromLoginForm) {
+      /* 手动登录：先给成功反馈，再进入欢迎编排 */
+      loginSuccessState();
+      setTimeout(showApp, 420);
+    } else {
+      /* 存储令牌自动进入：不加等待，直接进应用（轻量级联） */
+      showApp();
+    }
   } catch (e) {
     btn.classList.remove('loading');
     if (e.message.includes('令牌')) showLogin('访问令牌无效，请重新输入');

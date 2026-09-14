@@ -181,6 +181,77 @@ export function skeletonRows(n = 6, className = 'skeleton-row') {
   return Array.from({ length: n }, () => `<div class="skeleton ${className}"></div>`).join('');
 }
 
+/* ---------- 全局加载反馈：顶部进度条 / 慢加载胶囊 ---------- */
+
+const loadbarState = { el: null, timer: null, hideTimer: null, active: 0 };
+
+function loadbarEl() {
+  if (!loadbarState.el || !loadbarState.el.isConnected) {
+    const el = document.createElement('div');
+    el.className = 'loadbar';
+    document.body.appendChild(el);
+    loadbarState.el = el;
+  }
+  return loadbarState.el;
+}
+
+/** 请求开始时调用（与 loadbarEnd 严格配对）；并发请求只在首尾驱动进度条 */
+export function loadbarBegin() {
+  loadbarState.active += 1;
+  if (loadbarState.active > 1) return;
+  clearTimeout(loadbarState.hideTimer);
+  clearInterval(loadbarState.timer);
+  const el = loadbarEl();
+  el.style.opacity = '1';
+  el.style.width = '0%';
+  requestAnimationFrame(() => { el.style.width = '14%'; });
+  /* 等待期间缓慢推进并封顶 85%，完成感留给真实结束 */
+  loadbarState.timer = setInterval(() => {
+    const cur = parseFloat(el.style.width) || 0;
+    if (cur < 85) el.style.width = `${Math.min(cur + Math.max(0.6, (85 - cur) * 0.1), 85)}%`;
+  }, 260);
+}
+
+export function loadbarEnd() {
+  loadbarState.active = Math.max(0, loadbarState.active - 1);
+  if (loadbarState.active > 0) return;
+  clearInterval(loadbarState.timer);
+  const el = loadbarState.el;
+  if (!el) return;
+  el.style.width = '100%';
+  loadbarState.hideTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => { if (!loadbarState.active) el.style.width = '0%'; }, 320);
+  }, 160);
+}
+
+let loadingPillEl = null;
+let loadingPillTimer = null;
+
+/** 延迟 delayMs 后浮出"加载中"胶囊；快于延迟的加载不出现，避免闪烁 */
+export function showLoadingPill(text = '加载中…', delayMs = 600) {
+  clearTimeout(loadingPillTimer);
+  hideLoadingPill();
+  loadingPillTimer = setTimeout(() => {
+    loadingPillEl?.remove();
+    loadingPillEl = document.createElement('div');
+    loadingPillEl.className = 'loading-pill';
+    loadingPillEl.innerHTML = `<span class="spinner-sm"></span><span>${escapeHtml(text)}</span>`;
+    document.body.appendChild(loadingPillEl);
+  }, delayMs);
+}
+
+export function hideLoadingPill() {
+  clearTimeout(loadingPillTimer);
+  loadingPillTimer = null;
+  if (loadingPillEl) {
+    const el = loadingPillEl;
+    loadingPillEl = null;
+    el.classList.add('out');
+    setTimeout(() => el.remove(), 260);
+  }
+}
+
 /* ---------- 分页组件 ---------- */
 
 /**
@@ -265,9 +336,38 @@ function applyTheme(theme) {
   localStorage.setItem(THEME_KEY, theme);
 }
 
+/* 主题切换：以按钮为圆心的圆形揭示（View Transitions + clip-path）
+   节奏先慢后快：前半程缓缓扩散，尾段加速铺满（900ms）
+   不支持的浏览器退化为原来的直接切换（body 的颜色 transition 提供柔和过渡） */
 export function toggleTheme() {
-  const cur = document.documentElement.getAttribute('data-theme') || 'light';
-  applyTheme(cur === 'dark' ? 'light' : 'dark');
+  const root = document.documentElement;
+  const next = (root.getAttribute('data-theme') || 'light') === 'dark' ? 'light' : 'dark';
+
+  if (!document.startViewTransition) {
+    applyTheme(next);
+    return;
+  }
+
+  /* 圆心取主题按钮中心（键盘触发也有落点），半径覆盖到最远的屏幕角落 */
+  const btn = document.getElementById('btn-theme');
+  const rect = btn ? btn.getBoundingClientRect() : { left: innerWidth / 2 - 18, top: 18, width: 36, height: 36 };
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  const endRadius = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+
+  /* 快照前冻结所有颜色过渡，否则新主题快照会拍到还在过渡中的旧颜色 */
+  root.classList.add('theme-switching');
+  const vt = document.startViewTransition(() => applyTheme(next));
+  vt.finished.finally(() => root.classList.remove('theme-switching'));
+
+  vt.ready
+    .then(() => {
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`] },
+        { duration: 900, easing: 'cubic-bezier(0.6, 0.05, 0.95, 0.5)', pseudoElement: '::view-transition-new(root)' }
+      );
+    })
+    .catch(() => { /* 过渡被跳过时主题已同步切换，无需处理 */ });
 }
 
 /* ---------- 防抖 ---------- */
