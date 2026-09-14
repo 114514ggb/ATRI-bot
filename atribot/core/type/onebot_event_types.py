@@ -27,8 +27,8 @@ class SenderInfo(TypedDict, total=False):
     """昵称"""
     card: str
     """群名片"""
-    role: str
-    """群角色: owner / admin / member"""
+    role: Literal["owner", "admin", "member"]
+    """群角色"""
     title: str
     """专属头衔"""
     level: str

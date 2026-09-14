@@ -264,11 +264,17 @@ class ChatBasics(ABC):
     ) -> None:
         """为当前用户输入附加结构化的消息片段"""
         Segment = event.event.segments[0]
+        
+        if role := event.event.sender.get("role"):
+            role_line = f"<group_role>{role}</group_role>" if role != "member" else ""
+        else:
+            role_line = ""
+
         message_builder.add_text(
             f"最新用户消息:\n<MESSAGE>"
             f"<user_id>{event.user_id}</user_id>"
             f"<nick_name>{event.event.sender['nickname']}</nick_name>"
-            f"<group_role>{event.event.sender['role']}</group_role>"
+            f"{role_line}"
             f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
             f"<message_id>{event.event.message_id}</message_id>"
             "<user_message>"
