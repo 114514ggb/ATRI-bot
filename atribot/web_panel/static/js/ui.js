@@ -85,13 +85,6 @@ export function toast(message, type = 'success', duration = 3200) {
 
 /* ---------- 模态框 ---------- */
 
-function closeModal(root) {
-  const overlay = root.querySelector('.modal-overlay');
-  if (!overlay) return;
-  overlay.classList.add('closing');
-  setTimeout(() => overlay.remove(), 210);
-}
-
 /**
  * 打开模态框
  * @returns {{ close: () => void, el: HTMLElement }}
@@ -134,7 +127,8 @@ export function openModal({ title, bodyHtml, actions = [], wide = false, onClose
   });
 
   function close() {
-    closeModal(root);
+    overlay.classList.add('closing');
+    setTimeout(() => overlay.remove(), 210);
     if (onClose) onClose();
   }
 
@@ -309,13 +303,12 @@ export function renderPagination(container, { page, total, limit }, onChange) {
 
 export function countUp(el, target, { duration = 750, formatter = null } = {}) {
   const start = performance.now();
-  const from = 0;
   const fmt = formatter || ((v) => Math.round(v).toLocaleString());
 
   function frame(now) {
     const t = Math.min(1, (now - start) / duration);
     const eased = 1 - Math.pow(1 - t, 3);
-    el.textContent = fmt(from + (target - from) * eased);
+    el.textContent = fmt(target * eased);
     if (t < 1) requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -423,6 +416,18 @@ function ddMoveHighlight(key) {
   menu.querySelector(`.dd-item[data-i="${ddIndex}"]`)?.scrollIntoView({ block: 'nearest' });
 }
 
+/* 弹层定位：与触发器同宽，默认在下方展开；下方空间不足且上方更宽裕时翻到上方，并整体夹在视口内 */
+function positionMenu(menu, rect) {
+  menu.style.minWidth = `${Math.round(rect.width)}px`;
+  const mRect = menu.getBoundingClientRect();
+  const gap = 6;
+  const roomBelow = innerHeight - rect.bottom;
+  const openUp = mRect.height + gap > roomBelow && rect.top > roomBelow;
+  const top = openUp ? rect.top - mRect.height - gap : rect.bottom + gap;
+  menu.style.top = `${Math.max(gap, Math.min(top, innerHeight - mRect.height - gap))}px`;
+  menu.style.left = `${Math.max(gap, Math.min(rect.left, innerWidth - mRect.width - gap))}px`;
+}
+
 function openSelectMenu(sel) {
   closeSelectMenu();
   const opts = [...sel.options];
@@ -438,18 +443,8 @@ function openSelectMenu(sel) {
       <span class="dd-label">${escapeHtml(o.textContent)}</span>${icon('check')}
     </button>`).join('');
 
-  const rect = sel.getBoundingClientRect();
-  menu.style.minWidth = `${Math.round(rect.width)}px`;
   document.body.appendChild(menu);
-
-  /* 定位：默认在触发器下方展开；下方空间不足且上方更宽裕时翻到上方 */
-  const mRect = menu.getBoundingClientRect();
-  const gap = 6;
-  const roomBelow = innerHeight - rect.bottom;
-  const openUp = mRect.height + gap > roomBelow && rect.top > roomBelow;
-  const top = openUp ? rect.top - mRect.height - gap : rect.bottom + gap;
-  menu.style.top = `${Math.max(gap, Math.min(top, innerHeight - mRect.height - gap))}px`;
-  menu.style.left = `${Math.max(gap, Math.min(rect.left, innerWidth - mRect.width - gap))}px`;
+  positionMenu(menu, sel.getBoundingClientRect());
 
   menu.addEventListener('click', (e) => {
     const item = e.target.closest('.dd-item');
@@ -561,15 +556,7 @@ export function attachSuggest(input, getItems) {
         ${it.desc ? `<span class="dd-desc">${escapeHtml(it.desc)}</span>` : ''}
       </button>`).join('');
 
-    const rect = input.getBoundingClientRect();
-    menu.style.minWidth = `${Math.round(rect.width)}px`;
-    const mRect = menu.getBoundingClientRect();
-    const gap = 6;
-    const roomBelow = innerHeight - rect.bottom;
-    const openUp = mRect.height + gap > roomBelow && rect.top > roomBelow;
-    const top = openUp ? rect.top - mRect.height - gap : rect.bottom + gap;
-    menu.style.top = `${Math.max(gap, Math.min(top, innerHeight - mRect.height - gap))}px`;
-    menu.style.left = `${Math.max(gap, Math.min(rect.left, innerWidth - mRect.width - gap))}px`;
+    positionMenu(menu, input.getBoundingClientRect());
     idx = -1;
   };
 

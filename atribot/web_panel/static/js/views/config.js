@@ -826,11 +826,7 @@ function bindForm(section) {
     /* 「从列表选择」→ 打开工具勾选弹窗 */
     const pickBtn = e.target.closest('[data-tool-pick]');
     if (pickBtn) openToolPicker(pickBtn.dataset.toolPick);
-  });
-
-  /* 添加/删除平台 */
-  section.addEventListener('click', (e) => {
-    if (e.target.closest('#btn-add-platform')) { promptAddPlatform(); return; }
+    if (e.target.closest('#btn-add-platform')) promptAddPlatform();
   });
 
   section.addEventListener('click', async (e) => {

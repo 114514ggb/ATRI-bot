@@ -179,32 +179,24 @@ function bindConsole(section, ctx) {
         <div class="muted small" style="padding:10px 2px">语句执行成功，返回了空的行和列</div>`;
       return;
     }
-    if (resultMode === 'json') {
-      resultBox.innerHTML = `
-        <div class="db-result-bar">
-          <span class="small muted">${res.row_count} 行 · ${res.duration_ms} ms${res.truncated ? ` · 仅显示前 ${res.rows.length} 行` : ''}</span>
-          <span class="spacer"></span>
-          <div class="seg" id="db-result-mode">
-            <button data-mode="table">表格</button>
-            <button data-mode="json" class="active">JSON</button>
-          </div>
-          <button class="btn sm ghost" id="db-copy-json" title="复制 JSON">${icon('copy')}</button>
+    const bar = `
+      <div class="db-result-bar">
+        <span class="small muted">${res.row_count} 行 · ${res.duration_ms} ms${res.truncated ? ` · 仅显示前 ${res.rows.length} 行` : ''}</span>
+        <span class="spacer"></span>
+        <div class="seg" id="db-result-mode">
+          <button data-mode="table"${resultMode === 'table' ? ' class="active"' : ''}>表格</button>
+          <button data-mode="json"${resultMode === 'json' ? ' class="active"' : ''}>JSON</button>
         </div>
+        <button class="btn sm ghost" id="db-copy-json" title="复制 JSON">${icon('copy')}</button>
+      </div>`;
+    if (resultMode === 'json') {
+      resultBox.innerHTML = `${bar}
         <pre class="db-json mono">${escapeHtml(JSON.stringify(res.rows, null, 2))}</pre>`;
     } else {
       const rowsHtml = res.rows
         .map((row, r) => `<tr>${res.columns.map((c) => `<td>${cellHtml(c, row[c], r)}</td>`).join('')}</tr>`)
         .join('');
-      resultBox.innerHTML = `
-        <div class="db-result-bar">
-          <span class="small muted">${res.row_count} 行 · ${res.duration_ms} ms${res.truncated ? ` · 仅显示前 ${res.rows.length} 行` : ''}</span>
-          <span class="spacer"></span>
-          <div class="seg" id="db-result-mode">
-            <button data-mode="table" class="active">表格</button>
-            <button data-mode="json">JSON</button>
-          </div>
-          <button class="btn sm ghost" id="db-copy-json" title="复制 JSON">${icon('copy')}</button>
-        </div>
+      resultBox.innerHTML = `${bar}
         ${res.rows.length
           ? `<div class="db-result-wrap"><table class="tbl db-result-table">
               <thead><tr>${res.columns.map((c) => `<th class="mono">${escapeHtml(c)}</th>`).join('')}</tr></thead>
