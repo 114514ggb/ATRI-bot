@@ -91,7 +91,8 @@
 .input:focus, .select:focus, .textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3.5px var(--accent-soft);
-  background: var(--bg-card);
+  /* 只改背景色；background 简写会把 .select 的箭头图和 no-repeat 一并重置 */
+  background-color: var(--bg-card);
 }
 
 .input::placeholder, .textarea::placeholder { color: var(--text-caption); }
@@ -106,6 +107,96 @@
   padding-right: 34px;
   cursor: pointer;
 }
+
+/* select.input（枚举/布尔参数）同样会弹出自定义菜单，补上与 .select 一致的箭头 */
+select.input {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 34px;
+  cursor: pointer;
+}
+
+/* 菜单展开时触发器箭头翻转朝上 */
+.select.dd-open, select.dd-open {
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2386868b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m18 15-6-6-6 6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+/* ---------- 自定义下拉菜单（ui.js 接管原生 select 弹层） ---------- */
+
+.dd-menu {
+  position: fixed;
+  z-index: 460;
+  min-width: 120px;
+  max-width: min(420px, calc(100vw - 16px));
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-float);
+  animation: dd-in 0.2s var(--ease-out);
+}
+
+.dd-menu.closing {
+  opacity: 0;
+  transform: translateY(-4px) scale(0.98);
+  transition: opacity 0.14s, transform 0.14s;
+  pointer-events: none;
+}
+
+.dd-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-family: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.dd-item .dd-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 输入建议弹层（attachSuggest）右侧的灰色说明 */
+.dd-item .dd-desc {
+  flex: none;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-caption);
+}
+
+.dd-item svg { width: 14px; height: 14px; flex: none; color: var(--accent); opacity: 0; }
+
+.dd-item:hover, .dd-item.active { background: var(--bg-hover); color: var(--text); }
+
+.dd-item.selected { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.dd-item.selected svg { opacity: 1; }
+.dd-item.selected:hover, .dd-item.selected.active { background: var(--accent-soft); color: var(--accent); }
+
+.dd-item.disabled { opacity: 0.4; cursor: default; }
+.dd-item.disabled:hover { background: transparent; color: var(--text-2); }
 
 .input.mono { font-family: var(--font-mono); font-size: 13px; }
 

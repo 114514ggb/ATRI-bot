@@ -81,8 +81,18 @@ async def sub_agent_task(
     if not model_name:
         return "子代理执行失败: 配置中未找到有效的模型名称"
 
-    if agency_preset := config.tool_presets.agency_Agent:
-        tool_names = agency_preset
+    if "agency_Agent" in config.tool_presets:
+        preset_cfg = config.tool_presets["agency_Agent"]
+        if preset_cfg is None:
+            tool_calls_mgr = container.get_by_type(ToolCalls)
+            tool_names = [t.name for t in tool_calls_mgr.resolve_toolset(preset="agency_Agent")]
+            log.info(f"agency_Agent 工具预设为 null,子代理可使用全部 {len(tool_names)} 个工具")
+        elif isinstance(preset_cfg, dict):
+            # 子代理不支持 tool_search 发现机制，只取 default 部分
+            tool_names = list(preset_cfg.get("default", []))
+            log.info(f"agency_Agent 工具预设为字典格式，子代理使用 default 中的 {len(tool_names)} 个工具: {tool_names}")
+        else:
+            tool_names = list(preset_cfg)
     else:
         log.warning("config.json 中未配置 agency_Agent 工具预设，子代理将无工具可用")
         tool_names: List[str] = []

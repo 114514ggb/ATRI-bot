@@ -39,14 +39,16 @@ export const SCHEMA = [
       { path: 'model.connect.supplier', label: '供应商', type: 'supplier-select', desc: '对应供应商配置（supplier_config.json）中的 name' },
       { path: 'model.connect.model_name', label: '模型名称', type: 'model-select', depends: 'model.connect.supplier', desc: '对应供应商配置中 models 的 key' },
       { path: 'model.connect.user_global_context', label: '独立上下文', type: 'toggle', span: true, desc: '开启后群聊中每人使用自己的私聊上下文；关闭则整个群共享一个上下文' },
-      { path: 'model.chat_parameter.thinking_level', label: '思考等级', type: 'select', options: ['', 'minimal', 'low', 'medium', 'high'], optional: true, desc: '模型思考强度（可选）' },
-      { path: 'model.chat_parameter.temperature', label: '采样温度', type: 'number', step: 0.05, min: 0, max: 2, desc: '值越低输出越稳定' },
-      { path: 'model.chat_parameter.top_p', label: 'Top P', type: 'number', step: 0.05, min: 0, max: 1, optional: true },
-      { path: 'model.chat_parameter.max_tokens', label: '最大 Token', type: 'number', step: 256, min: 256 },
-      { path: 'model.chat_parameter.stream', label: '流式输出', type: 'toggle', desc: '是否使用流式响应' },
-      { path: 'model.chat_parameter.tool_choice', label: '工具选择', type: 'select', options: ['auto', 'none', 'required'], optional: true },
       { path: 'model.tavily_search_API_key', label: 'Tavily 搜索 Key', type: 'password', span: true, optional: true, desc: '联网搜索 API 密钥（免费）：docs.tavily.com' },
     ],
+  },
+  {
+    id: 'chat-params',
+    label: '聊天请求参数',
+    icon: 'gauge',
+    type: 'chat-params',
+    path: 'model.chat_parameter',
+    desc: '发送聊天请求时携带的参数，键值对会原样并入请求体（OpenAI 兼容格式），可自由添加 API 支持的任意参数。stream 为特殊键：true 时走流式接口。列表为空时使用内置默认参数。',
   },
   {
     id: 'aux-models',
@@ -114,7 +116,7 @@ export const SCHEMA = [
     label: '工具预设',
     icon: 'sliders',
     type: 'tool-presets',
-    desc: '各聊天模块可用的工具列表，每一项对应 LLMchat/tools/ 下的工具目录名。',
+    desc: '各聊天模块可用的工具，每一项对应 LLMchat/tools/ 下的工具目录名。default 中的工具直接暴露给模型；deferred 中的需模型通过 default 里的 tool_search 搜索后当轮临时启用；私聊/子代理的「限制工具」开关关闭 = 保存为 null = 全部工具（不推荐）。',
   },
   {
     id: 'whitelist',
@@ -159,4 +161,29 @@ export const MODEL_SENSES = [
   { key: 'audio_sense', label: '音频' },
   { key: 'video_sense', label: '视频' },
   { key: 'document_sense', label: '文档' },
+];
+
+/* 聊天请求参数（model.chat_parameter）中常见键的渲染定义。
+   键值对本身是自由透传的，这里只负责给已知键更好的控件与说明；
+   不在表中的键按「文本/数字/开关/JSON」通用行编辑。 */
+export const CHAT_PARAM_DEFS = {
+  temperature: { label: '采样温度', type: 'num', min: 0, max: 2, step: 0.05, desc: '值越低输出越稳定' },
+  top_p: { label: 'Top P', type: 'num', min: 0, max: 1, step: 0.05 },
+  max_tokens: { label: '最大 Token', type: 'num', min: 1, step: 256 },
+  stream: { label: '流式输出', type: 'bool', desc: '特殊键：true 时走流式接口' },
+  tool_choice: { label: '工具选择', type: 'select', options: ['auto', 'none', 'required'], optional: true },
+  thinking_level: { label: '思考等级', type: 'select', options: ['minimal', 'low', 'medium', 'high'], optional: true },
+  reasoning_effort: { label: '推理力度', type: 'select', options: ['minimal', 'low', 'medium', 'high'], optional: true },
+  frequency_penalty: { label: '频率惩罚', type: 'num', min: -2, max: 2, step: 0.1 },
+  presence_penalty: { label: '存在惩罚', type: 'num', min: -2, max: 2, step: 0.1 },
+  response_format: { label: '响应格式', type: 'json', optional: true, desc: '如 {"type": "json_object"}' },
+  stop: { label: '停止序列', type: 'json', optional: true, desc: '如 ["\n\n用户："]' },
+};
+
+/* 未知参数行的值类型选项 */
+export const CHAT_PARAM_VALUE_TYPES = [
+  { key: 'str', label: '文本' },
+  { key: 'num', label: '数字' },
+  { key: 'bool', label: '开关' },
+  { key: 'json', label: 'JSON' },
 ];

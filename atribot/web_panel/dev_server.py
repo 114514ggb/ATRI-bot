@@ -66,8 +66,8 @@ def _prepare_files() -> Path:
         "ai_chat": {"playRole": "ATRI_dev", "ai_max_record": 10, "group_max_record": 20, "private_max_record": 20},
         "sand_box": {"image": "atri-sandbox:latest"},
         "tool_presets": {
-            "group_chat": {"default": ["web_search", "memory_search"], "deferred": ["run_python_code"]},
-            "private_chat": ["web_search"],
+            "group_chat": {"default": ["web_search", "memory_search", "tool_search"], "deferred": ["run_python_code"]},
+            "private_chat": {"default": ["web_search", "tool_search"], "deferred": ["run_python_code", "send_file"]},
             "agency_Agent": ["run_command"],
         },
         "group_white_list": [123456, 789012],
@@ -119,8 +119,69 @@ class MockDatabase:
         for i in range(12)
     ]
 
+    # 数据库页（/api/db/*）的罐头 pg_catalog 数据，结构与真实查询一致
+    _TABLE_SIZES = [
+        # table_name, 行数估计, size_bytes, size_pretty, 列数, 注释
+        ("message", 128450, 96374528, "92 MB", 6, "聊天消息记录"),
+        ("atri_memory", 3821, 41582550, "40 MB", 11, "长期记忆（含 pgvector 向量）"),
+        ("token_statistics", 55210, 12582912, "12 MB", 8, "LLM token 消耗统计"),
+        ("chat_context", 86, 4194304, "4096 kB", 7, "会话上下文"),
+        ("users", 612, 278528, "272 kB", 3, "用户昵称表"),
+        ("user_group", 35, 131072, "128 kB", 2, "群组表"),
+        ("user_info", 428, 98304, "96 kB", 3, "用户画像（JSONB）"),
+        ("permissions", 24, 32768, "32 kB", 3, "权限表"),
+    ]
+    _COLUMNS = {
+        "users": [("user_id", "int8", "NO", None), ("nickname", "varchar", "NO", None), ("last_updated", "timestamp", "YES", None)],
+        "user_group": [("group_id", "int8", "NO", None), ("group_name", "varchar", "YES", None)],
+        "user_info": [("user_id", "int8", "NO", None), ("info", "jsonb", "YES", None), ("last_updated", "timestamp", "YES", None)],
+        "permissions": [("user_id", "int8", "NO", None), ("permission_type", "permission_type", "NO", None), ("granted_by", "int8", "YES", None)],
+        "message": [("sole_id", "bigserial", "NO", "nextval('message_sole_id_seq'::regclass)"), ("message_id", "int8", "NO", None), ("user_id", "int8", "NO", None), ("group_id", "int8", "YES", None), ("time", "int8", "NO", None), ("message_content", "text", "YES", None)],
+        "atri_memory": [("memory_id", "bigserial", "NO", "nextval('atri_memory_memory_id_seq'::regclass)"), ("user_id", "int8", "YES", None), ("group_id", "int8", "YES", None), ("event_time", "timestamp", "NO", None), ("event", "text", "NO", None), ("event_vector", "vector", "YES", None), ("category", "memory_category", "NO", None), ("importance", "int4", "NO", None), ("credibility", "int4", "NO", None), ("access_count", "int4", "YES", "0"), ("last_accessed", "timestamp", "YES", None)],
+        "chat_context": [("context_id", "bigserial", "NO", "nextval('chat_context_context_id_seq'::regclass)"), ("user_id", "int8", "YES", None), ("group_id", "int8", "YES", None), ("context_data", "jsonb", "YES", None), ("total_tokens", "int4", "YES", None), ("play_role", "varchar", "YES", None), ("last_updated", "timestamp", "YES", None)],
+        "token_statistics": [("id", "bigserial", "NO", "nextval('token_statistics_id_seq'::regclass)"), ("user_id", "int8", "YES", None), ("group_id", "int8", "YES", None), ("model", "varchar", "YES", None), ("prompt_tokens", "int4", "YES", None), ("completion_tokens", "int4", "YES", None), ("total_tokens", "int4", "YES", None), ("created_at", "timestamp", "YES", "CURRENT_TIMESTAMP")],
+    }
+    _CONSTRAINTS = {
+        "users": [("users_pkey", "p", "PRIMARY KEY (user_id)")],
+        "user_group": [("user_group_pkey", "p", "PRIMARY KEY (group_id)")],
+        "permissions": [("permissions_pkey", "p", "PRIMARY KEY (user_id)")],
+        "message": [("message_pkey", "p", "PRIMARY KEY (sole_id)")],
+        "atri_memory": [("atri_memory_pkey", "p", "PRIMARY KEY (memory_id)"), ("atri_memory_importance_check", "c", "CHECK ((importance >= 1) AND (importance <= 10))")],
+        "chat_context": [("chat_context_pkey", "p", "PRIMARY KEY (context_id)"), ("chat_context_user_group_check", "c", "CHECK ((user_id IS NULL) <> (group_id IS NULL))")],
+        "token_statistics": [("token_statistics_pkey", "p", "PRIMARY KEY (id)")],
+        "user_info": [("user_info_pkey", "p", "PRIMARY KEY (user_id)")],
+    }
+    _INDEXES = {
+        "message": [("message_pkey", "CREATE UNIQUE INDEX message_pkey ON public.message USING btree (sole_id)"), ("idx_message_user_time", "CREATE INDEX idx_message_user_time ON public.message USING btree (user_id, time DESC)")],
+        "atri_memory": [("atri_memory_pkey", "CREATE UNIQUE INDEX atri_memory_pkey ON public.atri_memory USING btree (memory_id)"), ("idx_memory_vector", "CREATE INDEX idx_memory_vector ON public.atri_memory USING hnsw (event_vector vector_cosine_ops)")],
+        "users": [("users_pkey", "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (user_id)")],
+        "chat_context": [("chat_context_pkey", "CREATE UNIQUE INDEX chat_context_pkey ON public.chat_context USING btree (context_id)")],
+    }
+
     async def execute_SQL(self, sql, args=None):
-        s = " ".join(sql.lower().split())
+        # 引号在关键词匹配前去掉，兼容 FROM "table" 写法
+        s = " ".join(sql.lower().split()).replace('"', "")
+        # 数据库页的 pg_catalog / information_schema 查询
+        if "pg_postmaster_start_time" in s:
+            return [{"version": "PostgreSQL 16.4 (Ubuntu 16.4-1.pgdg22.04+2) on x86_64", "db_name": "atri", "db_size": "156 MB", "uptime": "3 days, 04:12:33", "connections": 4}]
+        if "from pg_class" in s:
+            return [
+                {"table_name": t, "row_estimate": est, "size_bytes": size, "size_pretty": pretty, "column_count": cols, "comment": cmt}
+                for t, est, size, pretty, cols, cmt in self._TABLE_SIZES
+            ]
+        if "information_schema.columns" in s:
+            name = next((x for x in (args or []) if isinstance(x, str) and not x.startswith("%")), "")
+            cols = self._COLUMNS.get(name.lower(), [])
+            return [
+                {"column_name": c, "udt_name": u, "is_nullable": nul, "column_default": dflt, "character_maximum_length": 64 if u == "varchar" else None}
+                for c, u, nul, dflt in cols
+            ]
+        if "from pg_indexes" in s:
+            name = next((x for x in (args or []) if isinstance(x, str)), "")
+            return [{"indexname": i, "indexdef": d} for i, d in self._INDEXES.get(name.lower(), [])]
+        if "pg_constraint" in s:
+            name = next((x for x in (args or []) if isinstance(x, str)), "")
+            return [{"name": n, "type": t, "def": d} for n, t, d in self._CONSTRAINTS.get(name.lower(), [])]
         # LIKE 参数（搜索/筛选）在 mock 里做真过滤；$N 占位符按 args 顺序解析
         like = None
         eq_vals = []
@@ -131,7 +192,12 @@ class MockDatabase:
                 else:
                     eq_vals.append(a)
         if "count(*)" in s:
-            return [{"c": len(self._rows_for(s, like, eq_vals))}]
+            rows = self._rows_for(s, like, eq_vals)
+            if rows or like or eq_vals or "where" in s:
+                return [{"c": len(rows)}]
+            # 其余表（chat_context 等）无行集数据时，用行数估计兜底
+            est = next((r for r in self._TABLE_SIZES if f"from {r[0]}" in s), None)
+            return [{"c": est[1] if est else 0}]
         return [dict(r) for r in self._rows_for(s, like, eq_vals)]
 
     def _rows_for(self, s, like, eq_vals):
@@ -166,9 +232,9 @@ class MockDatabase:
             eq_cols = re.findall(r"(\w+)\s*=\s*\$\d+", s)
             for col, val in zip(eq_cols, eq_vals):
                 rows = [r for r in rows if str(r.get(col)) == str(val)]
-        m = re.search(r"limit (\d+) offset (\d+)", s)
+        m = re.search(r"limit (\d+)(?: offset (\d+))?", s)
         if m:
-            limit, offset = int(m.group(1)), int(m.group(2))
+            limit, offset = int(m.group(1)), int(m.group(2) or 0)
             rows = rows[offset: offset + limit]
         return rows
 
@@ -248,6 +314,127 @@ class _FakeCommandSystem(CommandSystem):
         self.alias_registry = {a: c.name for c in commands for a in c.aliases}
 
 
+class _MockToolset:
+    def __init__(self, names):
+        self._names = list(names)
+
+    def names(self):
+        return list(self._names)
+
+
+class _MockPresetManager:
+    """预置假工具预设，供 LLM 工具页展示归属关系"""
+
+    def __init__(self):
+        self.presets = {
+            "group_chat": _MockToolset(["web_search", "tool_search"]),
+            "agency_Agent": _MockToolset([]),
+        }
+        self.deferred = {"group_chat": ["run_python_code"]}
+
+
+class _MockRegistry:
+    def __init__(self, func_list):
+        self.func_list = func_list
+
+    def get_func(self, name):
+        return next((t for t in self.func_list if t.name == name), None)
+
+
+class _MockToolCalls:
+    """预置本地 + MCP 假工具，使 LLM 工具页在开发模式下可渲染与测试"""
+
+    def __init__(self):
+        from atribot.LLMchat.MCP.tool_model import LocalTool, MCPTool
+        from atribot.core.type.context_types import ToolSearchRequested
+
+        async def _web_search(query: str, search_depth: str = "basic"):
+            return json.dumps(
+                [
+                    {"title": f"「{query}」的结果 1（mock）", "url": "https://example.com/1", "content": "开发模式下的假搜索结果，验证 JSON 字符串序列化。"},
+                    {"title": f"「{query}」的结果 2（mock）", "url": "https://example.com/2", "content": "第二条假结果。"},
+                ],
+                ensure_ascii=False,
+            )
+
+        async def _get_user_info(user_id: int):
+            return {"user_id": user_id, "nickname": "测试用户甲（mock）", "impression": "一位喜欢深夜听爵士乐的用户。"}
+
+        async def _tool_search(query: str, limit: int = 1):
+            raise ToolSearchRequested(query=query, limit=limit)
+
+        async def _send_image_message(url: str, message_data=None):
+            return "不应在面板执行到这里"
+
+        class _FakeMcpTool:
+            def __init__(self, name):
+                self.name = name
+
+        class _FakeSession:
+            async def call_tool(self, name, arguments=None):
+                if name == "get_forecast":
+                    raise Exception("天气服务不可用（mock 错误演示）")
+                return {"city": (arguments or {}).get("city"), "weather": "晴", "temperature": 26}
+
+        class _FakeClient:
+            def __init__(self):
+                self.session = _FakeSession()
+
+        client = _FakeClient()
+
+        def _local(name, desc, props, handler, **kw):
+            return LocalTool(
+                name=name, description=desc,
+                parameters={"type": "object", "properties": props},
+                handler=handler, **kw,
+            )
+
+        def _mcp(name, desc, props, **kw):
+            return MCPTool(
+                name=name, description=desc,
+                parameters={"type": "object", "properties": props},
+                mcp_tool=_FakeMcpTool(name), mcp_client=client, mcp_server_name="weather",
+                **kw,
+            )
+
+        self._registry = _MockRegistry(
+            [
+                _local(
+                    "web_search", "联网搜索（mock）",
+                    {
+                        "query": {"type": "string", "description": "搜索关键词"},
+                        "search_depth": {"type": "string", "enum": ["basic", "advanced"], "default": "basic"},
+                    },
+                    _web_search, concurrent=True,
+                ),
+                _local(
+                    "get_user_info", "获取用户 user_info 文档（mock）",
+                    {"user_id": {"type": "integer", "description": "用户 QQ 号"}},
+                    _get_user_info,
+                ),
+                _local(
+                    "tool_search", "搜索待发现工具（mock，演示异常输出）",
+                    {"query": {"type": "string", "description": "关键词"}, "limit": {"type": "integer", "default": 1, "minimum": 1}},
+                    _tool_search,
+                ),
+                _local(
+                    "send_image_message", "发送图片消息（依赖消息上下文，演示不可测试状态）",
+                    {"url": {"type": "string", "description": "图片 URL"}},
+                    _send_image_message, chat_scope="private",
+                ),
+                _mcp("query_weather", "查询城市天气（mock MCP）", {"city": {"type": "string", "description": "城市名"}}),
+                _mcp("get_forecast", "查询城市预报（mock MCP，演示执行失败）", {"city": {"type": "string"}, "days": {"type": "integer", "default": 3}}, chat_scope="group"),
+            ]
+        )
+        self._preset_manager = _MockPresetManager()
+
+    async def calls(self, tool_name: str, arguments_str: str, message_data=None):
+        tool = self._registry.get_func(tool_name)
+        if tool is None:
+            raise Exception(f"Request function {tool_name} not found.")
+        return await tool.execute(message_data=None, **json.loads(arguments_str))
+
+
 async def _fake_log_stream():
     """持续产生假日志，验证 WebSocket 日志流"""
     sources = ["PlatformManager", "atri-bot.ChatManager", "atri-bot.LLM", "OneBotWSClient", "atri-bot.Memory", "atri-bot.Whitelist", "websockets.client"]
@@ -299,6 +486,7 @@ def main() -> None:
     container.register("database", MockDatabase())
     container.register("PermissionsManagement", PermissionsManagement())
     container.register("CommandSystem", _FakeCommandSystem())
+    container.register("ToolCalls", _MockToolCalls())
 
     app = FastAPI(title="ATRI Admin Panel (dev)")
     app.include_router(router)

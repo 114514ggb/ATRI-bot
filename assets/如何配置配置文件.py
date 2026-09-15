@@ -151,10 +151,11 @@
         "image":"atri-sandbox:latest"#启动的镜像名称
     },
     "tool_presets": {#各个聊天模块所使用的工具列表, 每一项对应 LLMchat/tools/ 下的一个工具目录名
-        # 两种格式:
-        # 1) 列表: 全部作为默认工具直接暴露给模型 (如 private_chat / agency_Agent)
+        # group_chat / private_chat / agency_Agent 三个模块都支持三种取值:
+        # 1) 列表(白名单): 只有列表内的工具会直接暴露给模型; 列表为空代表该模块没有任何工具
         # 2) 字典: {"default": [...], "deferred": [...]} 拆分为"默认启用"与"待发现"两组 (如 group_chat)
-        # 列表为空代表没有工具; 若要使用全部工具, 把该模块的列表值设为 null 或省略
+        # 3) null: 不限制, 该模块直接使用全部已加载的工具 (不推荐, 很多工具是专有的)
+        # 注意: 省略某个模块的键 != null, 省略后该模块等于没有工具(日志有警告), 想用全部工具必须显式写 null
         "group_chat": {#群聊使用的工具
             "default": [#默认直接暴露, 模型可直接调用
                 "web_search", "web_extract",
@@ -163,6 +164,9 @@
                 "tool_search"#用于发现并临时启用 deferred 中的工具,如果配置了deferred必须要配置这个工具不然发现不了
             ],
             "deferred": [#待发现工具, 不会直接暴露; 模型可通过 tool_search 搜索后在本轮临时启用(仅本轮有效)
+                # 注意: tool_search 与 deferred 必须成对出现(WebUI保存时会校验):
+                #   配了 deferred 就必须把 tool_search 加进 default, 不然发现不了
+                #   default 里有 tool_search 就必须在 deferred 至少放一个工具, 不然没有可发现的内容
                 "run_python_code",
                 "run_command",
                 "send_file","add_file",
@@ -170,12 +174,20 @@
                 "schedule_self_trigger", "sub_agent"
             ]
         },
-        "private_chat": [#私聊使用的工具
-            "web_search", "memory_search",
-            "load_skill_prompt", "get_user_info",
-            "tool_search"
-        ],
-        "agency_Agent": [#子代理(子 agent)使用的工具
+        "private_chat": {#私聊使用的工具, 也可以写成普通列表(白名单)
+            "default": [
+                "web_search", "memory_search",
+                "load_skill_prompt", "get_user_info",
+                "tool_search"
+            ],
+            "deferred": [
+                "run_python_code",
+                "send_file","add_file",
+                "send_image_message","send_speech_message",
+                "schedule_self_trigger"
+            ]
+        },
+        "agency_Agent": [#子代理(子 agent)使用的工具, 不支持 tool_search 发现机制, 字典格式时只取 default 部分
             "run_command",
             "send_file","add_file",
             "get_user_info", "memory_search",

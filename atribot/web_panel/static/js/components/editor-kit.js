@@ -39,9 +39,11 @@ export function fmtVal(v) {
   return s === undefined ? String(v) : s.length > 80 ? s.slice(0, 80) + '…' : s;
 }
 
-/** 递归 diff，返回 [{path, old, new}]（数组按整体比较） */
+/** 递归 diff，返回 [{path, old, new}]（数组逐元素比较，元素对象键序无关） */
 export function diffObjects(a, b, path = '', out = []) {
   const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  /* 空串/null/缺键在配置语义里都是「未设置」，视为等价，避免假 diff */
+  const isEmpty = (v) => v === undefined || v === null || v === '';
 
   if (isObj(a) && isObj(b)) {
     const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
@@ -51,6 +53,16 @@ export function diffObjects(a, b, path = '', out = []) {
     return out;
   }
 
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length === b.length) {
+      a.forEach((av, i) => diffObjects(av, b[i], `${path}[${i}]`, out));
+    } else {
+      out.push({ path: path || '(root)', old: a, new: b });
+    }
+    return out;
+  }
+
+  if (isEmpty(a) && isEmpty(b)) return out;
   const ja = JSON.stringify(a);
   const jb = JSON.stringify(b);
   if (ja !== jb) out.push({ path: path || '(root)', old: a, new: b });

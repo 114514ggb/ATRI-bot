@@ -40,26 +40,30 @@ async function init(section) {
 
   section.querySelector('#mem-batch-del').addEventListener('click', () => batchDelete(section));
 
-  section.addEventListener('change', (e) => {
-    if (e.target.matches('#mem-table input[type="checkbox"]')) updateSelCount(section);
-  });
+  /* 表格按钮走 section 级委托，section 持久存在，只绑一次避免重进页面时累积 */
+  if (!section.dataset.tableBound) {
+    section.dataset.tableBound = '1';
+    section.addEventListener('change', (e) => {
+      if (e.target.matches('#mem-table input[type="checkbox"]')) updateSelCount(section);
+    });
 
-  section.addEventListener('click', async (e) => {
-    const editBtn = e.target.closest('[data-edit-mem]');
-    if (editBtn) { openEditModal(Number(editBtn.dataset.editMem), section); return; }
+    section.addEventListener('click', async (e) => {
+      const editBtn = e.target.closest('[data-edit-mem]');
+      if (editBtn) { openEditModal(Number(editBtn.dataset.editMem), section); return; }
 
-    const delBtn = e.target.closest('[data-del-mem]');
-    if (delBtn) {
-      const id = Number(delBtn.dataset.delMem);
-      if (await confirmDialog({ title: '删除记忆', message: `确定删除记忆 <b>#${id}</b> 吗？此操作不可撤销。`, danger: true, confirmText: '删除' })) {
-        try {
-          await api.del(`/memory/${id}`);
-          toast('已删除', 'success');
-          load(section);
-        } catch (err) { toast(`删除失败：${err.message}`, 'error', 5000); }
+      const delBtn = e.target.closest('[data-del-mem]');
+      if (delBtn) {
+        const id = Number(delBtn.dataset.delMem);
+        if (await confirmDialog({ title: '删除记忆', message: `确定删除记忆 <b>#${id}</b> 吗？此操作不可撤销。`, danger: true, confirmText: '删除' })) {
+          try {
+            await api.del(`/memory/${id}`);
+            toast('已删除', 'success');
+            load(section);
+          } catch (err) { toast(`删除失败：${err.message}`, 'error', 5000); }
+        }
       }
-    }
-  });
+    });
+  }
 
   await load(section);
 }

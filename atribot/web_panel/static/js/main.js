@@ -1,13 +1,15 @@
 /* 面板入口：登录 / 路由注册 / 顶栏与系统菜单 */
 
 import { api, getToken, setToken, onUnauthorized } from './api.js';
-import { icon, toast, initTheme, toggleTheme, confirmDialog } from './ui.js';
+import { icon, toast, initTheme, toggleTheme, confirmDialog, initSelectMenus } from './ui.js';
 import { registerRoute, startRouter } from './router.js';
 import { restartAndWait } from './components/editor-kit.js';
 
 import { dashboardView } from './views/dashboard.js';
 import { groupsView, usersView, messagesView, commandsView } from './views/data.js';
+import { toolsView } from './views/tools.js';
 import { memoryView } from './views/memory.js';
+import { databaseView } from './views/database.js';
 import { configView } from './views/config.js';
 import { supplierView } from './views/supplier.js';
 import { mcpView } from './views/mcp.js';
@@ -23,7 +25,9 @@ registerRoute('groups', groupsView);
 registerRoute('users', usersView);
 registerRoute('messages', messagesView);
 registerRoute('memory', memoryView);
+registerRoute('database', databaseView);
 registerRoute('commands', commandsView);
+registerRoute('tools', toolsView);
 registerRoute('config', configView);
 registerRoute('supplier', supplierView);
 registerRoute('mcp', mcpView);
@@ -228,6 +232,7 @@ function bindChrome() {
 
 initTheme();
 bindChrome();
+initSelectMenus();
 
 if (getToken()) {
   document.getElementById('access-token').value = getToken();

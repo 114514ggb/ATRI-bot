@@ -89,6 +89,10 @@ function renderForm(section) {
 }
 
 function bindForm(section) {
+  /* section 级委托只绑一次：重复渲染（切换模式/回滚/重进页面）时避免监听器累积 */
+  if (section.dataset.formBound) return;
+  section.dataset.formBound = '1';
+
   /* key 模式切换 */
   section.addEventListener('click', (e) => {
     const modeBtn = e.target.closest('[data-keymode]');

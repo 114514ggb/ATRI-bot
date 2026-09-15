@@ -326,9 +326,10 @@ class ToolPresetManager:
     def load_presets_from_config(self, presets_config: Dict[str, Any], registry: "ToolRegistry") -> None:
         """从配置字典批量加载预设组
 
-        兼容两种配置形式：
+        兼容三种配置形式：
         - 列表：``{"group_chat": ["tool_a", ...]}`` → 全部作为默认启用工具，无待发现
         - 字典：``{"group_chat": {"default": [...], "deferred": [...]}}`` → 拆分为默认启用与待发现两组
+        - null:``{"group_chat": None}`` → 不限制，注册当前全部已加载工具（省略该键则不会注册，视为无工具）
 
         Args:
             presets_config: 预设配置（见上方说明）
@@ -337,6 +338,13 @@ class ToolPresetManager:
         self._registry = registry
         self.deferred = {}
         for name, value in presets_config.items():
+            if value is None:
+                toolset = ToolSetModel()
+                for func_tool in registry.func_list:
+                    toolset.add_tool(func_tool)
+                self.register_preset(name, toolset)
+                self.log.info(f"工具预设 '{name}' 为 null,已注册全部 {len(toolset)} 个已加载工具")
+                continue
             if isinstance(value, dict):
                 default_names = value.get("default", [])
                 deferred_names = value.get("deferred", [])

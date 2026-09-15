@@ -137,32 +137,36 @@ async function initUsers(section) {
     loadUsers(section);
   }, 350));
 
-  section.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-perm]');
-    if (!btn) return;
-    const uid = btn.dataset.uid;
-    const action = btn.dataset.perm;
-    const labels = {
-      promote: `将 ${uid} 提升为管理员`, demote: `取消 ${uid} 的管理员权限`,
-      blacklist: `将 ${uid} 加入黑名单（消息将被完全忽略）`, unblacklist: `将 ${uid} 移出黑名单`,
-    };
-    const ok = await confirmDialog({
-      title: '权限变更',
-      message: `确定要${labels[action]}吗？`,
-      danger: action === 'blacklist',
-      confirmText: '确认变更',
+  /* 表格按钮走 section 级委托，section 持久存在，只绑一次避免重进页面时累积 */
+  if (!section.dataset.permBound) {
+    section.dataset.permBound = '1';
+    section.addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-perm]');
+      if (!btn) return;
+      const uid = btn.dataset.uid;
+      const action = btn.dataset.perm;
+      const labels = {
+        promote: `将 ${uid} 提升为管理员`, demote: `取消 ${uid} 的管理员权限`,
+        blacklist: `将 ${uid} 加入黑名单（消息将被完全忽略）`, unblacklist: `将 ${uid} 移出黑名单`,
+      };
+      const ok = await confirmDialog({
+        title: '权限变更',
+        message: `确定要${labels[action]}吗？`,
+        danger: action === 'blacklist',
+        confirmText: '确认变更',
+      });
+      if (!ok) return;
+      btn.classList.add('loading');
+      try {
+        const res = await api.put(`/users/${uid}/permission`, { action });
+        toast(`操作成功，当前角色：${res.role}`, 'success');
+        loadUsers(section);
+      } catch (err) {
+        toast(`操作失败：${err.message}`, 'error', 5000);
+        btn.classList.remove('loading');
+      }
     });
-    if (!ok) return;
-    btn.classList.add('loading');
-    try {
-      const res = await api.put(`/users/${uid}/permission`, { action });
-      toast(`操作成功，当前角色：${res.role}`, 'success');
-      loadUsers(section);
-    } catch (err) {
-      toast(`操作失败：${err.message}`, 'error', 5000);
-      btn.classList.remove('loading');
-    }
-  });
+  }
 
   await loadUsers(section);
 }
@@ -243,7 +247,10 @@ async function initMessages(section) {
     section.querySelector('#msg-search').value = '';
     apply();
   });
-  section.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.filter-bar .input')) apply(); });
+  if (!section.dataset.msgKeyBound) {
+    section.dataset.msgKeyBound = '1';
+    section.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('.filter-bar .input')) apply(); });
+  }
 
   await loadMessages(section);
 }

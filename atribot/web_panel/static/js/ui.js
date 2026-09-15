@@ -370,6 +370,246 @@ export function toggleTheme() {
     .catch(() => { /* 过渡被跳过时主题已同步切换，无需处理 */ });
 }
 
+/* ---------- 自定义下拉菜单：接管全部原生 <select> 的弹出层 ----------
+   原生 select 原地保留，继续充当触发器与数据源（值、input/change 事件、
+   动态重建选项全部沿用原生行为），仅在 mousedown 时拦截浏览器默认弹层，
+   改为渲染与面板风格一致的自定义菜单。菜单每次打开都从 select 当前的
+   options 重建，因此动态刷新选项的页面（配置级联、SQL 历史、分页）无需
+   任何适配。 */
+
+let ddMenuEl = null; /* 当前弹层元素 */
+let ddOwner = null;  /* 打开弹层的 select */
+let ddIndex = -1;    /* 键盘高亮项在 options 中的下标 */
+
+function closeSelectMenu() {
+  if (!ddMenuEl) return;
+  const el = ddMenuEl;
+  ddMenuEl = null;
+  ddOwner?.classList.remove('dd-open');
+  ddOwner?.removeAttribute('aria-expanded');
+  ddOwner = null;
+  ddIndex = -1;
+  el.classList.add('closing');
+  setTimeout(() => el.remove(), 140);
+}
+
+function ddPick(index) {
+  const sel = ddOwner;
+  if (!sel) return;
+  closeSelectMenu();
+  sel.focus();
+  if (sel.selectedIndex === index) return;
+  sel.selectedIndex = index;
+  sel.dispatchEvent(new Event('input', { bubbles: true }));
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function ddMoveHighlight(key) {
+  const sel = ddOwner;
+  const menu = ddMenuEl;
+  if (!sel || !menu) return;
+  const opts = [...sel.options];
+  const enabled = opts.map((_, i) => i).filter((i) => !opts[i].disabled);
+  if (!enabled.length) return;
+  if (key === 'Home') ddIndex = enabled[0];
+  else if (key === 'End') ddIndex = enabled[enabled.length - 1];
+  else {
+    const pos = enabled.indexOf(ddIndex);
+    const dir = key === 'ArrowDown' ? 1 : -1;
+    ddIndex = enabled[Math.max(0, Math.min(enabled.length - 1, pos < 0 ? 0 : pos + dir))];
+  }
+  menu.querySelectorAll('.dd-item').forEach((el) =>
+    el.classList.toggle('active', Number(el.dataset.i) === ddIndex));
+  menu.querySelector(`.dd-item[data-i="${ddIndex}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+
+function openSelectMenu(sel) {
+  closeSelectMenu();
+  const opts = [...sel.options];
+  if (!opts.length) return;
+
+  const menu = document.createElement('div');
+  menu.className = 'dd-menu';
+  menu.setAttribute('role', 'listbox');
+  menu.innerHTML = opts.map((o, i) => `
+    <button type="button" tabindex="-1" role="option" data-i="${i}"
+      class="dd-item${o.selected ? ' selected' : ''}${o.disabled ? ' disabled' : ''}"
+      title="${escapeHtml(o.textContent)}">
+      <span class="dd-label">${escapeHtml(o.textContent)}</span>${icon('check')}
+    </button>`).join('');
+
+  const rect = sel.getBoundingClientRect();
+  menu.style.minWidth = `${Math.round(rect.width)}px`;
+  document.body.appendChild(menu);
+
+  /* 定位：默认在触发器下方展开；下方空间不足且上方更宽裕时翻到上方 */
+  const mRect = menu.getBoundingClientRect();
+  const gap = 6;
+  const roomBelow = innerHeight - rect.bottom;
+  const openUp = mRect.height + gap > roomBelow && rect.top > roomBelow;
+  const top = openUp ? rect.top - mRect.height - gap : rect.bottom + gap;
+  menu.style.top = `${Math.max(gap, Math.min(top, innerHeight - mRect.height - gap))}px`;
+  menu.style.left = `${Math.max(gap, Math.min(rect.left, innerWidth - mRect.width - gap))}px`;
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('.dd-item');
+    if (item && !item.classList.contains('disabled')) ddPick(Number(item.dataset.i));
+  });
+
+  ddMenuEl = menu;
+  ddOwner = sel;
+  ddIndex = sel.selectedIndex;
+  sel.classList.add('dd-open');
+  sel.setAttribute('aria-expanded', 'true');
+  menu.querySelector('.dd-item.selected')?.scrollIntoView({ block: 'nearest' });
+}
+
+export function initSelectMenus() {
+  document.addEventListener('mousedown', (e) => {
+    /* 菜单内部的按下交给菜单自身的 click 处理 */
+    if (ddMenuEl && ddMenuEl.contains(e.target)) return;
+    const sel = e.target.closest('select');
+    if (!sel || sel.disabled || sel.multiple || sel.size > 1) return;
+    e.preventDefault(); /* 阻止浏览器展开原生弹层 */
+    if (ddOwner === sel) closeSelectMenu(); /* 再点一次触发器 = 收起 */
+    else openSelectMenu(sel);
+    sel.focus();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (ddMenuEl) {
+      if (e.key === 'Escape' || e.key === 'Tab') { closeSelectMenu(); return; }
+      if (['Enter', ' ', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+        e.preventDefault();
+        if ((e.key === 'Enter' || e.key === ' ') && ddIndex >= 0) ddPick(ddIndex);
+        else ddMoveHighlight(e.key);
+      }
+      return;
+    }
+    const sel = e.target;
+    if (sel instanceof HTMLSelectElement && !sel.disabled && !sel.multiple && sel.size <= 1 &&
+        ['Enter', ' ', 'ArrowDown', 'ArrowUp'].includes(e.key)) {
+      e.preventDefault();
+      openSelectMenu(sel);
+      sel.focus();
+    }
+  });
+
+  /* 页面滚动会让弹层脱离触发器，直接收起（弹层自身内部滚动除外） */
+  window.addEventListener('scroll', (e) => {
+    if (ddMenuEl && !ddMenuEl.contains(e.target)) closeSelectMenu();
+  }, { capture: true, passive: true });
+
+  window.addEventListener('resize', closeSelectMenu);
+  document.addEventListener('blur', (e) => {
+    /* 焦点移入弹层内部（点选 dd-item 时按钮会抢走焦点）不算离开，收起会让 click 落空、选项永远点不中 */
+    if (ddMenuEl && e.target === ddOwner && !(e.relatedTarget && ddMenuEl.contains(e.relatedTarget))) closeSelectMenu();
+  }, true);
+}
+
+/* ---------- 输入建议弹层（autocomplete）：文本框的 themed 建议列表 ----------
+   复用 .dd-menu 样式，不接管输入框本身。getItems(query) 返回 [{ value, label, desc }]；
+   选中后写回 input 并派发 input 事件，由页面自身的 input 监听做后续联动
+   （如键名命中已知参数时升级值控件）。 */
+
+const sgBound = new WeakSet();
+
+export function attachSuggest(input, getItems) {
+  if (sgBound.has(input)) return;
+  sgBound.add(input);
+
+  let menu = null;
+  let items = [];
+  let idx = -1;
+
+  const close = () => {
+    if (!menu) return;
+    const el = menu;
+    menu = null;
+    items = [];
+    idx = -1;
+    el.classList.add('closing');
+    setTimeout(() => el.remove(), 140);
+  };
+
+  const highlight = () => {
+    if (!menu) return;
+    menu.querySelectorAll('.dd-item').forEach((el) => el.classList.toggle('active', Number(el.dataset.i) === idx));
+    menu.querySelector(`.dd-item[data-i="${idx}"]`)?.scrollIntoView({ block: 'nearest' });
+  };
+
+  const refresh = () => {
+    /* 整行被重渲染（input 已脱离文档）时不再弹建议，避免孤儿弹层 */
+    if (!input.isConnected) { close(); return; }
+    items = getItems(input.value) || [];
+    if (!items.length) { close(); return; }
+    if (!menu) {
+      menu = document.createElement('div');
+      menu.className = 'dd-menu sg-menu';
+      menu.setAttribute('role', 'listbox');
+      /* 按下不转移焦点：input 保持焦点，blur 关闭逻辑不会误触发，click 也不会落空 */
+      menu.addEventListener('mousedown', (e) => e.preventDefault());
+      menu.addEventListener('click', (e) => {
+        const item = e.target.closest('.dd-item');
+        if (item) pick(Number(item.dataset.i));
+      });
+      document.body.appendChild(menu);
+    }
+    menu.innerHTML = items.map((it, i) => `
+      <button type="button" tabindex="-1" role="option" data-i="${i}" class="dd-item" title="${escapeHtml(it.label)}">
+        <span class="dd-label">${escapeHtml(it.label)}</span>
+        ${it.desc ? `<span class="dd-desc">${escapeHtml(it.desc)}</span>` : ''}
+      </button>`).join('');
+
+    const rect = input.getBoundingClientRect();
+    menu.style.minWidth = `${Math.round(rect.width)}px`;
+    const mRect = menu.getBoundingClientRect();
+    const gap = 6;
+    const roomBelow = innerHeight - rect.bottom;
+    const openUp = mRect.height + gap > roomBelow && rect.top > roomBelow;
+    const top = openUp ? rect.top - mRect.height - gap : rect.bottom + gap;
+    menu.style.top = `${Math.max(gap, Math.min(top, innerHeight - mRect.height - gap))}px`;
+    menu.style.left = `${Math.max(gap, Math.min(rect.left, innerWidth - mRect.width - gap))}px`;
+    idx = -1;
+  };
+
+  const pick = (i) => {
+    const it = items[i];
+    if (!it) return;
+    input.value = it.value;
+    close();
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  };
+
+  /* 延迟一拍刷新：input 事件可能触发整行重渲染（键名命中已知参数），重渲染后本 input 已脱离文档 */
+  input.addEventListener('input', () => setTimeout(refresh, 0));
+  input.addEventListener('focus', refresh);
+  input.addEventListener('blur', (e) => {
+    if (menu && !(e.relatedTarget && menu.contains(e.relatedTarget))) close();
+  });
+  input.addEventListener('keydown', (e) => {
+    if (menu && (e.key === 'Escape' || e.key === 'Tab')) { close(); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!menu) refresh();
+      if (!menu || !items.length) return;
+      idx = idx < 0 ? (e.key === 'ArrowDown' ? 0 : items.length - 1)
+        : Math.max(0, Math.min(items.length - 1, idx + (e.key === 'ArrowDown' ? 1 : -1)));
+      highlight();
+    } else if (e.key === 'Enter' && menu) {
+      e.preventDefault();
+      if (idx >= 0) pick(idx);
+      else close();
+    }
+  });
+  window.addEventListener('scroll', () => { if (menu) close(); }, { capture: true, passive: true });
+  window.addEventListener('resize', close);
+
+  /* focusin 时才绑定的情况：焦点已在本输入框上，补一次刷新把建议弹出来 */
+  if (document.activeElement === input) refresh();
+}
+
 /* ---------- 防抖 ---------- */
 
 export function debounce(fn, ms = 300) {

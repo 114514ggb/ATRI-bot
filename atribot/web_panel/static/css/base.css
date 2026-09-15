@@ -229,6 +229,12 @@ code, pre, .mono { font-family: var(--font-mono); }
   to { opacity: 0; transform: translate(-50%, -6px) scale(0.96); }
 }
 
+/* 自定义下拉菜单进出场 */
+@keyframes dd-in {
+  from { opacity: 0; transform: translateY(-5px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   /* 系统"减少动画"时不再一刀切冻结（动画全变 0.01ms 会像闪烁/卡死），
      而是把位移/回弹类关键帧重声明为纯淡入：时长保留、过渡可见，只是不滑动不弹跳。
@@ -240,6 +246,7 @@ code, pre, .mono { font-family: var(--font-mono); }
   @keyframes zoom-fade { from { opacity: 0; } to { opacity: 1; } }
   @keyframes pill-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes pill-out { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes dd-in { from { opacity: 0; } to { opacity: 1; } }
   @keyframes bar-grow { from { opacity: 0.35; } to { opacity: 1; } }
   @keyframes shake { 20%, 40%, 60%, 80%, from, to { transform: none; } }
 

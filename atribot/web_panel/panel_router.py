@@ -13,7 +13,9 @@ import shutil
 import sys
 import time
 from collections import deque
-from datetime import datetime
+from datetime import date, datetime
+from datetime import time as dt_time
+from decimal import Decimal
 from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
@@ -557,6 +559,145 @@ async def api_commands(_: None = Depends(_auth)) -> List[Dict[str, Any]]:
     return sorted(result, key=lambda x: x["name"])
 
 
+def _tool_calls_service():
+    """惰性获取 ToolCalls 服务；未注册（bot 未启动/独立面板）时返回 None"""
+    if not container.exists("ToolCalls"):
+        return None
+    return container.get("ToolCalls")
+
+
+def _local_tool_needs_message_data(tool) -> bool:
+    """判断本地工具 handler 是否声明了 message_data 参数（声明即依赖聊天上下文）"""
+    import inspect
+
+    try:
+        return "message_data" in inspect.signature(tool.handler).parameters
+    except (TypeError, ValueError):
+        return True
+
+
+def _serialize_tool(tc, tool) -> Dict[str, Any]:
+    from atribot.LLMchat.MCP.tool_model import MCPTool
+
+    entry: Dict[str, Any] = {
+        "name": tool.name,
+        "description": tool.description,
+        "parameters": tool.parameters or {"type": "object", "properties": {}},
+        "active": tool.active,
+        "concurrent": tool.concurrent,
+        "background": tool.background,
+        "chat_scope": tool.chat_scope,
+        "source": "mcp" if isinstance(tool, MCPTool) else "local",
+        "mcp_server": getattr(tool, "mcp_server_name", None) if isinstance(tool, MCPTool) else None,
+        "source_detail": None,
+        "testable": True,
+        "testable_reason": None,
+        "presets": {},
+    }
+    if isinstance(tool, MCPTool):
+        entry["source_detail"] = f"MCP 服务: {tool.mcp_server_name}"
+    else:
+        entry["source_detail"] = getattr(tool.handler, "__module__", "") or None
+        if _local_tool_needs_message_data(tool):
+            entry["testable"] = False
+            entry["testable_reason"] = "依赖聊天消息上下文(message_data)"
+
+    pm = getattr(tc, "_preset_manager", None)
+    if pm is not None:
+        for preset_name, toolset in getattr(pm, "presets", {}).items():
+            try:
+                if tool.name in toolset.names():
+                    entry["presets"][preset_name] = "default"
+            except Exception:
+                continue
+        for preset_name, deferred_names in (getattr(pm, "deferred", None) or {}).items():
+            if tool.name in deferred_names:
+                entry["presets"][preset_name] = "deferred"
+    return entry
+
+
+@router.get("/api/tools")
+async def api_tools(_: None = Depends(_auth)) -> Dict[str, Any]:
+    tc = _tool_calls_service()
+    if tc is None:
+        return {"available": False, "tools": [], "mcp_servers": []}
+
+    tools: List[Dict[str, Any]] = []
+    server_count: Dict[str, int] = {}
+    for tool in tc._registry.func_list:
+        entry = _serialize_tool(tc, tool)
+        if entry["mcp_server"]:
+            server_count[entry["mcp_server"]] = server_count.get(entry["mcp_server"], 0) + 1
+        tools.append(entry)
+    tools.sort(key=lambda x: (x["source"], x["mcp_server"] or "", x["name"]))
+    mcp_servers = [{"name": n, "tool_count": c} for n, c in sorted(server_count.items())]
+    return {"available": True, "tools": tools, "mcp_servers": mcp_servers}
+
+
+def _tool_result_to_json(result: Any) -> Any:
+    """把工具返回值转为可 JSON 序列化的结构"""
+    if result is None:
+        return None
+    if isinstance(result, str):
+        try:
+            return json.loads(result)
+        except (ValueError, TypeError):
+            return result
+    if hasattr(result, "model_dump"):
+        try:
+            return result.model_dump(mode="json")
+        except Exception:
+            pass
+    try:
+        json.dumps(result)
+        return result
+    except (TypeError, ValueError):
+        return str(result)
+
+
+class ToolTestBody(BaseModel):
+    name: str
+    arguments: Dict[str, Any] = {}
+
+
+@router.post("/api/tools/test")
+async def api_tools_test(body: ToolTestBody, _: None = Depends(_auth)) -> Dict[str, Any]:
+    from atribot.LLMchat.MCP.tool_model import LocalTool
+
+    tc = _tool_calls_service()
+    if tc is None:
+        raise HTTPException(status_code=503, detail="工具系统不可用（bot 未启动或 ToolCalls 未注册）")
+    tool = tc._registry.get_func(body.name)
+    if tool is None:
+        raise HTTPException(status_code=404, detail=f"工具 {body.name} 不存在")
+    if isinstance(tool, LocalTool) and _local_tool_needs_message_data(tool):
+        raise HTTPException(
+            status_code=400,
+            detail=f"工具 {body.name} 依赖聊天消息上下文(message_data)，无法在面板测试",
+        )
+
+    start = time.time()
+    try:
+        raw = await asyncio.wait_for(
+            tc.calls(body.name, json.dumps(body.arguments, ensure_ascii=False), None),
+            timeout=60,
+        )
+    except asyncio.TimeoutError:
+        return {"ok": False, "error": "执行超时（60 秒）", "duration_ms": 60000}
+    except Exception as e:
+        # 工具自身抛错（含 tool_search 的 ToolSearchRequested）属于正常测试输出
+        return {
+            "ok": False,
+            "error": str(e) or repr(e),
+            "duration_ms": int((time.time() - start) * 1000),
+        }
+    return {
+        "ok": True,
+        "result": _tool_result_to_json(raw),
+        "duration_ms": int((time.time() - start) * 1000),
+    }
+
+
 @router.get("/api/platforms")
 async def api_platforms(_: None = Depends(_auth)) -> Dict[str, Any]:
     try:
@@ -655,6 +796,221 @@ async def api_memory_update(
     if not ok:
         raise HTTPException(status_code=404, detail=f"记忆 {memory_id} 不存在")
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# 数据库：连接状态 / 表结构 / SQL 控制台
+# ---------------------------------------------------------------------------
+
+_DB_TABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_DB_QUERY_MAX_ROWS = 500
+_DB_QUERY_TIMEOUT = 30  # 秒
+_DB_READ_VERBS = {"select", "show", "explain", "values", "table", "with"}
+
+
+def _db_json_safe(v: Any) -> Any:
+    """把 asyncpg 解码出的 PG 值转成 JSON 可序列化形态，超长文本截断"""
+    if isinstance(v, (datetime, date, dt_time)):
+        return v.isoformat()
+    if isinstance(v, Decimal):
+        return float(v)
+    if isinstance(v, (bytes, bytearray, memoryview)):
+        return f"<二进制 {len(bytes(v))} 字节>"
+    if isinstance(v, str) and len(v) > 600:
+        return v[:600] + f"…[已截断，共 {len(v)} 字符]"
+    if v is None or isinstance(v, (bool, int, float, str)):
+        return v
+    return str(v)
+
+
+def _db_conn_info() -> Dict[str, Any]:
+    """数据库连接信息（不含密码），仅供面板展示"""
+    try:
+        raw = _cfg()._raw_config.get("database") or {}
+        return {"host": raw.get("host"), "port": raw.get("port"), "user": raw.get("user")}
+    except Exception:
+        return {}
+
+
+@router.get("/api/db/status")
+async def api_db_status(_: None = Depends(_auth)) -> Dict[str, Any]:
+    try:
+        db = _db()
+    except Exception as e:
+        return {"available": False, "reason": f"数据库服务未注册（bot 未启动？）：{e}"}
+
+    pool = getattr(db, "_pool", None)
+    pool_info = None
+    if pool is not None:
+        try:
+            pool_info = {"size": pool.get_size(), "idle": pool.get_idle_size()}
+        except Exception:
+            pool_info = None
+
+    try:
+        rows = await db.execute_SQL(
+            """
+            SELECT version() AS version,
+                   current_database() AS db_name,
+                   pg_size_pretty(pg_database_size(current_database())) AS db_size,
+                   now() - pg_postmaster_start_time() AS uptime,
+                   (SELECT COUNT(*) FROM pg_stat_activity WHERE datname = current_database()) AS connections
+            """
+        )
+        r = dict(rows[0]) if rows else {}
+    except Exception as e:
+        return {"available": False, "reason": str(e), **_db_conn_info()}
+
+    return {
+        "available": True,
+        "version": r.get("version"),
+        "db_name": r.get("db_name"),
+        "db_size": str(r.get("db_size") or ""),
+        "uptime": str(r.get("uptime") or ""),
+        "connections": r.get("connections"),
+        "pool": pool_info,
+        **_db_conn_info(),
+    }
+
+
+@router.get("/api/db/tables")
+async def api_db_tables(_: None = Depends(_auth)) -> Dict[str, Any]:
+    try:
+        rows = await _db().execute_SQL(
+            """
+            SELECT c.relname AS table_name,
+                   c.reltuples::bigint AS row_estimate,
+                   pg_total_relation_size(c.oid) AS size_bytes,
+                   pg_size_pretty(pg_total_relation_size(c.oid)) AS size_pretty,
+                   (SELECT COUNT(*) FROM pg_attribute a
+                    WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped) AS column_count,
+                   obj_description(c.oid, 'pg_class') AS comment
+            FROM pg_class c
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relkind = 'r'
+            ORDER BY pg_total_relation_size(c.oid) DESC
+            """
+        )
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"数据库不可用: {e}")
+    return {"tables": [dict(r) for r in rows]}
+
+
+@router.get("/api/db/table")
+async def api_db_table(name: str, _: None = Depends(_auth)) -> Dict[str, Any]:
+    if not _DB_TABLE_NAME_RE.match(name or ""):
+        raise HTTPException(status_code=400, detail="非法表名")
+    db = _db()
+    try:
+        columns = await db.execute_SQL(
+            """
+            SELECT column_name, udt_name, is_nullable, column_default, character_maximum_length
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = $1
+            ORDER BY ordinal_position
+            """,
+            (name,),
+        )
+        indexes = await db.execute_SQL(
+            """
+            SELECT indexname, indexdef FROM pg_indexes
+            WHERE schemaname = 'public' AND tablename = $1
+            ORDER BY indexname
+            """,
+            (name,),
+        )
+        constraints = await db.execute_SQL(
+            """
+            SELECT con.conname AS name, con.contype AS type, pg_get_constraintdef(con.oid) AS def
+            FROM pg_constraint con
+            JOIN pg_class c ON c.oid = con.conrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = $1
+            ORDER BY con.contype, con.conname
+            """,
+            (name,),
+        )
+        count_rows = await db.execute_SQL(f'SELECT COUNT(*) AS c FROM "{name}"')
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"数据库不可用: {e}")
+    return {
+        "name": name,
+        "row_count": count_rows[0]["c"] if count_rows else 0,
+        "columns": [dict(r) for r in columns],
+        "indexes": [dict(r) for r in indexes],
+        "constraints": [dict(r) for r in constraints],
+    }
+
+
+class DbQueryBody(BaseModel):
+    sql: str
+
+
+def _strip_sql_comments(sql: str) -> str:
+    return re.sub(r"--[^\n]*", " ", sql)
+
+
+@router.post("/api/db/query")
+async def api_db_query(body: DbQueryBody, _: None = Depends(_auth)) -> Dict[str, Any]:
+    sql = (body.sql or "").strip()
+    if not sql:
+        raise HTTPException(status_code=400, detail="SQL 不能为空")
+    if len(sql) > 100_000:
+        raise HTTPException(status_code=400, detail="SQL 过长（上限 100000 字符）")
+
+    cleaned = _strip_sql_comments(sql).strip()
+    while cleaned.endswith(";"):
+        cleaned = cleaned[:-1].rstrip()
+    first_word = (cleaned.split(None, 1) or [""])[0].lower()
+    # fetch 路径：返回结果集的语句；含 RETURNING 的写语句同样有结果集
+    fetchable = first_word in _DB_READ_VERBS or "returning" in cleaned.lower()
+    # asyncpg 的 fetch 不支持多语句，提前拒绝避免歧义报错
+    if fetchable and ";" in cleaned:
+        raise HTTPException(status_code=400, detail="返回结果集的语句一次只能执行一条，多条请分开运行")
+
+    try:
+        db = _db()
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"数据库服务未注册: {e}")
+
+    started = time.monotonic()
+    status: Optional[str] = None
+    records = None
+    try:
+        pool = getattr(db, "_pool", None)
+        if pool is not None:
+            async with pool.acquire() as conn:
+                if fetchable:
+                    records = await conn.fetch(sql, timeout=_DB_QUERY_TIMEOUT)
+                else:
+                    status = await conn.execute(sql, timeout=_DB_QUERY_TIMEOUT)
+        elif fetchable:
+            # dev mock：无连接池时退回 execute_SQL
+            records = await db.execute_SQL(sql)
+        else:
+            await db.execute_SQL(sql)
+            status = "(dev mock) OK"
+    except asyncio.TimeoutError:
+        return {"ok": False, "error": f"执行超时（上限 {_DB_QUERY_TIMEOUT} 秒）"}
+    except Exception as e:
+        return {"ok": False, "error": str(e).strip() or type(e).__name__}
+    duration_ms = round((time.monotonic() - started) * 1000)
+
+    if not fetchable:
+        return {"ok": True, "kind": "status", "status": status, "duration_ms": duration_ms}
+
+    columns = list(records[0].keys()) if records else []
+    truncated = len(records) > _DB_QUERY_MAX_ROWS
+    rows = [{k: _db_json_safe(rec[k]) for k in columns} for rec in records[:_DB_QUERY_MAX_ROWS]]
+    return {
+        "ok": True,
+        "kind": "rows",
+        "columns": columns,
+        "rows": rows,
+        "row_count": len(records),
+        "truncated": truncated,
+        "duration_ms": duration_ms,
+    }
 
 
 # ---------------------------------------------------------------------------
