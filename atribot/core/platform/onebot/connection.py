@@ -15,6 +15,7 @@ from websockets.datastructures import Headers
 from websockets.legacy.client import WebSocketClientProtocol
 from websockets.legacy.server import Serve, WebSocketServerProtocol
 from websockets.legacy.server import WebSocketServer as WSServer
+from websockets.protocol import State
 
 from atribot.common_utils.net_utils import try_bind_port
 
@@ -238,7 +239,12 @@ class OneBotWSClient:
     @property
     def is_connected(self) -> bool:
         """检查是否已连接"""
-        return self.websocket is not None and not self.websocket.closed
+        if self.websocket is None:
+            return False
+        state = getattr(self.websocket, "state", None)
+        if state is not None:
+            return state is State.OPEN
+        return not self.websocket.closed
 
     @property
     def is_running(self) -> bool:
@@ -596,4 +602,9 @@ class OneBotHttpServer:
     @property
     def is_running(self) -> bool:
         """检查是否正在运行"""
+        return self._running
+
+    @property
+    def is_connected(self) -> bool:
+        """HTTP 模式没有长连接，事件服务器运行中即视为已连接"""
         return self._running
