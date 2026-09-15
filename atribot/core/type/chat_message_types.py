@@ -158,20 +158,56 @@ class AtSegment(MessageSegment):
         return f"[CQ:at,qq={self.user_id}]"
 
 
+_FACE_NAME_MAP_PATH = Path(__file__).parent / "qq_face_map.json"
+_FACE_NAME_MAP: Optional[Dict[str, str]] = None
+
+
+def get_face_name_map() -> Dict[str, str]:
+    """懒加载经典QQ表情id到名称的映射表,读取失败时降级为空表"""
+    global _FACE_NAME_MAP
+    if _FACE_NAME_MAP is None:
+        try:
+            _FACE_NAME_MAP = json.loads(_FACE_NAME_MAP_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            _FACE_NAME_MAP = {}
+    return _FACE_NAME_MAP
+
+
 class FaceSegment(MessageSegment):
     """QQ 表情"""
     __slots__ = ['face_id']
-    
+
     def __init__(self, face_id: str):
         self.face_id = face_id
         super().__init__(MessageSegmentType.FACE.value)
-    
+
     @property
     def data(self) -> Dict[str, Any]:
         return {"id": self.face_id}
-    
+
     def __str__(self) -> str:
+        if name := get_face_name_map().get(self.face_id):
+            return f"[CQ:face,id={self.face_id},name={name}]"
         return f"[CQ:face,id={self.face_id}]"
+
+class MFaceSegment(MessageSegment):
+    """商城表情"""
+    __slots__ = ['summary', 'emoji_id', 'url', '_raw_data']
+
+    def __init__(self, data: Dict[str, Any]):
+        self._raw_data = data
+        self.summary = str(data.get("summary") or "")
+        self.emoji_id = str(data.get("emoji_id") or "")
+        self.url = str(data.get("url") or "")
+        super().__init__(MessageSegmentType.MFACE.value)
+
+    @property
+    def data(self) -> Dict[str, Any]:
+        return self._raw_data
+
+    def __str__(self) -> str:
+        summary = self.summary.strip().strip("[]") or "商城表情"
+        return f"[CQ:mface,summary={summary}]"
 
 
 class ReplySegment(MessageSegment):
@@ -633,6 +669,9 @@ def parse_onebot_segments(raw_segments: List[Dict[str, Any]]) -> List[MessageSeg
 
         elif t == MessageSegmentType.FACE.value:
             parsed.append(FaceSegment(str(d.get("id", ""))))
+
+        elif t == MessageSegmentType.MFACE.value:
+            parsed.append(MFaceSegment(d))
 
         elif t == MessageSegmentType.RECORD.value:
             file_str = d.get("url") or d.get("path")

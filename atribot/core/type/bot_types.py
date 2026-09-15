@@ -98,7 +98,7 @@ class atriMessageEvent(ABC, Generic[E]):
         ev = self.event
         self.group_id: Optional[int] = getattr(ev, "group_id", None)
         self.user_id: Optional[int] = getattr(ev, "user_id", None)
-        self.chat_scope: ChatScope = "group" if self.group_id else "private" #虽然这个不准确但是够用了
+        self.chat_scope: ChatScope = "group" if self.group_id else "private" #虽然这个不准确但是够用了给聊天的LLM判断用的
         self.is_at: bool = getattr(ev, "is_at", False)
 
     def update_process_time(self) -> None:

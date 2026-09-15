@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import replace
 from logging import Logger
-from typing import Coroutine, Dict, List
+from typing import Awaitable, Callable, Coroutine, Dict, List
 
 from atribot.common_utils import (
     download_text,
@@ -28,6 +28,7 @@ from atribot.core.type.chat_message_types import (
     VideoSegment,
 )
 from atribot.core.type.context_types import Context, MessageBuilder
+from atribot.core.type.onebot_event_types import TEXT_LENGTH_LIMIT
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import (
     GenerationRequestSimplify,
@@ -254,32 +255,19 @@ class ChatBasics(ABC):
         except Exception as e:
             self.log.error(f"发送'模型返回无法解析的格式'兜底消息失败: {e}")
 
-    async def append_message_segments_prompt(
+    def _make_segment_appender(
         self,
-        event: MessageEventEnvelope,
         message_builder: MessageBuilder,
         including_pictures: bool,
         including_audios: bool = False,
         including_videos: bool = False,
-    ) -> None:
-        """为当前用户输入附加结构化的消息片段"""
-        Segment = event.event.segments[0]
-        
-        if role := event.event.sender.get("role"):
-            role_line = f"<group_role>{role}</group_role>" if role != "member" else ""
-        else:
-            role_line = ""
+    ) -> Callable[[List[MessageSegment]], Awaitable[None]]:
+        """构建消息片段追加器(多模态降级处理核心)
 
-        message_builder.add_text(
-            f"最新用户消息:\n<MESSAGE>"
-            f"<user_id>{event.user_id}</user_id>"
-            f"<nick_name>{event.event.sender['nickname']}</nick_name>"
-            f"{role_line}"
-            f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
-            f"<message_id>{event.event.message_id}</message_id>"
-            "<user_message>"
-        )
-
+        Returns:
+            异步片段追加函数,按模型感知能力把图片/音频/视频
+            附加为原始内容或文字描述
+        """
         if including_pictures:
             async def dispose_img(message: ImageSegment):
                 try:
@@ -380,6 +368,17 @@ class ChatBasics(ABC):
 
                 message_builder.add_text(segment.__str__())
 
+        return append_segments
+
+    async def _append_event_segments(
+        self,
+        event: MessageEventEnvelope,
+        message_builder: MessageBuilder,
+        append_segments: Callable[[List[MessageSegment]], Awaitable[None]],
+    ) -> None:
+        """附加单条消息的片段内容(含引用消息段处理)"""
+        Segment = event.event.segments[0]
+
         quote_message = None
 
         if isinstance(Segment, ReplySegment):
@@ -402,6 +401,34 @@ class ChatBasics(ABC):
             await append_segments(event.event.segments[1:])
         else:
             await append_segments(event.event.segments)
+
+    async def append_message_segments_prompt(
+        self,
+        event: MessageEventEnvelope,
+        message_builder: MessageBuilder,
+        including_pictures: bool,
+        including_audios: bool = False,
+        including_videos: bool = False,
+    ) -> None:
+        """为当前用户输入附加结构化的消息片段"""
+        role = event.event.sender.get("role")
+        role_line = f"<group_role>{role}</group_role>" if role != "member" else ""
+
+        message_builder.add_text(
+            f"最新用户消息:\n<MESSAGE>"
+            f"<user_id>{event.user_id}</user_id>"
+            f"<nick_name>{event.event.sender['nickname']}</nick_name>"
+            f"{role_line}"
+            f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
+            f"<message_id>{event.event.message_id}</message_id>"
+            "<user_message>"
+        )
+
+        await self._append_event_segments(
+            event,
+            message_builder,
+            self._make_segment_appender(message_builder, including_pictures, including_audios, including_videos),
+        )
 
         message_builder.add_text("</user_message></MESSAGE>")
 
@@ -982,15 +1009,21 @@ class PrivateChat(ChatBasics):
             audio_sense=self.audio_sense,
         )
 
-    async def step(self, event: MessageEventEnvelope, prompt: str) -> None:
-        """私聊 LLM 处理全流程"""
-        user_id = event.user_id
+    async def step(self, events: list[MessageEventEnvelope], prompt: str) -> None:
+        """私聊 LLM 处理全流程
+
+        Args:
+            events: 聚合窗口输出的一批私聊消息(同一用户,按时间升序)
+            prompt: 触发场景提示词
+        """
+        latest = events[-1]
+        user_id = latest.user_id
         uid: str = uuid.uuid4().hex
 
-        self.log.info(f"[{uid}]私聊LLM聊天json处理 user:{user_id}")
+        self.log.info(f"[{uid}]私聊LLM聊天json处理 user:{user_id} 共{len(events)}条消息")
 
         message_builder: MessageBuilder = await self.prompt_structure(
-            event=event,
+            events=events,
             prompt=prompt,
             user_id=user_id,
             including_pictures=self.visual_sense,
@@ -1007,22 +1040,22 @@ class PrivateChat(ChatBasics):
             self.template_request_simplify,
             increment_messages=[message_builder.build()],
             messages=original_context.get_messages(),
-            message_data=event,
+            message_data=latest,
             tool_json=round_toolset,
         )
 
         response = await self._request_model_with_fallback_private_(
             request=request,
-            event=event,
+            events=events,
             prompt=prompt,
             uid=uid,
         )
 
         self.log.info(f"[{uid}]私聊模型返回json_list:\n{''.join(response.reply_text)}")
 
-        await self._dispatch_private_actions(response, event, uid)
+        await self._dispatch_private_actions(response, latest, uid)
 
-        original_context.add_user_message(f"{prompt}\n{event.llm_formatted_message}")
+        original_context.add_user_message(self._format_private_batch_context(events, prompt))
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
@@ -1036,8 +1069,8 @@ class PrivateChat(ChatBasics):
             original_context.total_tokens = total_tokens
             try:
                 await self.token_manager.record_token_usage(
-                    user_id=event.user_id,
-                    group_id=event.group_id,
+                    user_id=latest.user_id,
+                    group_id=latest.group_id,
                     prompt_tokens=response.metadata.get("prompt_tokens", 0),
                     completion_tokens=response.metadata.get("completion_tokens", 0),
                     total_tokens=total_tokens,
@@ -1060,6 +1093,27 @@ class PrivateChat(ChatBasics):
                     self.log.info(f"[{uid}]私聊上下文总结为none user:{user_id}")
             except Exception as e:
                 self.log.exception(f"[{uid}]私聊上下文信息总结出现了错误:{e}")
+
+    def _format_private_batch_context(self, events: list[MessageEventEnvelope], prompt: str) -> str:
+        """把一批私聊消息格式化为上下文用户消息
+
+        用户级信息(user_id/昵称)只出现一次;每条消息带序号与
+        相对上一条的间隔标记,内容保留多模态CQ码
+        """
+        latest = events[-1]
+        parts = [
+            f"<MESSAGE count=\"{len(events)}\""
+            f" user_id=\"{latest.user_id}\" nickname=\"{latest.event.sender['nickname']}\">"
+        ]
+        prev_receive: float | None = None
+        for idx, event in enumerate(events):
+            interval = "" if prev_receive is None else f" interval=\"{event.receive_time - prev_receive:.1f}秒\""
+            parts.append(
+                f"<user_message order=\"{idx + 1}\"{interval}>{event.event.cq_code[:TEXT_LENGTH_LIMIT]}</user_message>"
+            )
+            prev_receive = event.receive_time
+        parts.append("</MESSAGE>")
+        return f"{prompt}\n" + "".join(parts)
 
     async def _dispatch_private_actions(
         self,
@@ -1093,10 +1147,7 @@ class PrivateChat(ChatBasics):
             self.build_prompt.decision_whether_private_responses(
                 user_id=user_id,
                 prompt=prompt,
-                else_prompt=(
-                    self.emoji_core.prompt
-                    + self.skills.prompt
-                ),
+                else_prompt=self.emoji_core.prompt,#表情包的提示词
             )
         )
 
@@ -1115,7 +1166,7 @@ class PrivateChat(ChatBasics):
 
         response = await self._request_model_with_fallback_private_(
             request=request,
-            event=event,
+            events=[event],
             prompt=prompt,
             uid=uid,
         )
@@ -1165,30 +1216,81 @@ class PrivateChat(ChatBasics):
 
     async def prompt_structure(
         self,
-        event: MessageEventEnvelope,
+        events: list[MessageEventEnvelope],
         prompt: str,
         user_id: int,
         including_pictures: bool,
         including_audios: bool = False,
         including_videos: bool = False,
     ) -> MessageBuilder:
-        """构建私聊提示结构"""
-        message_builder = MessageBuilder()
+        """构建私聊提示结构(批次)
 
-        await self.append_message_segments_prompt(
-            event,
+        用户级信息只出现一次;每条消息带序号/自身时间/与上一条的
+        间隔标记,内容走多模态降级处理;记忆检索用整批拼接文本
+        """
+        message_builder = MessageBuilder()
+        latest = events[-1]
+        append_segments = self._make_segment_appender(
             message_builder,
             including_pictures,
             including_audios,
             including_videos,
         )
+
+        count_note = f"(共{len(events)}条,按时间先后排列)" if len(events) > 1 else ""
+        message_builder.add_text(
+            f"最新用户消息{count_note}:\n<MESSAGE>"
+            f"<user_id>{user_id}</user_id>"
+            f"<nick_name>{latest.event.sender['nickname']}</nick_name>"
+            f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
+        )
+
+        prev_receive: float | None = None
+        for idx, event in enumerate(events):
+            attrs = (
+                f" order=\"{idx + 1}\""
+                f" time=\"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(event.event.time))}\""
+                f" message_id=\"{event.event.message_id}\""
+            )
+            if prev_receive is not None:
+                attrs += f" interval=\"{event.receive_time - prev_receive:.1f}秒\""
+            message_builder.add_text(f"<user_message{attrs}>")
+            await self._append_event_segments(event, message_builder, append_segments)
+            message_builder.add_text("</user_message>")
+            prev_receive = event.receive_time
+
+        message_builder.add_text("</MESSAGE>")
+
+        #记忆检索
+        combined_text = "".join(e.event.pure_text for e in events)
+        if (
+            len(combined_text) >= 5
+            and (memory := [
+                (
+                    f"user:{r[0]}",
+                    f"group:{r[1]}",
+                    datetime.datetime.fromtimestamp(r[2]).strftime("%Y-%m-%d %H:%M:%S"),
+                    r[2],
+                    f"可信度:{r[3]}",
+                )
+                for r in await self.memory_system.query_user_recently_memory(
+                    user_id=user_id,
+                    text=combined_text[:100],
+                    limit=10,
+                )
+            ])
+        ):
+            message_builder.add_text(
+                f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>"
+            )
+
         if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("private_chat", chat_type="private"):
             message_builder.add_text_left(deferred_prompt+self.skills.prompt)#待发现工具的提示词
         else:
             message_builder.add_text_left(
                 self.skills.prompt#skills的提示词
             )
-        
+
         message_builder.add_text(
             f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
         )
@@ -1196,10 +1298,7 @@ class PrivateChat(ChatBasics):
             self.build_prompt.decision_whether_private_responses(
                 user_id=user_id,
                 prompt=prompt,
-                else_prompt=(
-                    self.emoji_core.prompt
-                    + self.skills.prompt
-                ),
+                else_prompt=self.emoji_core.prompt,#表情包的提示词
             )
         )
         return message_builder
@@ -1209,6 +1308,7 @@ class PrivateChat(ChatBasics):
         self.log.info(f"私聊LLM决定回复 理由:{response_json.get('reason')}")
         await self.send_reply_message_separator(
             chat_text_list=response_json.get("content", []),
+            message_id=response_json.get("reply_message_id"),
             user_id=event.user_id,
             send_client=event.send_client,
         )
@@ -1217,6 +1317,7 @@ class PrivateChat(ChatBasics):
         self,
         chat_text_list: List[str],
         user_id: int,
+        message_id: int = None,
         send_client:SendClientBase = None,
     ) -> None:
         """发送私聊文本消息，支持表情标签"""
@@ -1232,6 +1333,7 @@ class PrivateChat(ChatBasics):
                 text_list=chat_text_list,
                 emoji_dict=self.emoji_file_dict,
                 send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
+                reply_id=message_id,
                 delay=MESSAGE_DELAY,
             )
         else:
@@ -1239,12 +1341,13 @@ class PrivateChat(ChatBasics):
                 text="\n".join(chat_text_list),
                 emoji_dict=self.emoji_file_dict,
                 send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
+                reply_id=message_id,
             )
 
     async def _request_model_with_fallback_private_(
         self,
         request: GenerationRequestSimplify,
-        event: MessageEventEnvelope,
+        events: list[MessageEventEnvelope],
         prompt: str,
         uid: str,
     ) -> GenerationResponse:
@@ -1286,9 +1389,9 @@ class PrivateChat(ChatBasics):
             else:
                 if not opposite_structure_increment_messages:
                     message_builder = await self.prompt_structure(
-                        event=event,
+                        events=events,
                         prompt=prompt,
-                        user_id=event.user_id,
+                        user_id=events[-1].user_id,
                         including_pictures=visual_sense,
                     )
                     opposite_structure_increment_messages = [message_builder.build()]

@@ -443,7 +443,7 @@ class LLMCoordinator():
                 query=search_req.query,
                 limit=search_req.limit,
                 target_toolset=request.tool_json,
-                chat_type=request.message_data.chat_scope
+                chat_type=request.message_data.chat_scope if request.message_data else None
             )
         except Exception as e:
             self.log.exception(f"tool_search 处理失败: {e}")

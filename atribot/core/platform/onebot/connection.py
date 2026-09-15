@@ -3,16 +3,20 @@ import asyncio as _asyncio
 import inspect
 import json
 import logging
+import sys
 import uuid
 from asyncio import CancelledError, Event, Task, create_task, gather, sleep
 from typing import Any, Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
+import uvicorn
 import websockets
 from websockets.datastructures import Headers
 from websockets.legacy.client import WebSocketClientProtocol
 from websockets.legacy.server import Serve, WebSocketServerProtocol
 from websockets.legacy.server import WebSocketServer as WSServer
+
+from atribot.common_utils.net_utils import try_bind_port
 
 
 class OneBotWSClient:
@@ -83,7 +87,7 @@ class OneBotWSClient:
                     )
                     raise
                 self.log.warning(
-                    "连接失败 (第%d次): %s, %.1f秒后重试...",
+                    "连接失败 (第%d次): %s| %.1f秒后重试...",
                     self._retry_count, e, self.retry_delay,
                 )
                 await sleep(self.retry_delay)
@@ -537,7 +541,10 @@ class OneBotHttpServer:
 
             return {"status": "ok"}
 
-        import uvicorn
+        sock = try_bind_port(self.host, self.port)
+        if sock is None:
+            self.log.error("HTTP 服务器端口 %s:%d 已被占用，进程退出", self.host, self.port)
+            sys.exit(3)
 
         cfg = uvicorn.Config(
             app,
@@ -548,7 +555,7 @@ class OneBotHttpServer:
         self._uvicorn_server = uvicorn.Server(cfg)
         self.log.info("HTTP 服务器已启动: http://%s:%d", self.host, self.port)
         try:
-            await self._uvicorn_server.serve()
+            await self._uvicorn_server.serve(sockets=[sock])
         finally:
             self._running = False
 

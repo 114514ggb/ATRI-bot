@@ -106,7 +106,7 @@ class WebSocketClient(WebSocketBase):
                 self._connected.clear()
                 
                 if self._retry_count >= self.max_retries:
-                    self.log.info(f"连接失败: {e}, 已达到最大重连次数 ({self.max_retries})")
+                    self.log.critical(f"连接失败: {e}, 已达到最大重连次数 ({self.max_retries})")
                     sys.exit(1)
                 
                 self.log.critical(f"连接失败: {e}\n{self.retry_delay} 秒后重试... ({self._retry_count}/{self.max_retries})")

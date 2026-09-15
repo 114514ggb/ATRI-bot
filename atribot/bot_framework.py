@@ -6,8 +6,10 @@ from typing import Any, Awaitable
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from atribot.common_utils.http_client import HTTPClient
+from atribot.common_utils.net_utils import try_bind_port
 from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
@@ -242,7 +244,20 @@ class BotFramework:
         admin_app.include_router(admin_router)
         mount_static(admin_app)
 
-        admin_port = panel_cfg.get("port") or 5125
+        @admin_app.get("/", include_in_schema=False)
+        async def _redirect_to_admin():
+            """访问根路径时重定向到管理面板"""
+            return RedirectResponse(url="/admin/")
+
+        admin_port = int(panel_cfg.get("port") or 5125)
+        sock = try_bind_port("127.0.0.1", admin_port)
+        if sock is None:
+            self.log.warning(
+                f"管理面板端口 127.0.0.1:{admin_port} 已被占用，本次跳过管理面板启动，"
+                f"不影响机器人运行（请检查是否已有实例在运行，或修改 config 中 web_panel.port）"
+            )
+            return
+
         cfg = uvicorn.Config(
             admin_app,
             host="127.0.0.1",
@@ -255,7 +270,8 @@ class BotFramework:
         server.capture_signals = lambda: contextlib.nullcontext()
         self._admin_server = server
         self.log.info(f"管理面板已就绪: http://127.0.0.1:{admin_port}/admin/")
-        await server.serve()
+        # 传入预绑定的 socket：绕开 uvicorn 绑定失败时内部 sys.exit 拖垮整个进程的分支
+        await server.serve(sockets=[sock])
 
     def create_background_task(self, coro: Awaitable[Any], *, name: str | None = None) -> asyncio.Task[Any]:
         """创建受控后台任务"""
@@ -271,7 +287,11 @@ class BotFramework:
             return
 
         if exc := task.exception():
-            self.log.exception("后台任务异常退出: %s", task.get_name(), exc_info=exc)
+            if isinstance(exc, SystemExit):
+                # SystemExit 仍会被事件循环继续抛出并终止进程，这里只留一行日志，不刷 traceback
+                self.log.warning("后台任务请求退出进程: %s (exit code=%s)", task.get_name(), exc.code)
+            else:
+                self.log.exception("后台任务异常退出: %s", task.get_name(), exc_info=exc)
 
     async def graceful_shutdown(self) -> None:
         """等待关闭流程执行完成"""
