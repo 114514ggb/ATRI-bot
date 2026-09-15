@@ -105,9 +105,9 @@ def main() -> None:
     from atribot.core.service_container import container
     from atribot.web_panel.dev_mocks import (
         MockDatabase,
+        _fake_log_stream,
         _FakeCommandSystem,
         _MockToolCalls,
-        _fake_log_stream,
     )
     from atribot.web_panel.panel_router import _ensure_log_handler, mount_static, router
 
