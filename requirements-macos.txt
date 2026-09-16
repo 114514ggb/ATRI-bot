@@ -159,6 +159,8 @@ python-multipart==0.0.28
     # via mcp
 pytz==2026.2
     # via dateparser
+pyyaml==6.0.3
+    # via atri-bot (pyproject.toml)
 referencing==0.37.0
     # via
     #   jsonschema

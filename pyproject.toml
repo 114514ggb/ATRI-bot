@@ -19,6 +19,7 @@ dependencies = [
     "croniter>=6.0.0",
     "trafilatura>=2.0.0",
     "strictyaml>=1.7.3",
+    "pyyaml>=6.0",
     "pillow>=12.1.0",
     "numpy>=2.4.2",
     "json-repair>=0.58.3",

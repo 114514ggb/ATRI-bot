@@ -167,6 +167,8 @@ pywin32==311
     # via
     #   docker
     #   mcp
+pyyaml==6.0.3
+    # via atri-bot (pyproject.toml)
 referencing==0.37.0
     # via
     #   jsonschema
