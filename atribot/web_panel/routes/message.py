@@ -1,8 +1,10 @@
-"""消息发送：通过平台适配器发送私聊 / 群消息"""
+"""适配器接口调用：通过平台适配器的 call_api 调用任意端点并返回原始 JSON"""
 
-from typing import Any, Dict, Optional
+import asyncio
+import time
+from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from atribot.core.service_container import container
@@ -11,20 +13,18 @@ from ..deps import _auth
 
 router = APIRouter()
 
-
-class SendMsgBody(BaseModel):
-    group_id: Optional[int] = None
-    user_id: Optional[int] = None
-    message: str | list
-    platform: Optional[str] = None
+_CALL_TIMEOUT = 30  # 秒；WS echo 自身 15 秒超时，这里兜底 HTTP 模式的连接挂起
 
 
-@router.post("/api/message/send")
-async def api_send_message(body: SendMsgBody, _: None = Depends(_auth)) -> Dict[str, Any]:
+class CallApiBody(BaseModel):
+    platform: str
+    action: str
+    params: Dict[str, Any] = {}
+
+
+@router.post("/api/message/call")
+async def api_call(body: CallApiBody, _: None = Depends(_auth)) -> Dict[str, Any]:
     from atribot.core.platform.manager import PlatformManager
-
-    if body.group_id is None and body.user_id is None:
-        raise HTTPException(status_code=400, detail="必须提供 group_id（群聊）或 user_id（私聊）")
 
     try:
         pm = container.get_by_type(PlatformManager)
@@ -35,15 +35,32 @@ async def api_send_message(body: SendMsgBody, _: None = Depends(_auth)) -> Dict[
     if not adapters:
         return {"status": "error", "result": "没有可用适配器"}
 
-    if body.platform and body.platform in adapters:
-        adapter = adapters[body.platform]
-    else:
-        adapter = next(iter(adapters.values()))
+    adapter = adapters.get(body.platform)
+    if adapter is None:
+        return {
+            "status": "error",
+            "result": f"适配器 '{body.platform}' 不存在，可用：{', '.join(adapters)}",
+        }
 
-    client = adapter.get_client()
-    if body.user_id is not None:
-        action, payload = "send_private_msg", {"user_id": body.user_id, "message": body.message}
-    else:
-        action, payload = "send_group_msg", {"group_id": body.group_id, "message": body.message}
-    result = await client.async_send(action, payload)
-    return {"status": "ok", "result": result}
+    start = time.time()
+    try:
+        result = await asyncio.wait_for(
+            adapter.call_api(body.action, body.params), timeout=_CALL_TIMEOUT
+        )
+    except asyncio.TimeoutError:
+        return {
+            "status": "error",
+            "result": f"调用超时（{_CALL_TIMEOUT} 秒）",
+            "duration_ms": int((time.time() - start) * 1000),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "result": str(e) or repr(e),
+            "duration_ms": int((time.time() - start) * 1000),
+        }
+    return {
+        "status": "ok",
+        "result": result,
+        "duration_ms": int((time.time() - start) * 1000),
+    }

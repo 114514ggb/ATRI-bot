@@ -107,6 +107,7 @@ def main() -> None:
         MockDatabase,
         _fake_log_stream,
         _FakeCommandSystem,
+        _MockPlatformManager,
         _MockToolCalls,
     )
     from atribot.web_panel.panel_router import _ensure_log_handler, mount_static, router
@@ -115,6 +116,7 @@ def main() -> None:
 
     container.register("config", atriConfig())
     container.register("database", MockDatabase())
+    container.register("PlatformManager", _MockPlatformManager())
     container.register("PermissionsManagement", PermissionsManagement())
     container.register("CommandSystem", _FakeCommandSystem())
     container.register("ToolCalls", _MockToolCalls())

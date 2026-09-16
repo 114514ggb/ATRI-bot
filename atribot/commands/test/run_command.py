@@ -14,7 +14,7 @@ db: AsyncPostgreSQL = container.get("database")
     name='run',
     description='执行异步Python代码',
     examples=[
-        "/run await send_message.send_group_message(984466158, 'hello')",
+        "/run await message_data.send_client.send_group_message(984466158, 'test')",
     ],
     authority_level=3
 )

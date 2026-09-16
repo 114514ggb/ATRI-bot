@@ -15,7 +15,7 @@ import { supplierView } from './views/supplier.js';
 import { mcpView } from './views/mcp.js';
 import { personasView } from './views/personas.js';
 import { logsView } from './views/logs.js';
-import { sendView } from './views/send.js';
+import { apiCallView } from './views/api-call.js';
 
 /* ---------- 视图注册 ---------- */
 
@@ -32,7 +32,7 @@ registerRoute('config', configView);
 registerRoute('supplier', supplierView);
 registerRoute('mcp', mcpView);
 registerRoute('personas', personasView);
-registerRoute('send', sendView);
+registerRoute('api-call', apiCallView);
 
 /* ---------- 登录流程 ---------- */
 
@@ -213,6 +213,21 @@ function bindChrome() {
 
   document.getElementById('btn-sidebar-toggle').addEventListener('click', () => {
     app().classList.toggle('sidebar-collapsed');
+  });
+
+  /* 小屏抽屉：默认收起；遮罩点击 / 菜单跳转 / Esc 关闭；进入小屏视口时自动收起 */
+  const mobileViewport = matchMedia('(max-width: 900px)');
+  const collapseSidebar = () => app().classList.add('sidebar-collapsed');
+
+  if (mobileViewport.matches) collapseSidebar();
+  mobileViewport.addEventListener('change', (e) => { if (e.matches) collapseSidebar(); });
+
+  document.getElementById('sidebar-backdrop').addEventListener('click', collapseSidebar);
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach((item) => {
+    item.addEventListener('click', () => { if (mobileViewport.matches) collapseSidebar(); });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && mobileViewport.matches) collapseSidebar();
   });
 
   const menuWrap = document.getElementById('system-menu-wrap');

@@ -139,6 +139,7 @@
 .app {
   display: flex;
   height: 100vh;
+  height: 100dvh; /* 移动端浏览器地址栏收展时跟随动态视口 */
   animation: fade-in 0.5s var(--ease-out);
 }
 
@@ -416,13 +417,43 @@
 
 /* ---------- 响应式 ---------- */
 
+/* 小屏侧栏遮罩：抽屉展开时盖住内容，点击可关闭（桌面端不渲染交互） */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55; /* 低于侧栏(60)，高于主内容 */
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
 @media (max-width: 900px) {
   .sidebar {
     position: fixed;
-    inset: 0 auto 0 0;
+    /* 从顶栏下方滑出：汉堡按钮保持在最上层可点，随时可收起抽屉 */
+    inset: var(--topbar-h) auto 0 0;
+    max-width: 86vw;
+    border-top: 1px solid var(--border);
     box-shadow: var(--shadow-float);
   }
   .app:not(.sidebar-collapsed) .sidebar { animation: fade-slide-in 0.3s var(--ease-out); }
+  .app:not(.sidebar-collapsed) .sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
   .view-scroll { padding: 18px 16px 40px; }
   .topbar { padding: 0 16px; }
+}
+
+@media (max-width: 680px) {
+  .view-scroll { padding: 14px 12px 36px; }
+  .topbar { padding: 0 12px; gap: 8px; }
+  .topbar h1 { font-size: 16.5px; }
+}
+
+@media (max-width: 480px) {
+  .login-card { padding: 32px 22px 28px; }
 }

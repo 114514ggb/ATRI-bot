@@ -97,8 +97,15 @@ export function createJsonEditor(root, { content = '', onChange = null } = {}) {
   input.value = content;
   render();
 
+  function setContent(src) {
+    input.value = src;
+    render();
+    if (onChange) onChange(input.value, valid);
+  }
+
   return {
     getContent: () => input.value,
     isValid: () => valid,
+    setContent,
   };
 }

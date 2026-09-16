@@ -11,6 +11,7 @@ import re
 import time
 
 from atribot.core.command.command_parsing import Command, CommandSystem, ParamType
+from atribot.core.platform.manager import PlatformManager
 from atribot.core.type.context_types import ToolSearchRequested
 from atribot.LLMchat.MCP.tool_model import LocalTool, MCPTool
 
@@ -171,6 +172,45 @@ class MockDatabase:
 
     async def __aexit__(self, *exc):
         return False
+
+
+class _MockConnection:
+    """假连接对象：只提供面板读取的 is_connected 状态"""
+
+    is_connected = True
+
+
+class _MockOneBotAdapter:
+    """罐头 OneBot 适配器：常用 action 返回真实形状的假数据，其余回显请求"""
+
+    source_name = "onebot"
+    is_started = True
+
+    _CANNED = {
+        "get_login_info": lambda: {"user_id": 10000, "nickname": "ATRI-dev"},
+        "get_group_list": lambda: [
+            {"group_id": g["group_id"], "group_name": g["group_name"], "member_count": 10, "max_member_count": 200}
+            for g in MockDatabase._GROUPS
+        ],
+        "get_friend_list": lambda: [
+            {"user_id": u["user_id"], "nickname": u["nickname"]} for u in MockDatabase._USERS
+        ],
+    }
+
+    def __init__(self):
+        self._connection = _MockConnection()
+
+    async def call_api(self, action: str, params: dict):
+        await asyncio.sleep(0.2)  # 模拟网络往返
+        data = self._CANNED.get(action, lambda: {"echo": {"action": action, "params": params}})()
+        return {"status": "ok", "retcode": 0, "data": data, "echo": "mock"}
+
+
+class _MockPlatformManager(PlatformManager):
+    """预置一个假 napcat 适配器，使调用接口页与平台状态在开发模式下可用（跳过父类构造的容器依赖）"""
+
+    def __init__(self):
+        self._adapters = {"napcat": _MockOneBotAdapter()}
 
 
 def _noop_handler():
