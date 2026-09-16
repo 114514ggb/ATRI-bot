@@ -10,7 +10,6 @@ from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.context_types import (
     Context,
     MessageBuilder,
-    ToolCallsStopIteration,
     ToolSearchRequested,
 )
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
@@ -359,12 +358,6 @@ class LLMCoordinator():
                 except ToolSearchRequested as e:
                     tool_output = self._handle_tool_search_request(request, e)
 
-                except ToolCallsStopIteration:
-                    increase_context.add_tool_message(tool_name,tool_call['id'],tool_output)
-                    self.log.info("模型主动结束工具调用!")
-                    response.messages = increase_context.messages
-                    return response
-
                 except Exception as e:
                     text = f"调用工具发生错误。\nErrors:{e}"
                     self.log.error(text,exc_info=True)
@@ -556,9 +549,6 @@ class LLMCoordinator():
                     lines.append(f"类型:{mime}")
                 builder.add_text("\n".join(lines))
 
-        if result.structuredContent:
-            builder.add_text(str(result.structuredContent))
-
         return builder.build_content()
 
     async def _handle_image_block(
@@ -632,9 +622,6 @@ class LLMCoordinator():
 
             elif block.type == "resource_link":
                 parts.append(f"[Link: {getattr(block, 'uri', 'unknown')}]")
-
-        if result.structuredContent:
-            parts.append(str(result.structuredContent))
 
         return "\n".join(parts)
     

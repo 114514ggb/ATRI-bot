@@ -7,6 +7,7 @@ from typing import Any, Callable
 from mcp.types import CallToolResult
 
 from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.context_types import ToolSearchRequested
 from atribot.LLMchat.MCP.tool_model import FunctionTool
 from atribot.LLMchat.model_api.llm_types import ToolCall
 
@@ -20,11 +21,14 @@ class ToolCallResult:
         tool_call_id: 工具调用 ID
         result: 执行返回的原始结果
         is_error: 是否执行出错
+        exception: tool_search 抛出的约定异常(ToolSearchRequested)，
+            不视为执行错误，由调用方解释处理；普通异常仍转为错误文本
     """
     tool_name: str
     tool_call_id: str
-    result: Any
+    result: str | Any
     is_error: bool = False
+    exception: Exception | None = None
 
 
 class ToolExecutionEngine:
@@ -100,6 +104,8 @@ class ToolExecutionEngine:
                 try:
                     raw: str | CallToolResult = await _func_tool.execute(message_data=message_data, **_args)
                     return ToolCallResult(_name, _tid, raw)
+                except ToolSearchRequested as e:
+                    return ToolCallResult(_name, _tid, None, exception=e)
                 except Exception as e:
                     self.log.error(f"工具 {_name} 执行失败: {e}", exc_info=True)
                     return ToolCallResult(
@@ -118,6 +124,8 @@ class ToolExecutionEngine:
                 try:
                     raw = await func_tool.execute(message_data=message_data, **args)
                     results.append(ToolCallResult(tool_name, tool_call_id, raw))
+                except ToolSearchRequested as e:
+                    results.append(ToolCallResult(tool_name, tool_call_id, None, exception=e))
                 except Exception as e:
                     self.log.error(f"工具 {tool_name} 执行失败: {e}", exc_info=True)
                     results.append(ToolCallResult(

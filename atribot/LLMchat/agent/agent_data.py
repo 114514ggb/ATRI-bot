@@ -18,6 +18,8 @@ class AgentData:
         model_name (str): 驱动此 Agent 的模型名称
         supplier (str): 提供大模型的服务商名称
         tools (List[str]): 提供给 Agent 调用的工具名称列表
+        tool_preset (str | None): 工具预设名(如 ``agency_Agent``)，优先于 tools,
+            同时作为待发现(deferred)工具名单的查找锚点
         kwargs (Dict[str, Any]): 额外运行时控制参数
         hooks (List[BaseAgentHooks]): 挂载到此 Agent 的生命周期钩子列表
     """
@@ -26,6 +28,7 @@ class AgentData:
     model_name: str
     supplier: str
     tools: List[str] = field(default_factory=list)
+    tool_preset: str | None = None
     kwargs: Dict[str, Any] = field(
         default_factory=lambda:{
             "temperature":0.0,

@@ -1,5 +1,4 @@
 from logging import Logger
-from typing import List
 
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
@@ -35,14 +34,14 @@ _MAX_TURNS = 20
         "委托一个复杂、多步骤的任务给子代理独立执行。"
         "子代理拥有独立的工具集和LLM交互循环,可以进行多步推理、"
         "组合使用工具、并在完成后返回结构化的结果"
-        "适用于查找资料或是深度寻找相关记忆,需要独立上下文执行的只用关注结果的复杂任务"
+        "适用于查找资料或是深度寻找相关记忆,需要独立上下文执行的只用关注结果的任务"
     ),
     properties={
         "task": {
             "type": "string",
             "description": (
                 "要委托给子代理的详细任务描述。应包含：任务目标、"
-                "具体要求和约束条件、期望的输出格式,越详细越好"
+                "具体要求和约束条件、期望的输出格式,越详细越好,如果需要处理文件要说明文件名"
             ),
         },
     },
@@ -81,25 +80,24 @@ async def sub_agent_task(
     if not model_name:
         return "子代理执行失败: 配置中未找到有效的模型名称"
 
+    tool_calls_mgr = container.get_by_type(ToolCalls)
+
     if "agency_Agent" in config.tool_presets:
-        preset_cfg = config.tool_presets["agency_Agent"]
-        if preset_cfg is None:
-            tool_calls_mgr = container.get_by_type(ToolCalls)
-            tool_names = [t.name for t in tool_calls_mgr.resolve_toolset(preset="agency_Agent")]
-            log.info(f"agency_Agent 工具预设为 null,子代理可使用全部 {len(tool_names)} 个工具")
-        elif isinstance(preset_cfg, dict):
-            # 子代理不支持 tool_search 发现机制，只取 default 部分
-            tool_names = list(preset_cfg.get("default", []))
-            log.info(f"agency_Agent 工具预设为字典格式，子代理使用 default 中的 {len(tool_names)} 个工具: {tool_names}")
-        else:
-            tool_names = list(preset_cfg)
+        tool_preset = "agency_Agent"
     else:
         log.warning("config.json 中未配置 agency_Agent 工具预设，子代理将无工具可用")
-        tool_names: List[str] = []
+        tool_preset = None
 
-    log.info(
+    hint_text = (
         f"子代理启动: model={model_name}, supplier={supplier_name}, "
-        f"tools={tool_names}, max_turns={_MAX_TURNS}"
+        f"tool_preset={tool_preset}, max_turns={_MAX_TURNS}"
+    )
+
+    log.info(hint_text)
+
+    message_data.deliver_merge_text(
+        message = f"下发任务交给子代理执行,可能要等挺久\n任务:\n{task}",
+        source="子代理正在执行任务" 
     )
 
     context = AgentContext()
@@ -107,14 +105,22 @@ async def sub_agent_task(
         environment_line = f"当前环境是群聊,群号是:{message_data.group_id}"
     else:
         environment_line = f"当前环境是与用户 {message_data.user_id} 的一对一私聊"
-    context.play_role = SUB_AGENT_SYSTEM_PROMPT + environment_line
+
+    system_prompt = SUB_AGENT_SYSTEM_PROMPT + environment_line
+    if tool_preset:
+        deferred_prompt = tool_calls_mgr.get_deferred_tools_prompt(
+            tool_preset, chat_type=message_data.chat_scope
+        )
+        if deferred_prompt:
+            system_prompt += f"\n{deferred_prompt}"
+    context.play_role = system_prompt
     context.add_user_message(content=task)
 
     agent_data = AgentData(
         context=context,
         model_name=model_name,
         supplier=supplier_name,
-        tools=tool_names,
+        tool_preset=tool_preset,
         kwargs={
             "temperature": 0.3,
             "top_p": 0.90,

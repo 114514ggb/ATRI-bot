@@ -97,7 +97,7 @@ async def main(url: str, message_data: atriMessageEvent) -> str:
 ## 返回值与异常
 
 - 返回任意值即可，**会被转成字符串作为工具结果回给 LLM**，超过 20000 字符自动截断。惯例返回 `f"xxx执行结果:{...}"` 这样带上下文的字符串，方便模型理解。
-- 特殊控制流（高级）：抛出 `ToolCallsStopIteration` 可提前结束本轮工具调用循环；`tool_search` 工具通过抛 `ToolSearchRequested` 实现工具发现，参考 `tool_search/__init__.py`。
+- 特殊控制流（高级）：`tool_search` 工具通过抛 `ToolSearchRequested` 实现工具发现，参考 `tool_search/__init__.py`。
 - 工具抛出的普通异常会被上层捕获并作为错误信息回给模型，注意不要在异常里泄露敏感内容。
 
 ## 另一种注册方式：装饰器

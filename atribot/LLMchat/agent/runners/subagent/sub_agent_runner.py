@@ -6,6 +6,7 @@ from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.context_types import ToolSearchRequested
 from atribot.LLMchat.agent.agent_data import AgentData
 from atribot.LLMchat.agent.context.context import AgentContext
 from atribot.LLMchat.agent.message import (
@@ -29,6 +30,7 @@ from atribot.LLMchat.agent.runners.response import (
     tool_call_start,
 )
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
+from atribot.LLMchat.MCP.tool_model import ToolSet
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, message
@@ -52,6 +54,23 @@ class SubAgentRunner(BaseAgentRunner):
         self._executor = self._tool_calls_mgr.executor
         self._media_processor = container.get_by_type(MediaProcessor)
         self._message_data: atriMessageEvent = message_data
+
+        # 本次运行独立的工具集副本
+        if self.agent_data.tool_preset:
+            self._toolset: Optional[ToolSet] = self._tool_calls_mgr.resolve_toolset(
+                preset=self.agent_data.tool_preset, chat_type=self._message_data.chat_scope
+            ).copy()
+        elif self.agent_data.tools:
+            self._toolset = self._tool_calls_mgr.resolve_toolset(
+                names=self.agent_data.tools, chat_type=self._message_data.chat_scope
+            ).copy()
+        else:
+            self._toolset = None
+            
+        if self._toolset is not None:
+            self.log.info(
+                f"子代理工具集({self._toolset.name or '未命名'}): {self._toolset.names()}"
+            )
 
         # 多模态能力
         self._visual_sense: bool = False
@@ -108,12 +127,14 @@ class SubAgentRunner(BaseAgentRunner):
             )
 
     def _get_tool_json(self) -> Optional[List[Dict[str, Any]]]:
-        """获取 OpenAI 格式工具定义"""
-        if not self.agent_data.tools:
+        """获取 OpenAI 格式工具定义
+
+        每次请求都从 ``self._toolset`` 重新解析，
+        tool_search 启用的待发现工具在后续请求中立即可见
+        """
+        if self._toolset is None:
             return []
-        return self._tool_calls_mgr.get_func_desc_openai_style(
-            names=self.agent_data.tools
-        )
+        return self._tool_calls_mgr.get_openai(toolset=self._toolset)
 
     def _build_payload_messages(self) -> List[Dict[str, Any]]:
         """拼接完整消息列表"""
@@ -487,6 +508,46 @@ class SubAgentRunner(BaseAgentRunner):
                 self.log.warning(f"工具返回{tag}降级转文字失败:{e}")
                 return TextSegment(f"[{tag}:{mime}]")
 
+    def _handle_tool_search_request(self, search_req: ToolSearchRequested) -> str:
+        """处理 tool_search 的发现请求：搜索待发现工具并启用至本次运行的工具集
+
+        Args:
+            search_req: tool_search 抛出的发现请求
+
+        Returns:
+            给 LLM 的回执文本
+        """
+        if self._toolset is None:
+            return (
+                f"未在待发现工具中找到匹配 '{search_req.query}' 的工具。"
+                "可尝试其他关键词，或查看<待发现执行工具>列表中的工具名。"
+            )
+
+        try:
+            matched = self._tool_calls_mgr.enable_deferred_tools(
+                preset_name=self.agent_data.tool_preset or "",
+                query=search_req.query,
+                limit=search_req.limit,
+                target_toolset=self._toolset,
+                chat_type=getattr(self._message_data, "chat_scope", None),
+            )
+        except Exception as e:
+            self.log.exception(f"tool_search 处理失败: {e}")
+            return f"tool_search 处理失败: {e}"
+
+        if not matched:
+            return (
+                f"未在待发现工具中找到匹配 '{search_req.query}' 的工具。"
+                "可尝试其他关键词，或查看<待发现执行工具>列表中的工具名。"
+            )
+
+        lines = [
+            f"找到 {len(matched)} 个匹配工具，已临时加入本轮可用工具:"
+        ]
+        lines += [f"- {t.name}: {t.description}" for t in matched]
+        lines.append("如需使用，请直接调用对应工具。")
+        return "\n".join(lines)
+
     async def _execute_tool_batch(
         self,
         tool_calls: List[Dict[str, Any]],
@@ -520,7 +581,14 @@ class SubAgentRunner(BaseAgentRunner):
 
             tool_msg: ToolMessage
 
-            if isinstance(result.result, CallToolResult):
+            if isinstance(result.exception, ToolSearchRequested):
+                receipt = self._handle_tool_search_request(result.exception)
+                tool_msg = ToolMessage(
+                    name=tool_name,
+                    tool_call_id=tool_call_id,
+                    content=receipt,
+                )
+            elif isinstance(result.result, CallToolResult):
                 tool_msg = await self._format_mcp_result(
                     result.result, tool_name, tool_call_id,
                 )
