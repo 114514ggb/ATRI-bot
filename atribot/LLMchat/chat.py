@@ -41,6 +41,7 @@ from atribot.LLMchat.MCP.tool_model import ToolSet
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
+from atribot.LLMchat.message_sender import MessageSender
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.prepare_model_prompt import build_prompt
 from atribot.LLMchat.skills.skills_manager import SkillsManager
@@ -82,19 +83,21 @@ class ChatBasics(ABC):
         skills_manager: SkillsManager,
         user_system: UserSystem,
         emoji_core: EmojiCore,
+        message_sender: MessageSender,
         tool_calls_mgr: ToolCalls,
         config: atriConfig,
         log: Logger,
     ):
         self.model_api_supervisor: LLMCoordinator = llm_supervisor
-        self.media_processor: MediaProcessor = media_processor
+        self.media_processor = media_processor
         self.supplier: LLMConnectionManager = llm_supplier
-        self.memory_system: MemorySystem = memory_system
-        self.token_manager: TokenManager = token_manager
-        self.chat_manager: ChatManager = chat_manager
+        self.memory_system = memory_system
+        self.token_manager = token_manager
+        self.chat_manager = chat_manager
         self.skills: SkillsManager = skills_manager
-        self.user_system: UserSystem = user_system
+        self.user_system = user_system
         self.emoji_core: EmojiCore = emoji_core
+        self.message_sender: MessageSender = message_sender
         self.tool_calls: ToolCalls = tool_calls_mgr
         self.config: atriConfig = config
         self.log: Logger = log
@@ -468,6 +471,7 @@ class GroupChat(ChatBasics):
         skills_manager: SkillsManager,
         user_system: UserSystem,
         emoji_core: EmojiCore,
+        message_sender: MessageSender,
         tool_calls_mgr: ToolCalls,
         config: atriConfig,
         log: Logger,
@@ -482,6 +486,7 @@ class GroupChat(ChatBasics):
             skills_manager=skills_manager,
             user_system=user_system,
             emoji_core=emoji_core,
+            message_sender=message_sender,
             tool_calls_mgr=tool_calls_mgr,
             config=config,
             log=log,
@@ -926,31 +931,28 @@ class GroupChat(ChatBasics):
             return
 
         if (
-            since_llm >= LLM_COOLDOWN_THRESHOLD 
+            since_llm >= LLM_COOLDOWN_THRESHOLD
             and len(chat_text_list) <= MAX_SINGLE_MESSAGE_LENGTH
             and len("".join(chat_text_list)) <= STRING_LENGTH_LIMIT
             # or MESSAGE_DELIMITER in chat_text
         ):
             #分条发送
-            await self.emoji_core.send_list_with_emoji_fallback(
+            await self.message_sender.send_group_text_list(
+                send_client=send_client,
+                group_id=group_id,
                 text_list=chat_text_list,
-                emoji_dict=self.emoji_file_dict,
-                send_func=lambda msg: send_client.send_group_msg(group_id, msg),
                 reply_id=message_id,
                 delay=MESSAGE_DELAY,
             )
-            return
-
         else:
             #合并发送
             text = chat_text_list if isinstance(chat_text_list, str) else "\n".join(chat_text_list)
-            await self.emoji_core.send_with_emoji_fallback(
+            await self.message_sender.send_group_text(
+                send_client=send_client,
+                group_id=group_id,
                 text=text,
-                emoji_dict=self.emoji_file_dict,
-                send_func=lambda msg: send_client.send_group_msg(group_id, msg),
                 reply_id=message_id,
             )
-            return
 
 
 class PrivateChat(ChatBasics):
@@ -967,6 +969,7 @@ class PrivateChat(ChatBasics):
         skills_manager: SkillsManager,
         user_system: UserSystem,
         emoji_core: EmojiCore,
+        message_sender: MessageSender,
         tool_calls_mgr: ToolCalls,
         config: atriConfig,
         log: Logger,
@@ -981,6 +984,7 @@ class PrivateChat(ChatBasics):
             skills_manager=skills_manager,
             user_system=user_system,
             emoji_core=emoji_core,
+            message_sender=message_sender,
             tool_calls_mgr=tool_calls_mgr,
             config=config,
             log=log,
@@ -1329,18 +1333,18 @@ class PrivateChat(ChatBasics):
             len(chat_text_list) <= MAX_SINGLE_MESSAGE_LENGTH
             and len("".join(chat_text_list)) <= STRING_LENGTH_LIMIT
         ):
-            await self.emoji_core.send_list_with_emoji_fallback(
+            await self.message_sender.send_private_text_list(
+                send_client=send_client,
+                user_id=user_id,
                 text_list=chat_text_list,
-                emoji_dict=self.emoji_file_dict,
-                send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
                 reply_id=message_id,
                 delay=MESSAGE_DELAY,
             )
         else:
-            await self.emoji_core.send_with_emoji_fallback(
+            await self.message_sender.send_private_text(
+                send_client=send_client,
+                user_id=user_id,
                 text="\n".join(chat_text_list),
-                emoji_dict=self.emoji_file_dict,
-                send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
                 reply_id=message_id,
             )
 

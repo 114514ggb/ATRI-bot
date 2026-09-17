@@ -436,6 +436,8 @@ class OneBotSendClient(SendClientBase):
                 url = str(base / url)
         if local_Path_type and not url.startswith(("http://", "https://", "base64://")):
             url = f"file://{url}"
+        if url.startswith("file://") and self.file_paths:
+            url = "file://" + self.file_paths.map_to_remote(url[len("file://"):])
         return url
 
     async def send_group_pictures(
@@ -551,6 +553,8 @@ class OneBotSendClient(SendClientBase):
         raw_path = url_file
         if default and self.file_paths:
             raw_path = str(self.file_paths.file / url_file)
+        if self.file_paths:
+            raw_path = self.file_paths.map_to_remote(raw_path)
         data: dict = {"file": f"file://{raw_path}" if local_Path_type else raw_path}
         if name:
             data["name"] = name
@@ -620,6 +624,8 @@ class OneBotSendClient(SendClientBase):
         raw_path = url_file
         if default and self.file_paths:
             raw_path = str(self.file_paths.file / url_file)
+        if self.file_paths:
+            raw_path = self.file_paths.map_to_remote(raw_path)
 
         data_payload: dict = {
             "file": f"file://{raw_path}" if local_Path_type else raw_path,

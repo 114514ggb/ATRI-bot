@@ -87,6 +87,9 @@ class FilePathConfig:
         temp (Path): 临时目录的绝对路径
         root_relative (Dict[str, Path]): 基于 project_root 的其他相对路径映射
         document_relative (Dict[str, Path]): 基于 document_root 的其他相对路径映射
+        path_mapping (Dict[str, str]): 本地路径前缀 → 协议端(如 NapCat)路径前缀的映射，
+            用于 bot 与协议端不在同一文件系统时转换 file:// 路径(例如 WSL 场景
+            "E:/xxx" → "/mnt/e/xxx")，为空时不做任何转换
     """
 
     project_root: Path
@@ -123,6 +126,8 @@ class FilePathConfig:
     """基于 project_root 的其他相对路径映射"""
     document_relative: Dict[str, Path]
     """基于 document_root 的其他相对路径映射"""
+    path_mapping: Dict[str, str] = field(default_factory=dict)
+    """本地路径前缀 → 协议端路径前缀映射,key/value 均为正斜杠分隔的字符串"""
 
     @staticmethod
     def _to_absolute(base: Path, target: str) -> Path:
@@ -228,6 +233,12 @@ class FilePathConfig:
         }
         document_relative.update(file_path_config.get("relative_to_document", {}))
 
+        # 本地路径前缀 → 协议端路径前缀，统一为正斜杠并保持字符串
+        path_mapping: Dict[str, str] = {
+            str(local).replace("\\", "/"): str(remote).replace("\\", "/")
+            for local, remote in (file_path_config.get("path_mapping") or {}).items()
+        }
+
         resolved_root = {
             name: normalize(
                 to_absolute(project_root, relative_path),
@@ -258,7 +269,36 @@ class FilePathConfig:
             temp=resolved_document.get("temp", Path()),
             root_relative=resolved_root,
             document_relative=resolved_document,
+            path_mapping=path_mapping,
         )
+
+    @staticmethod
+    def apply_path_mapping(path: str, path_mapping: Dict[str, str]) -> str:
+        """按配置把本地路径前缀替换为协议端(NapCat)路径前缀
+
+        做大小写不敏感的最长前缀匹配(统一按正斜杠比较)，未命中时原样返回。
+
+        Args:
+            path (str): 本地路径
+            path_mapping (Dict[str, str]): 本地路径前缀 → 协议端路径前缀
+
+        Returns:
+            str: 映射后的路径
+        """
+        if not path_mapping:
+            return path
+        normalized = path.replace("\\", "/")
+        lowered = normalized.lower()
+        for local_prefix, remote_prefix in sorted(
+            path_mapping.items(), key=lambda pair: len(pair[0]), reverse=True
+        ):
+            if lowered.startswith(local_prefix.lower()):
+                return remote_prefix + normalized[len(local_prefix):]
+        return path
+
+    def map_to_remote(self, path: str) -> str:
+        """把本地路径映射为协议端可访问的路径，供拼接发送用 file:// 路径时转换"""
+        return self.apply_path_mapping(path, self.path_mapping)
 
     def resolve_from_root(self, relative_path: str) -> Path:
         """基于 `project_root` 解析任意相对路径并返回绝对路径 Path 对象

@@ -21,13 +21,24 @@ for _sub_router in all_routers:
 
 
 def mount_static(app) -> None:
-    """将面板静态资源目录挂载到 FastAPI 应用（/admin/static）"""
+    """将面板静态资源目录挂载到 FastAPI 应用（/admin/static），并对面板资源禁用缓存
+
+    面板 HTML 与静态 JS/CSS 均以 no-store 下发，保证改动后普通刷新即可拿到最新前端，
+    避免浏览器启发式缓存导致新旧脚本混跑。正式环境（bot_framework）与开发服务器共用此处。
+    """
     static_dir = os.path.join(os.path.dirname(__file__), "static")
     app.mount("/admin/static", StaticFiles(directory=static_dir), name="admin_static")
+
+    @app.middleware("http")
+    async def _no_cache_panel_assets(request, call_next):
+        resp = await call_next(request)
+        if request.url.path.startswith("/admin/static"):
+            resp.headers["Cache-Control"] = "no-store"
+        return resp
 
 
 @router.get("/", response_class=HTMLResponse)
 async def panel_index() -> HTMLResponse:
     html_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
-        return HTMLResponse(f.read())
+        return HTMLResponse(f.read(), headers={"Cache-Control": "no-store"})

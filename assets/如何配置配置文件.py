@@ -59,6 +59,9 @@
             "img":"img", #图片目录
             "video":"video", #视频目录
             "temp":"temp" #临时目录
+        },
+        "path_mapping": {
+            "c:/程序文件/python/ATRI-main": "/mnt/c/程序文件/python/ATRI-main" #路径前缀的映射，bot 和协议端不在同一文件系统时用于转换发送的 `file://` 路径。为空时不做任何转换
         }
     },
     "model":{ 

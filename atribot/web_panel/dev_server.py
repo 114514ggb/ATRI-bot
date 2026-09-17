@@ -123,14 +123,7 @@ def main() -> None:
 
     app = FastAPI(title="ATRI Admin Panel (dev)")
     app.include_router(router)
-    mount_static(app)
-
-    @app.middleware("http")
-    async def _no_cache_static(request, call_next):
-        resp = await call_next(request)
-        if request.url.path.startswith("/admin/static"):
-            resp.headers["Cache-Control"] = "no-store"
-        return resp
+    mount_static(app)  # 静态资源 no-store 由 mount_static 统一注册
 
     @app.middleware("http")
     async def _slow_api_sim(request, call_next):

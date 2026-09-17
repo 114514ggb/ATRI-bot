@@ -1,11 +1,11 @@
-import asyncio
 import os
 import random
 import re
 from pathlib import Path
 from typing import Match
 
-from atribot.core.atri_config import atriConfig
+from atribot.common_utils import escape_cq_param
+from atribot.core.atri_config import FilePathConfig, atriConfig
 from atribot.core.service_container import ServiceBase
 from atribot.core.type.chat_message_types import File, GroupMessage
 from atribot.LLMchat.prepare_model_prompt import build_prompt
@@ -14,17 +14,21 @@ from atribot.LLMchat.prepare_model_prompt import build_prompt
 class EmojiCore(ServiceBase):
     """管理表情包"""
     
-    def __init__(self, folder_path: Path = ""):
+    def __init__(self, folder_path: Path = "", path_mapping: dict[str, str] | None = None):
         self.emoji_file_dict:dict[str : list[str]] = {}
         """表情目录字典"""
-        self.file = folder_path
         self.prompt = ""
         """关于emoji的提示词"""
         self.init_emoji_catalogue(folder_path)
+        
+        self.file = Path(FilePathConfig.apply_path_mapping(Path(folder_path).as_posix(), path_mapping or {}))
 
     @classmethod
     def factory(cls, config: atriConfig) -> "EmojiCore":
-        return cls(folder_path=config.file_path.emoji)
+        return cls(
+            folder_path=config.file_path.emoji,
+            path_mapping=config.file_path.path_mapping,
+        )
 
     def init_emoji_catalogue(self,folder_path:str)->None:
         """
@@ -378,7 +382,7 @@ class EmojiCore(ServiceBase):
                     continue
                 if bracket_start > text_start:
                     append_part(text[text_start:bracket_start])
-                append_part(f"[CQ:image,file=file://{get_complete_file_path(tag_content)}]")
+                append_part(f"[CQ:image,file=file://{escape_cq_param(get_complete_file_path(tag_content))}]")
                 text_start = current_pos = bracket_end + 1
             else:
                 current_pos = bracket_start + 1
@@ -419,83 +423,7 @@ class EmojiCore(ServiceBase):
             result[0] = f"[CQ:reply,id={reply_id}]{result[0]}"
 
         return result
-        
-        
-    async def send_with_emoji_fallback(
-        self,
-        text: str,
-        emoji_dict: dict,
-        send_func,
-        reply_id: int | None = None,
-        max_emoji: int = 3,
-    ) -> dict | None:
-        """发送单条带表情标签的消息，失败时自动去掉标签重试
 
-        Args:
-            text: 原始文本
-            emoji_dict: 表情标签字典
-            send_func: 发送消息的异步函数，接收 (message: str) -> dict | None
-            reply_id: 回复消息 ID
-            max_emoji: 最大表情数量，超出部分自动移除，默认 3
-
-        Returns:
-            dict | None: 最后一次发送的结果
-        """
-        cq_message = self.parse_text_to_cqcode_with_emotion(text, emoji_dict, reply_id, max_emoji=max_emoji)
-        result:dict = await send_func(cq_message)
-
-        if result and result.get("status") != "ok":
-            clean_text = re.sub(r'\[.*?\]', '', text).strip()
-            if clean_text:
-                if reply_id:
-                    clean_text = f"[CQ:reply,id={reply_id}]{clean_text}"
-                result = await send_func(clean_text)
-
-        return result
-
-    async def send_list_with_emoji_fallback(
-        self,
-        text_list: list[str],
-        emoji_dict: dict,
-        send_func,
-        reply_id: int | None = None,
-        delay: float = 0,
-        max_emoji: int = 3,
-    ) -> list[dict | None]:
-        """发送多条带表情标签的消息，每条失败时自动去掉标签重试
-
-        Args:
-            text_list: 原始文本列表
-            emoji_dict: 表情标签字典
-            send_func: 发送消息的异步函数，接收 (message: str) -> dict | None
-            reply_id: 回复消息 ID(仅附加到第一条
-            delay: 每条消息发送后的延迟（秒）
-            max_emoji: 最大表情数量，超出部分自动移除，默认 3
-
-        Returns:
-            list: 各条消息的发送结果列表
-        """
-        if not text_list:
-            return []
-
-        cq_messages = self.parse_list_to_cqcode_with_emotion(text_list, emoji_dict, reply_id, max_emoji=max_emoji)
-        results: list[dict | None] = []
-
-        for i, cq_msg in enumerate(cq_messages):
-            result:dict = await send_func(cq_msg)
-
-            if result and result.get("status") != "ok":
-                clean_text = re.sub(r'\[.*?\]', '', text_list[i]).strip()
-                if clean_text:
-                    if reply_id and i == 0:
-                        clean_text = f"[CQ:reply,id={reply_id}]{clean_text}"
-                    result = await send_func(clean_text)
-
-            results.append(result)
-
-            await asyncio.sleep(delay)
-
-        return results
 
     def _levenshtein_distance(self, s1: str, s2: str) -> int:
         """计算两个字符串的编辑距离

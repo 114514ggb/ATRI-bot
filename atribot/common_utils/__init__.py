@@ -1,4 +1,5 @@
 from .cluster_utils import ClusterUtils
+from .cq_utils import escape_cq_param
 from .db_format import format_memory_records
 from .file.file_utils import download_binary, resolve_file_to_bytes
 from .file.image_utils import (
@@ -41,6 +42,7 @@ __all__ = [
     "download_binary",
     "download_text",
     "estimate_tokens",
+    "escape_cq_param",
     "extract_json_from_text",
     "format_duration",
     "format_memory_records",

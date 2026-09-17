@@ -44,7 +44,7 @@ class KeywordResponder:
     def __init__(self) -> None:
         self.log: Logger = container.get_by_type(Logger).getChild("KeywordRsp")
         config: atriConfig = container.get_by_type(atriConfig)
-        self.url_prefix: str = f"file://{config.file_path.img.as_posix()}"
+        self.url_prefix: str = f"file://{config.file_path.map_to_remote(config.file_path.img.as_posix())}"
         self.context_management: ChatManager = container.get_by_type(ChatManager)
 
         self.monitoring_alike_list = monitoring_alike_list

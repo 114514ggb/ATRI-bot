@@ -73,11 +73,22 @@ async def run_async_code(message_data: MessageEventEnvelope):
     # # text = format_memory_records(record)
     # send_message = message_data.send_client
     # await send_message.send_group(GroupMessage(group_id=message_data.group_id).add_node(str(record)))
-    
-    raw = message_data.event.pure_text.strip()
+    # from atribot.LLMchat.message_sender import MessageSender
+    # message_sender = container.get_by_type(MessageSender)
+    # await message_sender.send_group_text(
+    #     send_client=message_data.send_client,
+    #     group_id=119036027,
+    #     text=r"公式是：$$\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}$$这个就是",
+    # )
+
+    parts = message_data.event.pure_text.strip().split(None, 1)
+    code = parts[1].strip() if len(parts) > 1 else ""
+    if not code:
+        raise ValueError("请在 /run 后面提供要执行的代码")
+
     src = f"""
 async def function(message_data,container):
-{textwrap.indent(raw[raw.find(' ') + 1:].strip(), "  ")}
+{textwrap.indent(code, "  ")}
 """
     locs = {}
     exec(src, globals(), locs)

@@ -148,20 +148,23 @@ async def _auth(
             detail="未配置访问令牌：请在 config.json 添加 web_panel.access_token 或设置环境变量 ATRI_PANEL_TOKEN",
         )
     ip = _client_ip(request)
+    # 先验令牌：正确令牌立即放行并清零失败计数（即使处于锁定期），
+    # 锁定只针对错误猜测——攻击者拿不到正确令牌，放行不损失防爆破强度
+    if creds is not None and secrets.compare_digest(
+        creds.credentials.encode("utf-8"), token.encode("utf-8")
+    ):
+        _clear_auth_failures(ip)
+        return
     remaining = _auth_rate_limited(ip)
     if remaining is not None:
-        # 锁定期内一律拒绝，即使令牌正确
+        # 锁定期内的错误令牌：直接拒绝且不再计数，避免持续探测把锁无限续期
         raise HTTPException(
             status_code=429,
             detail=f"尝试次数过多，请 {int(remaining) + 1} 秒后重试",
             headers={"Retry-After": str(int(remaining) + 1)},
         )
-    if creds is None or not secrets.compare_digest(
-        creds.credentials.encode("utf-8"), token.encode("utf-8")
-    ):
-        _register_auth_failure(ip)
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    _clear_auth_failures(ip)
+    _register_auth_failure(ip)
+    raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 def _chat_manager():

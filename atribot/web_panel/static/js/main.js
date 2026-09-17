@@ -44,6 +44,7 @@ function showLogin(message = null) {
   overlay.classList.remove('closing', 'hidden');
   app().classList.add('hidden');
   resetLoginBtn();
+  stopLockCountdown();
   const err = document.getElementById('login-error');
   if (message) {
     err.textContent = message;
@@ -75,6 +76,31 @@ function resetLoginBtn() {
   btn.style.background = '';
   btn.style.borderColor = '';
   btn.style.color = '';
+}
+
+/* ---------- 登录锁定倒计时：文案每秒跳动，到 0 提示解锁 ---------- */
+
+let _lockTimer = null;
+
+function stopLockCountdown() {
+  if (_lockTimer) { clearInterval(_lockTimer); _lockTimer = null; }
+}
+
+function startLockCountdown(seconds) {
+  stopLockCountdown();
+  const err = document.getElementById('login-error');
+  err.classList.add('show');
+  const tick = () => {
+    if (seconds > 0) {
+      err.textContent = `尝试次数过多，请 ${seconds} 秒后重试`;
+      seconds -= 1;
+    } else {
+      stopLockCountdown();
+      err.textContent = '锁定已解除，请重试';
+    }
+  };
+  tick();
+  _lockTimer = setInterval(tick, 1000);
 }
 
 /* 每个浏览器会话只在第一次进入时播完整欢迎揭幕，之后刷新只播轻量级联 */
@@ -132,6 +158,7 @@ async function checkAuth() {
   const btn = document.getElementById('login-btn');
   const fromLoginForm = !loginOverlay().classList.contains('hidden');
   btn.classList.add('loading');
+  stopLockCountdown();
   try {
     await api.get('/status');
     if (fromLoginForm) {
@@ -144,9 +171,20 @@ async function checkAuth() {
     }
   } catch (e) {
     btn.classList.remove('loading');
-    if (e.status === 429) showLogin(e.message || '尝试次数过多，请稍后再试');
-    else if (e.message.includes('令牌')) showLogin('访问令牌无效，请重新输入');
-    else showLogin(`无法连接面板服务：${e.message}`);
+    if (e.status === 429) {
+      /* 锁定只拦错误令牌：探测/输入的令牌已确认无效，清除存储，
+         避免之后每次刷新页面都自动重试、在锁过期后继续累积失败次数 */
+      setToken('');
+      showLogin();
+      startLockCountdown(e.retryAfter || 60);
+    } else if (e.status === 401) {
+      setToken('');
+      showLogin('访问令牌无效，请重新输入');
+    } else if (e.message.includes('令牌')) {
+      showLogin('访问令牌无效，请重新输入');
+    } else {
+      showLogin(`无法连接面板服务：${e.message}`);
+    }
   }
 }
 

@@ -55,6 +55,7 @@ async function request(method, path, body) {
       const detail = data && data.detail ? data.detail : `请求失败 (HTTP ${res.status})`;
       const err = new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
       err.status = res.status;
+      if (res.status === 429) err.retryAfter = Number(res.headers.get('Retry-After')) || 0;
       throw err;
     }
     return data;

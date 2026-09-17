@@ -34,7 +34,8 @@
             "img":"img",
             "video":"video",
             "temp":"temp"
-        }
+        },
+        "path_mapping": {}
     },
     "model":{ 
         "connect":

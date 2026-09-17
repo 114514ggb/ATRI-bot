@@ -51,15 +51,17 @@ async def ws_logs(websocket: WebSocket, token: str = "") -> None:
         await websocket.close(code=4401)
         return
 
+    # 与 HTTP _auth 相同的顺序：正确令牌先行放行并清零，锁定只针对错误猜测
     ip = websocket.client.host if websocket.client else "?"
-    if _auth_rate_limited(ip) is not None:
-        await websocket.close(code=4429)  # 与 HTTP 共用同一套失败锁定
+    if secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
+        _clear_auth_failures(ip)
+    elif _auth_rate_limited(ip) is not None:
+        await websocket.close(code=4429)  # 锁定期内：拒绝且不计数
         return
-    if not secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
+    else:
         _register_auth_failure(ip)
         await websocket.close(code=4401)
         return
-    _clear_auth_failures(ip)
 
     _ensure_log_handler()
     await websocket.accept()

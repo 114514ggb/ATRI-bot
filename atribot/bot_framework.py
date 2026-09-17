@@ -30,6 +30,7 @@ from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.memory.memory_system import MemorySystem
 from atribot.LLMchat.memory.user_info_system import UserSystem
+from atribot.LLMchat.message_sender import MessageSender
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.private_chat_trigger import privateChatTrigger
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
@@ -54,6 +55,7 @@ class BotFramework:
         PrivateChat,
         SkillsManager,
         EmojiCore,
+        MessageSender,
         ChatManager,
         PermissionsManagement,
         CommandSystem,
@@ -80,6 +82,7 @@ class BotFramework:
         UserSystem,
         ChatManager,
         EmojiCore,
+        MessageSender,
         PermissionsManagement,
         ToolCalls,
         MediaProcessor,

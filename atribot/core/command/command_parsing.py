@@ -543,10 +543,33 @@ class CommandSystem:
     
     async def dispatch_command(self, event:MessageEventEnvelope) -> bool:
         """解析并分发指令，会直接抛出命令执行的错误"""
-        tokens = shlex.split(event.event.pure_text[1:])
+        text = event.event.pure_text[1:]
+        parts = text.split(None, 1)
+        if not parts:
+            raise TypeError("空命令,请输入有效命令哦！")
+
+        command_name = self.alias_registry.get(parts[0], parts[0])
+        command = self.command_registry.get(command_name)
+        if command is not None:
+            self._process_command_decorators(command)
+            if not command.params:
+                rest = parts[1].strip() if len(parts) > 1 else ""
+                if rest in ("--help", "-h"):
+                    await event.send_client.send_group_merge_text(
+                        group_id=event.group_id,
+                        message=self._get_command_help(command),
+                        source="命令的帮助信息",
+                    )
+                    return
+
+                if self.permissions_management.has_permission(event.user_id, command.authority_level):#判断权限
+                    await command.handler(message_data = event)
+                return
+
+        tokens = shlex.split(text)
         if not tokens:
             raise TypeError("空命令,请输入有效命令哦！")
-        
+
         command_name, parsed = self._parse_command(tokens)
         
         command = self.command_registry[command_name]
