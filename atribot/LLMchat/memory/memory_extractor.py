@@ -48,11 +48,18 @@ class MemoryExtractor:
             user_id (int | str): 用户ID
         """
         if summarize_list :=  await self.extract_and_summarize_facts(str(messages)):
-            
+            embeddings = await self.rag.calculate_embedding(summarize_list)
+            if embeddings and isinstance(embeddings[0], (int, float)):
+                embeddings = [embeddings]
+            if not embeddings or len(embeddings) < len(summarize_list):
+                self.log.warning(
+                    f"私聊记忆 embedding 返回数量异常(待嵌入 {len(summarize_list)} 条, 返回 "
+                    f"{len(embeddings) if embeddings else 0} 条),仅按配对结果存储, 用户: {user_id}"
+                )
             event_time = int(time.time())
             await self.vector_store.batch_add_memories([
-                (user_id, 0, event_time, text, emb, "fact", 5, 5)
-                for text, emb in zip(summarize_list, await self.rag.calculate_embedding(summarize_list))
+                (user_id, 0, event_time, text, str(emb), "fact", 5, 5)
+                for text, emb in zip(summarize_list, embeddings or [])
             ])
 
 
@@ -65,15 +72,16 @@ class MemoryExtractor:
             bot_id (int|str): 总结排除在外的bot的qq号
         """
         result:Dict = await self.extract_and_summarize_group_facts(messages_str, bot_id)
-        
+
         self.log.info(f"群消息总结信息:{result}")
-        
+
         args_list = []
-        
+        pending: list[tuple] = []
+
         memories: List[Dict] = result.get("memories", [])
         for user_memory_dict in memories:
             for uid_str, fact_list in user_memory_dict.items():
-                for item, emb in zip(fact_list, await self.rag.calculate_embedding([item["event"] for item in fact_list])):
+                for item in fact_list:
                     event_text:str = item.get("event","")
                     if len(event_text) <= 2:
                         continue
@@ -81,16 +89,27 @@ class MemoryExtractor:
                         timestamp = int(datetime.strptime(item.get("occurrence_time", ""), "%Y-%m-%d %H:%M:%S").timestamp())
                     except (ValueError, TypeError):
                         timestamp = int(datetime.now().timestamp())
-                    args_list.append((
+                    pending.append((
                         int(uid_str),
                         group_id,
                         timestamp,
                         event_text,
-                        str(emb),
                         item.get("category", "fact"),
                         int(item.get("importance", 5)),
                         int(item.get("credibility", 5)),
                     ))
+
+        if pending:
+            embeddings = await self.rag.calculate_embedding([row[3] for row in pending])
+            if embeddings and isinstance(embeddings[0], (int, float)):
+                embeddings = [embeddings]
+            if not embeddings or len(embeddings) < len(pending):
+                self.log.warning(
+                    f"群记忆 embedding 返回数量异常(待嵌入 {len(pending)} 条, 返回 "
+                    f"{len(embeddings) if embeddings else 0} 条),仅按配对结果存储, 群: {group_id}"
+                )
+            for row, emb in zip(pending, embeddings or []):
+                args_list.append((*row[:4], str(emb), *row[4:]))
 
         group_topic: Dict = result.get("group_topic", {})
         if group_topic and group_topic.get("event"):
@@ -111,6 +130,8 @@ class MemoryExtractor:
                         int(group_topic.get("importance", 5)),
                         int(group_topic.get("credibility", 5)),
                     ))
+                else:
+                    self.log.warning(f"群话题 embedding 失败,跳过该条群话题存储, 群: {group_id}")
 
         if args_list:
             await self.vector_store.batch_add_memories(args_list)

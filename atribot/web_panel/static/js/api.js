@@ -53,7 +53,9 @@ async function request(method, path, body) {
 
     if (!res.ok) {
       const detail = data && data.detail ? data.detail : `请求失败 (HTTP ${res.status})`;
-      throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      const err = new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+      err.status = res.status;
+      throw err;
     }
     return data;
   } finally {

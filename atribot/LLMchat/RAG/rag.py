@@ -93,19 +93,19 @@ class RAGManager:
         """
         pass
         
-    async def search(self, embeddings:list[float], k:int=2)->tuple[dict]:
+    async def search(self, embeddings:list[list[float]], k:int=2)->tuple[str, ...]:
         """
         搜索与查询最相似的前 k 个文本块向量的文本块的和
 
         Args:
-            embeddings (list): 每个文本块对应的嵌入向量列表。
+            embeddings (list[list[float]]): 每个文本块对应的嵌入向量列表。
             k (int, 可选): 每个向量要返回的最相似文本块的数量，默认为 2。
 
         Returns:
-            combined_chunks (List[dict]): 前 k 个最相似文本块,结果合并后的列表行对象
+            tuple[str, ...]: 前 k 个最相似文本块的 event 文本,所有向量的结果合并后返回
         """
         sql = """
-        SELECT 
+        SELECT
             event
         FROM atri_memory
         WHERE event_vector <=> $1::vector(1024) <= 0.5
@@ -115,11 +115,13 @@ class RAGManager:
         return_text = []
         async with self.vector_store.vector_database as db:
             for embedding in embeddings:
-                return_text += await db.execute_with_pool(
-                    sql = sql,
-                    params = (embedding,k)
-                )["event"]
-                
+                rows = await db.execute_with_pool(
+                    query = sql,
+                    params = (str(embedding), k),
+                    fetch_type = "all"
+                )
+                return_text += [row["event"] for row in rows]
+
         return tuple(return_text)
         
         

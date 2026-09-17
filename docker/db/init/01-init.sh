@@ -173,6 +173,7 @@ CREATE INDEX idx_atri_memory_knowledge
 CREATE INDEX idx_atri_memory_group
     ON atri_memory (group_id, event_time DESC)
     WHERE group_id IS NOT NULL;
+CREATE INDEX idx_atri_memory_created ON atri_memory (created_at DESC);
 CREATE INDEX idx_atri_memory_event_pgroonga ON atri_memory USING pgroonga (event);
 
 CREATE OR REPLACE FUNCTION update_timestamp_func()

@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import secrets
 import subprocess
 import sys
 from typing import Dict
@@ -11,10 +12,13 @@ from fastapi import APIRouter, Depends, WebSocket
 from ..deps import (
     _access_token,
     _auth,
+    _auth_rate_limited,
     _cfg,
+    _clear_auth_failures,
     _ensure_log_handler,
     _log_buffer,
     _log_buffer_lock,
+    _register_auth_failure,
 )
 
 router = APIRouter()
@@ -43,9 +47,19 @@ async def api_system_restart(_: None = Depends(_auth)) -> Dict[str, str]:
 @router.websocket("/api/ws/logs")
 async def ws_logs(websocket: WebSocket, token: str = "") -> None:
     expected = _access_token()
-    if not expected or token != expected:
+    if not expected:
         await websocket.close(code=4401)
         return
+
+    ip = websocket.client.host if websocket.client else "?"
+    if _auth_rate_limited(ip) is not None:
+        await websocket.close(code=4429)  # 与 HTTP 共用同一套失败锁定
+        return
+    if not secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
+        _register_auth_failure(ip)
+        await websocket.close(code=4401)
+        return
+    _clear_auth_failures(ip)
 
     _ensure_log_handler()
     await websocket.accept()

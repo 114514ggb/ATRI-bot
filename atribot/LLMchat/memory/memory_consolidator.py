@@ -132,7 +132,7 @@ class MemoryConsolidator:
                 c.created_at
             FROM candidates c
             JOIN valid_groups g
-                ON c.user_id IS NOT DISTINCT FROM g.user_id
+                ON c.user_id = g.user_id
                AND c.category = g.category
             ORDER BY c.user_id NULLS FIRST, c.category, c.created_at DESC
         """

@@ -23,3 +23,17 @@ ADD COLUMN IF NOT EXISTS play_role VARCHAR(255);
 ```
 
 - **说明**：该列可为 `NULL`（旧数据无值），读取时若为空或不在人设列表内则回退默认人设。切换人设时通过 `save_user_role` / `save_group_role` 立即持久化。
+
+---
+
+## 002 - atri_memory 表新增 created_at DESC 索引
+
+- **日期**：2026-09-17
+- **目的**：加速无向量浏览查询（`query_memories` 的 `query_vector=None` 路径，即 `/查记忆` 无文本与 memory_search 工具无问题时按 `created_at DESC` 取最近记忆）。此前所有索引都无法提供该排序，必然全表扫描 + Top-N 排序。
+- **改动**：新增普通 btree 索引 `idx_atri_memory_created (created_at DESC)`。
+- **SQL**：
+
+```sql
+CREATE INDEX IF NOT EXISTS idx_atri_memory_created
+ON atri_memory (created_at DESC);
+```

@@ -231,6 +231,10 @@ CREATE INDEX IF NOT EXISTS idx_atri_memory_group
     ON atri_memory (group_id, event_time DESC)
     WHERE group_id IS NOT NULL;
 
+-- 记忆表：无向量浏览查询按创建时间倒序(query_memories 的 query_vector=None 路径)
+CREATE INDEX IF NOT EXISTS idx_atri_memory_created
+    ON atri_memory (created_at DESC);
+
 -- 记忆表：PGroonga 全文检索索引
 CREATE INDEX idx_atri_memory_event_pgroonga ON atri_memory USING pgroonga (event);
 

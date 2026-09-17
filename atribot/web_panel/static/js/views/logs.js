@@ -122,7 +122,9 @@ function connect(section) {
   ws.onclose = (event) => {
     if (!running) return;
     dot.className = 'dot red';
-    text.textContent = `连接断开（${event.code === 4401 ? '令牌无效' : '将自动重试'}）`;
+    const reason = event.code === 4401 ? '令牌无效' : event.code === 4429 ? '尝试次数过多已锁定，等待解锁' : '将自动重试';
+    text.textContent = `连接断开（${reason}）`;
+    // 4429 锁定期间令牌可能本就正确，保留重连：锁定过期后可自动恢复
     if (event.code !== 4401) scheduleReconnect(section);
   };
 

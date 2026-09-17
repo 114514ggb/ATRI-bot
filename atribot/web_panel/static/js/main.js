@@ -144,7 +144,8 @@ async function checkAuth() {
     }
   } catch (e) {
     btn.classList.remove('loading');
-    if (e.message.includes('令牌')) showLogin('访问令牌无效，请重新输入');
+    if (e.status === 429) showLogin(e.message || '尝试次数过多，请稍后再试');
+    else if (e.message.includes('令牌')) showLogin('访问令牌无效，请重新输入');
     else showLogin(`无法连接面板服务：${e.message}`);
   }
 }

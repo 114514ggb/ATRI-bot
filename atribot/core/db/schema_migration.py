@@ -43,6 +43,18 @@ MIGRATIONS: tuple[Migration, ...] = (
             "ADD COLUMN IF NOT EXISTS play_role VARCHAR(255)"
         ),
     ),
+    Migration(
+        version="002",
+        description="atri_memory 表新增 created_at DESC 索引，加速无向量浏览查询",
+        check_sql=(
+            "SELECT 1 FROM pg_indexes "
+            "WHERE tablename = 'atri_memory' AND indexname = 'idx_atri_memory_created'"
+        ),
+        apply_sql=(
+            "CREATE INDEX IF NOT EXISTS idx_atri_memory_created "
+            "ON atri_memory (created_at DESC)"
+        ),
+    ),
 )
 
 

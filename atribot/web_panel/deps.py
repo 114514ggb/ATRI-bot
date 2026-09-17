@@ -8,14 +8,16 @@
 import json
 import logging
 import os
+import secrets
 import shutil
+import time
 from collections import deque
 from datetime import datetime
 from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from atribot.core.service_container import container
@@ -91,7 +93,52 @@ def _access_token() -> Optional[str]:
 _security = HTTPBearer(auto_error=False)
 
 
+# ---------- 登录防暴力破解：按 IP 记录连续失败，平方递增锁定 ----------
+# 第 n 次连续失败后锁定该 IP 60*n² 秒（封顶 24 小时），登录成功即清零。
+# 只取 request.client.host，不信任 X-Forwarded-For（可被伪造绕过锁定）；
+# 将来若挂反向代理暴露面板，需改为从代理头取真实客户端 IP。
+
+_AUTH_INITIAL_LOCKOUT = 60  # 首次失败锁定秒数
+_AUTH_LOCKOUT_MAX = 86400  # 锁定上限（24 小时）
+
+_auth_failures: dict = {}  # IP -> 连续失败时间戳列表（time.monotonic()）
+_auth_failures_lock = Lock()
+
+
+def _client_ip(request: Request) -> str:
+    return request.client.host if request.client else "?"
+
+
+def _lockout_seconds(fails: int) -> int:
+    return min(_AUTH_INITIAL_LOCKOUT * fails * fails, _AUTH_LOCKOUT_MAX)
+
+
+def _auth_rate_limited(ip: str) -> Optional[float]:
+    """该 IP 是否处于锁定期，是则返回剩余秒数，否则 None"""
+    with _auth_failures_lock:
+        stamps = _auth_failures.get(ip)
+        if not stamps:
+            return None
+        remaining = _lockout_seconds(len(stamps)) - (time.monotonic() - stamps[-1])
+        return remaining if remaining > 0 else None
+
+
+def _register_auth_failure(ip: str) -> None:
+    with _auth_failures_lock:
+        now = time.monotonic()
+        _auth_failures.setdefault(ip, []).append(now)
+        # 清扫超过 24 小时无失败的 IP（其锁定期必然已过），防内存无限增长
+        for stale in [k for k, v in _auth_failures.items() if now - v[-1] > _AUTH_LOCKOUT_MAX]:
+            del _auth_failures[stale]
+
+
+def _clear_auth_failures(ip: str) -> None:
+    with _auth_failures_lock:
+        _auth_failures.pop(ip, None)
+
+
 async def _auth(
+    request: Request,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_security),
 ) -> None:
     token = _access_token()
@@ -100,8 +147,21 @@ async def _auth(
             status_code=503,
             detail="未配置访问令牌：请在 config.json 添加 web_panel.access_token 或设置环境变量 ATRI_PANEL_TOKEN",
         )
-    if creds is None or creds.credentials != token:
+    ip = _client_ip(request)
+    remaining = _auth_rate_limited(ip)
+    if remaining is not None:
+        # 锁定期内一律拒绝，即使令牌正确
+        raise HTTPException(
+            status_code=429,
+            detail=f"尝试次数过多，请 {int(remaining) + 1} 秒后重试",
+            headers={"Retry-After": str(int(remaining) + 1)},
+        )
+    if creds is None or not secrets.compare_digest(
+        creds.credentials.encode("utf-8"), token.encode("utf-8")
+    ):
+        _register_auth_failure(ip)
         raise HTTPException(status_code=401, detail="Unauthorized")
+    _clear_auth_failures(ip)
 
 
 def _chat_manager():
