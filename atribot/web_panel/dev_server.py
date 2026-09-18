@@ -66,6 +66,7 @@ def _prepare_files() -> Path:
             "group_chat": {"default": ["web_search", "memory_search", "tool_search"], "deferred": ["run_python_code"]},
             "private_chat": {"default": ["web_search", "tool_search"], "deferred": ["run_python_code", "send_file"]},
             "agency_Agent": ["run_command"],
+            "webui": {"default": ["web_search", "tool_search"], "deferred": ["run_python_code"]},
         },
         "group_white_list": [123456, 789012],
         "group_initiative_chat_white_list": [123456],
@@ -109,6 +110,9 @@ def main() -> None:
         _FakeCommandSystem,
         _MockPlatformManager,
         _MockToolCalls,
+        make_llm_supplier_mock,
+        make_media_processor_mock,
+        make_memory_mock,
     )
     from atribot.web_panel.panel_router import _ensure_log_handler, mount_static, router
 
@@ -120,6 +124,11 @@ def main() -> None:
     container.register("PermissionsManagement", PermissionsManagement())
     container.register("CommandSystem", _FakeCommandSystem())
     container.register("ToolCalls", _MockToolCalls())
+    # 聊天页（SubAgentRunner）在开发模式下的最小服务集
+    # （Logger 无需注册：导入链已在容器中登记了 "log" 服务，get_by_type(Logger) 可直接命中）
+    container.register("MemorySystem", make_memory_mock())
+    container.register("MediaProcessor", make_media_processor_mock())
+    container.register("LLMConnectionManager", make_llm_supplier_mock())
 
     app = FastAPI(title="ATRI Admin Panel (dev)")
     app.include_router(router)

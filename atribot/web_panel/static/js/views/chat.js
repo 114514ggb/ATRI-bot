@@ -1,0 +1,1343 @@
+/* 视图：AI 聊天（SubAgentRunner 驱动的多会话流式聊天）
+   分级展示：每步 = 思考过程(折叠) + 工具调用块(参数/结果) + 正文(Markdown+公式图片) */
+
+import { api, getToken } from '../api.js';
+import { icon, toast, escapeHtml, openModal, confirmDialog, fmtTokens } from '../ui.js';
+
+const SETTINGS_KEY = 'atri_chat_settings_v1';
+const LAST_SESSION_KEY = 'atri_chat_last_session';
+const CODECOGS = 'https://latex.codecogs.com/png.image?\\dpi{150}&space;';
+const MATH_HINT = /[\\^_{}=+<>|]/;
+const MAX_FORMULA_LEN = 300;
+
+/* ---------- 模块级运行状态（destroy 时清理） ---------- */
+
+let ws = null;
+let wsOpen = false;
+let wsRetry = 0;
+let wsRetryTimer = null;
+let destroyed = false;
+let initialOpened = false;
+
+let sectionEl = null;
+let messagesEl = null;
+let activeTurn = null;
+let generating = false;
+let currentSession = null;
+let lastNonce = '';
+
+let info = { defaults: {}, webui_preset: {}, limits: {} };
+let suppliers = [];
+let personas = [];
+let toolsData = { tools: [] };
+let sessions = [];
+let settings = { supplier: '', model: '', persona: 'none', tools: null, params: null };
+
+/* ---------- 设置持久化 ---------- */
+
+function loadSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    settings = { ...settings, ...saved };
+  } catch { /* 忽略损坏的本地设置 */ }
+}
+
+function saveSettings() {
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  if (settings.persona === 'custom') {
+    const box = sectionEl?.querySelector('#chat-custom-persona');
+    if (box) localStorage.setItem(`${SETTINGS_KEY}_custom`, box.value);
+  }
+  updateToolsCount();
+}
+
+function customPersonaText() {
+  const box = sectionEl?.querySelector('#chat-custom-persona');
+  return box ? box.value.trim() : '';
+}
+
+/* 请求参数默认值取自主配置 chat_parameter */
+function defaultParams() {
+  const cp = info.defaults?.chat_parameter || {};
+  return {
+    temperature: Number(cp.temperature ?? 0.6),
+    top_p: Number(cp.top_p ?? 0.9),
+    max_tokens: Number(cp.max_tokens ?? 65536),
+    tool_choice: cp.tool_choice || 'auto',
+  };
+}
+
+function currentSettingsPayload() {
+  return {
+    supplier: settings.supplier,
+    model: settings.model,
+    persona_key: settings.persona || 'none',
+    custom_persona: settings.persona === 'custom' ? customPersonaText() : '',
+    tools: settings.tools,
+    params: settings.params,
+  };
+}
+
+/* ---------- 轻量 Markdown + LaTeX 公式渲染（无外部依赖） ---------- */
+
+function formulaImgHtml(latex, display) {
+  const url = CODECOGS + encodeURIComponent(latex);
+  return `<img class="chat-formula${display ? ' display' : ''}" src="${escapeHtml(url)}" alt="${escapeHtml(latex)}" data-latex="${escapeHtml(latex)}" loading="lazy">`;
+}
+
+/* 把非代码文本中的公式替换为占位符，占位符在行内格式化后还原为公式图片 */
+function extractFormulas(text) {
+  const formulas = [];
+  const stash = (latex, display) => {
+    formulas.push(formulaImgHtml(latex, display));
+    return `\x00${formulas.length - 1}\x00`;
+  };
+  let out = text
+    .replace(/\$\$(.+?)\$\$/gs, (_, c) => stash(c.trim(), true))
+    .replace(/\\\[(.+?)\\\]/gs, (_, c) => stash(c.trim(), true))
+    .replace(/\\\((.+?)\\\)/gs, (_, c) => stash(c.trim(), false))
+    .replace(/\$([^$\n]+?)\$/g, (m, c) =>
+      c.trim() && c.length <= MAX_FORMULA_LEN && MATH_HINT.test(c) ? stash(c.trim(), false) : m);
+  return { out, formulas };
+}
+
+function inlineMd(raw) {
+  const { out, formulas } = extractFormulas(raw);
+  let html = escapeHtml(out);
+  html = html
+    .replace(/`([^`\n]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*\n][^*]*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
+    .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  html = html.replace(/\x00(\d+)\x00/g, (_, i) => formulas[Number(i)] ?? '');
+  return html;
+}
+
+function renderMarkdown(raw) {
+  const text = String(raw ?? '');
+  const parts = [];
+  const lines = text.split(/\r?\n/);
+  let i = 0;
+
+  const flushParagraph = (buf) => {
+    if (buf.length) parts.push(`<p>${buf.map(inlineMd).join('<br>')}</p>`);
+  };
+
+  let para = [];
+  while (i < lines.length) {
+    const line = lines[i];
+
+    /* 围栏代码块 */
+    const fence = line.match(/^```(\w*)\s*$/);
+    if (fence) {
+      flushParagraph(para); para = [];
+      const code = [];
+      i += 1;
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) { code.push(lines[i]); i += 1; }
+      i += 1;
+      parts.push(`<pre class="chat-code"><code>${escapeHtml(code.join('\n'))}</code></pre>`);
+      continue;
+    }
+
+    if (!line.trim()) { flushParagraph(para); para = []; i += 1; continue; }
+
+    /* 标题 / 分割线 / 引用 / 列表 / 表格 */
+    const h = line.match(/^(#{1,6})\s+(.*)$/);
+    if (h) {
+      flushParagraph(para); para = [];
+      const level = h[1].length;
+      parts.push(`<div class="chat-md-h chat-md-h${level}">${inlineMd(h[2])}</div>`);
+      i += 1; continue;
+    }
+    if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) {
+      flushParagraph(para); para = [];
+      parts.push('<hr class="chat-md-hr">');
+      i += 1; continue;
+    }
+    if (/^\s*>/.test(line)) {
+      flushParagraph(para); para = [];
+      const quote = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) {
+        quote.push(lines[i].replace(/^\s*>\s?/, '')); i += 1;
+      }
+      parts.push(`<blockquote class="chat-md-quote">${quote.map(inlineMd).join('<br>')}</blockquote>`);
+      continue;
+    }
+    if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
+      flushParagraph(para); para = [];
+      const ordered = /^\s*\d+[.)]\s+/.test(line);
+      const items = [];
+      while (i < lines.length && /^\s*([-*+]|\d+[.)])\s+/.test(lines[i])) {
+        items.push(lines[i].replace(/^\s*([-*+]|\d+[.)])\s+/, '')); i += 1;
+      }
+      const tag = ordered ? 'ol' : 'ul';
+      parts.push(`<${tag} class="chat-md-list">${items.map((it) => `<li>${inlineMd(it)}</li>`).join('')}</${tag}>`);
+      continue;
+    }
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      flushParagraph(para); para = [];
+      const head = line.split('|').slice(1, -1).map((c) => c.trim());
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+        rows.push(lines[i].split('|').slice(1, -1).map((c) => c.trim())); i += 1;
+      }
+      parts.push(`<table class="chat-md-table"><thead><tr>${head.map((c) => `<th>${inlineMd(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inlineMd(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
+      continue;
+    }
+
+    para.push(line);
+    i += 1;
+  }
+  flushParagraph(para);
+  return parts.join('') || '<p class="muted">(空回复)</p>';
+}
+
+/* ---------- 基础 DOM 工具 ---------- */
+
+function el(tag, cls, html = '') {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (html) node.innerHTML = html;
+  return node;
+}
+
+function userAtBottom() {
+  const box = messagesEl;
+  return box.scrollHeight - box.scrollTop - box.clientHeight < 90;
+}
+
+function scrollToBottom(force = false) {
+  if (force || userAtBottom()) messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+/* ---------- 消息渲染 ---------- */
+
+function attachmentHtml(file) {
+  const url = `${file.url}?token=${encodeURIComponent(getToken())}`;
+  const name = escapeHtml(file.name || file.id);
+  if (file.kind === 'image') return `<img class="chat-attach-img" src="${url}" alt="${name}" loading="lazy">`;
+  if (file.kind === 'audio') return `<audio class="chat-attach-audio" controls preload="none" src="${url}"></audio>`;
+  if (file.kind === 'video') return `<video class="chat-attach-video" controls preload="metadata" src="${url}"></video>`;
+  return `<span class="chat-attach-file">${icon('file')} ${name} <span class="muted small">(${Math.ceil((file.size || 0) / 1024)} KB)</span></span>`;
+}
+
+function appendUserMessage(text, files = [], nonce = '') {
+  messagesEl.querySelector('.chat-empty')?.remove();
+  const row = el('div', 'chat-msg user');
+  const bubble = el('div', 'chat-bubble');
+  if (text) bubble.appendChild(el('div', 'chat-text', escapeHtml(text)));
+  for (const file of files) bubble.appendChild(el('div', 'chat-attach', attachmentHtml(file)));
+  const actions = el('div', 'chat-msg-actions');
+  const editBtn = el('button', 'chat-msg-action', icon('edit'));
+  editBtn.type = 'button';
+  editBtn.title = '编辑此消息并回退后续对话';
+  editBtn.addEventListener('click', () => startEditMessage(row));
+  actions.appendChild(editBtn);
+  bubble.appendChild(actions);
+  row.appendChild(el('div', 'chat-avatar user-avatar', '我'));
+  row.appendChild(bubble);
+  messagesEl.appendChild(row);
+  scrollToBottom();
+}
+
+/* 内联编辑用户消息：保存并重发 / 仅回退 / 取消 */
+function startEditMessage(row) {
+  if (generating) { toast('请等待生成完成后再编辑', 'error'); return; }
+  if (row.querySelector('.chat-edit-box')) return;
+  const umIndex = [...messagesEl.querySelectorAll('.chat-msg.user')].indexOf(row);
+  if (umIndex < 0) return;
+  const bubble = row.querySelector('.chat-bubble');
+  const original = bubble.querySelector('.chat-text')?.textContent || '';
+  for (const child of [...bubble.children]) child.style.display = 'none';
+
+  const box = el('div', 'chat-edit-box');
+  box.innerHTML = `
+    <textarea class="input mono" rows="3"></textarea>
+    <div class="chat-edit-actions">
+      <button type="button" class="btn sm primary" data-act="resend">${icon('refresh')} 保存并重发</button>
+      <button type="button" class="btn sm ghost" data-act="revert">${icon('rollback')} 仅回退</button>
+      <button type="button" class="btn sm ghost" data-act="cancel">取消</button>
+    </div>`;
+  const ta = box.querySelector('textarea');
+  ta.value = original;
+  bubble.prepend(box);
+  ta.focus();
+  ta.style.height = 'auto';
+  ta.style.height = `${Math.min(ta.scrollHeight, 200)}px`;
+
+  const close = () => {
+    box.remove();
+    for (const child of [...bubble.children]) child.style.display = '';
+  };
+
+  box.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (!btn) return;
+    const act = btn.dataset.act;
+    if (act === 'cancel') { close(); return; }
+    const ok = sendWs({
+      type: 'edit',
+      session: currentSession,
+      um_index: umIndex,
+      text: ta.value.trim(),
+      resend: act === 'resend',
+      settings: currentSettingsPayload(),
+    });
+    if (!ok) return;
+    /* 成功后服务端会广播 history 整体重绘；重发路径的事件流随后到达 */
+    close();
+    if (act === 'resend') {
+      beginAssistantTurn();
+      setGenerating(true);
+    }
+  });
+}
+
+/* 工具/思考折叠块 */
+function makeCollapsible(titleHtml, { collapsed = true, cls = '' } = {}) {
+  const block = el('div', `chat-block ${cls}`);
+  block.innerHTML = `
+    <button type="button" class="chat-block-head">
+      <span class="chat-block-chevron">${icon('down')}</span>
+      <span class="chat-block-title">${titleHtml}</span>
+    </button>
+    <div class="chat-block-body"></div>`;
+  const head = block.querySelector('.chat-block-head');
+  head.addEventListener('click', () => {
+    block.classList.toggle('collapsed');
+    if (block.classList.contains('collapsed')) scrollToBottom();
+  });
+  if (collapsed) block.classList.add('collapsed');
+  return block;
+}
+
+function beginAssistantTurn() {
+  messagesEl.querySelector('.chat-empty')?.remove();
+  const row = el('div', 'chat-msg assistant');
+  const bubble = el('div', 'chat-bubble chat-assistant-bubble');
+  row.appendChild(el('div', 'chat-avatar bot-avatar', 'A'));
+  row.appendChild(bubble);
+  const status = el('div', 'chat-turn-status', '<span class="spinner-sm"></span> 生成中…');
+  bubble.appendChild(status);
+  messagesEl.appendChild(row);
+  scrollToBottom(true);
+
+  activeTurn = {
+    root: row,
+    bubble,
+    status,
+    steps: new Map(),
+    /* 工具块按 tool_call_id 全回合键控：流式 START 与其 RESULT/STEP_SUMMARY
+       分属相邻两个 step_index（runner 步计数器在流结束后自增），按步骤分组会重复建块 */
+    tools: new Map(),
+    reasonings: [],
+    done: false,
+  };
+}
+
+function stepOf(turn, stepIndex) {
+  let step = turn.steps.get(stepIndex);
+  if (step) return step;
+  const node = el('div', 'chat-step');
+  if (turn.steps.size > 0) {
+    node.appendChild(el('div', 'chat-step-sep', `第 ${stepIndex + 1} 步`));
+  }
+  turn.bubble.insertBefore(node, turn.status);
+  step = { node, reasoning: null, reasoningText: '', content: null, contentRaw: '', meta: null, renderPending: false };
+  turn.steps.set(stepIndex, step);
+  return step;
+}
+
+function reasoningBlock(turn, step) {
+  if (step.reasoning) return step.reasoning;
+  const block = makeCollapsible('<span class="chat-block-name">思考过程</span><span class="chat-reasoning-hint"></span>', { collapsed: false, cls: 'reasoning' });
+  step.node.appendChild(block);
+  step.reasoning = {
+    block,
+    body: block.querySelector('.chat-block-body'),
+    hint: block.querySelector('.chat-reasoning-hint'),
+  };
+  turn.reasonings.push(step.reasoning);
+  return step.reasoning;
+}
+
+function contentBlock(step) {
+  if (step.content) return step.content;
+  const node = el('div', 'chat-content chat-md');
+  step.node.appendChild(node);
+  step.content = node;
+  return step.content;
+}
+
+function scheduleContentRender(step) {
+  if (step.renderPending) return;
+  step.renderPending = true;
+  requestAnimationFrame(() => {
+    step.renderPending = false;
+    const node = contentBlock(step);
+    if (node.isConnected) {
+      node.innerHTML = renderMarkdown(step.contentRaw);
+      scrollToBottom();
+    }
+  });
+}
+
+function flushContentRender(turn) {
+  /* 收尾时对全部步骤做最终渲染，防 rAF 被打断（如标签页切走）丢正文 */
+  for (const step of turn.steps.values()) {
+    if (step.contentRaw && !step.renderPending) {
+      contentBlock(step).innerHTML = renderMarkdown(step.contentRaw);
+    }
+  }
+}
+
+function toolBlock(turn, step, toolCallId, toolName) {
+  let tool = turn.tools.get(toolCallId);
+  if (tool) return tool;
+  const block = makeCollapsible(
+    `<span class="chat-block-name mono">${escapeHtml(toolName || toolCallId)}</span><span class="chat-tool-status running">运行中…</span>`,
+    { collapsed: true, cls: 'tool' },
+  );
+  block.querySelector('.chat-block-body').innerHTML = `
+    <div class="chat-tool-section"><div class="chat-tool-label">参数</div><pre class="chat-tool-args mono">-</pre></div>
+    <div class="chat-tool-section"><div class="chat-tool-label">结果</div><pre class="chat-tool-result mono">…</pre></div>`;
+  step.node.appendChild(block);
+  tool = {
+    block,
+    status: block.querySelector('.chat-tool-status'),
+    args: block.querySelector('.chat-tool-args'),
+    result: block.querySelector('.chat-tool-result'),
+  };
+  turn.tools.set(toolCallId, tool);
+  scrollToBottom();
+  return tool;
+}
+
+function setToolResult(tool, result, isError) {
+  tool.status.textContent = isError ? '出错' : '完成';
+  tool.status.classList.remove('running');
+  tool.status.classList.add(isError ? 'error' : 'ok');
+  const text = String(result ?? '');
+  tool.result.textContent = text.length > 4000 ? `${text.slice(0, 4000)}…(已截断)` : text;
+  tool.result.classList.toggle('chat-tool-error', Boolean(isError));
+  scrollToBottom();
+}
+
+function prettyArgs(args) {
+  if (args === undefined || args === null || args === '') return '';
+  if (typeof args === 'string') {
+    try { return JSON.stringify(JSON.parse(args), null, 2); } catch { return args; }
+  }
+  try { return JSON.stringify(args, null, 2); } catch { return String(args); }
+}
+
+/* ---------- Agent 事件驱动 ---------- */
+
+function handleAgentEvent(event) {
+  if (!activeTurn || activeTurn.done) return;
+  const type = event.event_type;
+  const stepIndex = event.step_index ?? 0;
+  const step = stepOf(activeTurn, stepIndex);
+
+  if (type === 'REASONING_DELTA') {
+    const rs = reasoningBlock(activeTurn, step);
+    step.reasoningText += event.delta || '';
+    rs.body.textContent = step.reasoningText;
+    rs.hint.textContent = ` · ${step.reasoningText.length} 字`;
+    rs.body.parentElement.scrollTop = rs.body.parentElement.scrollHeight;
+    scrollToBottom();
+  } else if (type === 'TEXT_DELTA') {
+    /* 思考块在正文开始输出后折叠（与工具调用到达时一致） */
+    if (step.reasoning && !step.reasoning.block.classList.contains('collapsed')) {
+      step.reasoning.block.classList.add('collapsed');
+    }
+    step.contentRaw += event.delta || '';
+    scheduleContentRender(step);
+  } else if (type === 'TOOL_CALL_START') {
+    /* 思考块在首个工具调用/正文出现后折叠 */
+    if (step.reasoning && !step.reasoning.block.classList.contains('collapsed')) {
+      step.reasoning.block.classList.add('collapsed');
+    }
+    toolBlock(activeTurn, step, event.tool_call_id || event.tool_name, event.tool_name);
+  } else if (type === 'TOOL_CALL_RESULT') {
+    const tool = toolBlock(activeTurn, step, event.tool_call_id || event.tool_name, event.tool_name);
+    setToolResult(tool, event.result, event.is_error);
+  } else if (type === 'STEP_SUMMARY') {
+    /* 用完整参数补齐流式期间为空的工具参数 */
+    for (const tc of event.tool_calls || []) {
+      const id = tc.id || tc.name;
+      const tool = activeTurn.tools.get(id);
+      if (tool) {
+        tool.args.textContent = prettyArgs(tc.arguments);
+        if (tc.result !== undefined && tool.status.classList.contains('running')) {
+          setToolResult(tool, tc.result, tc.is_error);
+        }
+      }
+    }
+    for (const rs of activeTurn.reasonings) rs.block.classList.add('collapsed');
+    const usage = event.usage;
+    if (usage && usage.total_tokens) {
+      step.meta = el('div', 'chat-step-meta', `${fmtTokens(usage.total_tokens)} tokens`);
+      step.node.appendChild(step.meta);
+    }
+  } else if (type === 'RUN_SUMMARY') {
+    finishTurn(event.finish_reason || 'completed', event.total_usage);
+  } else if (type === 'ERROR') {
+    activeTurn.bubble.appendChild(el('div', 'chat-error', `${icon('alert')} ${escapeHtml(event.error_message || '未知错误')}`));
+    finishTurn('error');
+  }
+}
+
+function finishTurn(reason, usage) {
+  if (!activeTurn) return;
+  activeTurn.done = true;
+  flushContentRender(activeTurn);
+  const label = {
+    completed: '完成',
+    max_turns: '达到最大步数',
+    error: '出错终止',
+    stopped: '已停止',
+  }[reason] || reason;
+  const usageText = usage && usage.total_tokens ? ` · ${fmtTokens(usage.total_tokens)} tokens` : '';
+  activeTurn.status.innerHTML = `${icon('check')} ${escapeHtml(label)}${usageText}`;
+  activeTurn.status.classList.add('done');
+  setGenerating(false);
+  scrollToBottom();
+}
+
+function setGenerating(value) {
+  generating = value;
+  const sendBtn = sectionEl?.querySelector('#chat-send');
+  if (!sendBtn) return;
+  if (value) {
+    sendBtn.classList.add('danger');
+    sendBtn.innerHTML = `${icon('x')} 停止`;
+  } else {
+    sendBtn.classList.remove('danger');
+    sendBtn.innerHTML = `${icon('send')} 发送`;
+  }
+}
+
+/* ---------- 历史恢复渲染 ---------- */
+
+function renderHistory(items) {
+  messagesEl.innerHTML = '';
+  activeTurn = null;
+  for (const item of items || []) {
+    if (item.type === 'user') {
+      appendUserMessage(item.text || '', item.files || [], item.nonce || '');
+    } else if (item.type === 'assistant') {
+      beginAssistantTurn();
+      const step = stepOf(activeTurn, 0);
+      for (const tc of item.tools || []) {
+        const tool = toolBlock(activeTurn, step, tc.name, tc.name);
+        const pretty = prettyArgs(tc.arguments);
+        if (pretty && pretty !== '{}') tool.args.textContent = pretty;
+        setToolResult(tool, tc.result, tc.is_error);
+      }
+      if (item.text) {
+        step.contentRaw = item.text;
+        contentBlock(step).innerHTML = renderMarkdown(item.text);
+      }
+      finishTurn(item.finish_reason || 'completed', item.usage);
+      activeTurn = null;
+    }
+  }
+  if (!messagesEl.children.length) {
+    messagesEl.innerHTML = `
+      <div class="chat-empty">
+        <div class="chat-empty-logo">A</div>
+        <p>开始新对话吧</p>
+        <p class="muted small">支持图片 / 音频 / 视频附件 · 工具调用与思考过程分级展示</p>
+      </div>`;
+  }
+  scrollToBottom(true);
+}
+
+/* ---------- WebSocket 客户端 ---------- */
+
+function chatWsUrl() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${location.host}/admin/api/ws/chat?token=${encodeURIComponent(getToken())}`;
+}
+
+function connectWs() {
+  if (destroyed) return;
+  try { ws?.close(); } catch { /* 旧连接关闭失败不影响重连 */ }
+  ws = new WebSocket(chatWsUrl());
+
+  ws.addEventListener('open', () => {
+    wsOpen = true;
+    wsRetry = 0;
+    setConnState(true);
+    if (initialOpened && currentSession !== null) {
+      /* 断线重连后重新同步当前会话（含可能错过的生成结果） */
+      sendWs({ type: 'load', session: currentSession });
+    }
+    maybeOpenInitial();
+  });
+
+  ws.addEventListener('message', (e) => {
+    let data;
+    try { data = JSON.parse(e.data); } catch { return; }
+    handleWsMessage(data);
+  });
+
+  ws.addEventListener('close', (e) => {
+    wsOpen = false;
+    setConnState(false);
+    if (destroyed) return;
+    if (e.code === 4401) { toast('聊天连接鉴权失败，请重新登录', 'error'); return; }
+    if (e.code === 4429) { toast('尝试次数过多，聊天连接被锁定', 'error'); return; }
+    const delay = Math.min(15000, 1000 * Math.pow(1.6, wsRetry++));
+    wsRetryTimer = setTimeout(connectWs, delay);
+  });
+
+  ws.addEventListener('error', () => { /* close 会跟着触发，重连逻辑在那里 */ });
+}
+
+function sendWs(payload) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+    return true;
+  }
+  /* 连接已断开（而非正在建立）：立即抢救重连，不等退避计时 */
+  if (!ws || ws.readyState === WebSocket.CLOSED) {
+    connectWs();
+  }
+  toast('聊天服务未连接，稍后重试', 'error');
+  return false;
+}
+
+function handleWsMessage(data) {
+  switch (data.type) {
+    case 'ready':
+      break;
+    case 'session':
+      currentSession = data.id;
+      localStorage.setItem(LAST_SESSION_KEY, String(data.id));
+      refreshSessions();
+      break;
+    case 'history':
+      currentSession = data.session;
+      localStorage.setItem(LAST_SESSION_KEY, String(data.session));
+      renderHistory(data.items);
+      if (data.running) {
+        beginAssistantTurn();
+        setGenerating(true);
+      } else {
+        setGenerating(false);
+      }
+      refreshSessions();
+      break;
+    case 'user_message':
+      if (data.nonce && data.nonce === lastNonce) break;
+      appendUserMessage(data.text || '', data.files || [], data.nonce || '');
+      break;
+    case 'event':
+      if (!activeTurn || activeTurn.done) beginAssistantTurn();
+      setGenerating(true);
+      handleAgentEvent(data.event);
+      break;
+    case 'done':
+      if (!activeTurn || !activeTurn.done) finishTurn(data.finish_reason || 'completed');
+      setGenerating(false);
+      refreshSessions();
+      break;
+    case 'busy':
+      toast('该会话正在生成中，请先停止或等待完成', 'error');
+      /* 编辑重发的乐观 UI 在被拒时复位 */
+      if (!activeTurn || activeTurn.done) setGenerating(false);
+      break;
+    case 'stopping':
+      if (activeTurn) activeTurn.status.innerHTML = '<span class="spinner-sm"></span> 停止中…';
+      break;
+    case 'deleted':
+      toast(`聊天${data.session} 已删除`, 'info');
+      if (data.session === currentSession) {
+        currentSession = null;
+        resetTurnUi();
+        switchAfterDelete(data.session);
+      } else {
+        refreshSessions();
+      }
+      break;
+    case 'error':
+      toast(data.message || '未知错误', 'error');
+      break;
+    case 'pong':
+      break;
+    default:
+      break;
+  }
+}
+
+/* ---------- 会话管理（列表渲染在左侧栏 #chat-session-nav） ---------- */
+
+async function refreshSessions() {
+  try {
+    const res = await api.get('/chat/sessions');
+    sessions = res.items || [];
+    renderSessionNav();
+  } catch { /* 会话列表刷新失败不阻塞聊天 */ }
+}
+
+function renderSessionNav() {
+  const nav = document.getElementById('chat-session-nav');
+  if (!nav) return;
+  const known = new Set(sessions.map((s) => s.id));
+  if (currentSession !== null && !known.has(currentSession)) {
+    sessions = [...sessions, { id: currentSession, title: '' }].sort((a, b) => a.id - b.id);
+  }
+  const rows = sessions.map((s) => `
+    <div class="nav-sub-item ${s.id === currentSession ? 'active' : ''}" data-session="${s.id}" title="会话${s.id}${s.title ? '：' + s.title : ''}">
+      ${s.running ? '<span class="spinner-sm"></span>' : ''}
+      <span class="nav-sub-name">聊天${s.id}</span>
+      <span class="nav-sub-title">${escapeHtml(s.title || '')}</span>
+      <button class="nav-sub-del" data-del="${s.id}" title="删除该会话及其历史">${icon('trash')}</button>
+    </div>`).join('');
+  nav.innerHTML = `
+    <div class="nav-sub-item nav-sub-new" id="chat-nav-new">${icon('plus')} 新会话</div>
+    ${rows}`;
+
+  /* 状态栏标题：当前会话 + 首条消息摘要 */
+  const label = sectionEl?.querySelector('#chat-current');
+  if (label) {
+    const s = sessions.find((x) => x.id === currentSession);
+    label.textContent = currentSession === null
+      ? '正在连接…'
+      : `聊天${currentSession}${s?.title ? ` · ${s.title}` : ''}`;
+  }
+}
+
+/* 侧栏列表点击（元素常驻侧栏，只绑一次） */
+function bindSessionNav() {
+  const nav = document.getElementById('chat-session-nav');
+  if (!nav || nav.dataset.bound) return;
+  nav.dataset.bound = '1';
+  nav.addEventListener('click', async (e) => {
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      e.stopPropagation();
+      await deleteSession(Number(del.dataset.del));
+      return;
+    }
+    if (e.target.closest('#chat-nav-new')) {
+      createSession();
+      collapseMobileSidebar();
+      return;
+    }
+    const item = e.target.closest('[data-session]');
+    if (item) {
+      loadSession(Number(item.dataset.session));
+      collapseMobileSidebar();
+    }
+  });
+}
+
+function collapseMobileSidebar() {
+  if (matchMedia('(max-width: 900px)').matches) {
+    document.getElementById('app')?.classList.add('sidebar-collapsed');
+  }
+}
+
+function loadSession(id) {
+  if (!sendWs({ type: 'load', session: id })) return;
+  currentSession = id;
+  renderSessionNav();
+}
+
+function createSession() {
+  sendWs({ type: 'create' });
+}
+
+async function deleteSession(target) {
+  if (target === null || target === undefined) return;
+  const ok = await confirmDialog({
+    title: '删除会话',
+    message: `将删除会话 <b>聊天${target}</b> 的全部聊天历史（含数据库记录），id 会被后续新会话复用。确定继续吗？`,
+    confirmText: '删除',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await api.del(`/chat/sessions/${target}`);
+  } catch (e) {
+    toast(`删除失败：${e.message}`, 'error');
+    return;
+  }
+  /* deleted 广播通常已先行处理导航；WS 断线收不到时在此兜底 */
+  if (currentSession === target) {
+    currentSession = null;
+    resetTurnUi();
+    await switchAfterDelete(target);
+  } else {
+    await refreshSessions();
+  }
+}
+
+async function switchAfterDelete(deletedId) {
+  /* 切到最近的剩余会话（优先 id≥被删 id 的最小者，否则最大的），
+     仅当没有剩余会话时才新建——避免立即新建拿到刚释放的最小 id，
+     看起来像"删除没生效、同编号复活" */
+  await refreshSessions();
+  const remaining = sessions.map((s) => s.id).sort((a, b) => a - b);
+  if (!remaining.length) {
+    createSession();
+    return;
+  }
+  const next = remaining.find((id) => id >= deletedId) ?? remaining[remaining.length - 1];
+  loadSession(next);
+}
+
+function resetTurnUi() {
+  messagesEl.innerHTML = '';
+  activeTurn = null;
+  setGenerating(false);
+}
+
+function maybeOpenInitial() {
+  if (initialOpened || !wsOpen || !sectionEl) return;
+  const bootstrapped = suppliers.length > 0;
+  if (!bootstrapped) return;
+  initialOpened = true;
+  openInitialSession(false);
+}
+
+function openInitialSession(afterDelete) {
+  const last = Number(localStorage.getItem(LAST_SESSION_KEY) || '0');
+  const exists = sessions.some((s) => s.id === last);
+  if (!afterDelete && exists) loadSession(last);
+  else createSession();
+}
+
+/* ---------- 工具选择弹窗 ---------- */
+
+function openToolsModal() {
+  const presetMode = settings.tools === null;
+  const checkedSet = presetMode ? new Set(info.webui_preset?.default || []) : new Set(settings.tools || []);
+  const deferredSet = new Set(info.webui_preset?.deferred || []);
+
+  const modal = openModal({
+    title: '本轮可用工具',
+    wide: true,
+    bodyHtml: `
+      <div class="filter-bar" style="margin-bottom:10px">
+        <input class="input" id="chat-tool-search" placeholder="搜索工具名/描述…" style="max-width:260px">
+        <span class="spacer"></span>
+        <span class="badge ${presetMode ? 'blue' : 'gray'}" id="chat-tool-mode">${presetMode ? 'webui 预设' : '自定义选择'}</span>
+      </div>
+      <div class="chat-tool-list" id="chat-tool-list"></div>`,
+    actions: [
+      { label: '恢复 webui 预设', class: 'ghost', onClick: ({ close }) => { settings.tools = null; saveSettings(); toast('已恢复为 webui 预设', 'success'); close(); } },
+      {
+        label: '保存为 webui 预设',
+        class: 'ghost',
+        onClick: async ({ close, el: overlay }) => {
+          const picked = [...overlay.querySelectorAll('.chat-tool-check:checked')].map((c) => c.value);
+          try {
+            await api.post('/chat/tools', { tools: picked });
+            settings.tools = null;
+            saveSettings();
+            const res = await api.get('/chat/info');
+            info = { ...info, ...res };
+            toast(`已保存 ${picked.length} 个工具到 webui 预设`, 'success');
+            close();
+          } catch (e) {
+            toast(`保存失败：${e.message}`, 'error');
+          }
+        },
+      },
+      { label: '完成', class: 'primary', onClick: ({ close }) => { close(); } },
+    ],
+  });
+
+  const listEl = modal.el.querySelector('#chat-tool-list');
+  const searchEl = modal.el.querySelector('#chat-tool-search');
+  const modeBadge = modal.el.querySelector('#chat-tool-mode');
+
+  const render = () => {
+    const kw = (searchEl.value || '').trim().toLowerCase();
+    const items = (toolsData.tools || []).filter((t) =>
+      !kw || t.name.toLowerCase().includes(kw) || (t.description || '').toLowerCase().includes(kw));
+    listEl.innerHTML = items.map((t) => `
+      <label class="chat-tool-item">
+        <input type="checkbox" class="chat-tool-check" value="${escapeHtml(t.name)}" ${checkedSet.has(t.name) ? 'checked' : ''}>
+        <span class="mono chat-tool-name">${escapeHtml(t.name)}</span>
+        ${deferredSet.has(t.name) && !presetMode ? '<span class="badge gray">deferred</span>' : ''}
+        ${t.source === 'mcp' ? '<span class="badge purple">MCP</span>' : ''}
+        ${t.chat_scope && t.chat_scope !== 'both' ? `<span class="badge teal">${t.chat_scope === 'private' ? '私聊' : '群聊'}</span>` : ''}
+        <span class="chat-tool-desc">${escapeHtml(t.description || '')}</span>
+      </label>`).join('') || '<p class="muted">没有匹配的工具</p>';
+  };
+
+  const markCustom = () => {
+    settings.tools = [...checkedSet];
+    saveSettings();
+    modeBadge.textContent = '自定义选择';
+    modeBadge.className = 'badge gray';
+  };
+
+  listEl.addEventListener('change', (e) => {
+    const check = e.target.closest('.chat-tool-check');
+    if (!check) return;
+    if (check.checked) checkedSet.add(check.value);
+    else checkedSet.delete(check.value);
+    markCustom();
+  });
+  searchEl.addEventListener('input', render);
+  render();
+}
+
+/* ---------- 附件上传 ---------- */
+
+function kindOf(name, mime = '') {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif'].includes(ext)) return 'image';
+  if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'opus', 'silk', 'amr'].includes(ext)) return 'audio';
+  if (['mp4', 'webm', 'mov', 'avi', 'mkv', 'flv', 'm4v'].includes(ext)) return 'video';
+  if (mime.startsWith('image/')) return 'image';
+  if (mime.startsWith('audio/')) return 'audio';
+  if (mime.startsWith('video/')) return 'video';
+  return 'file';
+}
+
+async function uploadFile(file) {
+  const kind = kindOf(file.name, file.type);
+  const limit = (info.limits || {})[kind] ?? (info.limits || {}).file ?? 0;
+  if (limit && file.size > limit) {
+    toast(`「${file.name}」超过 ${Math.round(limit / 1048576)}MB 大小限制`, 'error');
+    return;
+  }
+  const chip = el('div', 'chat-chip uploading');
+  chip.innerHTML = `<span class="spinner-sm"></span><span class="mono">${escapeHtml(file.name)}</span><button class="chat-chip-x" title="移除">${icon('x')}</button>`;
+  sectionEl.querySelector('#chat-attachments').appendChild(chip);
+  const entry = { chip, brief: null };
+  pendingAttachments.push(entry);
+
+  chip.querySelector('.chat-chip-x').addEventListener('click', () => {
+    entry.removed = true;
+    chip.remove();
+  });
+
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch('/admin/api/chat/upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${getToken()}` },
+      body: fd,
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.detail || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    entry.brief = data.file;
+    if (!entry.removed) {
+      chip.classList.remove('uploading');
+      const iconMap = { image: 'eye', audio: 'activity', video: 'layers', file: 'file' };
+      chip.querySelector('.spinner-sm')?.remove();
+      chip.insertAdjacentHTML('afterbegin', icon(iconMap[kind] || 'file'));
+    }
+  } catch (e) {
+    entry.removed = true;
+    chip.classList.add('error');
+    chip.querySelector('.spinner-sm')?.remove();
+    chip.insertAdjacentHTML('afterbegin', icon('alert'));
+    toast(`上传失败：${e.message}`, 'error', 5000);
+  }
+}
+
+/* ---------- 设置面板控件（供应商/模型/人设/工具/参数） ---------- */
+
+function populateSuppliers() {
+  const sel = sectionEl.querySelector('#chat-supplier');
+  sel.innerHTML = suppliers.map((s) => `<option value="${escapeHtml(s.name)}" ${s.name === settings.supplier ? 'selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+  if (!settings.supplier && suppliers.length) {
+    settings.supplier = info.defaults?.supplier && suppliers.some((s) => s.name === info.defaults.supplier)
+      ? info.defaults.supplier : suppliers[0].name;
+    sel.value = settings.supplier;
+  }
+  populateModels();
+}
+
+function populateModels() {
+  const sel = sectionEl.querySelector('#chat-model');
+  const sup = suppliers.find((s) => s.name === settings.supplier);
+  const models = sup ? Object.keys(sup.models || {}) : [];
+  const badge = (m) => {
+    const caps = sup.models[m] || {};
+    let out = '';
+    if (caps.visual_sense) out += ' 🖼️';
+    if (caps.audio_sense) out += ' 🎧';
+    if (caps.video_sense) out += ' 🎬';
+    return out;
+  };
+  sel.innerHTML = models.map((m) => `<option value="${escapeHtml(m)}" ${m === settings.model ? 'selected' : ''}>${escapeHtml(m)}${badge(m)}</option>`).join('');
+  if (!models.includes(settings.model)) {
+    settings.model = info.defaults?.model && models.includes(info.defaults.model)
+      ? info.defaults.model : (models[0] || '');
+    sel.value = settings.model;
+  }
+}
+
+function populatePersonas() {
+  const sel = sectionEl.querySelector('#chat-persona');
+  const def = info.defaults?.persona || 'none';
+  if (!settings.persona || (settings.persona !== 'custom' && settings.persona !== 'none' && !personas.some((p) => p.key === settings.persona))) {
+    settings.persona = def;
+  }
+  sel.innerHTML = `
+    <option value="none" ${settings.persona === 'none' ? 'selected' : ''}>无人设</option>
+    ${personas.map((p) => `<option value="${escapeHtml(p.key)}" ${settings.persona === p.key ? 'selected' : ''}>${escapeHtml(p.key)}${p.is_default ? '（默认）' : ''}</option>`).join('')}
+    <option value="custom" ${settings.persona === 'custom' ? 'selected' : ''}>自定义人设…</option>`;
+  toggleCustomPersonaBox();
+}
+
+function toggleCustomPersonaBox() {
+  const box = sectionEl.querySelector('#chat-custom-persona-wrap');
+  box.classList.toggle('hidden', settings.persona !== 'custom');
+}
+
+function updateToolsCount() {
+  const badge = sectionEl?.querySelector('#chat-tools-count');
+  if (!badge) return;
+  const count = settings.tools === null
+    ? (info.webui_preset?.default?.length ?? 0)
+    : (settings.tools?.length ?? 0);
+  badge.textContent = `当前 ${count} 个工具${settings.tools === null ? '（webui 预设）' : ''}`;
+}
+
+function initParamsUI() {
+  const p = settings.params;
+  const temperature = sectionEl.querySelector('#chat-param-temperature');
+  const topP = sectionEl.querySelector('#chat-param-top_p');
+  const maxTokens = sectionEl.querySelector('#chat-param-max_tokens');
+  const toolChoice = sectionEl.querySelector('#chat-param-tool_choice');
+  temperature.value = p.temperature;
+  sectionEl.querySelector('#chat-val-temperature').textContent = p.temperature;
+  topP.value = p.top_p;
+  sectionEl.querySelector('#chat-val-top_p').textContent = p.top_p;
+  maxTokens.value = p.max_tokens;
+  toolChoice.value = p.tool_choice;
+
+  temperature.addEventListener('input', (e) => {
+    settings.params.temperature = Number(e.target.value);
+    sectionEl.querySelector('#chat-val-temperature').textContent = e.target.value;
+    saveSettings();
+  });
+  topP.addEventListener('input', (e) => {
+    settings.params.top_p = Number(e.target.value);
+    sectionEl.querySelector('#chat-val-top_p').textContent = e.target.value;
+    saveSettings();
+  });
+  maxTokens.addEventListener('change', (e) => {
+    const v = Math.max(1, Math.min(200000, parseInt(e.target.value, 10) || 0));
+    e.target.value = v;
+    settings.params.max_tokens = v;
+    saveSettings();
+  });
+  toolChoice.addEventListener('change', (e) => {
+    settings.params.tool_choice = e.target.value;
+    saveSettings();
+  });
+  sectionEl.querySelector('#chat-params-reset').addEventListener('click', () => {
+    settings.params = defaultParams();
+    saveSettings();
+    initParamsUI();
+    toast('请求参数已恢复为默认值', 'success');
+  });
+}
+
+function setConnState(ok) {
+  const dot = sectionEl?.querySelector('#chat-conn-dot');
+  if (dot) dot.className = `dot ${ok ? 'green' : 'red'}`;
+  if (!ok) {
+    const label = sectionEl?.querySelector('#chat-current');
+    if (label && currentSession === null) label.textContent = '正在连接…';
+  }
+}
+
+/* ---------- 视图入口 ---------- */
+
+let pendingAttachments = [];
+
+async function init(section) {
+  sectionEl = section;
+  /* 路由每次离开视图都会 destroy()（置 destroyed 关闭 WS），
+     再次进入必须重置，否则 connectWs 短路、永远报"聊天服务未连接" */
+  destroyed = false;
+  clearTimeout(wsRetryTimer);
+  wsRetry = 0;
+  loadSettings();
+  initialOpened = false;
+  generating = false;
+  currentSession = null;
+  activeTurn = null;
+  pendingAttachments = [];
+
+  section.innerHTML = `
+    <div class="chat-page">
+      <div class="chat-main">
+        <div class="chat-statusbar">
+          <span class="chat-conn" title="聊天服务连接状态"><span class="dot red" id="chat-conn-dot"></span></span>
+          <span class="chat-current" id="chat-current">正在连接…</span>
+          <span class="spacer"></span>
+          <button class="icon-btn chat-settings-toggle" id="chat-settings-toggle" title="会话设置">${icon('sliders')}</button>
+        </div>
+
+        <div class="chat-messages" id="chat-messages">
+          <div class="chat-empty">
+            <div class="chat-empty-logo">A</div>
+            <p>连接聊天服务后即可开始对话</p>
+            <p class="muted small">支持图片 / 音频 / 视频附件 · 工具调用与思考过程分级展示</p>
+          </div>
+        </div>
+
+        <div class="chat-drop-overlay">${icon('plus')} 松开以添加附件</div>
+
+        <div class="chat-input-area">
+          <div class="chat-attachments" id="chat-attachments"></div>
+          <div class="chat-input-row">
+            <button class="icon-btn" id="chat-attach-btn" title="添加附件（图片/音频/视频/文件）">${icon('file')}</button>
+            <textarea class="chat-textarea" id="chat-text" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行；可直接拖入文件"></textarea>
+            <button class="btn primary" id="chat-send">${icon('send')} 发送</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="chat-settings" id="chat-settings">
+        <div class="chat-settings-title">${icon('sliders')} 对话设置</div>
+
+        <div class="field">
+          <div class="field-label">供应商</div>
+          <div class="field-desc">选择模型 API 服务商</div>
+          <select class="select" id="chat-supplier"></select>
+        </div>
+        <div class="field">
+          <div class="field-label">模型</div>
+          <div class="field-desc">🖼️ 图片 🎧 音频 🎬 视频为模型多模态能力标记</div>
+          <select class="select" id="chat-model"></select>
+        </div>
+        <div class="field">
+          <div class="field-label">人设</div>
+          <div class="field-desc">对话的系统提示词，可选预设或自定义</div>
+          <select class="select" id="chat-persona"></select>
+        </div>
+        <div class="field hidden" id="chat-custom-persona-wrap">
+          <div class="field-label">自定义人设</div>
+          <div class="field-desc">直接输入人设全文（仅保存在本浏览器）</div>
+          <textarea class="input mono" id="chat-custom-persona" rows="4" placeholder="输入自定义人设文本…"></textarea>
+        </div>
+        <div class="field">
+          <div class="field-label">工具</div>
+          <div class="field-desc">本轮可直接调用的工具，可保存为 webui 预设</div>
+          <button class="btn sm ghost" id="chat-tools-btn" style="width:100%">${icon('settings')} <span id="chat-tools-count"></span></button>
+        </div>
+
+        <div class="chat-settings-sep">请求参数</div>
+        <div class="field-desc" style="margin:0 0 6px">未调整时使用主配置 chat_parameter</div>
+        <div class="field">
+          <div class="field-label">温度 temperature <span class="chat-param-val" id="chat-val-temperature"></span></div>
+          <div class="field-desc">值越高回答越发散</div>
+          <input type="range" class="chat-range" id="chat-param-temperature" min="0" max="2" step="0.1">
+        </div>
+        <div class="field">
+          <div class="field-label">核采样 top_p <span class="chat-param-val" id="chat-val-top_p"></span></div>
+          <div class="field-desc">采样概率累积上限，与温度二选一调节</div>
+          <input type="range" class="chat-range" id="chat-param-top_p" min="0" max="1" step="0.05">
+        </div>
+        <div class="field">
+          <div class="field-label">最大输出 max_tokens</div>
+          <div class="field-desc">单次回复的长度上限</div>
+          <input type="number" class="input" id="chat-param-max_tokens" min="1" max="200000" step="256">
+        </div>
+        <div class="field">
+          <div class="field-label">工具选择 tool_choice</div>
+          <div class="field-desc">是否强制模型调用工具</div>
+          <select class="select" id="chat-param-tool_choice">
+            <option value="auto">auto · 自动决定</option>
+            <option value="none">none · 禁用工具</option>
+            <option value="required">required · 强制调用</option>
+          </select>
+        </div>
+        <button class="btn sm ghost" id="chat-params-reset" style="width:100%">恢复默认参数</button>
+      </aside>
+
+      <div class="chat-settings-backdrop" id="chat-settings-backdrop"></div>
+      <input type="file" id="chat-file-input" multiple hidden
+             accept="image/*,audio/*,video/*,.txt,.md,.json,.csv,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.7z,.rar,.py,.js,.ts,.java,.c,.cpp,.html,.css,.xml,.yaml,.yml,.toml,.log">
+    </div>`;
+
+  messagesEl = section.querySelector('#chat-messages');
+  const textEl = section.querySelector('#chat-text');
+
+  /* 公式图片加载失败时降级为原始 LaTeX 文本 */
+  messagesEl.addEventListener('error', (e) => {
+    const img = e.target;
+    if (img instanceof HTMLImageElement && img.classList.contains('chat-formula')) {
+      const code = document.createElement('code');
+      code.textContent = img.dataset.latex || img.alt || '';
+      img.replaceWith(code);
+    }
+  }, true);
+
+  /* ---- 引导数据 ---- */
+  const [infoRes, supplierRes, personaRes, toolRes] = await Promise.allSettled([
+    api.get('/chat/info'),
+    api.get('/supplier_config'),
+    api.get('/personas'),
+    api.get('/tools'),
+  ]);
+  if (infoRes.status === 'fulfilled') info = { ...info, ...infoRes.value };
+  if (supplierRes.status === 'fulfilled') suppliers = supplierRes.value.suppliers || [];
+  if (personaRes.status === 'fulfilled') personas = personaRes.value.items || [];
+  if (toolRes.status === 'fulfilled') toolsData = toolRes.value;
+  if (infoRes.status === 'rejected') toast(`聊天服务信息加载失败：${infoRes.value.reason?.message || infoRes.value.reason}`, 'error', 5000);
+
+  populateSuppliers();
+  populatePersonas();
+  settings.params = { ...defaultParams(), ...(settings.params || {}) };
+  initParamsUI();
+  updateToolsCount();
+  const customBox = section.querySelector('#chat-custom-persona');
+  customBox.value = localStorage.getItem(`${SETTINGS_KEY}_custom`) || '';
+
+  section.querySelector('#chat-supplier').addEventListener('change', (e) => {
+    settings.supplier = e.target.value;
+    saveSettings();
+    populateModels();
+  });
+  section.querySelector('#chat-model').addEventListener('change', (e) => {
+    settings.model = e.target.value;
+    saveSettings();
+  });
+  section.querySelector('#chat-persona').addEventListener('change', (e) => {
+    settings.persona = e.target.value;
+    saveSettings();
+    toggleCustomPersonaBox();
+  });
+  customBox.addEventListener('change', saveSettings);
+  section.querySelector('#chat-tools-btn').addEventListener('click', openToolsModal);
+
+  /* ---- 移动端设置抽屉 ---- */
+  const pageEl = section.querySelector('.chat-page');
+  section.querySelector('#chat-settings-toggle').addEventListener('click', () => {
+    pageEl.classList.toggle('chat-settings-open');
+  });
+  section.querySelector('#chat-settings-backdrop').addEventListener('click', () => {
+    pageEl.classList.remove('chat-settings-open');
+  });
+
+  /* ---- 侧栏会话列表 + 连接 ---- */
+  bindSessionNav();
+  await refreshSessions();
+  connectWs();
+  maybeOpenInitial();
+
+  /* ---- 输入与发送 ---- */
+  const sendBtn = section.querySelector('#chat-send');
+  const autoGrow = () => {
+    textEl.style.height = 'auto';
+    textEl.style.height = `${Math.min(textEl.scrollHeight, 160)}px`;
+  };
+  textEl.addEventListener('input', autoGrow);
+
+  textEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+      e.preventDefault();
+      sendBtn.click();
+    }
+  });
+
+  sendBtn.addEventListener('click', () => {
+    if (generating) {
+      sendWs({ type: 'stop', session: currentSession });
+      return;
+    }
+    doSend();
+  });
+
+  function doSend() {
+    const text = textEl.value.trim();
+    const ready = pendingAttachments.filter((a) => a.brief && !a.removed);
+    const uploading = pendingAttachments.filter((a) => !a.brief && !a.removed);
+    if (uploading.length) { toast('附件还在上传中，请稍候', 'error'); return; }
+    if (!text && !ready.length) return;
+    if (!settings.supplier || !settings.model) {
+      toast('请先在右侧设置面板选择供应商和模型', 'error');
+      pageEl.classList.add('chat-settings-open');
+      return;
+    }
+    if (!wsOpen) { toast('聊天服务未连接', 'error'); return; }
+
+    const files = ready.map((a) => a.brief);
+    const nonce = Math.random().toString(36).slice(2);
+    lastNonce = nonce;
+    appendUserMessage(text, files, nonce);
+    beginAssistantTurn();
+    setGenerating(true);
+
+    const ok = sendWs({
+      type: 'send',
+      session: currentSession,
+      text,
+      files: files.map((f) => f.id),
+      settings: currentSettingsPayload(),
+      nonce,
+    });
+    if (!ok) {
+      finishTurn('error');
+      activeTurn?.bubble.appendChild(el('div', 'chat-error', `${icon('alert')} 发送失败：服务未连接`));
+    }
+
+    textEl.value = '';
+    autoGrow();
+    for (const a of pendingAttachments) a.chip?.remove();
+    pendingAttachments = [];
+  }
+
+  /* ---- 附件：按钮选择 + 拖拽 ---- */
+  const fileInput = section.querySelector('#chat-file-input');
+  section.querySelector('#chat-attach-btn').addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    for (const file of fileInput.files) uploadFile(file);
+    fileInput.value = '';
+  });
+
+  const overlay = section.querySelector('.chat-drop-overlay');
+  let dragDepth = 0;
+  section.addEventListener('dragover', (e) => e.preventDefault());
+  section.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    dragDepth += 1;
+    overlay.classList.add('show');
+  });
+  section.addEventListener('dragleave', (e) => {
+    e.preventDefault();
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) overlay.classList.remove('show');
+  });
+  section.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dragDepth = 0;
+    overlay.classList.remove('show');
+    for (const file of e.dataTransfer?.files || []) uploadFile(file);
+  });
+}
+
+function destroy() {
+  destroyed = true;
+  clearTimeout(wsRetryTimer);
+  try { ws?.close(); } catch { /* 忽略关闭异常 */ }
+  ws = null;
+  sectionEl = null;
+  messagesEl = null;
+  activeTurn = null;
+  pendingAttachments = [];
+}
+
+export const chatView = { title: 'AI 聊天', init, destroy };

@@ -35,6 +35,7 @@
 - [✨ Core Features](#-core-features)
   - [🧠 Deep LLM Chat Integration](#-deep-llm-chat-integration)
   - [💻 Unix-like Command System](#-unix-like-command-system)
+  - [🖥️ Web Admin Panel](#-web-admin-panel)
   - [🛠️ Other Practical Features](#-other-practical-features)
 - [🚀 Quick Start (How to Run)](#-quick-start-how-to-run)
   - [1. Frontend Connection (NapCat)](#1-frontend-connection-napcat)
@@ -75,13 +76,14 @@ The codebase is well-structured with detailed comments in core pipelines — sui
 
 ## ✨ Core Features
 
-A **NapCat**-connected QQ Bot focused on group chat scenarios, with all capabilities deeply customized for group interactions.
+A **NapCat**-connected QQ Bot deeply customized for group chat scenarios, with full private chat support as well.
 
 ### 🧠 Deep LLM Chat Integration
 Fully self-implemented LLM chat pipeline with complete control from input processing to output response:
 - **Fully asynchronous & high concurrency**: The reply process is completely asynchronous, supporting key pool rotation, easily handling high-concurrency scenarios across multiple group chats.
-- **Self-controllable**: Supports function calling and **MCP (Model Context Protocol)** configuration.
+- **Self-controllable**: Supports function calling and **MCP (Model Context Protocol)** configuration. The model returns structured JSON decisions (`speak` / `update` / `silence`), and 18 built-in tools are available (web search, memory read/write, sandboxed Python/Shell execution, sub-agent, scheduled self-trigger, etc.), plus a `tool_search` tool for on-demand tool discovery.
 - **RAG Memory System**: Memory function based on RAG (Retrieval-Augmented Generation), supporting knowledge base Q&A, giving the bot "long-term memory".
+- **LaTeX formula rendering**: Formulas in replies (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`) are automatically rendered as images before sending, so discussing math in chat doesn't mean a wall of raw source code.
 - **High availability design**: Implements fallback API response mechanism. If the primary model responds with an error, it automatically downgrades to other configured models (may be slower but ensures responses).
 - **Human-like interaction**:
   - Naturally sends emojis/stickers.
@@ -95,6 +97,14 @@ Features a usable command mechanism. Trigger by mentioning the bot followed by `
 - **Argument parsing**: Supports `-` and `--` argument styles with built-in type validation.
 - **Permission management**: Built-in permission system supporting blacklisting and granting admin rights. Can validate User permissions at any processing stage to reject unauthorized execution.
 - **Auto-generated help**: Simply use decorators in code and add argument descriptions to automatically generate detailed `--help` prompts.
+
+### 🖥️ Web Admin Panel
+
+A web admin panel is launched on a separate port when the bot starts (`web_panel.enable` is on by default; port and login token are configured in `config.web_panel`, default port `5125`). Panel failures do not affect the bot's main service:
+
+- **Visual management**: Online config editing (model suppliers, MCP tools, etc.), database status, memory browsing, persona switching, log viewing, and more — all adapted for mobile browsers.
+- **Web chat**: A built-in chat page lets you talk to the bot directly in the browser, with multi-session management, streaming agent output, attachment uploads, and a dedicated `webui` tool preset (`default` loaded by default / `deferred` loaded on demand).
+- **Security**: `access_token` authentication with rate limiting on repeated failures to prevent brute-force attacks.
 
 ### 🛠️ Other Practical Features
 - **Plugin system**: Plugins under `atribot/plugins/` are auto-loaded at startup, supporting message/notice/request event subscriptions and pipeline middleware, with hot-reload.
@@ -171,6 +181,8 @@ Before starting, ensure to check the  `assets` folder:
 4.  Configure `config.json` (project basic settings).
 5.  **MCP Configuration**：Default path is `atribot\LLMchat\MCP\mcp_server.json`. Specific MCP tools can be toggled via `"active": false`.
 6.  Under root `document/`, you can add corresponding audio, emoji, and file configurations according to the project structure.
+7.  **Web admin panel**: `config.web_panel` controls the admin panel (`enable` on by default, `port` defaults to `5125`, `access_token` is the login token — make sure to change it after deployment).
+8.  **Path mapping**: When the bot and the protocol frontend (NapCat) run on different filesystems (e.g. bot in WSL, NapCat on Windows), configure a "local path prefix → frontend path prefix" mapping in `paths.path_mapping` (e.g. `"E:/": "/mnt/e/"`); `file://` paths are converted automatically when sending. Leave empty to disable.
 ### 4. Start the Project
 The project requires **Python 3.14**. Using `uv` for package management is recommended.
 
@@ -182,9 +194,10 @@ uv run main.py
 ```
 
 **Using pip:**
+Use `requirements-linux.txt` or `requirements-macos.txt` on Linux / macOS respectively.
 ```bash
-pip install -r requirements.txt
-python3 main.py
+pip install -r requirements-windows.txt
+python main.py
 ```
 > ⚠️ **Important**: Ensure you are in the project root directory when running these commands to avoid path errors.
 
@@ -279,7 +292,7 @@ ATRI-main/
 │  ├─C/                         # C extension modules (Levenshtein algorithm, etc.)
 │  ├─commands/                  # 💻 Group chat command implementations
 │  │  ├─audio/                  # Audio & TTS commands
-│  │  ├─bromidic/               # Images / Bilibili & miscellaneous commands
+│  │  ├─bromidic/               # Image processing / token query & miscellaneous commands
 │  │  ├─interior/               # Internal management & status commands
 │  │  └─test/                   # Experimental / test commands
 │  ├─common_utils/              # Common utility functions
@@ -303,7 +316,7 @@ ATRI-main/
 │  │  ├─RAG/                    # Retrieval-Augmented Generation logic
 │  │  ├─sandbox/                # Sandbox
 │  │  ├─skills/                 # Skills prompt modules
-│  │  └─tools/                  # Function calling toolset (17 tools)
+│  │  └─tools/                  # Function calling toolset (18 tools)
 │  ├─plugins/                   # 🔌 Plugin system
 │  │  ├─plugin.py               # Plugin base class (event / middleware decorators)
 │  │  ├─manager.py / loader.py  # Plugin manager & loader (hot-reload)
@@ -311,7 +324,12 @@ ATRI-main/
 │  │  ├─group_manager/          # Group management + keyword replies + join approval
 │  │  └─poke_reaction/          # Poke feedback
 │  ├─log/                       # Runtime logs (daily rotation, 7 days)
-│  └─web_panel/                 # Web admin panel (currently disabled)
+│  └─web_panel/                 # 🖥️ Web admin panel
+│     ├─panel_router.py         # Panel routing & static assets
+│     ├─deps.py                 # Auth / config shared dependencies
+│     ├─routes/                 # Backend endpoints (chat / config / database / memory / personas / ...)
+│     ├─templates/              # Page templates
+│     └─static/                 # Frontend assets (JS / CSS)
 ├─docker/                       # 🐳 Docker resources
 │  ├─db/                        # Database init scripts & images
 │  └─python/                    # Python container environment
@@ -354,6 +372,8 @@ EventBus (dispatch by PostType)
 ```
 
 Group chats are handled by `GroupChat`, private chats by `PrivateChat`. The command and chat routes are registered in `bot_framework._register_at_routes()`, and plugin handlers are auto-scanned and mounted by `PluginManager` at startup.
+
+Besides the message backbone, the `web_panel/` module runs a visual admin & chat panel on a separate port — panel failures never affect the bot's main service.
 
 ---
 
@@ -433,7 +453,7 @@ MemorySystem.extract_stored_group_message()
 | `domain` | Domain expertise | ~10 years |
 | `guideline` | Behavioral guidelines | ~10 years |
 
-**Hybrid Recall**: A single CTE-based SQL query performs both **vector retrieval** (pgvector cosine distance) and **full-text retrieval** (pgroonga), then fuses results via RRF (Reciprocal Rank Fusion), with final ranking by importance, access frequency, and time decay.
+**Hybrid Recall**: A single CTE-based SQL query performs both **vector retrieval** (pgvector cosine distance) and **full-text retrieval** (pgroonga), then fuses results via RRF (Reciprocal Rank Fusion), with final ranking by importance, access frequency, and time decay. Retrieval columns are indexed, keeping memory queries fast as data grows.
 
 ```
 Query text

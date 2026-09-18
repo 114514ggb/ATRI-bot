@@ -60,9 +60,6 @@ def find_formulas(text: str) -> list[FormulaMatch]:
     Returns:
         list[FormulaMatch]: 按出现位置排序的公式列表
     """
-    if "$" not in text and "\\" not in text:
-        return []
-
     matches: list[FormulaMatch] = []
 
     for pattern, display, need_hint in _FORMULA_PATTERNS:
@@ -120,12 +117,7 @@ class CodecogsRenderer:
     未来的浏览器渲染器实现同样的 render 接口即可在 MessageSender 中替换使用
     """
 
-    def __init__(
-        self,
-        url_template: str = DEFAULT_URL_TEMPLATE,
-        max_formula_length: int = DEFAULT_MAX_FORMULA_LENGTH,
-    ):
-        self.url_template = url_template
+    def __init__(self, max_formula_length: int = DEFAULT_MAX_FORMULA_LENGTH):
         self.max_formula_length = max_formula_length
 
     def render(self, match: FormulaMatch) -> str | None:
@@ -141,7 +133,7 @@ class CodecogsRenderer:
         if not content or len(content) > self.max_formula_length:
             return None
 
-        url = self.url_template + quote(content, safe="")
+        url = DEFAULT_URL_TEMPLATE + quote(content, safe="")
         return f"[CQ:image,file={escape_cq_param(url)}]"
 
 
@@ -152,10 +144,6 @@ class MessageSender(ServiceBase):
         self.emoji_core: EmojiCore = emoji_core
         self.formula_renderer = CodecogsRenderer()
         self.log = get_named_logger("MessageSender")
-
-    @classmethod
-    def factory(cls, emoji_core: EmojiCore) -> MessageSender:
-        return cls(emoji_core=emoji_core)
 
     def format_text(
         self,
@@ -173,9 +161,6 @@ class MessageSender(ServiceBase):
         Returns:
             str: 转换后的带有 CQ 码的字符串
         """
-        if not text:
-            return ""
-
         text = replace_formulas(text, self.formula_renderer.render)
         return self.emoji_core.parse_text_to_cqcode_with_emotion(
             text,
@@ -200,9 +185,6 @@ class MessageSender(ServiceBase):
         Returns:
             list[str]: 转换后的带有 CQ 码的列表，顺序与输入一致
         """
-        if not text_list:
-            return []
-
         rendered_list = [
             replace_formulas(text, self.formula_renderer.render)
             for text in text_list
@@ -251,12 +233,13 @@ class MessageSender(ServiceBase):
             dict | None: 最后一次发送的结果
         """
         cq_message = self.format_text(text, reply_id=reply_id)
-        return await self._send_single_with_fallback(
-            cq_message,
-            text,
+        results = await self._send_with_fallback(
+            [cq_message],
+            [text],
             send_func=lambda msg: send_client.send_group_msg(group_id, msg),
             reply_id=reply_id,
         )
+        return results[0]
 
     async def send_group_text_list(
         self,
@@ -278,9 +261,8 @@ class MessageSender(ServiceBase):
         Returns:
             list[dict | None]: 各条消息的发送结果列表
         """
-        cq_messages = self.format_text_list(text_list, reply_id=reply_id)
-        return await self._send_list_with_fallback(
-            cq_messages,
+        return await self._send_with_fallback(
+            self.format_text_list(text_list, reply_id=reply_id),
             text_list,
             send_func=lambda msg: send_client.send_group_msg(group_id, msg),
             reply_id=reply_id,
@@ -306,12 +288,13 @@ class MessageSender(ServiceBase):
             dict | None: 最后一次发送的结果
         """
         cq_message = self.format_text(text, reply_id=reply_id)
-        return await self._send_single_with_fallback(
-            cq_message,
-            text,
+        results = await self._send_with_fallback(
+            [cq_message],
+            [text],
             send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
             reply_id=reply_id,
         )
+        return results[0]
 
     async def send_private_text_list(
         self,
@@ -333,9 +316,8 @@ class MessageSender(ServiceBase):
         Returns:
             list[dict | None]: 各条消息的发送结果列表
         """
-        cq_messages = self.format_text_list(text_list, reply_id=reply_id)
-        return await self._send_list_with_fallback(
-            cq_messages,
+        return await self._send_with_fallback(
+            self.format_text_list(text_list, reply_id=reply_id),
             text_list,
             send_func=lambda msg: send_client.send_private_msg(user_id=user_id, message=msg),
             reply_id=reply_id,
@@ -343,7 +325,7 @@ class MessageSender(ServiceBase):
         )
 
 
-    async def _send_list_with_fallback(
+    async def _send_with_fallback(
         self,
         cq_messages: list[str],
         original_texts: list[str],
@@ -375,24 +357,3 @@ class MessageSender(ServiceBase):
             await asyncio.sleep(delay)
 
         return results
-
-    async def _send_single_with_fallback(
-        self,
-        cq_message: str,
-        original_text: str,
-        send_func: Callable[[str], object],
-        reply_id: str | int | None = None,
-    ) -> dict | None:
-        """单条发送，失败时用降级纯文本重试"""
-        result: dict = await send_func(cq_message)
-
-        if result and result.get("status") != "ok":
-            self.log.warning(
-                "消息发送失败(status=%s)，改用降级纯文本重发",
-                result.get("status"),
-            )
-            clean_text = self.fallback_text(original_text, reply_id=reply_id)
-            if clean_text:
-                result = await send_func(clean_text)
-
-        return result

@@ -16,10 +16,12 @@ import { mcpView } from './views/mcp.js';
 import { personasView } from './views/personas.js';
 import { logsView } from './views/logs.js';
 import { apiCallView } from './views/api-call.js';
+import { chatView } from './views/chat.js';
 
 /* ---------- 视图注册 ---------- */
 
 registerRoute('dashboard', dashboardView);
+registerRoute('chat', chatView);
 registerRoute('logs', logsView);
 registerRoute('groups', groupsView);
 registerRoute('users', usersView);

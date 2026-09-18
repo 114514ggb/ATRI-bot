@@ -275,6 +275,89 @@
   to { transform: scaleY(1); }
 }
 
+/* ---------- AI 聊天会话子列表：仅当「AI 聊天」导航项激活(进入聊天页)时展开 ---------- */
+
+.nav-sublist {
+  display: none;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 5px;
+  padding: 0 8px 0 30px;
+}
+
+.nav-item.active + .nav-sublist {
+  display: flex;
+  animation: nav-sub-in 0.26s var(--ease-out);
+}
+
+@keyframes nav-sub-in {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: none; }
+}
+
+.nav-sub-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 9px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--text-3);
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+}
+
+.nav-sub-item:hover { background: var(--bg-hover); color: var(--text-2); }
+
+.nav-sub-item.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-sub-name {
+  flex: none;
+  font-weight: inherit;
+}
+
+.nav-sub-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.75;
+}
+
+.nav-sub-del {
+  flex: none;
+  display: inline-flex;
+  border: none;
+  background: none;
+  padding: 3px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-caption);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.nav-sub-del svg { width: 13px; height: 13px; }
+
+.nav-sub-item:hover .nav-sub-del { opacity: 1; }
+.nav-sub-del:hover { color: var(--red); background: var(--red-soft); }
+
+.nav-sub-new {
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-3);
+  gap: 5px;
+}
+
+.nav-sub-new svg { width: 13px; height: 13px; }
+.nav-sub-new:hover { border-color: var(--accent); color: var(--accent); background: none; }
+
 .sidebar-footer {
   padding: 12px 16px;
   border-top: 1px solid var(--border);

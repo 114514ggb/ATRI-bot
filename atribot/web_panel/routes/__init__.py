@@ -4,7 +4,7 @@ all_routers 由 panel_router 聚合挂载到 /admin 前缀下，
 子模块内路由路径不带前缀（如 /api/status）。
 """
 
-from . import config, dashboard, data, database, memory, message, personas, system, tools
+from . import chat, config, dashboard, data, database, memory, message, personas, system, tools
 
 all_routers = [
     dashboard.router,
@@ -15,5 +15,6 @@ all_routers = [
     config.router,
     personas.router,
     message.router,
+    chat.router,
     system.router,
 ]

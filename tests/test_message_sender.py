@@ -5,6 +5,7 @@ from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.message_sender import (
     DEFAULT_URL_TEMPLATE,
     CodecogsRenderer,
+    FormulaMatch,
     MessageSender,
     find_formulas,
     replace_formulas,
@@ -70,13 +71,15 @@ def test_replace_keeps_original_when_render_returns_none():
 def test_render_rejects_overlong_formula():
     renderer = CodecogsRenderer(max_formula_length=5)
 
-    assert renderer.render(type("M", (), {"content": "a" * 6, "display": True})()) is None
+    overlong = FormulaMatch(content="a" * 6, display=True, start=0, end=6)
+    assert renderer.render(overlong) is None
 
 
 def test_render_rejects_blank_formula():
     renderer = CodecogsRenderer()
 
-    assert renderer.render(type("M", (), {"content": "   ", "display": False})()) is None
+    blank = FormulaMatch(content="   ", display=False, start=0, end=5)
+    assert renderer.render(blank) is None
 
 
 def test_multiple_formulas_in_one_text():

@@ -35,6 +35,7 @@
 - [✨ 项目核心功能](#-项目核心功能)
   - [🧠 深度 LLM 聊天集成](#-深度-llm-聊天集成)
   - [💻 类 Unix 命令系统](#-类-unix-命令系统)
+  - [🖥️ Web 管理面板](#-web-管理面板)
   - [🛠️ 其他实用功能](#-其他实用功能)
 - [🚀 快速开始 (How to Run)](#-快速开始-how-to-run)
   - [1. 前端连接 (NapCat)](#1-前端连接-napcat)
@@ -73,7 +74,7 @@
 
 ## ✨ 项目核心功能
 
-一个基于 **NapCat** 对接、专注于群聊场景的 QQ Bot，所有能力均围绕群聊深度定制
+一个基于 **NapCat** 对接的 QQ Bot，以群聊场景为核心深度定制
 
 ### 🧠 深度 LLM 聊天集成
 
@@ -81,13 +82,14 @@
 
 - **全异步高并发**：回复流程完全异步，支持多供应商 Key 池轮询，多群并发场景下也能稳定运行。
 - **结构化决策输出**：模型以 JSON 格式返回结构化决策（`speak` 回复 / `update` 更新画像 / `silence` 静默），工具调用通过 Function Calling 循环执行，行为完全可控且易于扩展。
-- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词；内置 17 个工具（网页搜索、记忆读写、沙盒执行 Python/Shell、子代理、定时自触发等）。
+- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词；内置 18 个工具（网页搜索、记忆读写、沙盒执行 Python/Shell、子代理、定时自触发、工具搜索发现等），并提供 `tool_search` 工具让模型按需发现和加载工具。
 - **两级记忆系统**：
   - *短期*：每个群 / 用户维护独立的滑动上下文窗口，超限时由 LLM 自动压缩摘要、无损续接。
   - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让 Bot 有个比较可靠的长期记忆。
   > 注：长期记忆聚焦于对话中的事件与偏好，不适用于存储长文档，对于聊天场景下已足够实用。
 - **用户画像**：为每位用户维护称呼、关系、性格、偏好等画像文档，嵌入每次对话上下文，保证跨会话态度一致。
 - **高可用降级**：主模型 API 出现异常时，自动按配置顺序切换到备用供应商和模型，保证有问必达。
+- **公式图片化输出**：回复中的 LaTeX 公式（`$...$`、`$$...$$`、`\(...\)`、`\[...\]`）会自动渲染成图片发送，在群里讨论数学公式不再是一串源码。
 - **拟人化交互**：
   - 自然发送表情包，支持分段回复模拟真实打字节奏。
   - 达到条件时主动融入群聊话题，而不只是被动等待 @。
@@ -100,6 +102,14 @@
 - **参数解析**：支持 `-` / `--` 参数风格，内置参数类型校验。
 - **权限管理**：内置多级权限系统，支持拉黑或授予管理员权限，可在任意处理环节拒绝非法调用。
 - **自动帮助文档**：通过装饰器声明参数描述后，`--help` 文档自动生成，无需手写。
+
+### 🖥️ Web 管理面板
+
+Bot 启动时会在独立端口拉起一个 Web 管理面板（`web_panel.enable` 默认开启，端口与登录口令见 `config.web_panel`，默认 `5125`），面板异常不会影响 Bot 主服务运行：
+
+- **可视化管理**：配置文件在线编辑（模型供应商、MCP 工具等）、数据库状态查看、记忆检索与浏览、人设切换、日志查看等页面，并已适配手机端浏览器。
+- **Web 在线聊天**：内置聊天页，可以直接在浏览器里与 Bot 对话，支持多会话管理、Agent 流式输出、附件上传
+- **安全防护**：`access_token` 登录校验，连续认证失败会触发限制，防止密码被暴力破解。
 
 ### 🛠️ 其他实用功能
 
@@ -196,12 +206,14 @@ docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 5.  **Skills 文件夹**：默认路径在 `atribot/LLMchat/skills/agent_skills`。
 6.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
 7.  **表情包**：在 `document/img/emojis` 文件夹下新建**文件名代表内部表情的文件夹**，放入对应名称的图片（支持 .jpg, .jpeg, .png, .gif），LLM 即可在聊天中自然发送。
+8.  **Web 管理面板**：`config.web_panel` 控制管理面板（`enable` 默认开启、`port` 默认 `5125`、`access_token` 为登录口令，建议部署后务必修改）。
+9.  **路径映射**：Bot 与协议端（NapCat）不在同一文件系统时（例如 Bot 跑在 WSL 而 NapCat 在 Windows），在 `paths.path_mapping` 中配置「本地路径前缀 → 协议端路径前缀」映射（如 `"E:/": "/mnt/e/"`），发送 `file://` 路径时会自动转换；留空则不做转换。
 
 
 ### 4. 启动项目
 项目依赖 **Python 3.14** 环境，推荐使用 `uv` 管理依赖。
 
-**使用 uv (推荐):**
+**使用 uv :**
 ```bash
 # 进入项目根目录
 uv sync
@@ -295,9 +307,10 @@ ATRI-main/
 ├─assets/                       # ⚙️ 配置文件与示例
 ├─atribot/                      # 核心代码
 │  ├─bot_framework.py           # Bot 初始化与服务装配入口
+│  ├─C/                         # C 扩展模块（Levenshtein 距离等）
 │  ├─commands/                  # 💻 群聊命令实现
 │  │  ├─audio/                  # 音频与 TTS 相关命令
-│  │  ├─bromidic/               # 图片 / B 站等杂项功能命令
+│  │  ├─bromidic/               # 图片处理 / Token 查询等杂项功能命令
 │  │  ├─interior/               # 内部管理与状态查询命令
 │  │  └─test/                   # 实验性 / 测试命令
 │  ├─common_utils/              # 通用工具函数
@@ -364,7 +377,7 @@ ATRI-main/
 │  │  │  ├─parser.py            # Markdown 解析
 │  │  │  ├─models.py            # 数据模型
 │  │  │  └─agent_skills/        # Skills 提示词文件
-│  │  └─tools/                  # 函数调用工具集（共 17 个）
+│  │  └─tools/                  # 函数调用工具集（共 18 个）
 │  │     ├─web_search/          # 网页搜索
 │  │     ├─web_extract/         # 网页内容提取
 │  │     ├─run_python_code/     # 沙盒 Python 执行
@@ -376,6 +389,7 @@ ATRI-main/
 │  │     ├─send_file / add_file  # 沙盒文件进出
 │  │     ├─schedule_self_trigger # 定时自触发
 │  │     ├─sub_agent/           # 子代理
+│  │     ├─tool_search/         # 工具搜索与发现
 │  │     ├─load_skill_prompt/   # Skills 提示词加载
 │  │     └─...                  # 其余工具
 │  ├─plugins/                   # 🔌 插件系统
@@ -385,7 +399,12 @@ ATRI-main/
 │  │  ├─group_manager/          # 群管理 + 关键词回复 + 加群审批
 │  │  └─poke_reaction/          # 戳一戳反馈
 │  ├─log/                       # 运行时日志（每日轮转，保留 7 天）
-│  └─web_panel/                 # Web 管理面板（当前未启用）
+│  └─web_panel/                 # 🖥️ Web 管理面板
+│     ├─panel_router.py         # 面板路由挂载与静态资源
+│     ├─deps.py                 # 鉴权 / 配置等共享依赖
+│     ├─routes/                 # 后端端点（chat / config / database / memory / personas / ...）
+│     ├─templates/              # 页面模板
+│     └─static/                 # 前端资源（JS / CSS）
 ├─docker/                       # 🐳 Docker 相关资源
 │  ├─db/                        # 数据库初始化脚本与镜像文件
 │  └─python/                    # Python 容器环境相关资源
@@ -438,6 +457,7 @@ EventBus (按 PostType 分发)
 | `MediaProcessor` | 多模态消息处理器，将图片 / 音频 / 视频统一转为文本供 LLM 理解 |
 | `agent/` 子 Agent 系统 | 用于委派复杂多步任务，支持上下文隔离与工具链编排 |
 | `PermissionsManagement` | 四级权限校验（黑名单 → 普通用户 → 管理员 → Root） |
+| `web_panel/` Web 管理面板 | 独立端口运行的可视化管理与在线聊天面板，异常不影响 Bot 主服务 |
 
 ---
 

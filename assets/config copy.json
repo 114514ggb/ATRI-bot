@@ -132,6 +132,23 @@
             "get_user_info", "memory_search",
             "web_search", "web_extract"
         ],
+        "webui": {
+            "default": [
+                "web_search",
+                "tool_search",
+                "memory_search",
+                "get_user_info"
+            ],
+            "deferred": [
+                "run_python_code",
+                "run_command", "web_extract",
+                "memory_storage",
+                "send_file","add_file",
+                "send_image_message","send_speech_message",
+                "sub_agent",
+                "schedule_self_trigger"
+            ]
+        },
         "使用全部工具": null
     },
     "group_white_list":[

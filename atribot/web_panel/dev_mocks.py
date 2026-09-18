@@ -9,10 +9,12 @@ import logging
 import random
 import re
 import time
+from types import SimpleNamespace
 
 from atribot.core.command.command_parsing import Command, CommandSystem, ParamType
 from atribot.core.platform.manager import PlatformManager
 from atribot.core.type.context_types import ToolSearchRequested
+from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import LocalTool, MCPTool
 
 
@@ -275,10 +277,14 @@ class _FakeCommandSystem(CommandSystem):
 
 class _MockToolset:
     def __init__(self, names):
+        self.name = None
         self._names = list(names)
 
     def names(self):
         return list(self._names)
+
+    def copy(self):
+        return _MockToolset(self._names)
 
 
 class _MockPresetManager:
@@ -287,9 +293,10 @@ class _MockPresetManager:
     def __init__(self):
         self.presets = {
             "group_chat": _MockToolset(["web_search", "tool_search"]),
+            "webui": _MockToolset(["web_search", "tool_search"]),
             "agency_Agent": _MockToolset([]),
         }
-        self.deferred = {"group_chat": ["run_python_code"]}
+        self.deferred = {"group_chat": ["run_python_code"], "webui": ["run_python_code"]}
 
 
 class _MockRegistry:
@@ -300,8 +307,40 @@ class _MockRegistry:
         return next((t for t in self.func_list if t.name == name), None)
 
 
-class _MockToolCalls:
-    """预置本地 + MCP 假工具，使 LLM 工具页在开发模式下可渲染与测试"""
+class _MockExecutor:
+    """串行执行 mock 工具的执行器替身，满足 SubAgentRunner 的 execute_batch 接口"""
+
+    @staticmethod
+    async def execute_batch(tool_calls, get_func, message_data):
+        results = []
+        for tc in tool_calls:
+            name = tc.get("function", {}).get("name", "")
+            try:
+                args = json.loads(tc.get("function", {}).get("arguments", "{}"))
+            except ValueError:
+                args = {}
+            tool = get_func(name)
+            error = None
+            try:
+                result = await tool.execute(message_data=None, **args) if tool else f"工具 {name} 不存在"
+            except Exception as exc:  # tool_search 抛出的发现请求等按错误路径回传
+                result, error = str(exc), exc
+            results.append(SimpleNamespace(
+                tool_name=name,
+                tool_call_id=tc.get("id", name),
+                is_error=error is not None,
+                result=result,
+                exception=error,
+            ))
+        return results
+
+
+class _MockToolCalls(ToolCalls):
+    """预置本地 + MCP 假工具，使 LLM 工具页在开发模式下可渲染与测试
+
+    继承真实 ToolCalls 仅为满足 SubAgentRunner 的 get_by_type(ToolCalls) 查找，
+    构造不走父类工厂流程。
+    """
 
     def __init__(self):
 
@@ -385,11 +424,126 @@ class _MockToolCalls:
         )
         self._preset_manager = _MockPresetManager()
 
+    @property
+    def presets(self):
+        return self._preset_manager.presets
+
+    @property
+    def executor(self):
+        return _MockExecutor()
+
+    def resolve_toolset(self, preset=None, names=None, chat_type=None):
+        if names is not None:
+            return _MockToolset(names)
+        toolset = self._preset_manager.presets.get(preset) if preset else None
+        return _MockToolset(toolset.names() if toolset else [])
+
+    def get_openai(self, toolset=None):
+        return []
+
+    def get_deferred_tools_prompt(self, preset, chat_type=None):
+        return ""
+
+    async def modify_preset_tools(self, preset_name, op, tools):
+        toolset = self._preset_manager.presets.get(preset_name)
+        if toolset is None:
+            raise ValueError(f"预设 '{preset_name}' 不存在")
+        for name in tools:
+            if op == "add" and name not in toolset._names and self._registry.get_func(name):
+                toolset._names.append(name)
+            elif op == "remove" and name in toolset._names:
+                toolset._names.remove(name)
+
     async def calls(self, tool_name: str, arguments_str: str, message_data=None):
         tool = self._registry.get_func(tool_name)
         if tool is None:
             raise Exception(f"Request function {tool_name} not found.")
         return await tool.execute(message_data=None, **json.loads(arguments_str))
+
+
+def make_memory_mock():
+    """MemorySystem 替身：AgentContext 压缩策略只做容器查找，跳过真实构造"""
+    from atribot.LLMchat.memory.memory_system import MemorySystem
+
+    class _MockMemorySystem(MemorySystem):
+        def __init__(self):
+            pass
+
+    return _MockMemorySystem()
+
+
+def make_media_processor_mock():
+    """MediaProcessor 替身：开发模式下多模态降级直接给固定文案"""
+    from atribot.LLMchat.media_processor import MediaProcessor
+
+    class _MockMediaProcessor(MediaProcessor):
+        def __init__(self):
+            pass
+
+        async def image_to_text(self, image_url, file_name=None):
+            return "（开发模式图片描述：一张演示用的图片）"
+
+        async def audio_to_text(self, audio_url):
+            return "（开发模式音频转写：示例语音内容）"
+
+        async def video_to_text(self, video_url):
+            return "（开发模式视频描述：示例视频内容）"
+
+    return _MockMediaProcessor()
+
+
+class _MockStreamingApi:
+    """假流式模型：奇数轮演示工具调用，偶数轮输出含公式/Markdown 的回答"""
+
+    _call_count = 0
+
+    async def client_post_stream(self, data):
+        _MockStreamingApi._call_count += 1
+        await asyncio.sleep(0.3)
+        if _MockStreamingApi._call_count % 2 == 1:
+            yield {"choices": [{"delta": {"reasoning_content": "用户在开发模式提问，我先调用一次搜索工具，演示工具调用块的展示…"}}]}
+            await asyncio.sleep(0.25)
+            yield {"choices": [{"delta": {"tool_calls": [
+                {"index": 0, "id": "call_dev_1", "type": "function",
+                 "function": {"name": "web_search", "arguments": "{\"query\": \"ATRI webui \u6f14\u793a\"}"}}
+            ]}}]}
+            yield {"choices": [{"delta": {}}], "usage": {"prompt_tokens": 120, "completion_tokens": 30, "total_tokens": 150}}
+        else:
+            for piece in [
+                "这是**开发模式**的模拟回复。\n\n",
+                "行内公式 $E=mc^2$ 与块级公式：$$\\int_0^1 x^2\\,dx = \\frac{1}{3}$$\n\n",
+                "- 列表项 A\n- 列表项 B\n\n",
+                "> 引用：来自 mock 模型的回答\n\n",
+                "```python\nprint('hello ATRI')\n```\n",
+            ]:
+                yield {"choices": [{"delta": {"content": piece}}]}
+                await asyncio.sleep(0.12)
+            yield {"choices": [{"delta": {}}], "usage": {"prompt_tokens": 200, "completion_tokens": 80, "total_tokens": 280}}
+
+
+def make_llm_supplier_mock():
+    """假供应商连接管理器（LLMConnectionManager 子类），覆盖聊天页与 SubAgentRunner 的最小接口"""
+    from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
+
+    class _MockLLMConnectionManager(LLMConnectionManager):
+        def __init__(self):
+            self.connections = {
+                "dev-supplier": SimpleNamespace(
+                    name="dev-supplier",
+                    base_url="http://localhost:9999/v1/chat/completions",
+                    api_key=["sk-dev-1"],
+                    model_dict={
+                        "dev-model": {"visual_sense": True, "audio_sense": False, "video_sense": False},
+                        "dev-model2": {},
+                    },
+                    connection_object=_MockStreamingApi(),
+                ),
+            }
+
+        def get_filtration_connection(self, supplier_name, model_name):
+            return [self.connections[supplier_name]] if supplier_name in self.connections else []
+
+    return _MockLLMConnectionManager()
 
 
 async def _fake_log_stream():
