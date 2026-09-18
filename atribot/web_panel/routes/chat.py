@@ -7,7 +7,8 @@ WebSocket 负责收发消息与逐事件转发 Agent 流式输出。
 
 import asyncio
 import secrets
-from typing import Any, Dict, List, Optional
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse
@@ -97,13 +98,8 @@ async def api_chat_upload(file: UploadFile, _: None = Depends(_auth)) -> Dict[st
     return {"status": "ok", "file": engine.attachment_brief(info)}
 
 
-@router.get("/api/chat/files/{file_id}")
-async def api_chat_file(
-    file_id: str,
-    request: Request,
-    token: str = "",
-) -> FileResponse:
-    """附件预览（img/audio/video 标签无法带 Header，令牌走 query 参数）"""
+async def _check_query_token(request: Request, token: str) -> None:
+    """img/audio/video 标签无法带 Header 的端点共用鉴权（令牌走 query 参数，带防爆破）"""
     expected = _access_token()
     if not expected:
         raise HTTPException(status_code=503, detail="未配置访问令牌")
@@ -121,22 +117,72 @@ async def api_chat_file(
         _register_auth_failure(ip)
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+
+@router.get("/api/chat/files/{file_id}")
+async def api_chat_file(
+    file_id: str,
+    request: Request,
+    token: str = "",
+) -> FileResponse:
+    """附件预览（img/audio/video 标签无法带 Header，令牌走 query 参数）"""
+    await _check_query_token(request, token)
     info = engine.get_attachment(file_id)
     if info is None:
         raise HTTPException(status_code=404, detail="附件不存在或已过期")
     return FileResponse(info["path"], media_type=info["mime"], filename=info["name"])
 
 
+_AVATAR_CANDIDATES = ("ATRI-bot.png", "ATRI-bot.jpg", "ATRI-bot.jpeg", "ATRI-bot.webp", "ATRI-bot.gif")
+_AVATAR_MEDIA = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
+
+
+def _find_bot_image() -> Optional[Path]:
+    """配置文件同级的 ATRI-bot 图（固定候选文件名，无路径穿越风险）"""
+    base = Path(_cfg().config_file_path).parent
+    for name in _AVATAR_CANDIDATES:
+        path = base / name
+        if path.is_file():
+            return path
+    return None
+
+
+@router.get("/api/chat/avatar")
+async def api_chat_avatar(request: Request, token: str = "") -> FileResponse:
+    """机器人头像：配置文件同级的 ATRI-bot 图（img 标签走 query 令牌；FileResponse 自带 ETag，换图自动失效）"""
+    await _check_query_token(request, token)
+    path = _find_bot_image()
+    if path is None:
+        raise HTTPException(status_code=404, detail="未找到头像图片（在配置目录下放置 ATRI-bot.png）")
+    return FileResponse(path, media_type=_AVATAR_MEDIA[path.suffix.lower()])
+
+
+@router.get("/api/panel/logo")
+async def api_panel_logo() -> FileResponse:
+    """面板品牌图：免鉴权——登录页与 favicon 在拿到令牌之前就要显示，
+    且仅读取配置目录下固定文件名的 ATRI-bot 图，泄露面只是头像本身。
+    FileResponse 自带 ETag，换图自动失效。"""
+    path = _find_bot_image()
+    if path is None:
+        raise HTTPException(status_code=404, detail="未找到品牌图片（在配置目录下放置 ATRI-bot.png）")
+    return FileResponse(path, media_type=_AVATAR_MEDIA[path.suffix.lower()])
+
+
 class ChatToolsBody(BaseModel):
     tools: List[str]
+    deferred: Optional[List[str]] = None
+    """待发现组目标名单；缺省表示不改动待发现组"""
 
 
 @router.post("/api/chat/tools")
 async def api_chat_tools_save(body: ChatToolsBody, _: None = Depends(_auth)) -> Dict[str, Any]:
-    """把当前勾选的工具保存为 webui 预设的默认工具集（持久化到 config.json）"""
+    """把当前勾选的工具保存为 webui 预设的默认组与待发现组（持久化到 config.json）
+
+    传全量目标名单：先同步待发现组（跨组移动的工具会自动从默认组移除），
+    再同步默认组。两组互斥由 ToolPresetManager 保证。
+    """
     tc = engine._tool_calls_service()
     if tc is None:
-        raise HTTPException(status_code=503, detail="工具系统不可用（bot 未启动或 ToolCalls 未注册）")
+        raise HTTPException(503, "工具系统不可用（bot 未启动或 ToolCalls 未注册）")
 
     toolset = tc.presets.get(engine.WEBUI_PRESET)
     if toolset is None:
@@ -144,9 +190,19 @@ async def api_chat_tools_save(body: ChatToolsBody, _: None = Depends(_auth)) -> 
             status_code=400,
             detail=f"工具预设 '{engine.WEBUI_PRESET}' 不存在，请先在 config.json 的 tool_presets 中添加",
         )
-    current = set(toolset.names())
-    target = set(body.tools)
+
+    target_deferred: Optional[Set[str]] = None
     try:
+        if body.deferred is not None:
+            target_deferred = set(body.deferred)
+            current_deferred = set((tc._preset_manager.deferred or {}).get(engine.WEBUI_PRESET, []))
+            for name in sorted(current_deferred - target_deferred):
+                await tc.modify_preset_tools(engine.WEBUI_PRESET, "remove", [name], group="deferred")
+            for name in sorted(target_deferred - current_deferred):
+                await tc.modify_preset_tools(engine.WEBUI_PRESET, "add", [name], group="deferred")
+
+        current = set(toolset.names())
+        target = set(body.tools)
         to_remove = current - target
         to_add = target - current
         if to_remove:
@@ -155,7 +211,12 @@ async def api_chat_tools_save(body: ChatToolsBody, _: None = Depends(_auth)) -> 
             await tc.modify_preset_tools(engine.WEBUI_PRESET, "add", sorted(to_add))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-    return {"status": "ok", "tools": sorted(target)}
+    return {
+        "status": "ok",
+        "tools": sorted(target),
+        "deferred": sorted(target_deferred) if target_deferred is not None
+        else sorted((tc._preset_manager.deferred or {}).get(engine.WEBUI_PRESET, [])),
+    }
 
 
 @router.get("/api/chat/sessions")

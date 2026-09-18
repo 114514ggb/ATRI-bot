@@ -1,12 +1,12 @@
 from atribot.core.atri_config import atriConfig
-from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
-from atribot.core.type.chat_message_types import FileMessageSegment
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
-from atribot.LLMchat.tools.run_python_code.run_code import run_python_code_with_segments
+from atribot.LLMchat.tools.run_python_code.run_code import (
+    collect_context_file_segments,
+    run_python_code_with_segments,
+)
 
-chat_manager: ChatManager = container.get("ChatManager")
 config:atriConfig = container.get("config")
 
 _MAX_OUTPUT_CHARS = 3000
@@ -40,34 +40,12 @@ tool_json = {
 async def main(code: str, message_data: atriMessageEvent, files: list[str] | None = None) -> str:
 
     file_segments = []
-    group_id = message_data.group_id
-
     if files:
-        remaining_files = set(files)
-
-        if group_id is not None:
-            context_messages = (await chat_manager.get_group_context(group_id)).messages
-        else:
-            context_messages = (await chat_manager.get_private_context(message_data.user_id)).messages
-
-        for message in list(context_messages):
-            for segment in message.segments:
-                if not isinstance(segment, FileMessageSegment):
-                    continue
-
-                if segment.file_name in remaining_files:
-                    file_segments.append(segment)
-                    remaining_files.remove(segment.file_name)
-
-                    if not remaining_files:
-                        break
-
-            if not remaining_files:
-                break
+        file_segments = await collect_context_file_segments(message_data, files)
 
     execution_result: ExecutionResult = await run_python_code_with_segments(
         code = code,
-        group_id = group_id,
+        group_id = message_data.group_id,
         user_id = message_data.user_id,
         file_segments = file_segments,
     )

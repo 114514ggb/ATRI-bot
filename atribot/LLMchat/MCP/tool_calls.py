@@ -368,7 +368,7 @@ class ToolPresetManager:
         self.log.info(f"工具预设共加载 {len(self.presets)} 个")
 
     async def modify_preset_tools(
-        self, preset_name: str, op: str, tools: List[str]
+        self, preset_name: str, op: str, tools: List[str], group: str = "default"
     ) -> None:
         """修改工具预设内的工具 (增/删)，并持久化到 config.json
 
@@ -376,9 +376,11 @@ class ToolPresetManager:
             preset_name: 预设组名称（不可新建）
             op: ``"add"`` 添加工具（自动去重），``"remove"`` 移除工具
             tools: 要操作的工具名称列表
+            group: ``"default"`` 默认启用组；``"deferred"`` 待发现组。
+                两组互斥：把工具加入任一组时会自动从另一组移除
 
         Raises:
-            ValueError: 预设名称不存在、操作类型不支持，或配置文件中找不到预设信息
+            ValueError: 预设名称不存在、操作类型/分组不支持，或配置文件中找不到预设信息
             RuntimeError: ToolPresetManager 未绑定 ToolRegistry
         """
         if self._registry is None:
@@ -389,18 +391,36 @@ class ToolPresetManager:
                 raise ValueError(f"预设 '{preset_name}' 不存在，禁止非法创建预设")
 
             toolset = self.presets[preset_name]
-            if op == "add":
-                for t in tools:
-                    func_tool = self._registry.get_func(t)
-                    if func_tool is not None:
-                        toolset.add_tool(func_tool)
-                    else:
-                        self.log.warning(f"工具 '{t}' 未在注册表中找到，无法添加")
-            elif op == "remove":
-                for t in tools:
-                    toolset.remove_tool(t)
+            deferred_names = self.deferred.setdefault(preset_name, [])
+            if group == "deferred":
+                if op == "add":
+                    for t in tools:
+                        if t not in deferred_names:
+                            deferred_names.append(t)
+                        toolset.remove_tool(t)  # 两组互斥
+                elif op == "remove":
+                    for t in tools:
+                        if t in deferred_names:
+                            deferred_names.remove(t)
+                else:
+                    raise ValueError(f"不支持的操作类型: {op}")
+            elif group == "default":
+                if op == "add":
+                    for t in tools:
+                        func_tool = self._registry.get_func(t)
+                        if func_tool is not None:
+                            toolset.add_tool(func_tool)
+                        else:
+                            self.log.warning(f"工具 '{t}' 未在注册表中找到，无法添加")
+                        if t in deferred_names:
+                            deferred_names.remove(t)  # 两组互斥
+                elif op == "remove":
+                    for t in tools:
+                        toolset.remove_tool(t)
+                else:
+                    raise ValueError(f"不支持的操作类型: {op}")
             else:
-                raise ValueError(f"不支持的操作类型: {op}")
+                raise ValueError(f"不支持的预设分组: {group}")
 
             config_path: Path = container.get("config").config_file_path
             with open(config_path, "r", encoding="utf-8") as f:
@@ -422,7 +442,8 @@ class ToolPresetManager:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
             self.log.info(
-                f"预设 '{preset_name}' 成功执行 {op} 操作，当前包含: {toolset.names()}"
+                f"预设 '{preset_name}' 成功执行 {op} 操作（{group} 组），"
+                f"当前默认: {toolset.names()}，待发现: {self.deferred.get(preset_name, [])}"
             )
 
     def get_preset(self, preset_name: str) -> ToolSetModel | None:
@@ -984,10 +1005,13 @@ class ToolCalls(ServiceBase):
         self._deferred_prompt_cache.clear()
 
     async def modify_preset_tools(
-        self, preset_name: str, op: str, tools: List[str]
+        self, preset_name: str, op: str, tools: List[str], group: str = "default"
     ) -> None:
-        """修改工具预设内的工具 (增/删)，并持久化到 config.json"""
-        await self._preset_manager.modify_preset_tools(preset_name, op, tools)
+        """修改工具预设内的工具 (增/删)，并持久化到 config.json
+
+        group 可选 ``"default"``（默认启用组）或 ``"deferred"``（待发现组），两组互斥。
+        """
+        await self._preset_manager.modify_preset_tools(preset_name, op, tools, group=group)
         self._schema_cache.build_tool_description_cache(self._registry.func_list)
 
     @property

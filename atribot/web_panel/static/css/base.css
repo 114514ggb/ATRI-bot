@@ -308,3 +308,32 @@ code, pre, .mono { font-family: var(--font-mono); }
   from { clip-path: circle(120% at 50% 50%); }
   to { clip-path: circle(0% at 50% 50%); }
 }
+
+/* ---------- 品牌磁贴与遮罩水流（装饰性循环动画） ---------- */
+/* 无限循环的纯装饰动效，不重声明降级关键帧，由 layout.css 在
+   prefers-reduced-motion 下整段关闭（同 views.css 的 chat-avatar-pulse 策略） */
+
+/* 磁贴液态渐变：渐变首尾同色闭环，background-position 往返平移出流动感 */
+@keyframes logo-liquid {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* 磁贴立绘悬浮：像浸在水中轻轻起伏 */
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* 磁贴流光：高光带从左侧滑入扫过，大部分时间停在场外待命 */
+@keyframes logo-shine {
+  0%, 55% { transform: translateX(-130%) skewX(-12deg); }
+  80%, 100% { transform: translateX(130%) skewX(-12deg); }
+}
+
+/* 登录/欢迎遮罩的水流光斑漂移（配合 alternate 往返，无跳变） */
+@keyframes water-drift {
+  0% { transform: translate3d(-4%, -3%, 0) scale(1); }
+  50% { transform: translate3d(3%, 2%, 0) scale(1.08); }
+  100% { transform: translate3d(4%, -2%, 0) scale(1.04); }
+}

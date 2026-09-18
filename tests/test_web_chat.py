@@ -1,9 +1,12 @@
 """WebUI 聊天（chat_engine 会话引擎）的单元测试
 
 覆盖：附件分类与限额、合成消息事件、上下文序列化往返（媒体降级为注记）、
-用户消息构建（直传/降级）、会话 id 分配与删除复用、展示时间线重建。
+用户消息构建（直传/降级）、会话 id 分配与删除复用、展示时间线重建、
+WebuiSendClient 文件投递与 file_resolver 注入。
 """
 
+import base64
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -72,6 +75,146 @@ async def test_webui_message_event_send_fails_without_platform():
     event = engine.WebuiMessageEvent(7)
     with pytest.raises(RuntimeError):
         await event.send(object())
+
+
+# ---------- WebUI 文件投递（WebuiSendClient） ----------
+
+def _register_session(session_id: int) -> "engine.ChatSession":
+    session = engine.ChatSession(session_id)
+    engine.registry.sessions[session_id] = session
+    return session
+
+
+@pytest.mark.asyncio
+async def test_webui_deliver_file_registers_attachment_and_broadcasts(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "upload_dir", lambda: tmp_path)
+    session = _register_session(3)
+    queue = session.subscribe()
+    event = engine.WebuiMessageEvent(3)
+    try:
+        result = await event.deliver_file(
+            "base64://" + base64.b64encode(b"hello").decode(),
+            name="note.txt",
+            local_Path_type=False,
+        )
+        assert result["name"] == "note.txt"
+        info = engine.get_attachment(result["file_id"])
+        assert info["size"] == 5
+
+        msg = queue.get_nowait()
+        assert msg["type"] == "attachment"
+        assert msg["file"]["name"] == "note.txt"
+        assert msg["file"]["url"].startswith("/admin/api/chat/files/")
+        assert session.pending_files == [msg["file"]]
+    finally:
+        engine.registry.sessions.pop(3, None)
+        engine._attachments.clear()
+
+
+@pytest.mark.asyncio
+async def test_webui_deliver_image_sniffs_extension(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "upload_dir", lambda: tmp_path)
+    _register_session(4)
+    event = engine.WebuiMessageEvent(4)
+    raw = tmp_path / "rawfile"
+    raw.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 16)
+    try:
+        result = await event.deliver_image(str(raw), local_Path_type=True)
+        assert result["name"].endswith(".png")
+        assert engine.get_attachment(result["file_id"])["kind"] == "image"
+    finally:
+        engine.registry.sessions.pop(4, None)
+        engine._attachments.clear()
+
+
+@pytest.mark.asyncio
+async def test_webui_deliver_merge_text_broadcasts(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "upload_dir", lambda: tmp_path)
+    session = _register_session(5)
+    queue = session.subscribe()
+    event = engine.WebuiMessageEvent(5)
+    try:
+        await event.deliver_merge_text("print(1)", source="执行的代码")
+        msg = queue.get_nowait()
+        assert msg["type"] == "merge_text"
+        assert msg["source"] == "执行的代码"
+        assert msg["message"] == "print(1)"
+    finally:
+        engine.registry.sessions.pop(5, None)
+
+
+@pytest.mark.asyncio
+async def test_webui_send_client_raises_when_session_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "upload_dir", lambda: tmp_path)
+    event = engine.WebuiMessageEvent(999)  # 未注册的会话 id
+    with pytest.raises(RuntimeError):
+        await event.deliver_file(
+            "base64://" + base64.b64encode(b"x").decode(),
+            name="a.txt",
+            local_Path_type=False,
+        )
+
+
+@pytest.mark.asyncio
+async def test_webui_send_client_rejects_oversized_image(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "upload_dir", lambda: tmp_path)
+    _register_session(6)
+    event = engine.WebuiMessageEvent(6)
+    big = b"\x89PNG\r\n\x1a\n" + b"0" * (engine.IMAGE_LIMIT + 1)
+    try:
+        with pytest.raises(RuntimeError):
+            await event.deliver_image(
+                "base64://" + base64.b64encode(big).decode(), local_Path_type=False
+            )
+    finally:
+        engine.registry.sessions.pop(6, None)
+        engine._attachments.clear()
+
+
+# ---------- file_resolver 注入（webui 附件 → 工具可引用） ----------
+
+def test_webui_event_injects_file_resolver(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "upload_dir", lambda: tmp_path)
+    engine.save_attachment("data.csv", "text/csv", b"a,b\n1,2")
+    try:
+        event = engine.WebuiMessageEvent(9)
+        resolver = event.get_extra("file_resolver")
+        assert callable(resolver)
+
+        segments = resolver(["data.csv", "missing.txt"])
+        assert [s.file_name for s in segments] == ["data.csv"]
+        assert Path(segments[0].url).is_file()
+    finally:
+        engine._attachments.clear()
+
+
+@pytest.mark.asyncio
+async def test_collect_context_file_segments_prefers_injected_resolver(tmp_path, monkeypatch):
+    monkeypatch.setattr(engine, "upload_dir", lambda: tmp_path)
+    engine.save_attachment("x.txt", "text/plain", b"X")
+
+    class _FakeSandBox:
+        pass
+
+    class _FakeConfig:
+        pass
+
+    # run_code 及其 import 链在模块级取 SandBox/config 服务，测试环境给替身
+    registered: list[str] = []
+    for name, fake in (("SandBox", _FakeSandBox()), ("config", _FakeConfig())):
+        if not container.exists(name):
+            container.register(name, fake)
+            registered.append(name)
+    from atribot.LLMchat.tools.run_python_code.run_code import collect_context_file_segments
+
+    try:
+        event = engine.WebuiMessageEvent(11)
+        segments = await collect_context_file_segments(event, ["x.txt", "y.txt"])
+        assert [s.file_name for s in segments] == ["x.txt"]
+    finally:
+        engine._attachments.clear()
+        for name in registered:
+            container.unregister(name)
 
 
 # ---------- 上下文序列化 ----------
@@ -352,3 +495,88 @@ async def test_list_overview_includes_title(monkeypatch):
     assert len(items) == 1
     assert items[0]["id"] == 2
     assert items[0]["title"] == "帮我查一下明天 的天气"
+
+
+# ---------- 头像端点 ----------
+
+def _avatar_env(tmp_path, monkeypatch, with_image=True):
+    """把 chat 路由的鉴权/配置依赖换成替身，config 指向临时目录"""
+    from atribot.web_panel.routes import chat as chat_routes
+
+    if with_image:
+        (tmp_path / "ATRI-bot.png").write_bytes(b"\x89PNG\r\n\x1a\nfake")
+    monkeypatch.setattr(chat_routes, "_access_token", lambda: "t0k")
+    monkeypatch.setattr(chat_routes, "_auth_rate_limited", lambda ip: None)
+    monkeypatch.setattr(chat_routes, "_register_auth_failure", lambda ip: None)
+    monkeypatch.setattr(chat_routes, "_clear_auth_failures", lambda ip: None)
+    monkeypatch.setattr(chat_routes, "_cfg", lambda: SimpleNamespace(config_file_path=str(tmp_path / "config.json")))
+    return chat_routes
+
+
+@pytest.mark.asyncio
+async def test_avatar_serves_image_beside_config(tmp_path, monkeypatch):
+    routes = _avatar_env(tmp_path, monkeypatch)
+    request = SimpleNamespace(client=SimpleNamespace(host="127.0.0.1"))
+
+    resp = await routes.api_chat_avatar(request, token="t0k")
+
+    assert resp.media_type == "image/png"
+    assert Path(resp.path).read_bytes() == b"\x89PNG\r\n\x1a\nfake"
+
+
+@pytest.mark.asyncio
+async def test_avatar_404_when_no_image(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+
+    routes = _avatar_env(tmp_path, monkeypatch, with_image=False)
+    request = SimpleNamespace(client=SimpleNamespace(host="127.0.0.1"))
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.api_chat_avatar(request, token="t0k")
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_avatar_rejects_bad_token(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+
+    routes = _avatar_env(tmp_path, monkeypatch)
+    request = SimpleNamespace(client=SimpleNamespace(host="127.0.0.1"))
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.api_chat_avatar(request, token="wrong")
+    assert exc.value.status_code == 401
+
+
+# ---------- 面板品牌图端点（免鉴权，登录页/favicon 用） ----------
+
+@pytest.mark.asyncio
+async def test_panel_logo_serves_image_without_token(tmp_path, monkeypatch):
+    routes = _avatar_env(tmp_path, monkeypatch)
+
+    resp = await routes.api_panel_logo()
+
+    assert resp.media_type == "image/png"
+    assert Path(resp.path).read_bytes() == b"\x89PNG\r\n\x1a\nfake"
+
+
+@pytest.mark.asyncio
+async def test_panel_logo_404_when_no_image(tmp_path, monkeypatch):
+    from fastapi import HTTPException
+
+    routes = _avatar_env(tmp_path, monkeypatch, with_image=False)
+
+    with pytest.raises(HTTPException) as exc:
+        await routes.api_panel_logo()
+    assert exc.value.status_code == 404
+
+
+# ---------- 时间线时间戳 ----------
+
+def test_append_user_timeline_returns_and_stores_ts():
+    session = engine.ChatSession(1)
+
+    ts = session.append_user_timeline("几点了", [], "n1")
+
+    assert isinstance(ts, float) and ts > 0
+    assert session.timeline[-1]["ts"] == ts

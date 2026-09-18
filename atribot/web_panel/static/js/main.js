@@ -1,7 +1,7 @@
 /* 面板入口：登录 / 路由注册 / 顶栏与系统菜单 */
 
 import { api, getToken, setToken, onUnauthorized } from './api.js';
-import { icon, toast, initTheme, toggleTheme, confirmDialog, initSelectMenus } from './ui.js';
+import { icon, toast, initTheme, toggleTheme, confirmDialog, initSelectMenus, mountLogoImage, upgradeFavicon } from './ui.js';
 import { registerRoute, startRouter } from './router.js';
 import { restartAndWait } from './components/editor-kit.js';
 
@@ -138,6 +138,7 @@ function showApp() {
       <h1 class="welcome-title">欢迎回来</h1>
       <p class="welcome-sub">ATRI 管理控制台</p>`;
     document.body.appendChild(welcome);
+    mountLogoImage(welcome.querySelector('.welcome-logo'));
 
     setTimeout(() => {
       welcome.classList.add('iris-out');
@@ -289,6 +290,11 @@ function bindChrome() {
 initTheme();
 bindChrome();
 initSelectMenus();
+
+/* 品牌位：配置目录有 ATRI-bot 图则替换字母 A（失败保留兜底） */
+mountLogoImage(document.querySelector('.login-logo'));
+mountLogoImage(document.querySelector('.brand-badge'));
+upgradeFavicon();
 
 if (getToken()) {
   document.getElementById('access-token').value = getToken();

@@ -14,6 +14,7 @@
 import asyncio
 import json
 import logging
+import mimetypes
 import secrets
 import time
 from datetime import datetime
@@ -21,10 +22,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional, Set, Union
 
+from atribot.common_utils.file.file_utils import resolve_file_to_bytes
 from atribot.common_utils.file.image_utils import url_to_image_jpeg
 from atribot.common_utils.file.media_utils import url_to_audio_mp3, url_to_video_mp4
+from atribot.core.platform.send_client import SendClientBase
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
+from atribot.core.type.chat_message_types import FileSegment as PlatformFileSegment
 from atribot.LLMchat.agent.context.context import AgentContext
 from atribot.LLMchat.agent.message import (
     AssistantMessage,
@@ -162,38 +166,197 @@ def attachment_brief(info: Dict[str, Any]) -> Dict[str, Any]:
 
 # ---------- 合成消息事件 ----------
 
-class _NullSendClient:
-    """无可用的平台适配器时的占位发送客户端：调用即抛出可读错误"""
+_MAGIC_EXT_SNIPPETS: tuple[tuple[bytes, str], ...] = (
+    (b"\x89PNG\r\n\x1a\n", ".png"),
+    (b"\xff\xd8\xff", ".jpg"),
+    (b"GIF87a", ".gif"),
+    (b"GIF89a", ".gif"),
+    (b"fLaC", ".flac"),
+    (b"OggS", ".ogg"),
+    (b"ID3", ".mp3"),
+)
 
-    def __getattr__(self, item: str):
-        async def _fail(*args, **kwargs):
-            raise RuntimeError("WebUI 会话没有可用的平台发送客户端（平台适配器未连接）")
 
-        return _fail
+def _sniff_ext(data: bytes) -> str:
+    """按文件头魔数猜测扩展名（WebP/WAV/MP3 帧头需按偏移判断）"""
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return ".webp"
+    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
+        return ".wav"
+    if len(data) >= 2 and data[0] == 0xFF and (data[1] & 0xE0) == 0xE0:
+        return ".mp3"
+    for magic, ext in _MAGIC_EXT_SNIPPETS:
+        if data.startswith(magic):
+            return ext
+    return ".bin"
 
 
-def _resolve_send_client():
-    """尽力取第一个平台适配器的发送客户端，让 send_file 等工具可以真实发送"""
-    try:
-        from atribot.core.platform.manager import PlatformManager
+class WebuiSendClient(SendClientBase):
+    """WebUI 会话的发送客户端：出站媒体落盘为会话附件并广播到 WebSocket
 
-        manager = container.get_by_type(PlatformManager)
-        for adapter in getattr(manager, "_adapters", {}).values():
-            getter = getattr(adapter, "get_client", None)
-            if callable(getter):
-                client = getter()
-                if client is not None:
-                    return client
-    except Exception:
-        pass
-    return _NullSendClient()
+    工具经 message_data.deliver_*（基类按群/私分流后进入 personal 系列）触达这里；
+    文件复用聊天附件仓库（document/temp/webui_chat，24h 过期），
+    前端凭 /api/chat/files/{id} 预览下载。发送文本类内容以 WebSocket 消息呈现。
+    """
+
+    def __init__(self, session_id: int) -> None:
+        self.session_id = session_id
+
+    def _session(self) -> "ChatSession":
+        session = registry.get(self.session_id)
+        if session is None:
+            raise RuntimeError(f"WebUI 会话 #{self.session_id} 已不存在")
+        return session
+
+    # -- SendClientBase 抽象方法 --
+
+    async def send(self, message) -> Optional[dict]:
+        raise RuntimeError("WebUI 会话不支持 SendMessage 直发，请使用 deliver_* 系列")
+
+    async def async_send(self, action: str, params: dict) -> Optional[dict]:
+        raise RuntimeError(f"WebUI 会话不支持平台 API 调用: {action}")
+
+    async def send_group_msg(self, group_id: int, message: str | list) -> Optional[dict]:
+        raise RuntimeError("WebUI 会话不存在群聊目标")
+
+    async def send_private_msg(
+        self,
+        user_id: int,
+        message: str | list,
+        auto_escape: bool = False,
+    ) -> Optional[dict]:
+        session = self._session()
+        session.broadcast({"type": "assistant_note", "text": str(message)})
+        return None
+
+    async def close(self) -> None:
+        return None
+
+    # -- 富媒体投递 --
+
+    async def _deliver_attachment(
+        self,
+        url: str,
+        name: Optional[str],
+        fallback_stem: str,
+    ) -> Optional[dict]:
+        """解析载荷（base64/本地路径/URL）→ 落盘附件 → 广播卡片，返回投递摘要"""
+        session = self._session()
+        try:
+            resolved_name, data = await resolve_file_to_bytes(
+                url, name or fallback_stem, max_bytes=FILE_LIMIT
+            )
+        except Exception as e:
+            raise RuntimeError(f"文件载荷解析失败: {e}") from e
+        if not Path(resolved_name).suffix:
+            resolved_name += _sniff_ext(data)
+
+        kind = classify_file(resolved_name)
+        limit = size_limit_for(kind)
+        if len(data) > limit:
+            raise RuntimeError(
+                f"文件超过 WebUI {kind} 附件限额 {limit // (1024 * 1024)}MB: {resolved_name}"
+            )
+
+        mime = mimetypes.guess_type(resolved_name)[0] or ""
+        info = save_attachment(resolved_name, mime, data)
+        brief = attachment_brief(info)
+        session.pending_files.append(brief)
+        session.broadcast({"type": "attachment", "file": brief})
+        return {"file_id": info["id"], "name": resolved_name}
+
+    async def send_personal_pictures(
+        self,
+        qq_id: int,
+        url_img: str = "",
+        default: bool = False,
+        local_Path_type: bool = False,
+    ) -> Optional[dict]:
+        return await self._deliver_attachment(url_img, None, "image.png")
+
+    async def send_personal_audio(
+        self,
+        qq_id: int,
+        url_audio: str = "",
+        default: bool = False,
+        local_Path_type: bool = False,
+    ) -> Optional[dict]:
+        return await self._deliver_attachment(url_audio, None, "audio.mp3")
+
+    async def send_personal_file(
+        self,
+        qq_id: int,
+        url_file: str = "",
+        name: str | None = None,
+        default: bool = False,
+        local_Path_type: bool = True,
+    ) -> Optional[dict]:
+        return await self._deliver_attachment(url_file, name, "file.bin")
+
+    async def send_private_merge_text(
+        self,
+        qq_id: int,
+        message: str,
+        source: str = "ATRI",
+        preview: str = "ATRI:点击查看消息",
+        user_id: int = 3889393615,
+        nickname: str = "ATRI-亚托莉",
+    ) -> Optional[dict]:
+        session = self._session()
+        session.broadcast({"type": "merge_text", "source": source, "message": message})
+        return None
+
+    async def send_personal_music(
+        self,
+        qq_id: int,
+        type: str,
+        id: str | None = None,
+        url: str | None = None,
+        image: str | None = None,
+        singer: str | None = None,
+        title: str | None = None,
+        content: str | None = None,
+    ) -> Optional[dict]:
+        session = self._session()
+        parts = [f"分享音乐[{type}]", title or id or url or ""]
+        if singer:
+            parts.append(f"歌手: {singer}")
+        if url:
+            parts.append(url)
+        session.broadcast({"type": "assistant_note", "text": " · ".join(p for p in parts if p)})
+        return None
+
+
+def _attachment_file_resolver():
+    """构造按文件名检索 WebUI 附件注册表的查找器
+
+    注入到事件 extra（"file_resolver"）供 add_file / run_python_code 等工具消费：
+    工具只感知"是否注入了查找器"，不感知 webui 平台本身。
+    """
+
+    def resolve(names: List[str]) -> List[PlatformFileSegment]:
+        remaining = set(names or [])
+        found: List[PlatformFileSegment] = []
+        for info in _attachments.values():
+            if info["name"] in remaining:
+                remaining.discard(info["name"])
+                found.append(PlatformFileSegment.from_local_path(
+                    info["path"],
+                    file_name=info["name"],
+                    url=info["path"],
+                    file_size=info["size"],
+                ))
+        return found
+
+    return resolve
 
 
 class WebuiMessageEvent(atriMessageEvent):
     """WebUI 会话的合成私聊消息信封：user_id=会话id、chat_scope=private
 
     真实事件由平台适配器构造，这里用最小事件桩提供 time/user_id/group_id 等字段，
-    使 SubAgentRunner 与依赖 message_data 的工具按私聊语义工作。
+    使 SubAgentRunner 与依赖 message_data 的工具按私聊语义工作；
+    发送客户端为 WebuiSendClient（出站媒体投递回本会话的 WebSocket）。
     """
 
     def __init__(self, user_id: int) -> None:
@@ -204,7 +367,8 @@ class WebuiMessageEvent(atriMessageEvent):
             is_at=False,
             message_id=None,
         )
-        super().__init__(stub, send_client=_resolve_send_client(), source="webui")
+        super().__init__(stub, send_client=WebuiSendClient(user_id), source="webui")
+        self.set_extra("file_resolver", _attachment_file_resolver())
 
 
 # ---------- 服务解析（惰性，保持面板可在不完整运行时安全导入） ----------
@@ -462,6 +626,8 @@ class ChatSession:
         """展示用历史（用户消息 / 每轮助手汇总），刷新与跨标签页恢复用"""
         self.task: Optional[asyncio.Task] = None
         self.listeners: Set[asyncio.Queue] = set()
+        self.pending_files: List[Dict[str, Any]] = []
+        """本轮工具投递的附件摘要（WebuiSendClient 写入，回合收尾并入时间线后清空）"""
         self.updated_at = time.time()
 
     # -- 订阅广播 --
@@ -486,8 +652,11 @@ class ChatSession:
     def touch(self) -> None:
         self.updated_at = time.time()
 
-    def append_user_timeline(self, text: str, files: List[Dict[str, Any]], nonce: str = "") -> None:
-        self.timeline.append({"type": "user", "text": text, "files": files, "nonce": nonce})
+    def append_user_timeline(self, text: str, files: List[Dict[str, Any]], nonce: str = "") -> float:
+        """入时间线并返回时间戳（秒），供 user_message 广播复用同一时钟"""
+        ts = time.time()
+        self.timeline.append({"type": "user", "text": text, "files": files, "nonce": nonce, "ts": ts})
+        return ts
 
     def append_assistant_timeline(self, summary: Dict[str, Any]) -> None:
         self.timeline.append({"type": "assistant", **summary})
@@ -680,6 +849,8 @@ def build_system_prompt(session: ChatSession) -> str:
     environment = (
         f"现在的时间是:{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n"
         f"对话以一对一私聊形式进行，会话用户user_id为{session.id}。"
+        "当前为WebUI网页聊天环境:你通过工具发给用户的文件/图片会以可下载的附件卡片呈现,"
+        "用户上传过的文件可通过add_file或run_python_code的files参数按文件名引用。"
     )
     prompt = f"{persona}\n\n{environment}".strip() if persona else environment
     tc = _tool_calls_service()
@@ -859,12 +1030,13 @@ async def _run_turn(
     # 用户消息入上下文（附件按模型能力降级/直传）
     content = await build_user_content(text, file_infos, model_capabilities(supplier, model))
     session.context.add_user_message(content)
-    session.append_user_timeline(text, file_briefs, nonce)
+    user_ts = session.append_user_timeline(text, file_briefs, nonce)
     session.broadcast({
         "type": "user_message",
         "nonce": nonce,
         "text": text,
         "files": file_briefs,
+        "ts": user_ts,
     })
 
     try:
@@ -889,6 +1061,7 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
     session.touch()
     session.last_settings = settings
     _apply_persona_settings(session, settings)
+    turn_started = time.monotonic()
 
     supplier = settings.get("supplier") or ""
     model = settings.get("model") or ""
@@ -960,11 +1133,15 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
             session.append_assistant_timeline({
                 "text": total_text,
                 "tools": tools_summary,
+                "files": list(session.pending_files),
                 "usage": None,
+                "duration": round(time.monotonic() - turn_started, 1),
                 "finish_reason": "stopped",
+                "ts": time.time(),
             })
+            session.pending_files.clear()
             try:
-                await _finish(session, "stopped")
+                await _finish(session, "stopped", round(time.monotonic() - turn_started, 1))
             except asyncio.CancelledError:
                 pass
             raise
@@ -973,13 +1150,18 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
             finish_reason = "error"
             _broadcast_error(session, str(e), type(e).__name__)
 
+        duration = round(time.monotonic() - turn_started, 1)
         session.append_assistant_timeline({
             "text": total_text,
             "tools": tools_summary,
+            "files": list(session.pending_files),
             "usage": total_usage,
+            "duration": duration,
             "finish_reason": finish_reason,
+            "ts": time.time(),
         })
-        await _finish(session, finish_reason)
+        session.pending_files.clear()
+        await _finish(session, finish_reason, duration)
     except Exception as e:
         # 兜底：循环之外的未预期异常（AgentData 构造等）也通知前端并正常收尾；
         # CancelledError 继承自 BaseException，不会被这里吞掉
@@ -988,8 +1170,13 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
         await _finish(session, "error")
 
 
-async def _finish(session: ChatSession, finish_reason: str) -> None:
+async def _finish(session: ChatSession, finish_reason: str, duration: Optional[float] = None) -> None:
     try:
         await db_save(session)
     finally:
-        session.broadcast({"type": "done", "finish_reason": finish_reason})
+        session.broadcast({
+            "type": "done",
+            "finish_reason": finish_reason,
+            "duration": duration,
+            "ts": time.time(),
+        })

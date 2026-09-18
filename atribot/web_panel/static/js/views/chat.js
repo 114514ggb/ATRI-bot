@@ -25,6 +25,8 @@ let activeTurn = null;
 let generating = false;
 let currentSession = null;
 let lastNonce = '';
+let lastUserMeta = null;
+/* 最近一条用户消息的定位信息（um_index + 原文），供助手回合的重试按钮回退引用 */
 
 let info = { defaults: {}, webui_preset: {}, limits: {} };
 let suppliers = [];
@@ -203,6 +205,57 @@ function el(tag, cls, html = '') {
   return node;
 }
 
+/* ---------- 头像与时间戳 ---------- */
+
+function avatarUrl() {
+  return `/admin/api/chat/avatar?token=${encodeURIComponent(getToken() || '')}`;
+}
+
+/* 机器人头像：配置目录下的 ATRI-bot 图，加载失败（未配令牌/无图）回退字母 A */
+function makeBotAvatar() {
+  const wrap = el('div', 'chat-avatar bot-avatar');
+  const img = document.createElement('img');
+  img.className = 'chat-avatar-img';
+  img.alt = 'ATRI';
+  img.addEventListener('error', () => { img.remove(); wrap.textContent = 'A'; });
+  img.src = avatarUrl();
+  wrap.appendChild(img);
+  return wrap;
+}
+
+/* 空状态立绘：加载成功后替换容器内的字母 A */
+function mountEmptyLogo() {
+  const holder = sectionEl?.querySelector('#chat-empty-logo');
+  if (!holder || holder.querySelector('img')) return;
+  const img = document.createElement('img');
+  img.alt = 'ATRI';
+  img.addEventListener('load', () => { holder.textContent = ''; holder.appendChild(img); });
+  img.addEventListener('error', () => { /* 保留字母 A 兜底 */ });
+  img.src = avatarUrl();
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+/* 秒级时间戳 → 当天 HH:MM，跨天 MM-DD HH:MM；未知(0)返回空串 */
+function fmtTs(ts) {
+  if (!Number.isFinite(ts) || ts <= 0) return '';
+  const d = new Date(ts * 1000);
+  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  const now = new Date();
+  if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) return hm;
+  return `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${hm}`;
+}
+
+/* 消息时间戳徽标（放 hover 操作行），title 给完整时间；未知时间不显示 */
+function timeBadge(ts) {
+  const short = fmtTs(ts);
+  if (!short) return null;
+  const d = new Date(ts * 1000);
+  const span = el('span', 'chat-time', short);
+  span.title = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  return span;
+}
+
 function userAtBottom() {
   const box = messagesEl;
   return box.scrollHeight - box.scrollTop - box.clientHeight < 90;
@@ -217,20 +270,64 @@ function scrollToBottom(force = false) {
 function attachmentHtml(file) {
   const url = `${file.url}?token=${encodeURIComponent(getToken())}`;
   const name = escapeHtml(file.name || file.id);
-  if (file.kind === 'image') return `<img class="chat-attach-img" src="${url}" alt="${name}" loading="lazy">`;
+  if (file.kind === 'image') {
+    return `<a class="chat-attach-img-link" href="${url}" target="_blank" rel="noopener" title="查看/下载原图：${name}"><img class="chat-attach-img" src="${url}" alt="${name}" loading="lazy"></a>`;
+  }
   if (file.kind === 'audio') return `<audio class="chat-attach-audio" controls preload="none" src="${url}"></audio>`;
   if (file.kind === 'video') return `<video class="chat-attach-video" controls preload="metadata" src="${url}"></video>`;
-  return `<span class="chat-attach-file">${icon('file')} ${name} <span class="muted small">(${Math.ceil((file.size || 0) / 1024)} KB)</span></span>`;
+  return `<a class="chat-attach-file" href="${url}" download="${name}" title="下载：${name}">${icon('file')} ${name} <span class="muted small">(${Math.ceil((file.size || 0) / 1024)} KB)</span></a>`;
 }
 
-function appendUserMessage(text, files = [], nonce = '') {
+/* 工具投递的附件卡片：进当前助手回合，无活跃回合时兜底开一个并立即收尾 */
+function appendDeliveredFiles(files) {
+  const append = (turn) => {
+    for (const file of files || []) {
+      turn.bubble.insertBefore(el('div', 'chat-attach', attachmentHtml(file)), turn.status);
+    }
+  };
+  if (activeTurn && !activeTurn.done) { append(activeTurn); }
+  else { beginAssistantTurn(lastUserMeta || {}); setGenerating(true); append(activeTurn); finishTurn('completed'); }
+  scrollToBottom();
+}
+
+/* 合并转发文本（如 run_python_code 回传的代码与输出）：折叠块 */
+function appendMergeText(source, message) {
+  const append = (turn) => {
+    const block = makeCollapsible(`<span class="chat-block-name">${escapeHtml(source || '合并消息')}</span>`, { collapsed: false, cls: 'merge' });
+    const pre = el('pre', 'chat-tool-result mono');
+    pre.textContent = String(message || '');
+    block.querySelector('.chat-block-body').appendChild(pre);
+    turn.bubble.insertBefore(block, turn.status);
+  };
+  if (activeTurn && !activeTurn.done) { append(activeTurn); }
+  else { beginAssistantTurn(lastUserMeta || {}); setGenerating(true); append(activeTurn); finishTurn('completed'); }
+  scrollToBottom();
+}
+
+/* 独立文本气泡（send_private_msg / 音乐卡片之类的附注） */
+function appendAssistantNote(text) {
+  messagesEl.querySelector('.chat-empty')?.remove();
+  const row = el('div', 'chat-msg assistant');
+  const bubble = el('div', 'chat-bubble chat-assistant-bubble');
+  bubble.appendChild(el('div', 'chat-content chat-md', renderMarkdown(String(text || ''))));
+  row.appendChild(makeBotAvatar());
+  row.appendChild(bubble);
+  const now = new Date();
+  row.title = `${now.getFullYear()}-${pad2(now.getMonth() + 1)}-${pad2(now.getDate())} ${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
+  messagesEl.appendChild(row);
+  scrollToBottom();
+}
+
+function appendUserMessage(text, files = [], nonce = '', ts = 0) {
   messagesEl.querySelector('.chat-empty')?.remove();
   const row = el('div', 'chat-msg user');
   const bubble = el('div', 'chat-bubble');
   if (text) bubble.appendChild(el('div', 'chat-text', escapeHtml(text)));
   for (const file of files) bubble.appendChild(el('div', 'chat-attach', attachmentHtml(file)));
   const actions = el('div', 'chat-msg-actions');
-  const editBtn = el('button', 'chat-msg-action', icon('edit'));
+  const badge = timeBadge(ts);
+  if (badge) actions.appendChild(badge);
+  const editBtn = el('button', 'chat-msg-action', `${icon('edit')} 编辑`);
   editBtn.type = 'button';
   editBtn.title = '编辑此消息并回退后续对话';
   editBtn.addEventListener('click', () => startEditMessage(row));
@@ -313,11 +410,14 @@ function makeCollapsible(titleHtml, { collapsed = true, cls = '' } = {}) {
   return block;
 }
 
-function beginAssistantTurn() {
+function beginAssistantTurn(meta = {}) {
   messagesEl.querySelector('.chat-empty')?.remove();
   const row = el('div', 'chat-msg assistant');
   const bubble = el('div', 'chat-bubble chat-assistant-bubble');
-  row.appendChild(el('div', 'chat-avatar bot-avatar', 'A'));
+  const avatar = makeBotAvatar();
+  /* 生成中呼吸光圈（历史重放不算） */
+  if (!meta.replay) avatar.classList.add('speaking');
+  row.appendChild(avatar);
   row.appendChild(bubble);
   const status = el('div', 'chat-turn-status', '<span class="spinner-sm"></span> 生成中…');
   bubble.appendChild(status);
@@ -327,6 +427,7 @@ function beginAssistantTurn() {
   activeTurn = {
     root: row,
     bubble,
+    avatar,
     status,
     steps: new Map(),
     /* 工具块按 tool_call_id 全回合键控：流式 START 与其 RESULT/STEP_SUMMARY
@@ -334,18 +435,39 @@ function beginAssistantTurn() {
     tools: new Map(),
     reasonings: [],
     done: false,
+    /* 回合元信息：计时 + 重试定位（umIndex 指向本轮用户消息，重试 = edit 同文重发） */
+    startedAt: performance.now(),
+    firstTokenAt: null,
+    stopping: false,
+    timer: null,
+    finishInfo: null,
+    actionsRow: null,
+    umIndex: meta.umIndex ?? null,
+    userText: meta.userText ?? '',
+    historyText: meta.historyText || '',
+    replay: Boolean(meta.replay),
+    /* 回合时间戳（秒）：历史条目带真实时间；live 回合在 finishTurn 用本地时钟 */
+    ts: Number(meta.ts) || 0,
+    finishTs: 0,
   };
+  activeTurn.timer = setInterval(() => {
+    if (activeTurn.done || activeTurn.stopping) return;
+    const secs = ((performance.now() - activeTurn.startedAt) / 1000).toFixed(1);
+    activeTurn.status.innerHTML = `<span class="spinner-sm"></span> 生成中 ${secs}s`;
+  }, 200);
 }
 
 function stepOf(turn, stepIndex) {
   let step = turn.steps.get(stepIndex);
   if (step) return step;
   const node = el('div', 'chat-step');
+  let sep = null;
   if (turn.steps.size > 0) {
-    node.appendChild(el('div', 'chat-step-sep', `第 ${stepIndex + 1} 步`));
+    sep = el('div', 'chat-step-sep', `第 ${stepIndex + 1} 步`);
+    node.appendChild(sep);
   }
   turn.bubble.insertBefore(node, turn.status);
-  step = { node, reasoning: null, reasoningText: '', content: null, contentRaw: '', meta: null, renderPending: false };
+  step = { node, sep, created: performance.now(), reasoning: null, reasoningText: '', content: null, contentRaw: '', meta: null, renderPending: false };
   turn.steps.set(stepIndex, step);
   return step;
 }
@@ -441,6 +563,10 @@ function handleAgentEvent(event) {
   const stepIndex = event.step_index ?? 0;
   const step = stepOf(activeTurn, stepIndex);
 
+  if (type === 'REASONING_DELTA' || type === 'TEXT_DELTA') {
+    if (activeTurn.firstTokenAt == null) activeTurn.firstTokenAt = performance.now();
+  }
+
   if (type === 'REASONING_DELTA') {
     const rs = reasoningBlock(activeTurn, step);
     step.reasoningText += event.delta || '';
@@ -476,6 +602,10 @@ function handleAgentEvent(event) {
         }
       }
     }
+    if (step.sep && step.created) {
+      const secs = ((performance.now() - step.created) / 1000).toFixed(1);
+      step.sep.textContent = `第 ${stepIndex + 1} 步 · ${secs}s`;
+    }
     for (const rs of activeTurn.reasonings) rs.block.classList.add('collapsed');
     const usage = event.usage;
     if (usage && usage.total_tokens) {
@@ -490,19 +620,110 @@ function handleAgentEvent(event) {
   }
 }
 
-function finishTurn(reason, usage) {
-  if (!activeTurn) return;
-  activeTurn.done = true;
-  flushContentRender(activeTurn);
+function turnPlainText(turn) {
+  const live = [...turn.steps.values()].map((s) => s.contentRaw || '').join('').trim();
+  return live || turn.historyText || '';
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    /* 非 secure context 兜底 */
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/* 助手回合收尾操作行：时间戳 + 复制全文 / 回退到本轮用户消息重试（复用 edit 重发通道） */
+function appendTurnActions(turn) {
+  if (turn.actionsRow) return;
+  const actions = el('div', 'chat-msg-actions');
+
+  const badge = timeBadge(turn.finishTs);
+  if (badge) actions.appendChild(badge);
+
+  const copyBtn = el('button', 'chat-msg-action', `${icon('copy')} 复制`);
+  copyBtn.type = 'button';
+  copyBtn.title = '复制本回合回复全文';
+  copyBtn.addEventListener('click', async () => {
+    const text = turnPlainText(turn);
+    if (!text) { toast('本回合没有可复制的文本', 'error'); return; }
+    const ok = await copyText(text);
+    toast(ok ? '已复制回复全文' : '复制失败', ok ? 'success' : 'error');
+  });
+  actions.appendChild(copyBtn);
+
+  if (turn.umIndex != null) {
+    const retryBtn = el('button', 'chat-msg-action', `${icon('refresh')} 重试`);
+    retryBtn.type = 'button';
+    retryBtn.title = '回退到本轮用户消息并重新生成';
+    retryBtn.addEventListener('click', () => {
+      if (generating) { toast('请等待生成完成后再重试', 'error'); return; }
+      if (!sendWs({
+        type: 'edit',
+        session: currentSession,
+        um_index: turn.umIndex,
+        text: turn.userText,
+        resend: true,
+        settings: currentSettingsPayload(),
+      })) return;
+      /* 同文重发：服务端截断后广播 history 重绘，随后事件流开启新回合 */
+    });
+    actions.appendChild(retryBtn);
+  }
+
+  turn.bubble.appendChild(actions);
+  turn.actionsRow = actions;
+}
+
+function renderTurnStatus(turn) {
+  const info = turn.finishInfo || {};
   const label = {
     completed: '完成',
     max_turns: '达到最大步数',
     error: '出错终止',
     stopped: '已停止',
-  }[reason] || reason;
-  const usageText = usage && usage.total_tokens ? ` · ${fmtTokens(usage.total_tokens)} tokens` : '';
-  activeTurn.status.innerHTML = `${icon('check')} ${escapeHtml(label)}${usageText}`;
-  activeTurn.status.classList.add('done');
+  }[info.reason] || info.reason || '完成';
+  const parts = [];
+  if (info.firstTokenMs != null) parts.push(`首字 ${(info.firstTokenMs / 1000).toFixed(1)}s`);
+  if (info.duration != null) parts.push(`${Number(info.duration).toFixed(1)}s`);
+  if (info.usage && info.usage.total_tokens) parts.push(`${fmtTokens(info.usage.total_tokens)} tokens`);
+  turn.status.innerHTML = `${icon('check')} ${escapeHtml(label)}${parts.length ? ` · ${parts.join(' · ')}` : ''}`;
+  turn.status.classList.add('done');
+}
+
+function finishTurn(reason, usage, duration, ts) {
+  if (!activeTurn) return;
+  activeTurn.done = true;
+  if (activeTurn.timer) clearInterval(activeTurn.timer);
+  activeTurn.avatar?.classList.remove('speaking');
+  flushContentRender(activeTurn);
+  /* 历史重放没有真实回合计时（如进程重启后从库恢复），不显示耗时 */
+  const elapsed = duration != null ? duration
+    : (activeTurn.replay ? null : (performance.now() - activeTurn.startedAt) / 1000);
+  /* 完成时间：显式 ts（done 广播/历史条目）> 回合起始 ts > live 用本地时钟；历史无 ts 则不显示 */
+  activeTurn.finishTs = Number(ts) || activeTurn.ts || (activeTurn.replay ? 0 : Date.now() / 1000);
+  activeTurn.finishInfo = {
+    reason: reason || 'completed',
+    usage,
+    duration: elapsed,
+    firstTokenMs: activeTurn.firstTokenAt != null ? activeTurn.firstTokenAt - activeTurn.startedAt : null,
+  };
+  renderTurnStatus(activeTurn);
+  appendTurnActions(activeTurn);
   setGenerating(false);
   scrollToBottom();
 }
@@ -525,11 +746,22 @@ function setGenerating(value) {
 function renderHistory(items) {
   messagesEl.innerHTML = '';
   activeTurn = null;
+  lastUserMeta = null;
+  let userCount = 0;
+  let prevUserText = '';
   for (const item of items || []) {
     if (item.type === 'user') {
-      appendUserMessage(item.text || '', item.files || [], item.nonce || '');
+      appendUserMessage(item.text || '', item.files || [], item.nonce || '', Number(item.ts) || 0);
+      userCount += 1;
+      prevUserText = item.text || '';
     } else if (item.type === 'assistant') {
-      beginAssistantTurn();
+      beginAssistantTurn({
+        umIndex: userCount > 0 ? userCount - 1 : null,
+        userText: prevUserText,
+        historyText: item.text || '',
+        replay: true,
+        ts: Number(item.ts) || 0,
+      });
       const step = stepOf(activeTurn, 0);
       for (const tc of item.tools || []) {
         const tool = toolBlock(activeTurn, step, tc.name, tc.name);
@@ -541,17 +773,24 @@ function renderHistory(items) {
         step.contentRaw = item.text;
         contentBlock(step).innerHTML = renderMarkdown(item.text);
       }
-      finishTurn(item.finish_reason || 'completed', item.usage);
+      for (const file of item.files || []) {
+        activeTurn.bubble.insertBefore(el('div', 'chat-attach', attachmentHtml(file)), activeTurn.status);
+      }
+      finishTurn(item.finish_reason || 'completed', item.usage, item.duration, Number(item.ts) || 0);
       activeTurn = null;
     }
+  }
+  if (userCount > 0) {
+    lastUserMeta = { umIndex: userCount - 1, userText: prevUserText };
   }
   if (!messagesEl.children.length) {
     messagesEl.innerHTML = `
       <div class="chat-empty">
-        <div class="chat-empty-logo">A</div>
+        <div class="chat-empty-logo" id="chat-empty-logo">A</div>
         <p>开始新对话吧</p>
         <p class="muted small">支持图片 / 音频 / 视频附件 · 工具调用与思考过程分级展示</p>
       </div>`;
+    mountEmptyLogo();
   }
   scrollToBottom(true);
 }
@@ -625,7 +864,7 @@ function handleWsMessage(data) {
       localStorage.setItem(LAST_SESSION_KEY, String(data.session));
       renderHistory(data.items);
       if (data.running) {
-        beginAssistantTurn();
+        beginAssistantTurn(lastUserMeta || {});
         setGenerating(true);
       } else {
         setGenerating(false);
@@ -634,15 +873,36 @@ function handleWsMessage(data) {
       break;
     case 'user_message':
       if (data.nonce && data.nonce === lastNonce) break;
-      appendUserMessage(data.text || '', data.files || [], data.nonce || '');
+      appendUserMessage(data.text || '', data.files || [], data.nonce || '', Number(data.ts) || 0);
+      lastUserMeta = {
+        umIndex: [...messagesEl.querySelectorAll('.chat-msg.user')].length - 1,
+        userText: data.text || '',
+      };
+      break;
+    case 'attachment':
+      appendDeliveredFiles([data.file]);
+      break;
+    case 'merge_text':
+      appendMergeText(data.source, data.message);
+      break;
+    case 'assistant_note':
+      appendAssistantNote(data.text || '');
       break;
     case 'event':
-      if (!activeTurn || activeTurn.done) beginAssistantTurn();
+      if (!activeTurn || activeTurn.done) beginAssistantTurn(lastUserMeta || {});
       setGenerating(true);
       handleAgentEvent(data.event);
       break;
     case 'done':
-      if (!activeTurn || !activeTurn.done) finishTurn(data.finish_reason || 'completed');
+      if (activeTurn && activeTurn.done) {
+        /* RUN_SUMMARY 已收尾，补记服务端统计的回合耗时 */
+        if (data.duration != null && activeTurn.finishInfo) {
+          activeTurn.finishInfo.duration = data.duration;
+          renderTurnStatus(activeTurn);
+        }
+      } else {
+        finishTurn(data.finish_reason || 'completed', null, data.duration, Number(data.ts) || 0);
+      }
       setGenerating(false);
       refreshSessions();
       break;
@@ -652,7 +912,10 @@ function handleWsMessage(data) {
       if (!activeTurn || activeTurn.done) setGenerating(false);
       break;
     case 'stopping':
-      if (activeTurn) activeTurn.status.innerHTML = '<span class="spinner-sm"></span> 停止中…';
+      if (activeTurn) {
+        activeTurn.stopping = true;
+        activeTurn.status.innerHTML = '<span class="spinner-sm"></span> 停止中…';
+      }
       break;
     case 'deleted':
       toast(`聊天${data.session} 已删除`, 'info');
@@ -813,12 +1076,13 @@ function openInitialSession(afterDelete) {
   else createSession();
 }
 
-/* ---------- 工具选择弹窗 ---------- */
+/* ---------- 工具选择弹窗（默认启用 / 待发现 / 关闭 三态） ---------- */
 
 function openToolsModal() {
   const presetMode = settings.tools === null;
   const checkedSet = presetMode ? new Set(info.webui_preset?.default || []) : new Set(settings.tools || []);
-  const deferredSet = new Set(info.webui_preset?.deferred || []);
+  const deferredDraft = new Set(info.webui_preset?.deferred || []);
+  /* 待发现组是 webui 预设级配置：改动仅暂存，保存预设时才持久化 */
 
   const modal = openModal({
     title: '本轮可用工具',
@@ -829,21 +1093,41 @@ function openToolsModal() {
         <span class="spacer"></span>
         <span class="badge ${presetMode ? 'blue' : 'gray'}" id="chat-tool-mode">${presetMode ? 'webui 预设' : '自定义选择'}</span>
       </div>
-      <div class="chat-tool-list" id="chat-tool-list"></div>`,
+      <div class="chat-tool-list" id="chat-tool-list"></div>
+      <p class="muted small" style="margin-top:8px">
+        勾选 = 默认启用（直接进入本轮工具列表）；「待发现」= 不占上下文，仅在提示词中列出名字，
+        模型需要时先调用 tool_search 按需启用；两者互斥，都不选即关闭。
+      </p>`,
     actions: [
-      { label: '恢复 webui 预设', class: 'ghost', onClick: ({ close }) => { settings.tools = null; saveSettings(); toast('已恢复为 webui 预设', 'success'); close(); } },
+      {
+        label: '恢复 webui 预设',
+        class: 'ghost',
+        onClick: ({ close }) => {
+          settings.tools = null;
+          saveSettings();
+          checkedSet.clear();
+          (info.webui_preset?.default || []).forEach((n) => checkedSet.add(n));
+          deferredDraft.clear();
+          (info.webui_preset?.deferred || []).forEach((n) => deferredDraft.add(n));
+          modeBadge.textContent = 'webui 预设';
+          modeBadge.className = 'badge blue';
+          render();
+          toast('已恢复为 webui 预设', 'success');
+        },
+      },
       {
         label: '保存为 webui 预设',
         class: 'ghost',
         onClick: async ({ close, el: overlay }) => {
           const picked = [...overlay.querySelectorAll('.chat-tool-check:checked')].map((c) => c.value);
           try {
-            await api.post('/chat/tools', { tools: picked });
+            await api.post('/chat/tools', { tools: picked, deferred: [...deferredDraft] });
             settings.tools = null;
             saveSettings();
             const res = await api.get('/chat/info');
             info = { ...info, ...res };
-            toast(`已保存 ${picked.length} 个工具到 webui 预设`, 'success');
+            toast(`已保存：默认 ${picked.length} 个 · 待发现 ${deferredDraft.size} 个`, 'success');
+            updateToolsCount();
             close();
           } catch (e) {
             toast(`保存失败：${e.message}`, 'error');
@@ -866,7 +1150,8 @@ function openToolsModal() {
       <label class="chat-tool-item">
         <input type="checkbox" class="chat-tool-check" value="${escapeHtml(t.name)}" ${checkedSet.has(t.name) ? 'checked' : ''}>
         <span class="mono chat-tool-name">${escapeHtml(t.name)}</span>
-        ${deferredSet.has(t.name) && !presetMode ? '<span class="badge gray">deferred</span>' : ''}
+        <span class="chat-tool-defer ${deferredDraft.has(t.name) ? 'on' : ''}" data-defer="${escapeHtml(t.name)}"
+              title="待发现：不进入本轮工具列表，模型需先调用 tool_search 启用">待发现</span>
         ${t.source === 'mcp' ? '<span class="badge purple">MCP</span>' : ''}
         ${t.chat_scope && t.chat_scope !== 'both' ? `<span class="badge teal">${t.chat_scope === 'private' ? '私聊' : '群聊'}</span>` : ''}
         <span class="chat-tool-desc">${escapeHtml(t.description || '')}</span>
@@ -880,11 +1165,41 @@ function openToolsModal() {
     modeBadge.className = 'badge gray';
   };
 
+  const syncPill = (name) => {
+    const pill = listEl.querySelector(`.chat-tool-defer[data-defer="${CSS.escape(name)}"]`);
+    if (pill) pill.classList.toggle('on', deferredDraft.has(name));
+  };
+
+  /* 点 pill 会触发 label 默认行为（切换勾选），必须阻止 */
+  listEl.addEventListener('click', (e) => {
+    const pill = e.target.closest('.chat-tool-defer');
+    if (!pill) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const name = pill.dataset.defer;
+    if (deferredDraft.has(name)) {
+      deferredDraft.delete(name);
+    } else {
+      deferredDraft.add(name);
+      if (checkedSet.has(name)) {  /* 两组互斥：取消默认勾选 */
+        checkedSet.delete(name);
+        const cb = listEl.querySelector(`.chat-tool-check[value="${CSS.escape(name)}"]`);
+        if (cb) cb.checked = false;
+        if (!presetMode) markCustom();
+      }
+    }
+    syncPill(name);
+  });
+
   listEl.addEventListener('change', (e) => {
     const check = e.target.closest('.chat-tool-check');
     if (!check) return;
     if (check.checked) checkedSet.add(check.value);
     else checkedSet.delete(check.value);
+    if (check.checked && deferredDraft.has(check.value)) {  /* 两组互斥 */
+      deferredDraft.delete(check.value);
+      syncPill(check.value);
+    }
     markCustom();
   });
   searchEl.addEventListener('input', render);
@@ -1005,10 +1320,10 @@ function toggleCustomPersonaBox() {
 function updateToolsCount() {
   const badge = sectionEl?.querySelector('#chat-tools-count');
   if (!badge) return;
-  const count = settings.tools === null
-    ? (info.webui_preset?.default?.length ?? 0)
-    : (settings.tools?.length ?? 0);
-  badge.textContent = `当前 ${count} 个工具${settings.tools === null ? '（webui 预设）' : ''}`;
+  const defCount = info.webui_preset?.deferred?.length ?? 0;
+  badge.textContent = settings.tools === null
+    ? `预设：默认 ${info.webui_preset?.default?.length ?? 0} 个 · 待发现 ${defCount} 个`
+    : `自定义 ${settings.tools?.length ?? 0} 个工具（预设待发现 ${defCount} 个）`;
 }
 
 function initParamsUI() {
@@ -1091,7 +1406,7 @@ async function init(section) {
 
         <div class="chat-messages" id="chat-messages">
           <div class="chat-empty">
-            <div class="chat-empty-logo">A</div>
+            <div class="chat-empty-logo" id="chat-empty-logo">A</div>
             <p>连接聊天服务后即可开始对话</p>
             <p class="muted small">支持图片 / 音频 / 视频附件 · 工具调用与思考过程分级展示</p>
           </div>
@@ -1134,7 +1449,7 @@ async function init(section) {
         </div>
         <div class="field">
           <div class="field-label">工具</div>
-          <div class="field-desc">本轮可直接调用的工具，可保存为 webui 预设</div>
+          <div class="field-desc">默认启用的工具直接进入本轮列表，「待发现」工具由模型经 tool_search 按需启用，可保存为 webui 预设</div>
           <button class="btn sm ghost" id="chat-tools-btn" style="width:100%">${icon('settings')} <span id="chat-tools-count"></span></button>
         </div>
 
@@ -1174,6 +1489,7 @@ async function init(section) {
 
   messagesEl = section.querySelector('#chat-messages');
   const textEl = section.querySelector('#chat-text');
+  mountEmptyLogo();
 
   /* 公式图片加载失败时降级为原始 LaTeX 文本 */
   messagesEl.addEventListener('error', (e) => {
@@ -1277,8 +1593,12 @@ async function init(section) {
     const files = ready.map((a) => a.brief);
     const nonce = Math.random().toString(36).slice(2);
     lastNonce = nonce;
-    appendUserMessage(text, files, nonce);
-    beginAssistantTurn();
+    appendUserMessage(text, files, nonce, Date.now() / 1000);
+    lastUserMeta = {
+      umIndex: [...messagesEl.querySelectorAll('.chat-msg.user')].length - 1,
+      userText: text,
+    };
+    beginAssistantTurn(lastUserMeta);
     setGenerating(true);
 
     const ok = sendWs({

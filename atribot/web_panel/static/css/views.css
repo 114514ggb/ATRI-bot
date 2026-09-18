@@ -1260,6 +1260,14 @@
   font-weight: 700;
   line-height: 52px;
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.chat-empty-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .chat-msg {
@@ -1283,6 +1291,28 @@
   align-items: center;
   justify-content: center;
   margin-top: 2px;
+  overflow: hidden;
+}
+
+.chat-avatar-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* 生成中：头像外圈呼吸光圈 */
+@keyframes chat-avatar-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  70% { box-shadow: 0 0 0 7px color-mix(in srgb, var(--accent) 0%, transparent); }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+
+.chat-avatar.speaking { animation: chat-avatar-pulse 1.4s ease-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-avatar.speaking { animation: none; box-shadow: 0 0 0 2px var(--accent); }
 }
 
 .bot-avatar { background: var(--accent); color: #fff; }
@@ -1326,12 +1356,25 @@
 
 .chat-msg.user:hover .chat-msg-actions { opacity: 1; }
 
+/* 消息时间戳（hover 操作行内，随操作按钮一起显隐） */
+.chat-time {
+  font-size: 11px;
+  color: var(--text-caption);
+  align-self: center;
+  margin-right: 2px;
+  cursor: default;
+}
+
+/* 用户气泡为 accent 蓝底，时间戳改半透明白保证可读 */
+.chat-msg.user .chat-time { color: rgba(255, 255, 255, 0.75); }
+
 .chat-msg-action {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   border: none;
-  background: rgba(255, 255, 255, 0.22);
+  /* 深色半透明底：蓝色用户气泡上白图标/白字才看得清（白底会把白色内容吃掉） */
+  background: rgba(0, 0, 0, 0.24);
   color: #fff;
   border-radius: 6px;
   padding: 3px 7px;
@@ -1340,7 +1383,42 @@
 }
 
 .chat-msg-action svg { width: 12px; height: 12px; }
-.chat-msg-action:hover { background: rgba(255, 255, 255, 0.38); }
+.chat-msg-action:hover { background: rgba(0, 0, 0, 0.38); }
+
+/* ---------- 助手消息操作（复制/重试，浅色气泡变体，hover 显示） ---------- */
+
+.chat-msg.assistant:hover .chat-msg-actions { opacity: 1; }
+
+.chat-msg.assistant .chat-msg-action {
+  background: var(--bg-hover);
+  color: var(--text-2);
+}
+
+.chat-msg.assistant .chat-msg-action:hover { background: var(--border); color: var(--text-1); }
+
+/* ---------- 工具弹窗：待发现切换 pill ---------- */
+
+.chat-tool-defer {
+  cursor: pointer;
+  user-select: none;
+  font-size: 11px;
+  line-height: 1;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-2);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+
+.chat-tool-defer:hover { border-color: var(--border); }
+
+.chat-tool-defer.on {
+  background: var(--orange-soft);
+  color: var(--orange);
+  border-color: var(--orange);
+}
 
 .chat-edit-box {
   background: var(--bg-card);
@@ -1365,6 +1443,7 @@
 /* ---------- 附件展示 ---------- */
 
 .chat-attach { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.chat-attach-img-link { display: block; width: fit-content; }
 .chat-attach-img { max-width: min(320px, 100%); border-radius: var(--radius-md); display: block; }
 .chat-attach-audio { width: min(300px, 100%); height: 40px; }
 .chat-attach-video { max-width: min(380px, 100%); border-radius: var(--radius-md); display: block; max-height: 260px; }
@@ -1377,8 +1456,13 @@
   border-radius: var(--radius-sm);
   padding: 4px 10px;
   font-size: 13px;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
 }
+.chat-attach-file:hover { background: rgba(255, 255, 255, 0.3); }
 .chat-msg.assistant .chat-attach-file { background: var(--bg-hover); }
+.chat-msg.assistant .chat-attach-file:hover { background: var(--bg-active, rgba(0, 0, 0, 0.12)); }
 
 /* ---------- 分级块：思考过程 / 工具调用 ---------- */
 
@@ -1543,6 +1627,13 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   padding: 10px 12px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* 聚焦任一输入控件时整卡高亮 */
+.chat-input-area:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft), var(--shadow-card);
 }
 
 .chat-attachments {

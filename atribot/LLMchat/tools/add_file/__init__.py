@@ -1,15 +1,14 @@
-from atribot.core.cache.management_chat_example import ChatManager
+from atribot.common_utils import resolve_file_to_bytes
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
-from atribot.core.type.chat_message_types import FileMessageSegment
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.tools.run_python_code.run_code import (
-    _download_https_file,
+    _COLLECT_MAX_BYTES,
     _upload_bytes_to_container,
+    collect_context_file_segments,
 )
 
 sand_box: DockerSandbox = container.get("SandBox")
-chat_manager: ChatManager = container.get("ChatManager")
 
 tool_json = {
     "name": "add_file",
@@ -34,19 +33,8 @@ async def main(file_name: str, message_data: atriMessageEvent, dest: str = "") -
     if not sand_box.is_running:
         await sand_box.start()
 
-    if message_data.group_id is not None:
-        context_messages = (await chat_manager.get_group_context(message_data.group_id)).messages
-    else:
-        context_messages = (await chat_manager.get_private_context(message_data.user_id)).messages
-
-    segment: FileMessageSegment | None = None
-    for message in list(context_messages):
-        for seg in message.segments:
-            if isinstance(seg, FileMessageSegment) and seg.file_name == file_name:
-                segment = seg
-                break
-        if segment:
-            break
+    segments = await collect_context_file_segments(message_data, [file_name])
+    segment = segments[0] if segments else None
 
     if not segment:
         return f"[Error]在聊天上下文中未找到文件: {file_name}"
@@ -54,6 +42,11 @@ async def main(file_name: str, message_data: atriMessageEvent, dest: str = "") -
         return f"[Error]文件{file_name}没有可下载的地址"
 
     remote_path = dest if dest else f"{sand_box.work_dir}/{file_name}"
-    content = await _download_https_file(segment.url)
+    try:
+        _, content = await resolve_file_to_bytes(
+            segment.url, file_name, max_bytes=_COLLECT_MAX_BYTES
+        )
+    except Exception as e:
+        return f"[Error]读取文件{file_name}失败: {e}"
     await _upload_bytes_to_container(content=content, remote_path=remote_path)
     return f"已上传 {file_name} → {remote_path} ({len(content)} 字节)"

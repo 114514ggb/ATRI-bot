@@ -246,6 +246,32 @@ export function hideLoadingPill() {
   }
 }
 
+/* ---------- 品牌图（登录页/欢迎揭幕/侧栏徽章/favicon 共用） ---------- */
+
+function logoUrl() {
+  /* 免鉴权端点：登录页与 favicon 在拿到令牌之前就要显示 */
+  return '/admin/api/panel/logo';
+}
+
+/** 品牌磁贴：加载成功后替换容器内的字母 A，失败保留兜底 */
+export function mountLogoImage(holder) {
+  if (!holder || holder.querySelector('img')) return;
+  const img = document.createElement('img');
+  img.alt = 'ATRI';
+  img.addEventListener('load', () => { holder.textContent = ''; holder.appendChild(img); });
+  img.addEventListener('error', () => { /* 保留字母 A 兜底 */ });
+  img.src = logoUrl();
+}
+
+/** favicon 探测换图：图片存在才替换默认的字母 A 内联 SVG */
+export function upgradeFavicon() {
+  const link = document.querySelector('link[rel="icon"]');
+  if (!link) return;
+  const probe = new Image();
+  probe.addEventListener('load', () => { link.href = logoUrl(); });
+  probe.src = logoUrl();
+}
+
 /* ---------- 分页组件 ---------- */
 
 /**

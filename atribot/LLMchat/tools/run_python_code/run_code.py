@@ -7,16 +7,51 @@ import tarfile
 import uuid
 import zipfile
 
-import aiohttp
-
 from atribot.common_utils import resolve_file_to_bytes
-from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
+from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.chat_message_types import File, FileMessageSegment
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile
 
 sand_box:DockerSandbox = container.get("SandBox")
+
+_COLLECT_MAX_BYTES = 200 * 1024 * 1024
+"""输入文件进沙盒的大小上限（与 send_file 的 200MB 读取上限对齐）"""
+
+
+async def collect_context_file_segments(
+    message_data: atriMessageEvent,
+    names: list[str],
+) -> list[FileMessageSegment]:
+    """按文件名收集要进沙盒的输入文件段
+
+    优先使用事件上注入的 file_resolver（WebUI 附件注册表，返回本地路径段），
+    未注入时回退到 ChatManager 聊天上下文检索（QQ 平台，url 为网络地址）。
+    只返回匹配到的段，缺失的文件名由调用方决定如何提示。
+    """
+    resolver = message_data.get_extra("file_resolver")
+    if callable(resolver):
+        return list(resolver(names) or [])
+
+    from atribot.core.cache.management_chat_example import ChatManager
+
+    chat_manager: ChatManager = container.get("ChatManager")
+    remaining = set(names)
+    if message_data.group_id is not None:
+        context_messages = (await chat_manager.get_group_context(message_data.group_id)).messages
+    else:
+        context_messages = (await chat_manager.get_private_context(message_data.user_id)).messages
+
+    segments: list[FileMessageSegment] = []
+    for message in list(context_messages):
+        for segment in message.segments:
+            if isinstance(segment, FileMessageSegment) and segment.file_name in remaining:
+                segments.append(segment)
+                remaining.remove(segment.file_name)
+                if not remaining:
+                    return segments
+    return segments
 
 
 def session_dirs(group_id: int | None, user_id: int | None = None) -> tuple[str, str, str, str]:
@@ -90,25 +125,6 @@ async def _upload_bytes_to_container(content: bytes, remote_path: str) -> None:
         path=remote_dir,
         data=tar_stream,
     )
-
-
-async def _download_https_file(url: str) -> bytes:
-    """从 HTTPS 地址下载文件。
-
-    Args:
-        url: 下载地址，必须以 https:// 开头。
-
-    Returns:
-        文件的二进制内容。
-
-    Raises:
-        ValueError: URL 协议错误或 HTTP 状态码非 2xx。
-    """
-    if not url.startswith("https://"):
-        raise ValueError(f"文件地址必须是 https:// ，当前为: {url}")
-
-    http:HTTPClient = container.get("HTTPClient")
-    return await http.get_bytes(url, timeout=aiohttp.ClientTimeout(total=30, connect=10))
 
 
 async def _collect_generated_files(
@@ -347,8 +363,11 @@ async def run_python_code_with_segments(
             if not segment.url:
                 raise ValueError(f"文件 {segment.file_name} 缺少可下载的 url")
 
+            _, content = await resolve_file_to_bytes(
+                segment.url, segment.file_name, max_bytes=_COLLECT_MAX_BYTES
+            )
             await _upload_bytes_to_container(
-                content = await _download_https_file(segment.url),
+                content = content,
                 remote_path = f"{run_dir}/{segment.file_name}"
             )
             ignored_names.add(segment.file_name)

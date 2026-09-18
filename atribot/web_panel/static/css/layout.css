@@ -11,6 +11,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden; /* 裁掉水流光斑层的越界部分 */
   background:
     radial-gradient(1000px 500px at 15% -10%, var(--accent-soft), transparent 60%),
     radial-gradient(900px 600px at 110% 110%, var(--purple-soft), transparent 55%),
@@ -27,7 +28,40 @@
   transform: scale(1.03);
 }
 
+/* 水流光斑：叠在基础渐变之上的模糊色块缓慢漂移（::after 反向第二层增加纵深），
+   装饰层不接事件，内容提 z-index 压在其上；关键帧与降级见 base.css / layout.css 末尾 */
+.login-overlay::before,
+.welcome-overlay::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(36% 26% at 28% 32%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 70%),
+    radial-gradient(30% 22% at 70% 58%, color-mix(in srgb, var(--teal) 16%, transparent), transparent 72%),
+    radial-gradient(26% 20% at 52% 78%, color-mix(in srgb, var(--purple) 14%, transparent), transparent 70%);
+  filter: blur(28px);
+  animation: water-drift 16s ease-in-out infinite alternate;
+}
+
+.login-overlay::after,
+.welcome-overlay::after {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(26% 18% at 62% 30%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 70%),
+    radial-gradient(22% 16% at 30% 66%, color-mix(in srgb, var(--purple) 10%, transparent), transparent 70%);
+  filter: blur(36px);
+  animation: water-drift 24s ease-in-out infinite alternate-reverse;
+}
+
 .login-card {
+  position: relative; /* 压到水流光斑层（z-index:0）之上 */
+  z-index: 1;
   width: min(400px, calc(100vw - 48px));
   padding: 44px 40px 36px;
   border-radius: var(--radius-xl);
@@ -42,6 +76,27 @@
 
 .login-card.shake { animation: shake 0.5s var(--ease-out); }
 
+/* 品牌磁贴通用：液态渐变流动 + 立绘悬浮（img 由 JS 挂载，失败回退字母 A）；
+   渐变首尾同色形成闭环，配合 background-size 拉大后有流动感 */
+.login-logo,
+.welcome-logo,
+.sidebar-brand .brand-badge {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0071e3, #64d2ff 45%, #bf5af2, #0071e3);
+  background-size: 300% 300%;
+  animation: logo-liquid 8s ease-in-out infinite;
+}
+
+.login-logo img,
+.welcome-logo img,
+.sidebar-brand .brand-badge img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  animation: logo-float 3.6s ease-in-out infinite;
+}
+
 .login-logo {
   width: 74px;
   height: 74px;
@@ -53,9 +108,21 @@
   font-size: 34px;
   font-weight: 800;
   color: var(--on-accent);
-  background: linear-gradient(135deg, #0071e3, #64d2ff 60%, #bf5af2);
   box-shadow: 0 12px 32px rgba(10, 132, 255, 0.35);
   letter-spacing: -1px;
+}
+
+/* 流光周期性横扫（侧栏小徽章不加，避免琐碎） */
+.login-logo::after,
+.welcome-logo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 32%, rgba(255, 255, 255, 0.32) 50%, transparent 68%);
+  transform: translateX(-130%) skewX(-12deg);
+  animation: logo-shine 4.5s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .login-title {
@@ -90,10 +157,16 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  overflow: hidden; /* 裁掉水流光斑层的越界部分 */
   background:
     radial-gradient(1000px 500px at 15% -10%, var(--accent-soft), transparent 60%),
     radial-gradient(900px 600px at 110% 110%, var(--purple-soft), transparent 55%),
     var(--bg);
+}
+
+.welcome-overlay > * {
+  position: relative; /* 压到水流光斑层（z-index:0）之上 */
+  z-index: 1;
 }
 
 .welcome-logo {
@@ -107,10 +180,9 @@
   font-size: 44px;
   font-weight: 800;
   color: var(--on-accent);
-  background: linear-gradient(135deg, #0071e3, #64d2ff 60%, #bf5af2);
   box-shadow: 0 16px 44px rgba(10, 132, 255, 0.4);
   letter-spacing: -1px;
-  animation: welcome-pop 0.6s var(--ease-spring);
+  animation: welcome-pop 0.6s var(--ease-spring), logo-liquid 8s ease-in-out infinite;
 }
 
 .welcome-title {
@@ -132,6 +204,39 @@
 .welcome-overlay.iris-out {
   animation: welcome-iris 0.55s cubic-bezier(0.6, 0.05, 0.95, 0.5) forwards;
   pointer-events: none;
+}
+
+/* 装饰性循环动效（液态渐变/立绘悬浮/流光/水流光斑）在"减少动画"下整段关闭，
+   入场反馈（welcome-pop 等）不受影响（写法同 views.css 的 chat-avatar-pulse） */
+@media (prefers-reduced-motion: reduce) {
+  /* welcome-pop 是用户主动触发的入场反馈，按 base.css 约定不降级，只去掉液态流动 */
+  .login-logo,
+  .sidebar-brand .brand-badge {
+    animation: none;
+  }
+
+  .welcome-logo {
+    animation: welcome-pop 0.6s var(--ease-spring);
+  }
+
+  .login-logo img,
+  .welcome-logo img,
+  .sidebar-brand .brand-badge img {
+    animation: none;
+  }
+
+  .login-logo::after,
+  .welcome-logo::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .login-overlay::before,
+  .login-overlay::after,
+  .welcome-overlay::before,
+  .welcome-overlay::after {
+    animation: none;
+  }
 }
 
 /* ---------- 应用骨架 ---------- */
@@ -190,7 +295,6 @@
   font-weight: 800;
   font-size: 17px;
   color: var(--on-accent);
-  background: linear-gradient(135deg, #0071e3, #64d2ff 60%, #bf5af2);
   flex-shrink: 0;
 }
 
