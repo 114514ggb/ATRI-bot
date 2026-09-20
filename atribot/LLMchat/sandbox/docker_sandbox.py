@@ -19,6 +19,8 @@ import docker
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile, SandBoxBase
 from atribot.LLMchat.sandbox.stream_exec import (
     MAX_STREAM_OUTPUT as MAX_PANEL_OUTPUT,
+)
+from atribot.LLMchat.sandbox.stream_exec import (
     MarkerStreamFilter,
     StreamDecoder,
     container_sentinel_line,

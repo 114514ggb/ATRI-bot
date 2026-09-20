@@ -13,7 +13,7 @@ from logging.handlers import TimedRotatingFileHandler
 
 import pytest
 
-from atribot.core.logger import SafeTimedRotatingFileHandler, Logger
+from atribot.core.logger import Logger, SafeTimedRotatingFileHandler
 
 win_only = pytest.mark.skipif(
     not sys.platform.startswith("win"), reason="依赖 Windows 的文件占用语义"

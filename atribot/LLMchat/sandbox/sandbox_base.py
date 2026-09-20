@@ -85,7 +85,7 @@ class SandBoxBase(ABC):
         Args:
             code: 代码字符串
             language: 语言类型 (python, bash, nodejs)
-            timeout: 超时时间（秒）
+            timeout: 超时时间(秒)
             
         Returns:
             ExecutionResult 对象
@@ -118,7 +118,7 @@ class SandBoxBase(ABC):
     @abstractmethod
     async def read_file(self, remote_path: str) -> str:
         """
-        直接读取沙盒内文件的内容（文本模式）
+        直接读取沙盒内文件的内容(文本模式)
         """
         pass
 
@@ -143,7 +143,7 @@ class SandBoxBase(ABC):
 
     @abstractmethod
     async def session_send(self, session_name: str, input_text: str, wait: float = 0.5) -> ExecutionResult:
-        """向 tmux 会话发送一行输入（自动追加回车），并返回发送后的屏幕内容
+        """向 tmux 会话发送一行输入(自动追加回车)，并返回发送后的屏幕内容
 
         Args:
             session_name: 目标会话名称
@@ -151,7 +151,7 @@ class SandBoxBase(ABC):
             wait: 发送后等待程序响应的秒数，默认 0.5
 
         Returns:
-            ExecutionResult(text 为发送后抓取的屏幕快照）
+            ExecutionResult(text 为发送后抓取的屏幕快照)
         """
         pass
 
@@ -163,7 +163,7 @@ class SandBoxBase(ABC):
             session_name: 目标会话名称
 
         Returns:
-            ExecutionResult(text 为当前屏幕文本）
+            ExecutionResult(text 为当前屏幕文本)
         """
         pass
 
@@ -199,7 +199,7 @@ class SandBoxBase(ABC):
     async def panel_status(self) -> dict:
         """汇总管理页展示的状态快照
 
-        返回 dict：
+        返回 dict:
         - backend / display: 后端标识与展示名
         - running: 是否运行中
         - rows: [(标签, 值), ...] 有序状态行，面板按原样渲染
@@ -212,22 +212,22 @@ class SandBoxBase(ABC):
             "rows": [],
         }
 
-    async def panel_exec_stream(self, command: str, send: Callable[[str], Awaitable[None]], cwd: Optional[str] = None):
-        """流式执行一条命令，供面板沙盒终端使用（需 capabilities.terminal = True）
+    async def panel_exec_stream(self, command: str, send: Callable[[str], Awaitable[None]], cwd: str | None = None):
+        """流式执行一条命令，供面板沙盒终端使用(需 capabilities.terminal = True)
 
         Args:
-            command: 用户输入的命令行（单行）
-            send: 异步回调，接收可见输出文本块（哨兵标记已被后端剔除）
-            cwd: 本条命令的工作目录（终端会话维护的当前目录，None 用沙盒默认）
+            command: 用户输入的命令行(单行)
+            send: 异步回调，接收可见输出文本块(哨兵标记已被后端剔除)
+            cwd: 本条命令的工作目录(终端会话维护的当前目录，None 用沙盒默认)
 
         Returns:
-            执行句柄：提供 await wait() -> int（退出码）、kill()（强制终止），
-            以及完成后可读的 new_cwd 属性（命令执行后的工作目录）。
+            执行句柄:提供 await wait() -> int(退出码)、kill()(强制终止)，
+            以及完成后可读的 new_cwd 属性(命令执行后的工作目录)。
         """
-        raise NotImplementedError(f"沙盒后端 {self.backend} 未实现终端流（panel_exec_stream）")
+        raise NotImplementedError(f"沙盒后端 {self.backend} 未实现终端流(panel_exec_stream)")
 
     def panel_terminal_info(self) -> dict:
-        """沙盒终端的握手信息（面板终端的提示符/问候展示用）"""
+        """沙盒终端的握手信息(面板终端的提示符/问候展示用)"""
         return {
             "cwd": getattr(self, "work_dir", "/"),
             "home": "/",
