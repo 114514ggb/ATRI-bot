@@ -6,6 +6,7 @@ import mimetypes
 import os
 import shlex
 import tarfile
+import threading
 import time
 import uuid
 import zipfile
@@ -16,10 +17,19 @@ from docker.errors import ImageNotFound, NotFound
 
 import docker
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile, SandBoxBase
+from atribot.LLMchat.sandbox.stream_exec import (
+    MAX_STREAM_OUTPUT as MAX_PANEL_OUTPUT,
+    MarkerStreamFilter,
+    StreamDecoder,
+    container_sentinel_line,
+)
 
 
 class DockerSandbox(SandBoxBase):
     """基于 Docker 容器的沙盒实现"""
+
+    backend = "docker"
+    backend_display = "Docker 容器"
     def __init__(self, config: dict = None):
         """初始化 Docker 沙盒实例
 
@@ -712,5 +722,197 @@ class DockerSandbox(SandBoxBase):
         finally:
             self.container = None
             self.is_running = False
+
+
+    def panel_capabilities(self) -> dict:
+        return {"start_stop": True, "terminal": True, "metrics": True}
+
+    async def panel_status(self) -> dict:
+        running = False
+        state = "未创建"
+        rows: List[tuple] = [
+            ("镜像", self.image),
+            ("容器名", self.container_name),
+        ]
+        if self.container is not None:
+            try:
+                await asyncio.to_thread(self.container.reload)
+                state = self.container.status
+                running = state == "running"
+            except NotFound:
+                self.container = None
+                state = "已移除"
+            except Exception as e:
+                state = f"查询失败（{e}）"
+        rows.append(("容器状态", state))
+        if running:
+            try:
+                attrs = self.container.attrs
+                rows.append(("启动时间", str(attrs.get("State", {}).get("StartedAt", ""))[:19].replace("T", " ")))
+            except Exception:
+                pass
+        cpu_percent = round(self.cpu_quota / self.cpu_period * 100) if self.cpu_period else 0
+        rows.extend([
+            ("内存限制", self.mem_limit),
+            ("CPU 限制", f"{cpu_percent}%（1 核）" if cpu_percent else f"quota={self.cpu_quota}"),
+            ("进程数限制", str(self.pids_limit)),
+            ("网络模式", self.network_mode),
+            ("工作目录", self.work_dir),
+        ])
+        self.is_running = running
+        return {
+            "backend": self.backend,
+            "display": self.backend_display,
+            "running": running,
+            "rows": rows,
+        }
+
+    async def panel_exec_stream(self, command: str, send, cwd: str | None = None):
+        if not self.is_running or not self.container:
+            raise RuntimeError("Sandbox is not running")
+        return _DockerExecHandle(self, command, send, cwd=cwd)
+
+    def panel_terminal_info(self) -> dict:
+        container_id = ""
+        try:
+            container_id = (self.container.id or "")[:12] if self.container else ""
+        except Exception:
+            pass
+        return {
+            "cwd": self.work_dir,
+            "home": "/root",
+            "user": "root",
+            "host": container_id or self.container_name,
+            "isWindows": False,
+            "platform": "linux",
+            "sep": "/",
+        }
+
+
+class _DockerExecHandle:
+    """panel_exec_stream 的执行句柄：docker exec 输出流经线程泵入 asyncio 队列"""
+
+    def __init__(self, sandbox: DockerSandbox, command: str, send, timeout: int = 600, cwd: str | None = None):
+        self._sb = sandbox
+        self._command = command
+        self._send = send
+        self._timeout = timeout
+        self._cwd = cwd or sandbox.work_dir
+        self._exec_id: str | None = None
+        self._pid: int | None = None
+        self._killed = False
+        self.exit_code: int | None = None
+        self.new_cwd: str | None = None
+        self._task = asyncio.create_task(self._run())
+
+    async def wait(self) -> int:
+        await self._task
+        return self.exit_code if self.exit_code is not None else -1
+
+    def kill(self) -> None:
+        """强杀当前 exec 的进程组（容器内 kill -9 -PID），尽力而为"""
+        self._killed = True
+        pid = self._pid
+        if not pid:
+            return
+        asyncio.get_running_loop().create_task(self._kill_remote(pid))
+
+    async def _kill_remote(self, pid: int) -> None:
+        try:
+            await asyncio.to_thread(
+                self._sb.container.exec_run, ["kill", "-9", f"-{pid}"]
+            )
+        except Exception:
+            try:
+                await asyncio.to_thread(self._sb.container.exec_run, ["kill", "-9", str(pid)])
+            except Exception:
+                pass
+
+    async def _run(self) -> None:
+        try:
+            api = self._sb.container.client.api
+            line = container_sentinel_line(self._command, self._timeout)
+
+            async def _setup():
+                exec_data = await asyncio.to_thread(
+                    api.exec_create,
+                    self._sb.container.id,
+                    ["/bin/sh", "-c", line],
+                    workdir=self._cwd,
+                    stdout=True,
+                    stderr=True,
+                )
+                self._exec_id = exec_data["Id"]
+                stream = await asyncio.to_thread(api.exec_start, self._exec_id, stream=True, demux=True)
+                try:
+                    inspect = await asyncio.to_thread(api.exec_inspect, self._exec_id)
+                    self._pid = inspect.get("Pid") or None
+                except Exception:
+                    pass
+                return stream
+
+            # exec 建立阶段同样可能被 Docker daemon 卡住：短超时防会话悬死
+            try:
+                stream = await asyncio.wait_for(_setup(), timeout=15)
+            except asyncio.TimeoutError:
+                self.exit_code = -1
+                await self._send("\n[atri] 容器命令建立超时，请重试\n")
+                return
+
+            loop = asyncio.get_running_loop()
+            queue: asyncio.Queue = asyncio.Queue()
+
+            def _pump_thread() -> None:
+                try:
+                    for out, err in stream:
+                        for piece in (out, err):
+                            if piece:
+                                asyncio.run_coroutine_threadsafe(queue.put(piece), loop).result()
+                except Exception:
+                    pass
+                finally:
+                    asyncio.run_coroutine_threadsafe(queue.put(None), loop).result()
+
+            threading.Thread(target=_pump_thread, daemon=True).start()
+
+            decoder = StreamDecoder()
+            marker = MarkerStreamFilter()
+            total = 0
+            truncated = False
+            marker_exit: int | None = None
+            while True:
+                chunk = await queue.get()
+                if chunk is None:
+                    break
+                total += len(chunk)
+                out, new_cwd, code = marker.feed(decoder.feed(chunk))
+                if new_cwd:
+                    self.new_cwd = new_cwd
+                if code is not None:
+                    marker_exit = code
+                if total > MAX_PANEL_OUTPUT:
+                    if not truncated:
+                        truncated = True
+                        await self._send("\n[atri] 输出超过 4 MB，后续内容已截断\n")
+                elif out:
+                    await self._send(out)
+            tail = marker.feed(decoder.flush())[0] + marker.flush()
+            if tail:
+                await self._send(tail)
+
+            if marker_exit is not None:
+                self.exit_code = marker_exit
+            else:
+                try:
+                    inspect = await asyncio.to_thread(api.exec_inspect, self._exec_id)
+                    self.exit_code = int(inspect.get("ExitCode", -1))
+                except Exception:
+                    self.exit_code = -1
+        except Exception as e:
+            self.exit_code = -1
+            try:
+                await self._send(f"\n[atri] 容器命令执行出错：{e}\n")
+            except Exception:
+                pass
 
 

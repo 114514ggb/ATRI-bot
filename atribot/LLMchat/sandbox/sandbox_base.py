@@ -2,7 +2,7 @@ import base64
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List
+from typing import Awaitable, Callable, List
 
 
 @dataclass(slots=True)
@@ -47,8 +47,12 @@ class ExecutionResult:
 class SandBoxBase(ABC):
     """
     沙盒环境的抽象基类。
-    所有具体的沙盒实现都必须继承此类。
+    所有具体的沙盒实现都必须继承此类
     """
+
+    # 后端标识与展示名，子类应覆盖
+    backend: str = "base"
+    backend_display: str = "未知沙盒后端"
 
     def __init__(self, config: dict = None):
         self.config = config or {}
@@ -181,3 +185,55 @@ class SandBoxBase(ABC):
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.stop()
+
+
+    def panel_capabilities(self) -> dict:
+        """声明本后端支持的管理能力，面板据此渲染按钮与终端入口
+
+        - start_stop: 是否支持 start()/stop()/restart()
+        - terminal:   是否支持 panel_exec_stream() 交互终端
+        - metrics:    是否能在 panel_status 的 metrics 中提供资源指标
+        """
+        return {"start_stop": True, "terminal": False, "metrics": False}
+
+    async def panel_status(self) -> dict:
+        """汇总管理页展示的状态快照
+
+        返回 dict：
+        - backend / display: 后端标识与展示名
+        - running: 是否运行中
+        - rows: [(标签, 值), ...] 有序状态行，面板按原样渲染
+        - metrics: 可选 {cpu_percent, mem_usage, ...}，仅在 capabilities.metrics 时被读取
+        """
+        return {
+            "backend": self.backend,
+            "display": self.backend_display,
+            "running": self.is_running,
+            "rows": [],
+        }
+
+    async def panel_exec_stream(self, command: str, send: Callable[[str], Awaitable[None]], cwd: Optional[str] = None):
+        """流式执行一条命令，供面板沙盒终端使用（需 capabilities.terminal = True）
+
+        Args:
+            command: 用户输入的命令行（单行）
+            send: 异步回调，接收可见输出文本块（哨兵标记已被后端剔除）
+            cwd: 本条命令的工作目录（终端会话维护的当前目录，None 用沙盒默认）
+
+        Returns:
+            执行句柄：提供 await wait() -> int（退出码）、kill()（强制终止），
+            以及完成后可读的 new_cwd 属性（命令执行后的工作目录）。
+        """
+        raise NotImplementedError(f"沙盒后端 {self.backend} 未实现终端流（panel_exec_stream）")
+
+    def panel_terminal_info(self) -> dict:
+        """沙盒终端的握手信息（面板终端的提示符/问候展示用）"""
+        return {
+            "cwd": getattr(self, "work_dir", "/"),
+            "home": "/",
+            "user": "?",
+            "host": self.backend,
+            "isWindows": False,
+            "platform": self.backend,
+            "sep": "/",
+        }

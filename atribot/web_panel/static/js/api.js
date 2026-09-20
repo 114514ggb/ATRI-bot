@@ -71,8 +71,23 @@ export const api = {
   del: (path) => request('DELETE', path),
 };
 
+/** WebSocket 地址（path 形如 /ws/logs；token 已含在 query） */
+function wsUrl(path) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${proto}://${location.host}${API_BASE}${path}?token=${encodeURIComponent(getToken())}`;
+}
+
 /** WebSocket 日志地址 */
 export function logsWsUrl() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${proto}://${location.host}${API_BASE}/ws/logs?token=${encodeURIComponent(getToken())}`;
+  return wsUrl('/ws/logs');
+}
+
+/** WebSocket 终端地址 */
+export function terminalWsUrl() {
+  return wsUrl('/ws/terminal');
+}
+
+/** WebSocket 沙盒终端地址 */
+export function sandboxWsUrl() {
+  return wsUrl('/ws/sandbox-terminal');
 }

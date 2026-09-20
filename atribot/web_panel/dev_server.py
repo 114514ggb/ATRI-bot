@@ -103,6 +103,10 @@ def _prepare_files() -> Path:
 
 
 def main() -> None:
+    # dev 模式不写 bot 的日志文件：logger.py 默认会打开 atribot/log/atri_log_，
+    # 与主进程共用同一文件会导致跨天轮转互相锁死（WinError 32），只留控制台输出
+    os.environ.setdefault("ATRI_FILE_LOG", "0")
+
     tmp = _prepare_files()
     os.environ["ATRI_CONFIG_PATH"] = str(tmp / "config.json")
 
@@ -112,6 +116,7 @@ def main() -> None:
     from atribot.core.atri_config import atriConfig
     from atribot.core.command.async_permissions_management import PermissionsManagement
     from atribot.core.service_container import container
+    from atribot.LLMchat.sandbox.factory import create_sandbox
     from atribot.web_panel.dev_mocks import (
         MockDatabase,
         _fake_log_stream,
@@ -128,6 +133,10 @@ def main() -> None:
 
     container.register("config", atriConfig())
     container.register("database", MockDatabase())
+
+    # 沙盒（容器管理页）：开发模式直接用本机直执行后端，无需 Docker
+    sand_box = create_sandbox({"type": "none", "work_dir": str(tmp / "sandbox_workspace")})
+    container.register("SandBox", sand_box, cleanup=sand_box.stop)
     container.register("PlatformManager", _MockPlatformManager())
     container.register("PermissionsManagement", PermissionsManagement())
     container.register("CommandSystem", _FakeCommandSystem())
@@ -154,6 +163,7 @@ def main() -> None:
     async def _start_fake_logs() -> None:
         _ensure_log_handler()
         asyncio.get_event_loop().create_task(_fake_log_stream())
+        await sand_box.start()
 
     port = int(os.environ.get("ATRI_PANEL_PORT", "5125"))
     print(f"[dev_server] 临时配置目录: {tmp}")

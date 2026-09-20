@@ -167,6 +167,30 @@ async def _auth(
     raise HTTPException(status_code=401, detail="Unauthorized")
 
 
+async def _ws_auth(websocket, token: str) -> bool:
+    """WebSocket 令牌校验（与 HTTP _auth 同一顺序），失败时关闭连接并返回 False
+
+    注意必须先 accept 再 close：accept 之前 close 会被 uvicorn 转成 HTTP 403
+    拒绝握手，浏览器端只能看到抽象的 1006，自定义 close code（4401 等）
+    永远到不了前端，导致前端无法展示真实失败原因。
+    """
+    await websocket.accept()
+    expected = _access_token()
+    if not expected:
+        await websocket.close(code=4401)
+        return False
+    ip = websocket.client.host if websocket.client else "?"
+    if secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
+        _clear_auth_failures(ip)
+        return True
+    if _auth_rate_limited(ip) is not None:
+        await websocket.close(code=4429)  # 锁定期内：拒绝且不计数
+        return False
+    _register_auth_failure(ip)
+    await websocket.close(code=4401)
+    return False
+
+
 def _chat_manager():
     """获取 ChatManager（可能未启动，如独立调试时）"""
     from atribot.core.cache.management_chat_example import ChatManager

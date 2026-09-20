@@ -2,19 +2,25 @@ import shlex
 
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
-from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
-from atribot.LLMchat.tools.run_python_code.run_code import session_workspace
+from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
+from atribot.LLMchat.tools.run_python_code.run_code import is_local_sandbox, session_workspace
 
-sand_box: DockerSandbox = container.get("SandBox")
+sand_box: SandBoxBase = container.get("SandBox")
 
 _MAX_OUTPUT_CHARS = 3000
+
+_env_desc = (
+    "在本机直接执行Shell命令(没有沙盒隔离,PATH和文件系统就是本机环境)"
+    if is_local_sandbox()
+    else "在沙盒中执行中执行Shell命令,环境是Python3.12-slim预装ffmpeg"
+)
 
 tool_json = {
     "name": "run_command",
     "description": (
-        "在沙盒中执行中执行Shell命令,环境是Python3.12-slim预装ffmpeg"
-        "拥有独立的持久化工作区：群聊为 /workspace/groups/<群号>/data,"
-        "私聊为 /workspace/private/<你的QQ号>/data,不填path时默认使用当前会话的持久化目录 "
+        _env_desc
+        + f"拥有独立的持久化工作区：群聊为 {sand_box.work_dir}/groups/<群号>/data,"
+        f"私聊为 {sand_box.work_dir}/private/<你的QQ号>/data,不填path时默认使用当前会话的持久化目录 "
         "输出超过限制时仅返回末尾部分,"
         "返回值包含退出码，可据此判断命令是否执行成功"
     ),

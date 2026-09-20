@@ -4,6 +4,7 @@ from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult
 from atribot.LLMchat.tools.run_python_code.run_code import (
     collect_context_file_segments,
+    is_local_sandbox,
     run_python_code_with_segments,
 )
 
@@ -11,12 +12,18 @@ config:atriConfig = container.get("config")
 
 _MAX_OUTPUT_CHARS = 3000
 
+_env_desc = (
+    "可用库取决于本机 Python 环境"
+    if is_local_sandbox()
+    else "可用库:numpy,pandas,matplotlib,seaborn,pillow,opencv-python-headless"
+         "图表如需显示中文,linux安装了fonts-wqy-zenhei字体,环境还有ffmpeg"
+)
+
 tool_json = {
     "name": "run_python_code",
     "description": (
         "在沙盒中执行Python代码,可传入输入文件并返回执行结果与新生成文件"
-        "可用库:numpy,pandas,matplotlib,seaborn,pillow,opencv-python-headless"
-        "图表如需显示中文,linux安装了fonts-wqy-zenhei字体,环境还有ffmpeg"
+        f"{_env_desc}"
         "每个会话(群聊按群/私聊按用户)拥有独立持久化工作区,可通过os.environ访问:"
         "SESSION_WORKSPACE=当前会话持久目录(群聊同GROUP_WORKSPACE), SHARED_DIR=共享目录"
         "生成文件直接写在脚本同级目录大小不超过 20MB 就会自动发送,跨次调用保留文件写入SESSION_WORKSPACE"

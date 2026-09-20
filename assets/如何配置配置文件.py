@@ -150,8 +150,16 @@
         "group_max_record":20,#群消息缓存的消息条数量为ai上下文的
         "private_max_record":20#user上下文消息轮数限制
     },#注意消息轮数是指你输入一条消息然后等到ai回复一次这就是一轮,这一轮里面可能包含ai多次工具调用什么的
-    "sand_box":{#这个是沙盒的的配置参数，需要看具体使用的沙盒实例来传递参数,默认使用的是docker，可以去atribot\LLMchat\sandbox\docker_sandbox.py看看class接受的参数
-        "image":"atri-sandbox:latest"#启动的镜像名称
+    "sand_box":{#这个是沙盒的的配置参数，需要看具体使用的沙盒实例来传递参数
+        #type 沙盒后端类型：
+        #  "docker" (默认) Docker容器沙盒，参数见 atribot\LLMchat\sandbox\docker_sandbox.py
+        #  "none"  「没有沙盒」，直接在本机执行命令和代码(无任何隔离，注意安全)，支持Linux/Windows
+        #          专属参数: "work_dir" 本地工作区根目录(默认 项目根/sandbox_workspace)、
+        #                   "shell" 指定shell程序(默认自动: Linux用/bin/sh; Windows优先找Git Bash,找不到退回cmd)
+        #          见 atribot\LLMchat\sandbox\no_sandbox.py
+        #  "e2b"   E2B云端沙盒，参数见 atribot\LLMchat\sandbox\E2B_sandbox.py
+        "type":"docker",
+        "image":"atri-sandbox:latest"#启动的镜像名称(docker后端)
     },
     "tool_presets": {#各个聊天模块所使用的工具列表, 每一项对应 LLMchat/tools/ 下的一个工具目录名
         # group_chat / private_chat / agency_Agent 三个模块都支持三种取值:

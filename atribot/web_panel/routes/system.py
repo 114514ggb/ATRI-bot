@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import secrets
 import subprocess
 import sys
 from typing import Dict
@@ -10,15 +9,12 @@ from typing import Dict
 from fastapi import APIRouter, Depends, WebSocket
 
 from ..deps import (
-    _access_token,
     _auth,
-    _auth_rate_limited,
     _cfg,
-    _clear_auth_failures,
     _ensure_log_handler,
     _log_buffer,
     _log_buffer_lock,
-    _register_auth_failure,
+    _ws_auth,
 )
 
 router = APIRouter()
@@ -46,25 +42,11 @@ async def api_system_restart(_: None = Depends(_auth)) -> Dict[str, str]:
 
 @router.websocket("/api/ws/logs")
 async def ws_logs(websocket: WebSocket, token: str = "") -> None:
-    expected = _access_token()
-    if not expected:
-        await websocket.close(code=4401)
-        return
-
-    # 与 HTTP _auth 相同的顺序：正确令牌先行放行并清零，锁定只针对错误猜测
-    ip = websocket.client.host if websocket.client else "?"
-    if secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
-        _clear_auth_failures(ip)
-    elif _auth_rate_limited(ip) is not None:
-        await websocket.close(code=4429)  # 锁定期内：拒绝且不计数
-        return
-    else:
-        _register_auth_failure(ip)
-        await websocket.close(code=4401)
+    # _ws_auth 内部已 accept（失败时带 4401/4429 关闭）
+    if not await _ws_auth(websocket, token):
         return
 
     _ensure_log_handler()
-    await websocket.accept()
 
     with _log_buffer_lock:
         history = list(_log_buffer)

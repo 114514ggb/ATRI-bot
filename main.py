@@ -27,6 +27,7 @@ async def main():
         await asyncio.Event().wait()
     except asyncio.CancelledError:
         log.info("收到停止信号")
+        raise
     finally:
         if framework:
             await framework.graceful_shutdown()
@@ -34,4 +35,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        pass

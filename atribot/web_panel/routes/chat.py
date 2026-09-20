@@ -21,6 +21,7 @@ from ..deps import (
     _cfg,
     _clear_auth_failures,
     _register_auth_failure,
+    _ws_auth,
 )
 from . import chat_engine as engine
 from .chat_engine import registry
@@ -232,24 +233,6 @@ async def api_chat_session_delete(session_id: int, _: None = Depends(_auth)) -> 
 
 # ---------- 聊天 WebSocket ----------
 
-async def _ws_auth(websocket: WebSocket, token: str) -> bool:
-    """与 ws_logs 相同的鉴权顺序：正确令牌放行并清零，锁定只针对错误猜测"""
-    expected = _access_token()
-    if not expected:
-        await websocket.close(code=4401)
-        return False
-    ip = websocket.client.host if websocket.client else "?"
-    if secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
-        _clear_auth_failures(ip)
-        return True
-    if _auth_rate_limited(ip) is not None:
-        await websocket.close(code=4429)
-        return False
-    _register_auth_failure(ip)
-    await websocket.close(code=4401)
-    return False
-
-
 def _history_payload(session: "engine.ChatSession") -> Dict[str, Any]:
     return {
         "type": "history",
@@ -262,9 +245,9 @@ def _history_payload(session: "engine.ChatSession") -> Dict[str, Any]:
 
 @router.websocket("/api/ws/chat")
 async def ws_chat(websocket: WebSocket, token: str = "") -> None:
+    # _ws_auth 内部已 accept（失败时带 4401/4429 关闭）
     if not await _ws_auth(websocket, token):
         return
-    await websocket.accept()
 
     queue: asyncio.Queue = asyncio.Queue()
     subscribed: Optional[engine.ChatSession] = None

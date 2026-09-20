@@ -1,18 +1,18 @@
 from atribot.common_utils import resolve_file_to_bytes
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
-from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
+from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 from atribot.LLMchat.tools.run_python_code.run_code import (
     _COLLECT_MAX_BYTES,
-    _upload_bytes_to_container,
+    _upload_bytes_to_sandbox,
     collect_context_file_segments,
 )
 
-sand_box: DockerSandbox = container.get("SandBox")
+sand_box: SandBoxBase = container.get("SandBox")
 
 tool_json = {
     "name": "add_file",
-    "description": "将聊天上下文中的文件上传到沙盒容器内指定路径。自动在聊天历史中查找匹配文件名的文件",
+    "description": "将聊天上下文中的文件上传到沙盒内指定路径。自动在聊天历史中查找匹配文件名的文件",
     "properties": {
         "file_name": {
             "type": "string",
@@ -48,5 +48,5 @@ async def main(file_name: str, message_data: atriMessageEvent, dest: str = "") -
         )
     except Exception as e:
         return f"[Error]读取文件{file_name}失败: {e}"
-    await _upload_bytes_to_container(content=content, remote_path=remote_path)
+    await _upload_bytes_to_sandbox(content=content, remote_path=remote_path)
     return f"已上传 {file_name} → {remote_path} ({len(content)} 字节)"

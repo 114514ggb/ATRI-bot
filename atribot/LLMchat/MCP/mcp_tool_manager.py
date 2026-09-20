@@ -241,6 +241,9 @@ class MCPClient:
 class ToolManager(ServiceBase):
     """管理 MCP 连接生命周期"""
 
+    _CLEANUP_TIMEOUT = 8.0
+    """cleanup 时等待所有客户端终止的总超时（秒）"""
+
     def __init__(self, mcp_path: str | Path = "") -> None:
         self.log: Logger = container.get_by_type(Logger).getChild("MCPManager")
         """日志配置"""
@@ -256,6 +259,8 @@ class ToolManager(ServiceBase):
         """MCP配置文件路径"""
         self._mcp_service_task: asyncio.Task | None = None
         """MCP 服务控制后台任务"""
+        self._wrapper_tasks: set[asyncio.Task] = set()
+        """各客户端的初始化/终止 wrapper 任务，关闭时统一回收"""
         self._on_tools_changed: Callable[[str | None, List], None] | None = None
         """MCP 工具变更回调：(server_name | None, mcp_func_list) -> None"""
 
@@ -267,8 +272,30 @@ class ToolManager(ServiceBase):
         return instance
 
     async def cleanup(self) -> None:
-        self.mcp_service_queue.put_nowait({"type": "terminate"})
-        await asyncio.sleep(0)
+        """终止所有 MCP 客户端并回收控制任务"""
+        for event in self.mcp_client_event.values():
+            event.set()
+
+        if self._wrapper_tasks:
+            done, pending = await asyncio.wait(
+                set(self._wrapper_tasks), timeout=self._CLEANUP_TIMEOUT
+            )
+            if pending:
+                self.log.warning(
+                    f"MCP 客户端清理在 {self._CLEANUP_TIMEOUT}s 内未完成，剩余客户端将在后台继续退出"
+                )
+                # 只请求取消不等待：可能卡在不可取消的关闭里，交由进程收尾兜底
+                for task in pending:
+                    task.cancel()
+
+        if self.mcp_client_dict:
+            # 兜底：关闭没有存活 wrapper 的客户端（尽力而为，同样有超时上限）
+            orphan_task = asyncio.create_task(self.terminate())
+            orphan_task.add_done_callback(self._drain_task_result)
+            done, pending = await asyncio.wait({orphan_task}, timeout=1.0)
+            if pending:
+                pending.pop().cancel()
+
         if self._mcp_service_task is not None:
             self._mcp_service_task.cancel()
             with suppress(asyncio.CancelledError):
@@ -289,6 +316,18 @@ class ToolManager(ServiceBase):
         """触发工具变更回调"""
         if self._on_tools_changed is not None:
             await self._on_tools_changed(server_name, list(self._mcp_func_list))
+
+    def _spawn_mcp_client_wrapper(self, name: str, cfg: dict, event: asyncio.Event) -> None:
+        """创建客户端 wrapper 任务并登记，避免留下不受控的裸任务"""
+        task = asyncio.create_task(self._init_mcp_client_task_wrapper(name, cfg, event))
+        self._wrapper_tasks.add(task)
+        task.add_done_callback(self._wrapper_tasks.discard)
+
+    @staticmethod
+    def _drain_task_result(task: asyncio.Task) -> None:
+        """取走任务异常，避免超时弃置的任务触发 'exception was never retrieved' 警告"""
+        if not task.cancelled():
+            task.exception()
 
     async def _init_mcp_clients(self) -> None:
         """读取 mcp_server.json 文件，初始化 MCP 服务列表。文件格式如下：
@@ -325,9 +364,7 @@ class ToolManager(ServiceBase):
             cfg = mcp_server_json_obj[name]
             if cfg.get("active", True):
                 event = asyncio.Event()
-                asyncio.create_task(
-                    self._init_mcp_client_task_wrapper(name, cfg, event)
-                )
+                self._spawn_mcp_client_wrapper(name, cfg, event)
                 self.mcp_client_event[name] = event
 
     async def mcp_service_selector(self):
@@ -348,11 +385,7 @@ class ToolManager(ServiceBase):
             if data["type"] == "init":
                 if "name" in data:
                     event = asyncio.Event()
-                    asyncio.create_task(
-                        self._init_mcp_client_task_wrapper(
-                            data["name"], data["cfg"], event
-                        )
-                    )
+                    self._spawn_mcp_client_wrapper(data["name"], data["cfg"], event)
                     self.mcp_client_event[data["name"]] = event
                 else:
                     await self._init_mcp_clients()

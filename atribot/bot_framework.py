@@ -33,8 +33,7 @@ from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.message_sender import MessageSender
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.private_chat_trigger import privateChatTrigger
-from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
-from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
+from atribot.LLMchat.sandbox.factory import create_sandbox
 from atribot.LLMchat.skills.skills_manager import SkillsManager
 from atribot.LLMchat.token_manage import TokenManager
 from atribot.plugins.manager import PluginManager
@@ -200,8 +199,9 @@ class BotFramework:
 
     async def _start_sandbox(self) -> None:
         """启动 LLM 可选沙盒"""
+        sandbox_config: dict = getattr(self.config, "sand_box", None) or {}
         try:
-            sand_box: SandBoxBase = DockerSandbox(config=self.config.sand_box)
+            sand_box = create_sandbox(sandbox_config)
             await sand_box.start()
             container.register("SandBox", sand_box, cleanup=sand_box.stop)
         except Exception as e:
@@ -321,6 +321,15 @@ class BotFramework:
 
         await self._stop_admin_panel()
         await self._cancel_background_tasks()
+
+        # 调度器没有注册容器 cleanup，这里显式停止，
+        # 避免其主循环拖到事件循环收尾才被取消（关机日志会停在莫名的一行）
+        if container.exists("TimeTriggerSupervisor"):
+            try:
+                await container.get("TimeTriggerSupervisor").stop()
+            except Exception:
+                self.log.exception("停止调度器失败，忽略并继续关闭")
+
         await container.shutdown()
 
         self._is_shutdown = True
@@ -340,9 +349,14 @@ class BotFramework:
             return
 
         try:
-            await asyncio.wait_for(asyncio.shield(panel_task), timeout=3.0)
+            # uvicorn 的 timeout_graceful_shutdown=3，这里等待时间必须比它长：
+            # 面板页还挂着 WebSocket 连接时，uvicorn 优雅关闭恰好需要约 3s，
+            # 等待时间相等必然超时，导致 uvicorn 关闭被取消、内部任务残留到收尾
+            await asyncio.wait_for(asyncio.shield(panel_task), timeout=8.0)
         except (TimeoutError, asyncio.CancelledError):
-            pass
+            # 强制退出标记：确保 panel_task 随后被取消时 uvicorn 能立即停下
+            if self._admin_server is not None:
+                self._admin_server.force_exit = True
 
     async def _cancel_background_tasks(self) -> None:
         """取消并等待所有受控后台任务"""

@@ -15,6 +15,8 @@ import { supplierView } from './views/supplier.js';
 import { mcpView } from './views/mcp.js';
 import { personasView } from './views/personas.js';
 import { logsView } from './views/logs.js';
+import { terminalView } from './views/terminal.js';
+import { sandboxView } from './views/sandbox.js';
 import { apiCallView } from './views/api-call.js';
 import { chatView } from './views/chat.js';
 
@@ -23,6 +25,8 @@ import { chatView } from './views/chat.js';
 registerRoute('dashboard', dashboardView);
 registerRoute('chat', chatView);
 registerRoute('logs', logsView);
+registerRoute('terminal', terminalView);
+registerRoute('sandbox', sandboxView);
 registerRoute('groups', groupsView);
 registerRoute('users', usersView);
 registerRoute('messages', messagesView);

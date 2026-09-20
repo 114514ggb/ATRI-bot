@@ -3,7 +3,10 @@ import base64
 import io
 import mimetypes
 import os
+import shutil
+import sys
 import tarfile
+import tempfile
 import uuid
 import zipfile
 
@@ -12,9 +15,10 @@ from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.chat_message_types import File, FileMessageSegment
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
-from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile
+from atribot.LLMchat.sandbox.no_sandbox import NoSandbox
+from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile, SandBoxBase
 
-sand_box:DockerSandbox = container.get("SandBox")
+sand_box: SandBoxBase = container.get("SandBox")
 
 _COLLECT_MAX_BYTES = 200 * 1024 * 1024
 """输入文件进沙盒的大小上限（与 send_file 的 200MB 读取上限对齐）"""
@@ -82,6 +86,51 @@ def session_workspace(group_id: int | None, user_id: int | None = None) -> str:
     return data_dir
 
 
+def is_local_sandbox() -> bool:
+    """当前沙盒是否为本地执行后端(no-sandbox)"""
+    return isinstance(sand_box, NoSandbox)
+
+
+def _python3_command() -> str:
+    """返回 shell 命令行中使用的 python 解释器
+
+    Windows 本地后端下 PATH 上的 python3 通常是无参即退出的应用商店存根,
+    因此改用当前进程解释器的绝对路径(带引号,兼容含空格路径)
+    """
+    if is_local_sandbox() and os.name == "nt":
+        return f'"{sys.executable}"' if sys.executable else "python"
+    return "python3"
+
+
+async def _ensure_sandbox_dirs(*dirs: str) -> None:
+    """确保沙盒内的目录存在
+
+    Docker 走 shell 的 mkdir -p;本地后端直接创建,不依赖 shell 命令
+    """
+    if isinstance(sand_box, NoSandbox):
+        for d in dirs:
+            os.makedirs(d, exist_ok=True)
+        return
+    await sand_box.run_command(f"mkdir -p {' '.join(dirs)}")
+
+
+async def _write_script(code: str, script_path: str) -> None:
+    """把代码写入沙盒内的脚本文件"""
+    if isinstance(sand_box, NoSandbox):
+        await _upload_bytes_to_sandbox(code.encode("utf-8"), script_path)
+        return
+    b64_code = base64.b64encode(code.encode("utf-8")).decode("utf-8")
+    await sand_box.run_command(f"echo {b64_code} | base64 -d > {script_path}")
+
+
+async def _cleanup_sandbox_dir(dir_path: str) -> None:
+    """删除沙盒内的临时目录"""
+    if isinstance(sand_box, NoSandbox):
+        await asyncio.to_thread(shutil.rmtree, dir_path, True)
+        return
+    await sand_box.run_command(f"rm -rf {dir_path}", timeout=5)
+
+
 def _safe_filename(name: str) -> str:
     """提取安全的文件名。
 
@@ -95,36 +144,114 @@ def _safe_filename(name: str) -> str:
     return safe_name or "input.bin"
 
 
-async def _upload_bytes_to_container(content: bytes, remote_path: str) -> None:
-    """将二进制内容上传到 Docker 容器。
+async def _upload_bytes_to_sandbox(content: bytes, remote_path: str) -> None:
+    """将二进制内容写入沙盒
+
+    Docker 后端走内存 tar + put_archive;其余后端(如本地 no-sandbox)
+    通过临时文件走统一的 upload_file 接口
 
     Args:
-        content: 要上传的二进制数据。
-        remote_path: 容器内的目标绝对路径。
+        content: 要写入的二进制数据。
+        remote_path: 沙盒内的目标绝对路径。
 
     Raises:
-        RuntimeError: 容器未初始化时抛出。
+        RuntimeError: Docker 容器未初始化时抛出。
     """
-    if not sand_box.container:
-        raise RuntimeError("Sandbox container is not initialized")
+    if isinstance(sand_box, DockerSandbox):
+        if not sand_box.container:
+            raise RuntimeError("Sandbox container is not initialized")
 
-    tar_stream = io.BytesIO()
-    file_name = os.path.basename(remote_path)
+        tar_stream = io.BytesIO()
+        file_name = os.path.basename(remote_path)
 
-    with tarfile.open(fileobj=tar_stream, mode="w") as tar:
-        info = tarfile.TarInfo(name=file_name)
-        info.size = len(content)
-        tar.addfile(info, io.BytesIO(content))
+        with tarfile.open(fileobj=tar_stream, mode="w") as tar:
+            info = tarfile.TarInfo(name=file_name)
+            info.size = len(content)
+            tar.addfile(info, io.BytesIO(content))
 
-    tar_stream.seek(0)
-    remote_dir = os.path.dirname(remote_path) or sand_box.work_dir
+        tar_stream.seek(0)
+        remote_dir = os.path.dirname(remote_path) or sand_box.work_dir
 
-    await sand_box.run_command(f"mkdir -p {remote_dir}")
-    await asyncio.to_thread(
-        sand_box.container.put_archive,
-        path=remote_dir,
-        data=tar_stream,
-    )
+        await sand_box.run_command(f"mkdir -p {remote_dir}")
+        await asyncio.to_thread(
+            sand_box.container.put_archive,
+            path=remote_dir,
+            data=tar_stream,
+        )
+        return
+
+    fd, tmp_path = tempfile.mkstemp(prefix="atri_upload_")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(content)
+        await sand_box.upload_file(tmp_path, remote_path)
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
+
+
+async def _collect_generated_files_local(
+    run_dir: str,
+    ignored_names: set[str],
+    max_file_size: int,
+    max_total_size: int,
+) -> tuple[list[GeneratedFile], str]:
+    """本地(no-sandbox)后端的文件收集实现,直接遍历运行目录
+
+    警告文案与 Docker 版保持一致,便于上层统一处理
+    """
+    warnings: list[str] = []
+    candidates: list[tuple[str, str]] = []
+    total_size = 0
+
+    if os.path.isdir(run_dir):
+        for root, _dirs, files in os.walk(run_dir):
+            for name in files:
+                if name in ignored_names:
+                    continue
+                full_path = os.path.join(root, name)
+                size = os.path.getsize(full_path)
+                if size > max_file_size:
+                    warnings.append(
+                        f"\n[System Warning] File '{name}' ignored. "
+                        f"Size ({size} bytes) exceeds limit ({max_file_size} bytes)."
+                    )
+                    continue
+                candidates.append((full_path, name))
+                total_size += size
+
+    if total_size > max_total_size:
+        return [], (
+            f"\n[System Warning] Generated files ignored. Total size ({total_size} bytes) "
+            f"exceeds limit ({max_total_size} bytes)."
+        )
+
+    if not candidates:
+        return [], "".join(warnings)
+
+    if len(candidates) == 1:
+        full_path, filename = candidates[0]
+        with open(full_path, "rb") as f:
+            content = f.read()
+        mime_type, _ = mimetypes.guess_type(filename)
+        return [
+            GeneratedFile(
+                path=filename,
+                content=content,
+                type=mime_type or "application/octet-stream",
+            )
+        ], "".join(warnings)
+
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for full_path, filename in candidates:
+            zip_file.write(full_path, arcname=filename)
+
+    return [
+        GeneratedFile(path="output.zip", content=zip_buffer.getvalue(), type="application/zip")
+    ], "".join(warnings)
 
 
 async def _collect_generated_files(
@@ -144,6 +271,11 @@ async def _collect_generated_files(
     Returns:
         tuple: (生成的 GeneratedFile 列表, 警告信息字符串)。
     """
+    if not isinstance(sand_box, DockerSandbox):
+        return await _collect_generated_files_local(
+            run_dir, ignored_names, max_file_size, max_total_size
+        )
+
     bits, _ = await asyncio.to_thread(sand_box.container.get_archive, run_dir)
     file_obj = io.BytesIO()
     downloaded_size = 0
@@ -256,7 +388,7 @@ async def run_python_code(
     ignored_names: set[str] = {script_name}
 
     try:
-        await sand_box.run_command(f"mkdir -p {run_dir}")
+        await _ensure_sandbox_dirs(run_dir)
 
         for index, file_item in enumerate(files or [], start=1):
             filename, content = await resolve_file_to_bytes(
@@ -266,14 +398,13 @@ async def run_python_code(
             )
             safe_name = _safe_filename(filename)
             remote_file_path = f"{run_dir}/{safe_name}"
-            await _upload_bytes_to_container(content=content, remote_path=remote_file_path)
+            await _upload_bytes_to_sandbox(content=content, remote_path=remote_file_path)
             ignored_names.add(safe_name)
 
-        b64_code = base64.b64encode(code.encode("utf-8")).decode("utf-8")
-        await sand_box.run_command(f"echo {b64_code} | base64 -d > {script_path}")
+        await _write_script(code, script_path)
 
         exec_result = await sand_box.run_command(
-            f"cd {run_dir} && python3 -u {script_name}",
+            f"cd {run_dir} && {_python3_command()} -u {script_name}",
             timeout=timeout,
         )
 
@@ -289,7 +420,7 @@ async def run_python_code(
 
     finally:
         if run_dir.startswith(sand_box.work_dir) and "run_" in run_dir:
-            await sand_box.run_command(f"rm -rf {run_dir}", timeout=5)
+            await _cleanup_sandbox_dir(run_dir)
 
     if exec_result is None:
         return ExecutionResult(
@@ -355,7 +486,7 @@ async def run_python_code_with_segments(
     ignored_names: set[str] = {script_name}
 
     try:
-        await sand_box.run_command(f"mkdir -p {data_dir} {shared_dir} {run_dir}")
+        await _ensure_sandbox_dirs(data_dir, shared_dir, run_dir)
 
         for segment in file_segments or []:
             if not segment.file_name:
@@ -366,14 +497,13 @@ async def run_python_code_with_segments(
             _, content = await resolve_file_to_bytes(
                 segment.url, segment.file_name, max_bytes=_COLLECT_MAX_BYTES
             )
-            await _upload_bytes_to_container(
-                content = content,
-                remote_path = f"{run_dir}/{segment.file_name}"
+            await _upload_bytes_to_sandbox(
+                content=content,
+                remote_path=f"{run_dir}/{segment.file_name}",
             )
             ignored_names.add(segment.file_name)
 
-        b64_code = base64.b64encode(code.encode("utf-8")).decode("utf-8")
-        await sand_box.run_command(f"echo {b64_code} | base64 -d > {script_path}")
+        await _write_script(code, script_path)
 
         env_prefix = (
             f"export GROUP_ID={session_id} "
@@ -384,7 +514,7 @@ async def run_python_code_with_segments(
             f"SHARED_DIR={shared_dir} && "
         )
         exec_result = await sand_box.run_command(
-            f"{env_prefix}cd {run_dir} && python3 -u {script_name}",
+            f"{env_prefix}cd {run_dir} && {_python3_command()} -u {script_name}",
             timeout=timeout,
         )
 
@@ -404,4 +534,4 @@ async def run_python_code_with_segments(
 
     finally:
         if run_dir.startswith(session_tmp_base) and "run_" in run_dir:
-            await sand_box.run_command(f"rm -rf {run_dir}", timeout=5)
+            await _cleanup_sandbox_dir(run_dir)

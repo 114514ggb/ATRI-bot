@@ -2,7 +2,9 @@ import logging
 import os
 import re
 import sys
+import time
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
 
 class ColoredFormatter(logging.Formatter):
@@ -30,6 +32,30 @@ class ColoredFormatter(logging.Formatter):
         formatter = logging.Formatter(log_fmt, datefmt="%m-%d %H:%M:%S")
         return formatter.format(record)
 
+class SafeTimedRotatingFileHandler(TimedRotatingFileHandler):
+    """轮转失败时降级为继续写当前文件的 TimedRotatingFileHandler
+
+    Windows 上若日志文件同时被其他进程打开（第二个实例、dev_server、编辑器等），
+    标准实现的 os.rename 会抛 PermissionError，且 rolloverAt 不前进，
+    导致之后每条日志都重试轮转、失败并刷 "--- Logging error ---"。
+    这里捕获失败：重开当前文件继续写，并把 rolloverAt 顺延一小段时间后重试。
+    """
+
+    retry_delay = 300
+    """轮转失败后到下次重试的间隔（秒）"""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            if self.shouldRollover(record):
+                self.doRollover()
+        except OSError:
+            # 多为文件被其他进程占用而无法改名：继续写当前文件，稍后重试
+            if self.stream is None:
+                self.stream = self._open()
+            self.rolloverAt = int(time.time()) + self.retry_delay
+        logging.FileHandler.emit(self, record)
+
+
 class Logger:
     def __init__(self, name='atri-bot', log_level=logging.DEBUG):
 
@@ -42,24 +68,25 @@ class Logger:
             console_handler.setFormatter(ColoredFormatter())
             self.logger.addHandler(console_handler)
 
-            log_dir = "atribot/log"
-            if not os.path.exists(log_dir):
-                os.makedirs(log_dir)
-            
-            file_handler = TimedRotatingFileHandler(
-                filename=f"{log_dir}/atri_log_",
-                when="midnight",  # 时间单位天
-                interval=1,       # 每1天
-                backupCount=7,    # 保留的文件数量
-                encoding='utf-8'
-            )
-            file_handler.suffix = "%Y-%m-%d.log"
-            file_handler.extMatch = re.compile(r"^\d{4}-\d{2}-\d{2}.log$")
-            file_handler.setFormatter(logging.Formatter(
-                "%(asctime)s [%(levelname)s] %(name)s | %(message)s (%(filename)s:%(lineno)d)",
-                datefmt="%m-%d %H:%M:%S"
-            ))
-            self.logger.addHandler(file_handler)
+            log_dir = Path(__file__).resolve().parents[1] / "log"
+            os.makedirs(log_dir, exist_ok=True)
+
+            # ATRI_FILE_LOG=0 时只输出到控制台
+            if os.environ.get("ATRI_FILE_LOG", "1") != "0":
+                file_handler = SafeTimedRotatingFileHandler(
+                    filename=str(log_dir / "atri_log_"),
+                    when="midnight",  # 时间单位天
+                    interval=1,       # 每1天
+                    backupCount=7,    # 保留的文件数量
+                    encoding='utf-8'
+                )
+                file_handler.suffix = "%Y-%m-%d.log"
+                file_handler.extMatch = re.compile(r"^\d{4}-\d{2}-\d{2}.log$")
+                file_handler.setFormatter(logging.Formatter(
+                    "%(asctime)s [%(levelname)s] %(name)s | %(message)s (%(filename)s:%(lineno)d)",
+                    datefmt="%m-%d %H:%M:%S"
+                ))
+                self.logger.addHandler(file_handler)
     
     def get_logger(self) -> logging.Logger:
         return self.logger
