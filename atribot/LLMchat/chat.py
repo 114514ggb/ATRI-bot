@@ -102,7 +102,12 @@ class ChatBasics(ABC):
         self.config: atriConfig = config
         self.log: Logger = log
         self.build_prompt = build_prompt()
-        
+
+        self._tool_preset_name: str
+        """工具预设名"""
+        self._tool_chat_type: str
+        """会话场景"""
+
         self.template_request_simplify :GenerationRequestSimplify
         """构建请求缓存"""
         
@@ -113,15 +118,17 @@ class ChatBasics(ABC):
             # "use_tools" : self.use_tools_conduct,
         }
 
-    def _prepare_round_toolset(self) -> ToolSet | None:
-        """为当前对话轮次创建独立的工具集合副本
+    def _prepare_round_toolset(self) -> ToolSet:
+        """为当前对话轮次现取工具集合（不缓存模板快照）
+
+        resolve_toolset 每次返回全新对象，可安全地被 enable_deferred_tools 修改；
+        因此重载工具、预设增删、沙盒启停等变化下一轮即生效。
 
         Returns:
-            本轮独立的工具集合副本；模板无工具集合时返回 None
+            本轮工具集合
         """
-        template_toolset = self.template_request_simplify.tool_json
-        return (
-            template_toolset.copy() if template_toolset is not None else None
+        return self.tool_calls.resolve_toolset(
+            preset=self._tool_preset_name, chat_type=self._tool_chat_type
         )
 
     @abstractmethod
@@ -504,13 +511,15 @@ class GroupChat(ChatBasics):
         
         self.api_order: list[dict[str, str]] = self.config.model.standby_model
         """备用api调用list"""
-        
+
+        self._tool_preset_name = "group_chat"
+        self._tool_chat_type = "group"
+
         self.template_request_simplify = GenerationRequestSimplify(
             model_api=self.model_api,
             model=model_name,
             parameter=self.config.model.chat_parameter,
             messages=None,
-            tool_json=self.tool_calls.resolve_toolset(preset="group_chat", chat_type="group"),
             visual_sense=self.visual_sense,
             audio_sense=self.audio_sense,
         )
@@ -1003,12 +1012,14 @@ class PrivateChat(ChatBasics):
 
         self.api_order: list[dict[str, str]] = self.config.model.standby_model
 
+        self._tool_preset_name = "private_chat"
+        self._tool_chat_type = "private"
+
         self.template_request_simplify = GenerationRequestSimplify(
             model_api=self.model_api,
             model=model_name,
             parameter=self.config.model.chat_parameter,
             messages=None,
-            tool_json=self.tool_calls.resolve_toolset(preset="private_chat", chat_type="private"),
             visual_sense=self.visual_sense,
             audio_sense=self.audio_sense,
         )

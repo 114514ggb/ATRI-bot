@@ -33,7 +33,7 @@ from atribot.LLMchat.memory.user_info_system import UserSystem
 from atribot.LLMchat.message_sender import MessageSender
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.private_chat_trigger import privateChatTrigger
-from atribot.LLMchat.sandbox.factory import create_sandbox
+from atribot.LLMchat.sandbox.factory import create_sandbox, resolve_sandbox_config
 from atribot.LLMchat.skills.skills_manager import SkillsManager
 from atribot.LLMchat.token_manage import TokenManager
 from atribot.plugins.manager import PluginManager
@@ -198,8 +198,14 @@ class BotFramework:
             container.register_class(service_cls, name=service_name)
 
     async def _start_sandbox(self) -> None:
-        """启动 LLM 可选沙盒"""
-        sandbox_config: dict = getattr(self.config, "sand_box", None) or {}
+        """启动 LLM 可选沙盒
+
+        本地直执行(none)后端的工作区默认落在 ``document/work``；docker / e2b
+        等隔离后端不受影响（容器内固定路径）。
+        """
+        raw_config: dict = getattr(self.config, "sand_box", None) or {}
+        document_root = getattr(getattr(self.config, "file_path", None), "document_root", None)
+        sandbox_config = resolve_sandbox_config(raw_config, document_root)
         try:
             sand_box = create_sandbox(sandbox_config)
             await sand_box.start()

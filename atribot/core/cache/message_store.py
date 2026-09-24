@@ -5,9 +5,7 @@ from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.onebot_event_types import (
-    GroupMessageEvent,
     MessageEvent,
-    MessageSentEvent,
     PostType,
 )
 
@@ -36,8 +34,8 @@ async def store_message_to_db(msg: atriMessageEvent) -> None:
     if group_id and group_id not in _seen_groups:
         _seen_groups.add(group_id)
         try:
-            if isinstance(ev, (GroupMessageEvent, MessageSentEvent)):
-                group_name = ev.primeval.get("group_name", "")
+            if group_name := ev.primeval.get("group_name"):
+                pass
             else:
                 group_name = "[unknown]"
 

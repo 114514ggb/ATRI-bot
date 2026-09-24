@@ -5,6 +5,14 @@ import { icon, toast, escapeHtml, confirmDialog, openModal, attachSuggest } from
 import { SCHEMA, CHAT_PARAM_DEFS, CHAT_PARAM_VALUE_TYPES } from '../config-schema.js';
 import { createJsonEditor } from '../components/json-editor.js';
 import * as kit from '../components/editor-kit.js';
+import {
+  bindChipInteractions,
+  readChips,
+  renderChips,
+  renderToolPresetModule,
+  setPresetChangeHandler,
+  validatePresetPairing,
+} from '../components/tool-preset-editor.js';
 
 let original = null; // 服务器当前配置（diff 基准）
 let formBase = null; // 表单渲染基础（源码→表单时更新）
@@ -15,7 +23,9 @@ let editor = null;
 let saveBar = null;
 let mode = 'form';
 let observer = null;
-let toolCatalog = null; // /api/tools 的缓存 {tools:[...]}，弹窗内可强制刷新
+/* 工具预设清单（config.json 中 tool_presets 的键）：
+   首次读取配置时确定，切回表单模式/回滚重载时重读，避免每轮渲染都重新枚举 */
+let presetKeysCache = [];
 
 /* ---------- 字段控件渲染 ---------- */
 
@@ -80,15 +90,6 @@ function renderControl(field, value) {
     default:
       return `<input class="input" type="text" data-path="${field.path}" data-ftype="text" value="${escapeHtml(String(v))}" placeholder="${field.optional ? '（可选）' : ''}">`;
   }
-}
-
-function renderChips(path, kind, values) {
-  const chips = values
-    .map((val, i) => `<span class="chip" data-i="${i}">${escapeHtml(String(val))}<button data-del="${i}" title="删除">${icon('x')}</button></span>`)
-    .join('');
-  return `<div class="chips" data-path="${path}" data-ftype="chips" data-kind="${kind}">
-    ${chips}<input placeholder="${kind === 'int' ? '输入 QQ 号/群号后回车' : '输入后回车添加'}">
-  </div>`;
 }
 
 function fieldHtml(field, value) {
@@ -259,277 +260,47 @@ function replaceChatParamRow(row, key, value) {
   refreshDirty();
 }
 
-/* 工具预设取值 → UI 状态：
-   null/缺省 = 不限制（全部工具）；数组 = 白名单；数组含 tool_search 或字典 = 默认+待发现 双列表 */
-function toolPresetState(value) {
-  if (value === null || value === undefined) return { isNull: true, isDict: false, def: [], deferred: [] };
-  if (Array.isArray(value)) {
-    return { isNull: false, isDict: value.includes('tool_search'), def: value, deferred: [] };
-  }
-  const def = Array.isArray(value.default) ? value.default : [];
-  const deferred = Array.isArray(value.deferred) ? value.deferred : [];
-  return { isNull: false, isDict: def.includes('tool_search') || deferred.length > 0, def, deferred };
+/* ---------- 工具预设（清单与取值均由 config.json 决定，不硬编码预设名） ---------- */
+
+/* tool_presets 必须是对象；写成数组/字符串等非法形态时按空处理（后端保存时会拦截） */
+function presetSourceOf() {
+  const raw = formBase?.tool_presets;
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
 }
 
-const TOOL_MODULE_TITLES = { private_chat: '私聊 private_chat', agency_Agent: '子代理 agency_Agent' };
-
-function renderToolModule(key, value) {
-  const st = toolPresetState(value);
-  const dim = st.isNull ? ' style="opacity:.4;pointer-events:none"' : '';
-  const body = st.isDict
-    ? `
-      ${toolListHead('默认工具 default · 直接暴露给模型，可直接调用', `__tools.${key}.default`)}
-      ${renderChips(`__tools.${key}.default`, 'str', st.def)}
-      ${toolListHead('待发现工具 deferred · 不直接暴露给模型', `__tools.${key}.deferred`)}
-      ${renderChips(`__tools.${key}.deferred`, 'str', st.deferred)}
-      <p class="field-desc">deferred 中的工具不出现在模型的工具列表里；模型须先调用 default 中的 <code>tool_search</code> 搜索到它，才会在当轮临时启用（仅当轮有效）。两条硬性规则（保存时会校验）：① default 必须保留 <code>tool_search</code>，否则整个 deferred 列表无效；② 配置了 <code>tool_search</code> 就必须在 deferred 中至少放一个工具，否则没有可发现的内容。若删除 default 中的 tool_search 且 deferred 为空，会自动切回单列表白名单模式。</p>`
-    : `
-      ${toolListHead('工具白名单 · 只有此处列出的工具会暴露给模型', `__tools.${key}`)}
-      ${renderChips(`__tools.${key}`, 'str', st.def)}
-      <p class="field-desc">列表为空 = 该模块没有任何可用工具。在上方输入 <code>tool_search</code> 并回车，自动切换为「默认 + 待发现」双列表模式（同群聊 group_chat）。</p>`;
-  return `<div class="field" data-tools-field="${key}">
-    <div class="toggle-row">
-      <div class="field-label" style="margin:0">${TOOL_MODULE_TITLES[key]} · 限制工具</div>
-      <label class="toggle"><input type="checkbox" data-tools-restrict="${key}" ${st.isNull ? '' : 'checked'}><span class="track"></span><span class="thumb"></span></label>
-    </div>
-    <p class="field-desc">开关开启 = 白名单模式：该模块只能使用下方列出的工具。开关关闭 = 不限制：向模型暴露全部已加载的工具（保存为 <code>null</code>，不推荐——其中包含禁言、执行命令等场景专用工具），下方列表不生效。</p>
-    <div class="tools-body"${dim}>${body}</div>
-  </div>`;
+/* 重算预设清单缓存：配置解析完成 / 源码模式切回表单 / 保存后调用 */
+function refreshPresetKeys() {
+  presetKeysCache = Object.keys(presetSourceOf());
 }
 
-/* 就地重渲染某个工具模块（切换 白名单 ⇄ 双列表 模式时使用） */
-function replaceToolModule(key, value) {
+/* 从 DOM 读回单个预设模块的取值（与 renderToolPresetModule 的形态判定保持一致） */
+function readPresetModule(key) {
   const wrap = document.querySelector(`[data-tools-field="${key}"]`);
-  if (!wrap) return;
-  const tmp = document.createElement('div');
-  tmp.innerHTML = renderToolModule(key, value);
-  wrap.replaceWith(tmp.firstElementChild);
-  refreshDirty();
+  if (!wrap) return undefined; /* 未渲染：交给 buildPayload 保留原值 */
+  const restrict = wrap.querySelector(`[data-tools-restrict="${key}"]`);
+  if (restrict && !restrict.checked) return null; /* 限制关闭 = null = 全部工具 */
+  const defEl = wrap.querySelector(`[data-path="__tools.${key}.default"]`);
+  if (!defEl) return readChips(wrap.querySelector(`[data-path="__tools.${key}"]`)); /* 单列表白名单 */
+
+  /* deferred 为空时双列表等价于白名单，统一回写成列表，避免产生歧义配置 */
+  const deferred = readChips(wrap.querySelector(`[data-path="__tools.${key}.deferred"]`));
+  const def = readChips(defEl);
+  return deferred.length ? { default: def, deferred } : def;
 }
 
-/* 删除工具 chip 后的联动：default 失去 tool_search 时收敛/告警 */
-function afterToolChipRemoved(fieldWrap) {
-  if (!fieldWrap || !fieldWrap.isConnected) return;
-  const key = fieldWrap.dataset.toolsField;
-  const defEl = fieldWrap.querySelector(`[data-path="__tools.${key}.default"]`);
-  if (!defEl) return; /* 单列表模式，无需处理 */
-  const defNames = readChips(defEl);
-  const deferredNames = readChips(fieldWrap.querySelector(`[data-path="__tools.${key}.deferred"]`) || document.createElement('div'));
-  if (defNames.includes('tool_search')) {
-    if (deferredNames.length === 0) {
-      toast('deferred 已清空：请至少添加一个待发现工具，或删除 default 中的 tool_search 切回白名单，否则无法保存', 'error', 6000);
-    }
-    return;
+function renderToolPresets() {
+  const presets = presetSourceOf();
+  if (!presetKeysCache.length) {
+    return `<div class="notice info">${icon('info')}<div>配置中尚无工具预设。可在源码模式向 <code>tool_presets</code> 添加预设名（对应 <code>atribot/LLMchat/chat.py</code> 等处的预设标识），保存后切回表单模式即可在此编辑。</div></div>`;
   }
-  if (deferredNames.length === 0) {
-    replaceToolModule(key, defNames);
-    toast('已切回工具白名单模式', 'info');
-  } else {
-    toast('default 中已没有 tool_search，deferred 里的工具将无法被模型发现', 'error');
-  }
-}
-
-function renderToolPresets(presets) {
-  const gc = presets?.group_chat || {};
-  const gcDef = Array.isArray(gc.default) ? gc.default : [];
-  const gcDeferred = Array.isArray(gc.deferred) ? gc.deferred : [];
-
   return `
-    <div class="notice info">${icon('info')}<div><b>default</b> 中的工具直接暴露给模型；<b>deferred</b>（待发现）中的工具不直接暴露，模型需通过 default 里的 <code>tool_search</code> 搜索后才在当轮临时启用。<code>tool_search</code> 与 deferred 必须成对出现——配了 tool_search 就要在 deferred 中至少放一个工具，配了 deferred 就必须把 tool_search 加进 default，否则保存时会被拦截。私聊 / 子代理在白名单里输入 <code>tool_search</code> 回车即可切换为双列表模式；「限制工具」开关关闭 = 保存为 null = 全部工具（不推荐）。</div></div>
+    <div class="notice info">${icon('info')}<div>预设清单取自 <code>config.json</code> 的 <code>tool_presets</code>（新增预设后需重新加载配置或切回表单模式）。<b>default</b> 中的工具直接暴露给模型；<b>deferred</b>（待发现）中的工具不直接暴露，模型需通过 default 里的 <code>tool_search</code> 搜索后才在当轮临时启用。<code>tool_search</code> 与 deferred 必须成对出现——配了 tool_search 就要在 deferred 中至少放一个工具，配了 deferred 就必须把 tool_search 加进 default，否则保存时会被拦截。在白名单里输入 <code>tool_search</code> 回车即可切换为双列表模式；「限制工具」开关关闭 = 保存为 <code>null</code> = 全部工具（不推荐）。</div></div>
     <div class="field-grid">
-      <div class="field span-2">
-        ${toolListHead('群聊 group_chat · 默认工具 default（直接暴露给模型）', '__tools.group_chat.default')}
-        ${renderChips('__tools.group_chat.default', 'str', gcDef)}
-      </div>
-      <div class="field span-2">
-        ${toolListHead('群聊 group_chat · 待发现工具 deferred（不直接暴露）', '__tools.group_chat.deferred')}
-        ${renderChips('__tools.group_chat.deferred', 'str', gcDeferred)}
-        <p class="field-desc">模型通过 default 中的 tool_search 搜索后本轮临时启用；default 必须包含 tool_search</p>
-      </div>
-      ${renderToolModule('private_chat', presets?.private_chat)}
-      ${renderToolModule('agency_Agent', presets?.agency_Agent)}
+      ${presetKeysCache.map((key) => renderToolPresetModule(key, presets[key])).join('')}
     </div>`;
 }
 
-/* ---------- 工具选择弹窗（数据来自 GET /api/tools） ---------- */
-
-const PICK_TITLES = {
-  '__tools.group_chat.default': '群聊 group_chat · 默认工具 default',
-  '__tools.group_chat.deferred': '群聊 group_chat · 待发现工具 deferred',
-  '__tools.private_chat.default': '私聊 private_chat · 默认工具 default',
-  '__tools.private_chat.deferred': '私聊 private_chat · 待发现工具 deferred',
-  '__tools.private_chat': '私聊 private_chat · 工具白名单',
-  '__tools.agency_Agent.default': '子代理 agency_Agent · 默认工具 default',
-  '__tools.agency_Agent.deferred': '子代理 agency_Agent · 待发现工具 deferred',
-  '__tools.agency_Agent': '子代理 agency_Agent · 工具白名单',
-};
-
-const SCOPE_BADGES = { group: '<span class="badge blue">群聊</span>', private: '<span class="badge purple">私聊</span>', both: '' };
-
-/* 列表标题行：标题 + 「从列表选择」按钮 */
-function toolListHead(label, path) {
-  return `<div class="tool-list-head">
-    <div class="field-label" style="margin:0">${label}</div>
-    <button type="button" class="btn sm ghost" data-tool-pick="${path}">${icon('edit')} 从列表选择</button>
-  </div>`;
-}
-
-async function fetchToolCatalog(force = false) {
-  if (toolCatalog && !force) return toolCatalog;
-  const res = await api.get('/tools');
-  if (!res || res.available === false) return null; /* bot 未启动 / ToolCalls 未注册 */
-  toolCatalog = { tools: res.tools || [] };
-  return toolCatalog;
-}
-
-/* 勾选结果写回 chips，并联动 白名单⇄双列表 模式切换 */
-function applyChips(path, names) {
-  const chipsEl = document.querySelector(`[data-path="${path}"]`);
-  if (!chipsEl) return;
-  const moduleField = chipsEl.closest('[data-tools-field]');
-  const moduleKey = moduleField?.dataset.toolsField || null;
-
-  /* 白名单勾入 tool_search → 自动升级为「默认+待发现」双列表（与手动输入一致） */
-  if (moduleKey && path === `__tools.${moduleKey}` && names.includes('tool_search')) {
-    replaceToolModule(moduleKey, { default: names, deferred: [] });
-    toast('已切换为「默认 + 待发现」双列表模式，请继续为 deferred 选择待发现工具', 'success');
-    return;
-  }
-
-  const tmp = document.createElement('div');
-  tmp.innerHTML = renderChips(path, 'str', names);
-  const fresh = tmp.firstElementChild;
-  chipsEl.replaceWith(fresh);
-  onFieldInput({ target: fresh });
-  refreshDirty();
-
-  /* default 勾掉 tool_search → 复用删除联动：deferred 空则收回白名单，非空则告警 */
-  if (moduleKey && path === `__tools.${moduleKey}.default` && !names.includes('tool_search')) {
-    afterToolChipRemoved(moduleField);
-  }
-}
-
-async function openToolPicker(path) {
-  const chipsEl = document.querySelector(`[data-path="${path}"]`);
-  if (!chipsEl) return;
-
-  let catalog;
-  try {
-    catalog = await fetchToolCatalog();
-  } catch (e) {
-    toast(`获取工具列表失败：${e.message}`, 'error', 5000);
-    return;
-  }
-  if (!catalog) {
-    toast('工具服务未就绪（bot 未启动或工具未加载），暂无法勾选，可继续手动输入工具名', 'error', 5000);
-    return;
-  }
-
-  const scope = path.includes('group_chat') ? 'group' : path.includes('private_chat') ? 'private' : null;
-  const scopeBadge = { group: '群聊', private: '私聊' };
-  const selected = new Set(readChips(chipsEl));
-
-  const rows = catalog.tools.map((t) => {
-    const off = t.active === false;
-    return `<label class="tool-pick-row${off ? ' inactive' : ''}"
-      data-namelc="${escapeHtml(t.name.toLowerCase())}" data-desclc="${escapeHtml((t.description || '').toLowerCase())}" data-scope="${escapeHtml(t.chat_scope || 'both')}">
-      <input type="checkbox" data-pick="${escapeHtml(t.name)}" ${selected.has(t.name) ? 'checked' : ''}${off ? ' disabled' : ''}>
-      <div class="tp-main">
-        <div class="tp-line">
-          <span class="tp-name mono">${escapeHtml(t.name)}</span>
-          ${t.source === 'mcp' ? `<span class="badge teal" title="MCP 服务: ${escapeHtml(t.mcp_server || '')}">MCP${t.mcp_server ? ` · ${escapeHtml(t.mcp_server)}` : ''}</span>` : '<span class="badge gray">本地</span>'}
-          ${SCOPE_BADGES[t.chat_scope] || ''}
-          ${off ? '<span class="badge red">未启用</span>' : ''}
-        </div>
-        <div class="tp-desc muted small">${escapeHtml(t.description || '（无描述）')}</div>
-      </div>
-    </label>`;
-  }).join('');
-
-  /* chips 里已有但不在当前工具目录中的名字（未加载/已改名/MCP 离线）：
-     渲染成置顶的「未加载」行并保持勾选，避免确认时被静默丢弃 */
-  const known = new Set(catalog.tools.map((t) => t.name));
-  const missingRows = [...selected].filter((n) => !known.has(n)).map((n) => `
-    <label class="tool-pick-row" data-namelc="${escapeHtml(n.toLowerCase())}" data-desclc="" data-scope="both">
-      <input type="checkbox" data-pick="${escapeHtml(n)}" checked>
-      <div class="tp-main">
-        <div class="tp-line">
-          <span class="tp-name mono">${escapeHtml(n)}</span>
-          <span class="badge orange">未加载</span>
-        </div>
-        <div class="tp-desc muted small">不在当前工具列表中（工具未加载、已改名或所属 MCP 服务离线）；保留勾选则配置维持原样</div>
-      </div>
-    </label>`).join('');
-
-  const modal = openModal({
-    title: `选择工具 · ${PICK_TITLES[path] || path}`,
-    wide: true,
-    bodyHtml: `
-      <div class="filter-bar">
-        <input class="input" id="tp-search" placeholder="搜索名称 / 描述" style="width:220px">
-        ${scope ? `<label class="check-row"><input type="checkbox" id="tp-scope" checked>仅适用${scopeBadge[scope]}场景</label>` : ''}
-        <span class="spacer"></span>
-        <button type="button" class="btn sm ghost" id="tp-refresh" title="重新拉取工具列表">${icon('refresh')} 刷新</button>
-      </div>
-      <div class="tool-pick-list" id="tp-list">${missingRows}${rows || (missingRows ? '' : '<p class="muted" style="padding:12px">当前没有已加载的工具</p>')}</div>
-      <p class="field-desc">勾选状态即该列表的最终内容（保存前不会写入配置）。未启用的工具无法勾选；场景不符的工具运行时会被剔除，建议只选适用的。</p>`,
-    actions: [
-      { label: '取消', class: 'ghost', onClick: ({ close }) => close() },
-      {
-        label: `确定（已选 ${selected.size}）`,
-        class: 'primary',
-        onClick: ({ close, el }) => {
-          const names = [...el.querySelectorAll('#tp-list input[data-pick]:checked')].map((c) => c.dataset.pick);
-          applyChips(path, names);
-          close();
-        },
-      },
-    ],
-  });
-
-  const root = modal.el;
-  const confirmBtn = root.querySelector('.modal-foot [data-action="1"]');
-  const updateCount = () => {
-    const n = root.querySelectorAll('#tp-list input[data-pick]:checked').length;
-    if (confirmBtn) confirmBtn.textContent = `确定（已选 ${n}）`;
-  };
-  const applyFilter = () => {
-    const q = root.querySelector('#tp-search')?.value.trim().toLowerCase() || '';
-    const scopeOnly = root.querySelector('#tp-scope')?.checked ?? false;
-    root.querySelectorAll('.tool-pick-row').forEach((row) => {
-      const checked = row.querySelector('input').checked;
-      const hitSearch = !q || row.dataset.namelc.includes(q) || row.dataset.desclc.includes(q);
-      const hitScope = !scopeOnly || checked || row.dataset.scope === 'both' || row.dataset.scope === scope;
-      row.classList.toggle('hidden', !(hitSearch && hitScope));
-    });
-  };
-
-  root.querySelector('#tp-search')?.addEventListener('input', applyFilter);
-  root.querySelector('#tp-scope')?.addEventListener('change', applyFilter);
-  root.querySelector('#tp-list').addEventListener('change', (e) => {
-    if (!e.target.matches('input[data-pick]')) return;
-    updateCount();
-    applyFilter(); /* 已勾选的行不受「仅适用场景」过滤影响 */
-  });
-  root.querySelector('#tp-refresh').addEventListener('click', async () => {
-    try {
-      const fresh = await fetchToolCatalog(true);
-      if (!fresh) { toast('工具服务未就绪，刷新失败', 'error'); return; }
-    } catch (e) {
-      toast(`刷新失败：${e.message}`, 'error', 5000);
-      return;
-    }
-    modal.close();
-    openToolPicker(path); /* 用新目录重开（勾选状态以当前 chips 为准） */
-  });
-  applyFilter();
-}
-
 /* ---------- DOM 读取 → payload ---------- */
-
-function readChips(el) {
-  return Array.from(el.querySelectorAll('.chip')).map((c) => c.textContent.trim());
-}
 
 export function buildPayload() {
   const data = kit.deepClone(formBase || {});
@@ -606,27 +377,14 @@ export function buildPayload() {
     else delete data.model.chat_parameter; /* 空 dict 在后端为 falsy，等价走内置默认参数，保持配置干净 */
   }
 
-  /* 工具预设 */
-  const tools = {};
-  tools.group_chat = {
-    default: readChips(document.querySelector('[data-path="__tools.group_chat.default"]') || document.createElement('div')),
-    deferred: readChips(document.querySelector('[data-path="__tools.group_chat.deferred"]') || document.createElement('div')),
-  };
-  for (const key of ['private_chat', 'agency_Agent']) {
-    const restrictEl = document.querySelector(`[data-tools-restrict="${key}"]`);
-    if (!restrictEl) { tools[key] = kit.getPath(formBase, `tool_presets.${key}`) ?? null; continue; }
-    if (!restrictEl.checked) { tools[key] = null; continue; } /* 限制关闭 = null = 全部工具 */
-    const defEl = document.querySelector(`[data-path="__tools.${key}.default"]`);
-    if (defEl) {
-      const def = readChips(defEl);
-      const deferred = readChips(document.querySelector(`[data-path="__tools.${key}.deferred"]`) || document.createElement('div'));
-      /* deferred 为空时双列表等价于白名单，统一回写成列表，避免产生歧义配置 */
-      tools[key] = deferred.length ? { default: def, deferred } : def;
-    } else {
-      tools[key] = readChips(document.querySelector(`[data-path="__tools.${key}"]`) || document.createElement('div'));
-    }
+  /* 工具预设：以配置中既有预设为基底增量覆盖（未渲染的预设原样保留，避免表单模式误删） */
+  const tools = { ...presetSourceOf() };
+  for (const key of presetKeysCache) {
+    const value = readPresetModule(key);
+    if (value !== undefined) tools[key] = value; /* undefined = 该预设未渲染，保留既有值 */
   }
-  data.tool_presets = tools;
+  if (Object.keys(tools).length) data.tool_presets = tools;
+  else delete data.tool_presets;
 
   return data;
 }
@@ -638,26 +396,8 @@ function findField(path) {
   return null;
 }
 
-/* 工具预设保存校验：tool_search 与 deferred 必须成对出现，缺一个就没有意义 */
-function validateToolPresets(payload) {
-  const errors = [];
-  const presets = payload?.tool_presets;
-  if (!presets || typeof presets !== 'object') return errors;
-  const labels = { group_chat: '群聊 group_chat', private_chat: '私聊 private_chat', agency_Agent: '子代理 agency_Agent' };
-  for (const [key, label] of Object.entries(labels)) {
-    const v = presets[key];
-    if (v === null || v === undefined) continue; /* null/缺省 = 全部或无工具，不涉及 deferred */
-    const def = Array.isArray(v) ? v : Array.isArray(v.default) ? v.default : [];
-    const deferred = Array.isArray(v?.deferred) ? v.deferred : [];
-    if (def.includes('tool_search') && deferred.length === 0) {
-      errors.push(`${label}：default 中配置了 tool_search，但 deferred 为空，没有可发现的内容。请在 deferred 中至少添加一个工具，或删除 tool_search 切回白名单模式`);
-    } else if (!def.includes('tool_search') && deferred.length > 0) {
-      errors.push(`${label}：配置了 deferred 工具，但 default 中没有 tool_search，这些工具将永远无法被模型发现。请把 tool_search 加进 default 或清空 deferred`);
-    }
-  }
-  return errors;
-}
-
+/* 工具预设保存校验：tool_search 与 deferred 必须成对出现，缺一个就没有意义
+   （预设名来自配置，逐项用 validatePresetPairing 校验） */
 /* 聊天请求参数保存校验（仅表单模式）：空键名 / 重复键 / 非法数字 / 非法 JSON，出错行标红 */
 function validateChatParams() {
   const errors = [];
@@ -698,7 +438,7 @@ function renderForm(section) {
     if (s.type === 'platforms') inner = renderPlatforms(formBase.platforms);
     else if (s.type === 'standby-list') inner = renderStandby(formBase.model?.standby_model);
     else if (s.type === 'chat-params') inner = renderChatParams(kit.getPath(formBase, s.path));
-    else if (s.type === 'tool-presets') inner = renderToolPresets(formBase.tool_presets);
+    else if (s.type === 'tool-presets') inner = renderToolPresets();
     else {
       inner = `<div class="field-grid">${s.fields.map((f) => fieldHtml(f, kit.getPath(formBase, f.path))).join('')}</div>`;
     }
@@ -714,9 +454,37 @@ function renderForm(section) {
 }
 
 let anchorLockUntil = 0; /* 点击锚点后的平滑滚动期间，不让 IntersectionObserver 抢走高亮 */
+let anchorOffsetObserver = null; /* 观察保存栏高度，驱动 --cfg-anchor-top */
 
 function setAnchorActive(id) {
   document.querySelectorAll('.config-anchor a').forEach((l) => l.classList.toggle('active', l.dataset.target === id));
+}
+
+/* 保存栏是 sticky 的（top:10px + 自身高度），会遮住左栏顶部与锚点目标区块的标题。
+   --cfg-anchor-top = 保存栏高度 + 22（保存栏自身 top 10 + 间距 12），喂给左栏 sticky top、
+   左栏最大高度与 .config-section 的 scroll-margin-top；窄屏保存栏换行时高度会变，靠 ResizeObserver 跟随. */
+function setupAnchorOffset(section) {
+  const bar = section.querySelector('#config-savebar');
+  if (!bar) return;
+  const apply = () => {
+    const h = Math.round(bar.getBoundingClientRect().height);
+    if (h > 0) section.style.setProperty('--cfg-anchor-top', `${h + 22}px`);
+  };
+  apply();
+  anchorOffsetObserver?.disconnect();
+  anchorOffsetObserver = new ResizeObserver(apply);
+  anchorOffsetObserver.observe(bar);
+}
+
+/* 锚点跳转：sticky 偏移的参考系是滚动容器的内容区，scrollIntoView/scroll-margin 的参考系是容器顶部
+   （不含容器 padding），因此这里手算滚动量并补上 padding-top，两种坐标系才对齐 */
+function scrollToSection(section, target) {
+  const scroller = section.closest('.view-scroll');
+  const padTop = parseFloat(getComputedStyle(scroller).paddingTop) || 0;
+  const barH = Math.round(section.querySelector('#config-savebar').getBoundingClientRect().height);
+  const offset = padTop + (barH > 0 ? barH + 22 : 0);
+  const relTop = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
+  scroller.scrollTo({ top: Math.max(0, scroller.scrollTop + relTop - offset), behavior: 'smooth' });
 }
 
 function bindForm(section) {
@@ -725,8 +493,10 @@ function bindForm(section) {
     a.addEventListener('click', () => {
       anchorLockUntil = Date.now() + 900;
       setAnchorActive(a.dataset.target);
+      /* 关掉入场动画：fade-slide-in 起始带 translateY(10px)，动画中途测量会让落点偏下 */
+      section.querySelector('.config-sections')?.classList.add('no-anim');
       const target = document.getElementById(`cfgsec-${a.dataset.target}`);
-      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (target) scrollToSection(section, target);
     });
   });
 
@@ -771,61 +541,13 @@ function bindForm(section) {
       card.replaceWith(tmp.firstElementChild);
       toast(`已切换 ${key} 的连接方式为 ${el.value}，请补全对应字段`, 'info');
     }
-    /* 工具「限制工具」开关 → 启用/禁用对应模块的工具列表 */
-    if (el.matches('[data-tools-restrict]')) {
-      const body = document.querySelector(`[data-tools-field="${el.dataset.toolsRestrict}"] .tools-body`);
-      if (body) {
-        body.style.opacity = el.checked ? '' : '0.4';
-        body.style.pointerEvents = el.checked ? '' : 'none';
-      }
-    }
   });
 
-  /* chips 交互（委托） */
-  section.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && e.target.matches('.chips input')) {
-      e.preventDefault();
-      const raw = e.target.value.trim();
-      if (!raw) return;
-      const chipsEl = e.target.closest('.chips');
-      const kind = chipsEl.dataset.kind;
-      if (kind === 'int' && !/^\d+$/.test(raw)) { toast('请输入纯数字 ID', 'error'); return; }
-      /* 白名单中输入 tool_search → 自动切换为「默认 + 待发现」双列表模式 */
-      const toolMod = chipsEl.dataset.path?.match(/^__tools\.(private_chat|agency_Agent)$/);
-      if (toolMod && raw === 'tool_search') {
-        const defNames = readChips(chipsEl);
-        if (!defNames.includes('tool_search')) defNames.push('tool_search');
-        replaceToolModule(toolMod[1], { default: defNames, deferred: [] });
-        toast('已切换为「默认 + 待发现」双列表模式，可在 deferred 中添加待发现工具', 'success');
-        return;
-      }
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.innerHTML = `${escapeHtml(raw)}<button data-del-x>${icon('x')}</button>`;
-      chipsEl.insertBefore(chip, e.target);
-      e.target.value = '';
-      onFieldInput({ target: chipsEl });
-    }
-  });
+  /* chips 回车添加 / chip 删除 / 「限制工具」开关 / 「从列表选择」统一由共享组件绑定，
+     保证配置页与聊天页工具弹窗行为一致（重复调用幂等） */
+  bindChipInteractions(section);
+
   section.addEventListener('click', (e) => {
-    const del = e.target.closest('[data-del]') || e.target.closest('[data-del-x]');
-    if (del) {
-      const chip = del.closest('.chip');
-      if (chip) {
-        const chipsEl = chip.parentElement; /* remove 后 parentElement 会变 null，先取 */
-        const toolsField = chip.closest('[data-tools-field]');
-        chip.style.transform = 'scale(0.7)'; chip.style.opacity = '0';
-        setTimeout(() => {
-          chip.remove();
-          afterToolChipRemoved(toolsField);
-          onFieldInput({ target: chipsEl });
-        }, 140);
-      }
-      return;
-    }
-    /* 「从列表选择」→ 打开工具勾选弹窗 */
-    const pickBtn = e.target.closest('[data-tool-pick]');
-    if (pickBtn) openToolPicker(pickBtn.dataset.toolPick);
     if (e.target.closest('#btn-add-platform')) promptAddPlatform();
   });
 
@@ -1052,7 +774,7 @@ async function save() {
   }
 
   /* 工具预设合法性校验：tool_search 必须搭配非空 deferred（反之亦然） */
-  const toolErrors = validateToolPresets(payload);
+  const toolErrors = Object.entries(payload?.tool_presets ?? {}).flatMap(([key, value]) => validatePresetPairing(key, value));
   if (toolErrors.length) {
     toast(`无法保存：${toolErrors[0]}${toolErrors.length > 1 ? `（还有 ${toolErrors.length - 1} 处工具预设问题）` : ''}`, 'error', 8000);
     return;
@@ -1077,6 +799,7 @@ async function save() {
     await api.post('/config', { content: JSON.stringify(payload, null, 2) });
     original = kit.deepClone(payload);
     formBase = kit.deepClone(payload);
+    refreshPresetKeys(); /* 清单随保存后的配置同步（源码模式增删的预设切回表单时即可见） */
     saveBar.setDirty(false);
     toast('配置已保存，已生成 .bak 备份', 'success');
     await kit.needsRestartFlow('主配置');
@@ -1112,6 +835,7 @@ async function load() {
   ]);
   original = JSON.parse(configRes.content);
   formBase = kit.deepClone(original);
+  refreshPresetKeys(); /* 预设清单随配置一起（重新）读取 */
   pathLabel = configRes.path;
   suppliers = supplierRes.suppliers || [];
   personas = personaRes.items || [];
@@ -1151,7 +875,10 @@ async function init(section) {
   });
 
   mode = 'form';
+  /* 工具预设编辑（chips 增删 / 模式切换 / 限制开关）后刷新保存栏 dirty 标记 */
+  setPresetChangeHandler(refreshDirty);
   renderForm(section);
+  setupAnchorOffset(section);
   setupSectionObserver(section);
 }
 
@@ -1170,6 +897,7 @@ function switchMode(next) {
     if (editor) {
       try { formBase = JSON.parse(editor.getContent()); } catch { /* keep */ }
     }
+    refreshPresetKeys(); /* 源码模式可能新增/删除预设，切回表单时重读清单 */
     sourceWrap.classList.add('hidden');
     formWrap.classList.remove('hidden');
     mode = 'form';
@@ -1202,6 +930,7 @@ function setupSectionObserver(section) {
 
 function destroy() {
   if (observer) { observer.disconnect(); observer = null; }
+  if (anchorOffsetObserver) { anchorOffsetObserver.disconnect(); anchorOffsetObserver = null; }
 }
 
 export const configView = { title: '主配置', init, destroy };

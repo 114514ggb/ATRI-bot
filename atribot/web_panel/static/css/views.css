@@ -134,14 +134,20 @@
 
 .config-layout { display: grid; grid-template-columns: 178px minmax(0, 1fr); gap: 22px; align-items: start; }
 
+/* 左栏锚点：可视高度与锚点跳转的补偿量。--cfg-anchor-top 由 config.js 按 sticky 保存栏的实测高度
+   写入（窄屏保存栏换行时会变高），这里只是首帧兜底；锚点落点由 scrollToSection() 精确计算 */
+#view-config { --cfg-anchor-top: 88px; }
+
 .config-anchor {
   position: sticky;
-  top: 0;
+  top: var(--cfg-anchor-top);
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 8px 0;
-  max-height: calc(100vh - var(--topbar-h) - 60px);
+  /* 视口高度减去顶栏与保存栏占位：窗口变矮时左栏可自行滚动（不设 overscroll-behavior，
+     列表没溢出时滚轮仍会正常带动右侧内容） */
+  max-height: calc(100dvh - var(--topbar-h) - var(--cfg-anchor-top) - 16px);
   overflow-y: auto;
 }
 
@@ -171,8 +177,12 @@
   box-shadow: var(--shadow-card);
   padding: 20px 24px;
   animation: fade-slide-in 0.4s var(--ease-out) backwards;
-  scroll-margin-top: 16px;
+  scroll-margin-top: var(--cfg-anchor-top);
 }
+
+/* 用户点过锚点后关闭入场动画：fade-slide-in 起始带 translateY(10px)，
+   动画未结束时的实时矩形会让 scrollIntoView 的位置偏差约 10px */
+.config-sections.no-anim .config-section { animation: none; }
 
 .config-section > h3 {
   margin: 0 0 2px;
@@ -1396,29 +1406,10 @@
 
 .chat-msg.assistant .chat-msg-action:hover { background: var(--border); color: var(--text-1); }
 
-/* ---------- 工具弹窗：待发现切换 pill ---------- */
-
-.chat-tool-defer {
-  cursor: pointer;
-  user-select: none;
-  font-size: 11px;
-  line-height: 1;
-  padding: 4px 9px;
-  border-radius: 999px;
-  background: var(--bg-hover);
-  color: var(--text-2);
-  border: 1px solid transparent;
-  white-space: nowrap;
-  transition: all 0.12s;
-}
-
-.chat-tool-defer:hover { border-color: var(--border); }
-
-.chat-tool-defer.on {
-  background: var(--orange-soft);
-  color: var(--orange);
-  border-color: var(--orange);
-}
+/* ---------- 工具弹窗 ----------
+   聊天页的工具预设弹窗直接复用配置页的工具预设模块
+   （components/tool-preset-editor.js：.field / .tool-list-head / .chips / .field-desc），
+   故不再有独立的 .chat-tool-* 样式 */
 
 .chat-edit-box {
   background: var(--bg-card);
@@ -1712,42 +1703,6 @@
 }
 .chat-drop-overlay.show { display: flex; }
 .chat-drop-overlay svg { width: 26px; height: 26px; }
-
-/* ---------- 工具选择弹窗 ---------- */
-
-.chat-tool-list {
-  max-height: 52vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin: 0 -6px;
-  padding: 0 6px;
-}
-
-.chat-tool-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  flex-wrap: wrap;
-}
-.chat-tool-item:hover { background: var(--bg-hover); }
-.chat-tool-item input[type='checkbox'] { accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
-.chat-tool-name { font-size: 13px; font-weight: 600; }
-
-.chat-tool-desc {
-  color: var(--text-3);
-  font-size: 12.5px;
-  flex: 1;
-  min-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* ---------- 移动端 ---------- */
 

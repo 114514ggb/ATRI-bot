@@ -123,8 +123,47 @@ async def api_tools(_: None = Depends(_auth)) -> Dict[str, Any]:
             server_count[entry["mcp_server"]] = server_count.get(entry["mcp_server"], 0) + 1
         tools.append(entry)
     tools.sort(key=lambda x: (x["source"], x["mcp_server"] or "", x["name"]))
+    sandbox_tools = _sandbox_tools_info(tc)
     mcp_servers = [{"name": n, "tool_count": c} for n, c in sorted(server_count.items())]
-    return {"available": True, "tools": tools, "mcp_servers": mcp_servers}
+    return {
+        "available": True,
+        "tools": tools,
+        "mcp_servers": mcp_servers,
+        "sandbox_tools": sandbox_tools,
+    }
+
+
+def _sandbox_tools_info(tc) -> Dict[str, Any]:
+    """汇总沙盒依赖工具的环境与启用状态（供面板展示/一键刷新）"""
+    try:
+        from atribot.LLMchat.tools.sandbox_tools import (
+            SANDBOX_TOOL_NAMES,
+            env_facts,
+            sandbox_active,
+        )
+
+        facts = env_facts()
+        return {
+            "names": list(SANDBOX_TOOL_NAMES),
+            "facts": facts,
+            "active": {name: sandbox_active(name) for name in SANDBOX_TOOL_NAMES},
+            "work_dir": facts.get("work_dir"),
+        }
+    except Exception as e:
+        return {"names": [], "facts": {}, "active": {}, "error": str(e)}
+
+
+@router.post("/api/tools/refresh")
+async def api_tools_refresh(_: None = Depends(_auth)) -> Dict[str, Any]:
+    """全量重载本地工具（沙盒环境/描述刷新），并重建 schema 缓存"""
+    tc = _tool_calls_service()
+    if tc is None:
+        raise HTTPException(status_code=503, detail="ToolCalls 服务未就绪")
+    try:
+        changed = tc.reload_local_tools()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"重载本地工具失败：{e}")
+    return {"status": "reloaded", "changed_tools": changed or []}
 
 
 def _tool_result_to_json(result: Any) -> Any:

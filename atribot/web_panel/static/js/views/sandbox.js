@@ -20,6 +20,7 @@ async function init(section) {
       <span class="sb-type js-type"></span>
       <span style="flex:1"></span>
       <button class="btn sm ghost js-refresh">${icon('refresh')} 刷新</button>
+      <button class="btn sm ghost js-sync-tools" title="按当前 config.json 重建沙盒并刷新沙盒工具的描述与启用状态">${icon('refresh')} 同步工具</button>
       <button class="btn sm ghost js-action" data-action="restart">${icon('refresh')} 重启</button>
       <button class="btn sm ghost js-action" data-action="stop">${icon('power')} 停止</button>
       <button class="btn sm primary js-action" data-action="start">${icon('activity')} 启动</button>
@@ -31,6 +32,7 @@ async function init(section) {
   const q = (sel) => section.querySelector(sel);
 
   q('.js-refresh').addEventListener('click', () => refresh(section));
+  q('.js-sync-tools').addEventListener('click', (e) => syncTools(section, e.currentTarget));
   section.querySelectorAll('.js-action').forEach((btn) => {
     btn.addEventListener('click', () => doAction(section, btn.dataset.action, btn));
   });
@@ -144,6 +146,28 @@ async function doAction(section, action, btn) {
     if (res.status === 'already_running') toast('沙盒已在运行中', 'info');
     else if (res.status === 'already_stopped') toast('沙盒本就未在运行', 'info');
     else toast(label, 'success');
+  } catch (e) {
+    toast(`${e.message}`, 'error');
+  } finally {
+    btn.innerHTML = original;
+    btn.classList.remove('loading');
+    await refresh(section);
+  }
+}
+
+async function syncTools(section, btn) {
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  try {
+    const res = await api.post('/sandbox/refresh-tools');
+    const changed = res.changed_tools || [];
+    toast(
+      changed.length
+        ? `沙盒已按当前配置重建，刷新了 ${changed.length} 个工具：${changed.join(', ')}`
+        : '沙盒已按当前配置重建，工具描述无变化',
+      'success'
+    );
   } catch (e) {
     toast(`${e.message}`, 'error');
   } finally {

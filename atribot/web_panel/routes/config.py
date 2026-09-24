@@ -1,6 +1,7 @@
 """配置管理：主配置 / 供应商配置 / MCP 配置的读写与回滚"""
 
 import json
+import logging
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List
@@ -12,7 +13,75 @@ from ..deps import _auth, _cfg, _read_config_text, _save_config_file
 
 router = APIRouter()
 
+log = logging.getLogger("atri-bot.WebPanelConfig")
+
 _VALID_CONN_TYPES = {"WebSocket_client", "WebSocket_server", "http"}
+
+_TOOL_SEARCH_NAME = "tool_search"
+
+
+def _name_list(key: str, group: str, raw: Any, errors: List[str]) -> List[str]:
+    """取某个分组的工具名列表：缺省视为空列表，非字符串数组则记错并返回空列表"""
+    if raw is None:
+        return []
+    if isinstance(raw, list) and all(isinstance(name, str) for name in raw):
+        return raw
+    errors.append(f"tool_presets.{key}.{group} 必须是字符串数组")
+    return []
+
+
+def _validate_tool_presets(data: dict) -> List[str]:
+    """校验 tool_presets：每项须为 null / 字符串数组 / {default,deferred}，且 tool_search 与 deferred 成对
+
+    与前端 components/tool-preset-editor.js 的 validatePresetPairing 规则一致，
+    兜住源码模式手改、聊天页保存等多条写入路径。
+    """
+    presets = data.get("tool_presets")
+    if presets is None:
+        return []
+    if not isinstance(presets, dict):
+        return ["tool_presets 必须是对象"]
+
+    errors: List[str] = []
+    for key, value in presets.items():
+        if value is None:  # null = 不限制（全部工具）
+            continue
+        if isinstance(value, list):  # 单列表 = 只有默认组
+            value = {"default": value}
+        elif not isinstance(value, dict):
+            errors.append(f"tool_presets.{key} 必须是 null、字符串数组或 {{default, deferred}} 对象")
+            continue
+
+        unknown = [group for group in value if group not in ("default", "deferred")]
+        if unknown:
+            errors.append(f"tool_presets.{key} 含未知分组: {', '.join(sorted(unknown))}")
+        default = _name_list(key, "default", value.get("default"), errors)
+        deferred = _name_list(key, "deferred", value.get("deferred"), errors)
+        if _TOOL_SEARCH_NAME in default and not deferred:
+            errors.append(f"tool_presets.{key}：default 含 tool_search 但 deferred 为空，没有可发现的内容")
+        elif _TOOL_SEARCH_NAME not in default and deferred:
+            errors.append(f"tool_presets.{key}：配置了 deferred 但 default 缺少 tool_search，这些工具无法被模型发现")
+    return errors
+
+
+def _reload_tool_presets() -> bool:
+    """把刚写盘的工具预设同步到运行中的 ToolCalls 与 atriConfig（面板与 bot 同进程）
+
+    不热重载的话会出现「配置页改了预设 → 聊天页仍旧值 → 聊天页保存又把改动覆盖」，
+    或「聊天页保存 → 点刷新工具 → 预设回退」（reload_local_tools 从 atriConfig 重读）。
+    独立面板/开发模式下没有 ToolCalls 服务，静默跳过。
+    """
+    from atribot.core.service_container import container
+
+    if not container.exists("ToolCalls"):
+        return False
+    try:
+        presets = _cfg().reload_section("tool_presets") or {}
+        container.get("ToolCalls").load_presets_from_config(presets)
+    except Exception as exc:  # 热重载失败不应影响保存结果
+        log.warning("工具预设热重载失败（配置已写入磁盘，重启后生效）: %s", exc)
+        return False
+    return True
 
 
 def _validate_main_config(data: dict) -> None:
@@ -48,6 +117,8 @@ def _validate_main_config(data: dict) -> None:
             if field not in database:
                 errors.append(f"database.{field} 不能为空")
 
+    errors.extend(_validate_tool_presets(data))
+
     if errors:
         raise HTTPException(status_code=400, detail="；".join(errors))
 
@@ -81,7 +152,8 @@ class ConfigBody(BaseModel):
 @router.post("/api/config")
 async def api_save_config(body: ConfigBody, _: None = Depends(_auth)) -> Dict[str, Any]:
     backup = _save_config_file(_cfg().config_file_path, body.content, _validate_main_config)
-    return {"status": "ok", "needs_restart": True, "backup": backup}
+    presets_reloaded = _reload_tool_presets()  # 工具预设立即生效，其余配置段仍需重启
+    return {"status": "ok", "needs_restart": True, "backup": backup, "presets_reloaded": presets_reloaded}
 
 
 @router.get("/api/supplier_config")
@@ -159,4 +231,10 @@ async def api_config_rollback(body: RollbackBody, _: None = Depends(_auth)) -> D
     shutil.copy2(backup, path)
     if previous is not None:
         backup.write_text(previous, encoding="utf-8")
-    return {"status": "ok", "restored_from": str(backup), "needs_restart": True}
+    presets_reloaded = _reload_tool_presets() if body.target == "config" else False
+    return {
+        "status": "ok",
+        "restored_from": str(backup),
+        "needs_restart": True,
+        "presets_reloaded": presets_reloaded,
+    }

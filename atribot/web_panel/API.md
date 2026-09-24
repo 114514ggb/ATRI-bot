@@ -86,8 +86,9 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/commands` | 命令注册表元数据：名称、描述、别名、权限等级、冷却、用法、示例、参数定义 |
-| GET | `/api/tools` | LLM 工具清单（本地 + MCP）。返回 `{available, tools, mcp_servers}`。单个 tool：`{name, description, parameters(JSON Schema), active, concurrent, background, chat_scope, source(local/mcp), mcp_server, source_detail, testable, testable_reason, presets}` |
+| GET | `/api/tools` | LLM 工具清单（本地 + MCP）。返回 `{available, tools, mcp_servers, sandbox_tools}`。单个 tool：`{name, description, parameters(JSON Schema), active, concurrent, background, chat_scope, source(local/mcp), mcp_server, source_detail, testable, testable_reason, presets}`；`sandbox_tools` 汇总沙盒依赖工具的环境事实与启用状态 `{names, facts, active, work_dir}` |
 | POST | `/api/tools/test` | 面板内试运行工具（60 秒超时）。Body：`{ "name": "...", "arguments": {...} }`。返回 `{ok, result, duration_ms}` 或 `{ok: false, error, duration_ms}`。依赖聊天上下文（message_data）的本地工具不可测，`testable=false` |
+| POST | `/api/tools/refresh` | 重跑各工具的动态 `tool_json`（沙盒环境描述/启用状态）并重建 schema 缓存。返回 `{status: "refreshed", changed_tools}`；ToolCalls 未就绪时 503 |
 
 ## 数据库控制台（database.py）
 
@@ -235,9 +236,10 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/sandbox/status` | `{configured, type, capabilities, backend, display, running, rows}`；沙盒未注册时只有前两项。`rows` 为状态展示行 |
-| POST | `/api/sandbox/start` | 启动沙盒（bot 启动时初始化失败的场景下面板可懒启动并注册进容器）。返回 `{status: "started"/"already_running", backend}` |
-| POST | `/api/sandbox/stop` | 停止沙盒。返回 `{status: "stopped"/"already_stopped"}`；未初始化 503 |
-| POST | `/api/sandbox/restart` | 重启沙盒。返回 `{status: "restarted", backend}` |
+| POST | `/api/sandbox/start` | 启动沙盒（bot 启动时初始化失败的场景下面板可懒启动并注册进容器）。返回 `{status: "started"/"already_running", backend}`；成功后自动刷新沙盒依赖工具的启用状态/描述 |
+| POST | `/api/sandbox/stop` | 停止沙盒。返回 `{status: "stopped"/"already_stopped"}`；未初始化 503；成功后自动刷新沙盒依赖工具 |
+| POST | `/api/sandbox/restart` | 重启沙盒。返回 `{status: "restarted", backend}`；成功后自动刷新沙盒依赖工具 |
+| POST | `/api/sandbox/refresh-tools` | 按当前 `config.json` 的 `sand_box` 段重建沙盒（原先运行中则启动新实例），并刷新沙盒依赖工具的 `active` 与描述。返回 `{status: "refreshed", backend, running, changed_tools}` |
 
 ### WebSocket `/api/ws/sandbox-terminal?token=`
 

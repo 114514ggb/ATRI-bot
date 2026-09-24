@@ -564,6 +564,27 @@ class atriConfig:
         """返回当前加载的配置文件绝对路径"""
         return self._config_file
 
+    def reload_section(self, key: str) -> Any:
+        """从配置文件重读某个顶层配置段并同步到内存（文件须已写盘）
+
+        self._raw_config 与 self._config（ConfigObject）是两份数据（嵌套字典会被递归拷贝），
+        因此必须同时更新，否则 getattr(config, key) 仍会读到启动时的旧值。
+
+        Args:
+            key (str): 顶层配置项名称，如 "tool_presets"
+
+        Returns:
+            Any: 同步后的值（配置中无此项时为 None）
+
+        Raises:
+            FileNotFoundError, json.JSONDecodeError: 文件不可读或非法
+        """
+        with open(self._config_file, "r", encoding="utf-8") as file_handler:
+            value = json.load(file_handler).get(key)
+        self._raw_config[key] = value
+        self._config[key] = ConfigObject(value) if isinstance(value, dict) else value
+        return value
+
     def __getattr__(self, name: str) -> Any:
         """代理获取配置项
 

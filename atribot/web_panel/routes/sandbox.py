@@ -11,7 +11,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, WebSocket
 
 from atribot.core.service_container import container
-from atribot.LLMchat.sandbox.factory import create_sandbox
+from atribot.LLMchat.sandbox.factory import create_sandbox, resolve_sandbox_config
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 
 from ..deps import _auth, _cfg, _ws_auth
@@ -28,9 +28,22 @@ def _sandbox() -> Optional[SandBoxBase]:
 
 def _sandbox_config() -> dict:
     try:
-        return (_cfg()._raw_config or {}).get("sand_box") or {}
+        config = _cfg()
+        raw = (config._raw_config or {}).get("sand_box") or {}
+        document_root = getattr(getattr(config, "file_path", None), "document_root", None)
+        return resolve_sandbox_config(raw, document_root)
     except Exception:
         return {}
+
+
+def _reload_sandbox_tools() -> Optional[list]:
+    """沙盒可用性变化后全量重载本地工具（失败不影响沙盒操作）"""
+    try:
+        from atribot.LLMchat.MCP.tool_calls import ToolCalls
+
+        return container.get_by_type(ToolCalls).reload_local_tools()
+    except Exception:
+        return None
 
 
 async def _send(websocket: WebSocket, payload: dict) -> None:
@@ -77,6 +90,7 @@ async def api_sandbox_start(_: None = Depends(_auth)) -> dict:
             await sb.start()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"沙盒启动失败：{e}")
+    _reload_sandbox_tools()
     return {"status": "started", "backend": sb.backend}
 
 
@@ -91,6 +105,7 @@ async def api_sandbox_stop(_: None = Depends(_auth)) -> dict:
         await sb.stop()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"沙盒停止失败：{e}")
+    _reload_sandbox_tools()
     return {"status": "stopped"}
 
 
@@ -103,7 +118,43 @@ async def api_sandbox_restart(_: None = Depends(_auth)) -> dict:
         await sb.restart()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"沙盒重启失败：{e}")
+    _reload_sandbox_tools()
     return {"status": "restarted", "backend": sb.backend}
+
+
+@router.post("/api/sandbox/refresh-tools")
+async def api_sandbox_refresh_tools(_: None = Depends(_auth)) -> dict:
+    """重读 sand_box 配置并刷新依赖工具的启用状态与描述（无需重启进程）
+
+    会用当前 config.json 的 sand_box 段重建沙盒实例（未运行时仅注册不启动），
+    使切换 type / work_dir / tool_prompts 后立即可用。
+    """
+    config = _sandbox_config()
+    try:
+        new_sandbox = create_sandbox(config)
+
+        prev = _sandbox()
+        was_running = bool(prev is not None and prev.is_running)
+        if prev is not None:
+            try:
+                await prev.stop()
+            except Exception:
+                pass
+            container.unregister("SandBox")
+
+        if was_running:
+            await new_sandbox.start()
+        container.register("SandBox", new_sandbox, cleanup=new_sandbox.stop)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"沙盒重建失败：{e}")
+
+    changed = _reload_sandbox_tools()
+    return {
+        "status": "refreshed",
+        "backend": new_sandbox.backend,
+        "running": new_sandbox.is_running,
+        "changed_tools": changed or [],
+    }
 
 
 # ---------- 沙盒终端 ----------

@@ -1,3 +1,10 @@
+"""沙盒内 Python 代码执行引擎(供 ``run_python_code`` 工具使用)
+
+从原 ``atribot/LLMchat/tools/run_python_code/run_code.py`` 迁入；工具入口见
+:mod:`atribot.LLMchat.tools.sandbox_tools.tools`。所有沙盒访问均为惰性获取，
+模块导入期不触碰容器中的 SandBox 服务。
+"""
+
 import asyncio
 import base64
 import io
@@ -7,7 +14,6 @@ import shutil
 import sys
 import tarfile
 import tempfile
-import uuid
 import zipfile
 
 from atribot.common_utils import resolve_file_to_bytes
@@ -16,12 +22,19 @@ from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.chat_message_types import File, FileMessageSegment
 from atribot.LLMchat.sandbox.docker_sandbox import DockerSandbox
 from atribot.LLMchat.sandbox.no_sandbox import NoSandbox
-from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile, SandBoxBase
-
-sand_box: SandBoxBase = container.get("SandBox")
+from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile
+from atribot.LLMchat.tools.sandbox_tools.runtime import (
+    is_local_sandbox,
+    new_run_id,
+    require_sandbox,
+)
+from atribot.LLMchat.tools.sandbox_tools.workspace import (
+    session_dirs,
+    session_tmp_dir,
+)
 
 _COLLECT_MAX_BYTES = 200 * 1024 * 1024
-"""输入文件进沙盒的大小上限（与 send_file 的 200MB 读取上限对齐）"""
+"""输入文件进沙盒的大小上限(与 send_file 的 200MB 读取上限对齐)"""
 
 
 async def collect_context_file_segments(
@@ -30,8 +43,8 @@ async def collect_context_file_segments(
 ) -> list[FileMessageSegment]:
     """按文件名收集要进沙盒的输入文件段
 
-    优先使用事件上注入的 file_resolver（WebUI 附件注册表，返回本地路径段），
-    未注入时回退到 ChatManager 聊天上下文检索（QQ 平台，url 为网络地址）。
+    优先使用事件上注入的 file_resolver(WebUI 附件注册表，返回本地路径段)，
+    未注入时回退到 ChatManager 聊天上下文检索(QQ 平台，url 为网络地址)。
     只返回匹配到的段，缺失的文件名由调用方决定如何提示。
     """
     resolver = message_data.get_extra("file_resolver")
@@ -58,39 +71,6 @@ async def collect_context_file_segments(
     return segments
 
 
-def session_dirs(group_id: int | None, user_id: int | None = None) -> tuple[str, str, str, str]:
-    """返回会话工作区路由信息
-
-    群聊按群号隔离: {work_dir}/groups/<群号>/
-    私聊按用户隔离: {work_dir}/private/<QQ号>/
-    执行结束后只清理 tmp/run_{uuid} 临时目录,data/ 目录永久保留
-
-    Returns:
-        tuple: (data_dir, shared_dir, session_type, session_id)
-            data_dir 为该会话的持久化数据目录,shared_dir 为全局共享目录
-    """
-    if group_id is not None:
-        session_type = "group"
-        session_id = str(group_id)
-        session_root = f"{sand_box.work_dir}/groups/{session_id}"
-    else:
-        session_type = "private"
-        session_id = str(user_id) if user_id is not None else "anonymous"
-        session_root = f"{sand_box.work_dir}/private/{session_id}"
-    return f"{session_root}/data", f"{sand_box.work_dir}/shared", session_type, session_id
-
-
-def session_workspace(group_id: int | None, user_id: int | None = None) -> str:
-    """返回会话(群/私聊用户)的持久化数据目录(容器内绝对路径)"""
-    data_dir, _, _, _ = session_dirs(group_id, user_id)
-    return data_dir
-
-
-def is_local_sandbox() -> bool:
-    """当前沙盒是否为本地执行后端(no-sandbox)"""
-    return isinstance(sand_box, NoSandbox)
-
-
 def _python3_command() -> str:
     """返回 shell 命令行中使用的 python 解释器
 
@@ -107,6 +87,7 @@ async def _ensure_sandbox_dirs(*dirs: str) -> None:
 
     Docker 走 shell 的 mkdir -p;本地后端直接创建,不依赖 shell 命令
     """
+    sand_box = require_sandbox()
     if isinstance(sand_box, NoSandbox):
         for d in dirs:
             os.makedirs(d, exist_ok=True)
@@ -116,6 +97,7 @@ async def _ensure_sandbox_dirs(*dirs: str) -> None:
 
 async def _write_script(code: str, script_path: str) -> None:
     """把代码写入沙盒内的脚本文件"""
+    sand_box = require_sandbox()
     if isinstance(sand_box, NoSandbox):
         await _upload_bytes_to_sandbox(code.encode("utf-8"), script_path)
         return
@@ -125,6 +107,7 @@ async def _write_script(code: str, script_path: str) -> None:
 
 async def _cleanup_sandbox_dir(dir_path: str) -> None:
     """删除沙盒内的临时目录"""
+    sand_box = require_sandbox()
     if isinstance(sand_box, NoSandbox):
         await asyncio.to_thread(shutil.rmtree, dir_path, True)
         return
@@ -157,6 +140,7 @@ async def _upload_bytes_to_sandbox(content: bytes, remote_path: str) -> None:
     Raises:
         RuntimeError: Docker 容器未初始化时抛出。
     """
+    sand_box = require_sandbox()
     if isinstance(sand_box, DockerSandbox):
         if not sand_box.container:
             raise RuntimeError("Sandbox container is not initialized")
@@ -264,13 +248,14 @@ async def _collect_generated_files(
 
     Args:
         run_dir: 执行目录路径。
-        ignored_names: 需要忽略的文件名集合（通常是脚本本身和输入文件）
+        ignored_names: 需要忽略的文件名集合(通常是脚本本身和输入文件)
         max_file_size: 单个文件最大大小限制
         max_total_size: 所有文件总大小限制
 
     Returns:
         tuple: (生成的 GeneratedFile 列表, 警告信息字符串)。
     """
+    sand_box = require_sandbox()
     if not isinstance(sand_box, DockerSandbox):
         return await _collect_generated_files_local(
             run_dir, ignored_names, max_file_size, max_total_size
@@ -279,14 +264,14 @@ async def _collect_generated_files(
     bits, _ = await asyncio.to_thread(sand_box.container.get_archive, run_dir)
     file_obj = io.BytesIO()
     downloaded_size = 0
-    safe_download_limit = max_total_size + 1024 * 1024 
+    safe_download_limit = max_total_size + 1024 * 1024
 
     for chunk in bits:
         file_obj.write(chunk)
         downloaded_size += len(chunk)
         if downloaded_size > safe_download_limit:
             return [], "\n[System Warning] Archive download aborted. Size exceeds memory safety limit."
-    
+
     file_obj.seek(0)
 
     generated_files: list[GeneratedFile] = []
@@ -354,31 +339,30 @@ async def _collect_generated_files(
     return generated_files, "".join(warnings)
 
 
-
 async def run_python_code(
-    code: str, 
+    code: str,
     files: list[File] = None,
-    timeout: int = 30, 
+    timeout: int = 30,
     max_file_size: int = 20 * 1024 * 1024,
-    max_total_size: int = 150 * 1024 * 1024
-)->ExecutionResult:
+    max_total_size: int = 150 * 1024 * 1024,
+) -> ExecutionResult:
     """在沙盒中执行一次性python代码
 
     Args:
         code (str): 要执行的代码字符串
         files (list[File]): 要输入到环境的文件列表
-        timeout (int, optional): 执行超时时间（秒）. Defaults to 30.
-        max_file_size (int, optional): 单个文件最大字节数限制（仅在单文件模式下生效）. Defaults to 20*1024*1024.
-        max_total_size (int, optional): 产生的所有文件总大小限制（压缩前）. Defaults to 150*1024*1024.
+        timeout (int, optional): 执行超时时间(秒). Defaults to 30.
+        max_file_size (int, optional): 单个文件最大字节数限制(仅在单文件模式下生效).
+        max_total_size (int, optional): 产生的所有文件总大小限制(压缩前).
 
     Returns:
         ExecutionResult: 包含执行结果的对象
     """
+    sand_box = require_sandbox()
     if not sand_box.is_running:
         await sand_box.start()
 
-    run_id = uuid.uuid4().hex
-    run_dir = f"{sand_box.work_dir}/run_{run_id}"
+    run_dir = f"{sand_box.work_dir}/run_{new_run_id()}"
     script_name = "main.py"
     script_path = f"{run_dir}/{script_name}"
 
@@ -461,7 +445,7 @@ async def run_python_code_with_segments(
         group_id: 群号,群聊时用于隔离持久化工作区目录。
         user_id: 用户 QQ 号,私聊(group_id 为 None)时按用户隔离工作区目录。
         file_segments: 输入文件段列表。
-        timeout: 执行超时（秒）。
+        timeout: 执行超时(秒)。
         max_file_size: 单个文件大小限制。
         max_total_size: 生成文件总大小限制。
 
@@ -469,17 +453,16 @@ async def run_python_code_with_segments(
         ExecutionResult: 包含标准输出、错误输出、退出码及生成文件的对象
 
     Raises:
-        ValueError: 输入文件配置错误（如缺少文件名或非 HTTPS 链接）
+        ValueError: 输入文件配置错误(如缺少文件名或非 HTTPS 链接)
     """
+    sand_box = require_sandbox()
     if not sand_box.is_running:
         await sand_box.start()
 
     data_dir, shared_dir, session_type, session_id = session_dirs(group_id, user_id)
-    session_root = f"{sand_box.work_dir}/{'groups' if session_type == 'group' else 'private'}/{session_id}"
+    session_tmp_base = session_tmp_dir(group_id, user_id)
 
-    run_id = uuid.uuid4().hex
-    session_tmp_base = f"{session_root}/tmp"
-    run_dir = f"{session_tmp_base}/run_{run_id}"
+    run_dir = f"{session_tmp_base}/run_{new_run_id()}"
     script_name = "main.py"
     script_path = f"{run_dir}/{script_name}"
 
@@ -505,16 +488,23 @@ async def run_python_code_with_segments(
 
         await _write_script(code, script_path)
 
-        env_prefix = (
-            f"export GROUP_ID={session_id} "
-            f"GROUP_WORKSPACE={data_dir} "
-            f"SESSION_TYPE={session_type} "
-            f"SESSION_ID={session_id} "
-            f"SESSION_WORKSPACE={data_dir} "
-            f"SHARED_DIR={shared_dir} && "
-        )
+        env_vars = {
+            "GROUP_ID": session_id,
+            "GROUP_WORKSPACE": data_dir,
+            "SESSION_TYPE": session_type,
+            "SESSION_ID": session_id,
+            "SESSION_WORKSPACE": data_dir,
+            "SHARED_DIR": shared_dir,
+        }
+        if getattr(sand_box, "shell_kind", "sh") == "cmd":
+            env_prefix = "".join(f'set "{k}={v}" && ' for k, v in env_vars.items())
+            exec_cmd = f'{env_prefix}cd /d "{run_dir}" && {_python3_command()} -u {script_name}'
+        else:
+            env_prefix = "export " + " ".join(f"{k}={v}" for k, v in env_vars.items()) + " && "
+            exec_cmd = f"{env_prefix}cd {run_dir} && {_python3_command()} -u {script_name}"
+
         exec_result = await sand_box.run_command(
-            f"{env_prefix}cd {run_dir} && {_python3_command()} -u {script_name}",
+            exec_cmd,
             timeout=timeout,
         )
 

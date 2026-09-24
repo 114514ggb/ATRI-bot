@@ -6,9 +6,11 @@ WebSocket 负责收发消息与逐事件转发 Agent 流式输出。
 """
 
 import asyncio
+import json
 import secrets
+import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse
@@ -25,6 +27,7 @@ from ..deps import (
 )
 from . import chat_engine as engine
 from .chat_engine import registry
+from .config import _reload_tool_presets, _validate_tool_presets
 
 router = APIRouter()
 
@@ -41,12 +44,13 @@ async def api_chat_info(_: None = Depends(_auth)) -> Dict[str, Any]:
     preset_default: List[str] = []
     preset_deferred: List[str] = []
     tc = engine._tool_calls_service()
+    preset_names = list(tc.presets) if tc is not None else list((cfg._raw_config.get("tool_presets") or {}).keys())
     if tc is not None:
         try:
             toolset = tc.presets.get(engine.WEBUI_PRESET)
             if toolset is not None:
                 preset_default = list(toolset.names())
-            preset_deferred = list((tc._preset_manager.deferred or {}).get(engine.WEBUI_PRESET, []))
+            preset_deferred = tc.get_preset_deferred_names(engine.WEBUI_PRESET)
         except Exception:
             pass
 
@@ -58,9 +62,11 @@ async def api_chat_info(_: None = Depends(_auth)) -> Dict[str, Any]:
             "chat_parameter": chat_parameter,
         },
         "webui_preset": {
+            "name": engine.WEBUI_PRESET,
             "exists": preset_exists,
             "default": preset_default,
             "deferred": preset_deferred,
+            "preset_names": preset_names,
         },
         "limits": {
             "image": engine.IMAGE_LIMIT,
@@ -174,49 +180,65 @@ class ChatToolsBody(BaseModel):
     """待发现组目标名单；缺省表示不改动待发现组"""
 
 
+async def _sync_group(tc: Any, group: str, current: set, target: set) -> None:
+    """把 webui 预设某个分组的名单同步为 target（增删各一次写入，组间互斥由 ToolPresetManager 保证）"""
+    for op, names in (("remove", current - target), ("add", target - current)):
+        if names:
+            await tc.modify_preset_tools(engine.WEBUI_PRESET, op, sorted(names), group=group)
+
+
+def _create_webui_preset(name: str, tools: List[str], deferred: List[str]) -> None:
+    """在 config.json 中补齐缺失的预设段（仅用于固定预设，如 webui）
+
+    ToolPresetManager.modify_preset_tools 禁止新建预设，这里直接写盘 + 热重载，
+    否则用户在浏览器端遇到「预设不存在」就无路可走。
+    """
+    path = _cfg().config_file_path
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.setdefault("tool_presets", {})[name] = {"default": tools, "deferred": deferred} if deferred else tools
+
+    shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))  # 与 POST /api/config 一致，先备份再写
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+    _reload_tool_presets()
+
+
 @router.post("/api/chat/tools")
 async def api_chat_tools_save(body: ChatToolsBody, _: None = Depends(_auth)) -> Dict[str, Any]:
-    """把当前勾选的工具保存为 webui 预设的默认组与待发现组（持久化到 config.json）
+    """把当前编辑的工具列表保存为该预设的默认组与待发现组（持久化到 config.json）
 
-    传全量目标名单：先同步待发现组（跨组移动的工具会自动从默认组移除），
-    再同步默认组。两组互斥由 ToolPresetManager 保证。
+    传全量目标名单：先同步待发现组（跨组移动的工具会自动从默认组移除），再同步默认组。
+    两组互斥由 ToolPresetManager 保证；预设不存在时（被手删 / 从未配置）会直接创建。
     """
     tc = engine._tool_calls_service()
     if tc is None:
         raise HTTPException(503, "工具系统不可用（bot 未启动或 ToolCalls 未注册）")
 
-    toolset = tc.presets.get(engine.WEBUI_PRESET)
-    if toolset is None:
-        raise HTTPException(
-            status_code=400,
-            detail=f"工具预设 '{engine.WEBUI_PRESET}' 不存在，请先在 config.json 的 tool_presets 中添加",
-        )
+    name = engine.WEBUI_PRESET
+    target_tools = sorted(set(body.tools))
+    target_deferred = sorted(set(body.deferred)) if body.deferred is not None else None
+    pair_errors = _validate_tool_presets(
+        {"tool_presets": {name: {"default": target_tools, "deferred": target_deferred or []}}}
+    )
+    if pair_errors:
+        raise HTTPException(status_code=400, detail=pair_errors[0])
 
-    target_deferred: Optional[Set[str]] = None
+    if tc.presets.get(name) is None:
+        _create_webui_preset(name, target_tools, target_deferred or [])
+        return {"status": "ok", "created": True, "tools": target_tools, "deferred": target_deferred or []}
+
     try:
-        if body.deferred is not None:
-            target_deferred = set(body.deferred)
-            current_deferred = set((tc._preset_manager.deferred or {}).get(engine.WEBUI_PRESET, []))
-            for name in sorted(current_deferred - target_deferred):
-                await tc.modify_preset_tools(engine.WEBUI_PRESET, "remove", [name], group="deferred")
-            for name in sorted(target_deferred - current_deferred):
-                await tc.modify_preset_tools(engine.WEBUI_PRESET, "add", [name], group="deferred")
-
-        current = set(toolset.names())
-        target = set(body.tools)
-        to_remove = current - target
-        to_add = target - current
-        if to_remove:
-            await tc.modify_preset_tools(engine.WEBUI_PRESET, "remove", sorted(to_remove))
-        if to_add:
-            await tc.modify_preset_tools(engine.WEBUI_PRESET, "add", sorted(to_add))
+        if target_deferred is not None:
+            await _sync_group(tc, "deferred", set(tc.get_preset_deferred_names(name)), set(target_deferred))
+        await _sync_group(tc, "default", set(tc.presets[name].names()), set(target_tools))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    _reload_tool_presets()
     return {
         "status": "ok",
-        "tools": sorted(target),
-        "deferred": sorted(target_deferred) if target_deferred is not None
-        else sorted((tc._preset_manager.deferred or {}).get(engine.WEBUI_PRESET, [])),
+        "created": False,
+        "tools": target_tools,
+        "deferred": target_deferred if target_deferred is not None else sorted(tc.get_preset_deferred_names(name)),
     }
 
 

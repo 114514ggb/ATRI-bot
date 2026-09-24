@@ -4,12 +4,34 @@
 
 ## 目录约定
 
-- **一个工具 = 本目录下一个子目录，子目录里必须有 `__init__.py`**（复杂工具可在同目录放辅助模块，如 `run_python_code/run_code.py`）。
+- **一个工具 = 本目录下一个子目录，子目录里必须有 `__init__.py`**（复杂工具可在同目录放辅助模块，如 `schedule_self_trigger/trigger_scheduler.py`）。
 - `__init__.py` 里必须导出两个东西：
   - `tool_json`（dict）：工具的名称、描述和参数 JSON Schema；
   - `main`（async 函数）：工具执行入口。
 - 子目录名不必与工具名一致，**工具名以 `tool_json["name"]` 为准**。
 - 废弃的工具移到同级 `LLMchat/discard_tools/` 目录（不在加载路径内）。
+- **共享代码包**放在本目录下但需以 `_` 开头（如 `_shared/`）；没有导出 `main`/`tool_json` 的目录（如 `sandbox_tools` 这类共享包、或改用装饰器注册的工具）不会被当作工具注册。
+- 工具内**不要**在模块顶层获取可能不存在的服务（如 `container.get("SandBox")`）：`exec_module` 期间的任何异常都会让整个工具从注册表消失。请把获取放到 `main()` 里。
+
+> **沙盒依赖工具已合并**：`run_python_code` / `run_command` / `send_file` /
+> `add_file` 不再有独立目录，统一实现在 `sandbox_tools/`（`runtime` / `env` /
+> `workspace` / `execution` / `tools`），并由 `ToolCalls` 通过
+> `SANDBOX_TOOL_SPECS` 显式注册。
+
+## 全量重载本地工具
+
+本地工具不缓存描述/启用状态，聊天每轮都从注册表现取。需要让工具配置、沙盒
+启停或环境变化立即生效时，调用 `ToolCalls.reload_local_tools()`（移除全部
+本地工具后重新扫描目录与注册沙盒工具 → 重解析预设 → 重建 schema 缓存）。
+当前入口：聊天命令 `/tools reload`、WebUI `POST /api/sandbox/refresh-tools`
+与 `POST /api/tools/refresh`。
+
+- 沙盒依赖工具（`run_python_code` / `run_command` / `send_file` / `add_file`）
+  在 `sandbox_tools/tools.py` 中定义 handler，描述由
+  `sandbox_tools.env.build_tool_json(工具名, properties)` 按后端
+  （docker / 本机直执行 / e2b）× 平台在加载/重载时生成，并支持
+  `config.json` 的 `sand_box.tool_prompts` 追加或替换。
+- MCP 工具不参与重载（其有独立的增量同步/重连回调）。
 
 ## 最小示例
 
@@ -73,7 +95,7 @@ async def main(url: str, message_data: atriMessageEvent) -> str:
 | `deliver_image` / `deliver_file` / `deliver_merge_text` / `deliver_audio` / `deliver_music` | 发送便捷方法，自动区分群聊/私聊 |
 | `send_client` | 平台发送客户端（`send_group_msg` 等底层 API） |
 
-其他服务（数据库、配置、其他系统）在模块顶部用 `container.get(...)` / `container.get_by_type(...)` 获取，参考 `run_python_code`。
+其他服务（数据库、配置、其他系统）在模块顶部用 `container.get(...)` / `container.get_by_type(...)` 获取，参考 `sandbox_tools/tools.py`。
 
 ## `tool_json` 字段说明
 
@@ -135,7 +157,8 @@ async def sub_agent(...):
 ## 参考实现
 
 - 纯参数工具：`get_user_info`、`memory_search`
-- 会话上下文发送类：`send_image_message`、`send_speech_message`、`send_cloud_music`、`send_file`
+- 会话上下文发送类：`send_image_message`、`send_speech_message`、`send_cloud_music`
 - 限定会话类型：`set_group_ban`（`"chat_scope": "group"`）
-- 装饰器注册 + 辅助模块：`sub_agent`、`run_python_code`、`schedule_self_trigger`
+- 装饰器注册 + 辅助模块：`sub_agent`、`schedule_self_trigger`
+- 动态装饰器注册（环境描述）：`sandbox_tools/tools.py`（`run_python_code` / `run_command` / `send_file` / `add_file`）
 - JSON Schema 的 strict 模式写法另见 `atribot/docs/LLM_tool.md`

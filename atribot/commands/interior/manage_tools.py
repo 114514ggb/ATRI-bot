@@ -1,6 +1,3 @@
-import json
-
-from atribot.core.atri_config import atriConfig
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import MessageEventEnvelope
@@ -31,10 +28,7 @@ cmd_system:CommandSystem = container.get("CommandSystem")
 @cmd_system.argument(name="extra_arg", description="工具列表", required=False)
 async def manage_tools(message_data: MessageEventEnvelope, action: str, target: str | None = None, extra_arg: str | None = None) -> None:
     send_message = message_data.send_client
-    config:atriConfig = container.get("config")
     tool_calls_instance: ToolCalls = container.get("ToolCalls")
-    
-    config_path = config.config_file_path
 
     if action == "list":
         presets = tool_calls_instance.presets
@@ -68,14 +62,13 @@ async def manage_tools(message_data: MessageEventEnvelope, action: str, target: 
         await send_message.send_group_msg(message_data.group_id, f"✅ 预设 '{target}' 移除工具成功")
             
     elif action == "reload":
-        with open(config_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        presets = data.get("tool_presets", {})
-        
-        tool_calls_instance.presets.clear()
-        tool_calls_instance.load_presets_from_config(presets)
-        tool_calls_instance.build_tool_description_cache()
-        
-        await send_message.send_group_msg(message_data.group_id, "✅ 工具预设缓存已重载完成！")
+        # 全量重载本地工具（含预设重解析与沙盒工具描述/启用状态）
+        changed = tool_calls_instance.reload_local_tools()
+
+        await send_message.send_group_msg(
+            message_data.group_id,
+            "✅ 本地工具已全部重载！"
+            + (f"\n已重载 {len(changed)} 个本地工具" if changed else ""),
+        )
     else:
         raise ValueError("无效的操作类型。支持的类型有: list, add_tool, del_tool, reload")

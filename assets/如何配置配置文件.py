@@ -154,12 +154,19 @@
         #type 沙盒后端类型：
         #  "docker" (默认) Docker容器沙盒，参数见 atribot\LLMchat\sandbox\docker_sandbox.py
         #  "none"  「没有沙盒」，直接在本机执行命令和代码(无任何隔离，注意安全)，支持Linux/Windows
-        #          专属参数: "work_dir" 本地工作区根目录(默认 项目根/sandbox_workspace)、
+        #          专属参数: "work_dir" 本地工作区根目录(默认 document/work)、
         #                   "shell" 指定shell程序(默认自动: Linux用/bin/sh; Windows优先找Git Bash,找不到退回cmd)
         #          见 atribot\LLMchat\sandbox\no_sandbox.py
         #  "e2b"   E2B云端沙盒，参数见 atribot\LLMchat\sandbox\E2B_sandbox.py
+        #tool_prompts 给沙盒相关工具(run_python_code / run_command / send_file / add_file)追加或替换描述：
+        #  值写字符串 → 追加到内置环境描述之后；写 {"description":"...","append":"..."} → 整体替换 / 追加
+        #  例如 {"run_command": "本项目额外使用了 uv 管理依赖，python 请用 uv run python"}
+        #tools 显式启停沙盒工具(默认全部启用,沙盒不可用时全部自动禁用)：
+        #  例如 {"send_file": false} 表示不把 send_file 暴露给模型
         "type":"docker",
-        "image":"atri-sandbox:latest"#启动的镜像名称(docker后端)
+        "image":"atri-sandbox:latest",#启动的镜像名称(docker后端)
+        "tool_prompts":{},#按需追加/替换沙盒工具的环境描述
+        "tools":{}#按需单个启停沙盒工具
     },
     "tool_presets": {#各个聊天模块所使用的工具列表, 每一项对应 LLMchat/tools/ 下的一个工具目录名
         # group_chat / private_chat / agency_Agent 三个模块都支持三种取值:

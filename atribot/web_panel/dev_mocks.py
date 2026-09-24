@@ -298,6 +298,22 @@ class _MockPresetManager:
         }
         self.deferred = {"group_chat": ["run_python_code"], "webui": ["run_python_code"]}
 
+    def load_presets_from_config(self, presets_config, registry=None):
+        """与真实 ToolPresetManager 同语义：list / {default,deferred} / None 三种形态"""
+        self.presets = {}
+        self.deferred = {}
+        for name, value in (presets_config or {}).items():
+            if value is None:
+                names = [t.name for t in getattr(registry, "func_list", [])]
+            elif isinstance(value, dict):
+                self.deferred[name] = list(value.get("deferred") or [])
+                names = list(value.get("default") or [])
+            elif isinstance(value, list):
+                names = value
+            else:
+                continue
+            self.presets[name] = _MockToolset(names)
+
 
 class _MockRegistry:
     def __init__(self, func_list):
@@ -423,6 +439,7 @@ class _MockToolCalls(ToolCalls):
             ]
         )
         self._preset_manager = _MockPresetManager()
+        self._deferred_prompt_cache: dict = {}  # 基类 load_presets_from_config 会清空它
 
     @property
     def presets(self):
@@ -444,15 +461,41 @@ class _MockToolCalls(ToolCalls):
     def get_deferred_tools_prompt(self, preset, chat_type=None):
         return ""
 
-    async def modify_preset_tools(self, preset_name, op, tools):
+    async def modify_preset_tools(self, preset_name, op, tools, group="default"):
         toolset = self._preset_manager.presets.get(preset_name)
         if toolset is None:
             raise ValueError(f"预设 '{preset_name}' 不存在")
+        deferred = self._preset_manager.deferred.setdefault(preset_name, [])
         for name in tools:
-            if op == "add" and name not in toolset._names and self._registry.get_func(name):
-                toolset._names.append(name)
+            if group == "deferred":
+                if op == "add":
+                    if name not in deferred:
+                        deferred.append(name)
+                    if name in toolset._names:
+                        toolset._names.remove(name)  # 两组互斥
+                elif op == "remove" and name in deferred:
+                    deferred.remove(name)
+                continue
+            if op == "add":
+                if name not in toolset._names and self._registry.get_func(name):
+                    toolset._names.append(name)
+                if name in deferred:
+                    deferred.remove(name)  # 两组互斥
             elif op == "remove" and name in toolset._names:
                 toolset._names.remove(name)
+
+        # 与真实 ToolPresetManager 一致写回 config.json：保存后的热重载链路依赖这一步
+        from atribot.core.service_container import container
+
+        path = container.get("config").config_file_path
+        data = json.loads(path.read_text(encoding="utf-8"))
+        data.setdefault("tool_presets", {})[preset_name] = (
+            {"default": toolset.names(), "deferred": deferred}
+            if preset_name in self._preset_manager.deferred
+            else toolset.names()
+        )
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
 
     async def calls(self, tool_name: str, arguments_str: str, message_data=None):
         tool = self._registry.get_func(tool_name)

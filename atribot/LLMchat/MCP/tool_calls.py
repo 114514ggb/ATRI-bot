@@ -3,6 +3,7 @@ import importlib.util
 import json
 import os
 import re
+import shutil
 from logging import Logger
 from pathlib import Path
 from typing import Any, Dict, List
@@ -164,14 +165,23 @@ class ToolRegistry:
         """扫描工具目录，动态加载每个子目录中的 ``__init__.py``
 
         每个工具子目录应导出：
-        - ``tool_json`` (dict): 工具描述
+        - ``tool_json`` (dict): 工具的名称、描述和参数 JSON Schema
         - ``main`` (async function): 工具处理函数
+
+        未导出 ``main`` / ``tool_json`` 的子目录（如改用装饰器注册的工具、
+        共享代码包）不会被注册，仅打印提示日志。
+
+        Args:
+            folder_path: 工具根目录
         """
         default_module_name = "main"
 
-        for name in os.listdir(folder_path):
+        for name in sorted(os.listdir(folder_path)):
             dir_path = os.path.join(folder_path, name)
             if not os.path.isdir(dir_path):
+                continue
+            if name.startswith(".") or name.startswith("_"):
+                # 隐藏/私有目录
                 continue
 
             file_path = os.path.join(dir_path, "__init__.py")
@@ -238,6 +248,13 @@ class ToolRegistry:
             )
 
     @classmethod
+    def _store(cls, tool_json: dict, func: Any) -> None:
+        """按工具名幂等登记：全量重载会重新 exec 装饰器模块，避免同名条目累积"""
+        name = tool_json.get("name")
+        cls._registry[:] = [e for e in cls._registry if e[0].get("name") != name]
+        cls._registry.append((tool_json, func))
+
+    @classmethod
     def register(cls, tool_json: dict):
         """工具注册装饰器（完整 dict 参数）
 
@@ -255,7 +272,7 @@ class ToolRegistry:
         """
 
         def decorator(func: Any) -> Any:
-            cls._registry.append((tool_json, func))
+            cls._store(tool_json, func)
             return func
 
         return decorator
@@ -296,7 +313,7 @@ class ToolRegistry:
         }
 
         def decorator(func: Any) -> Any:
-            cls._registry.append((tool_json, func))
+            cls._store(tool_json, func)
             return func
 
         return decorator
@@ -438,6 +455,8 @@ class ToolPresetManager:
                 data["tool_presets"][preset_name] = toolset.names()
 
             # 持久化
+            if config_path.exists():
+                shutil.copy2(config_path, config_path.with_suffix(config_path.suffix + ".bak"))
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=4)
 
@@ -693,10 +712,14 @@ class ToolCalls(ServiceBase):
         self._executor = ToolExecutionEngine(self.log)
         self._deferred_prompt_cache: Dict[str, str] = {}
         """待发现工具提示词段落缓存"""
+        self._tool_path: Path = tool_path
+        """本地工具根目录"""
 
-        # 加载本地工具
-        self._registry.get_files_in_folder(str(tool_path))
+        self._registry.get_files_in_folder(
+            str(tool_path)
+        )
         self._registry._load_registered_tools()
+        self._load_sandbox_tools()
 
         # 同步 MCP 工具（可能尚未发现，后续通过回调增量更新）
         mcp_tools = self._tool_manager.get_mcp_func_tools()
@@ -991,6 +1014,62 @@ class ToolCalls(ServiceBase):
         """重建工具描述缓存"""
         self._schema_cache.build_tool_description_cache(self._registry.func_list)
 
+    def _load_sandbox_tools(self) -> None:
+        """加载/重载沙盒依赖工具（run_python_code / run_command / send_file / add_file）
+
+        按当前沙盒环境重新生成 tool_json（描述与 active），并注册到注册表；
+        add_func 按工具名去重，因此初始化与 reload_local_tools 可重复调用。
+        """
+        from atribot.LLMchat.tools.sandbox_tools import tools as sandbox_tools
+        from atribot.LLMchat.tools.sandbox_tools.env import build_tool_json
+
+        for name, handler, properties, defaults in sandbox_tools.SANDBOX_TOOL_SPECS:
+            tool_json = build_tool_json(name, properties, defaults)
+            self._registry.add_func(
+                name=name,
+                func_args=properties,
+                desc=tool_json["description"],
+                handler=handler,
+                active=tool_json.get("active", True),
+                chat_scope=tool_json.get("chat_scope", "both"),
+            )
+
+    def reload_local_tools(self) -> List[str]:
+        """全量重载本地工具（保留 MCP 工具）
+
+        移除全部本地工具后重新扫描工具目录、重跑装饰器注册与沙盒工具注册，
+        再按 config 重新解析预设、重建 schema 缓存并清空待发现提示词缓存。
+        MCP 工具不参与重载（其有独立的增量同步/重连回调）。
+
+        Returns:
+            本次重载的本地工具名列表
+        """
+        # 保留 MCP 工具，丢弃全部本地工具
+        self._registry.func_list = [
+            t for t in self._registry.func_list if isinstance(t, MCPTool)
+        ]
+
+        # 重扫目录工具
+        self._registry.get_files_in_folder(
+            str(self._tool_path)
+        )
+        # 装饰器注册的静态工具（sub_agent 等）
+        self._registry._load_registered_tools()
+        # 沙盒依赖工具（按当前环境重新生成描述与 active）
+        self._load_sandbox_tools()
+
+        # 预设重解析（ToolSet 持有 LocalTool 引用，需重绑到新对象）
+        config = container.get("config")
+        self._preset_manager.presets.clear()
+        self.load_presets_from_config(getattr(config, "tool_presets", {}) or {})
+
+        # 重建 schema 缓存
+        self._schema_cache.build_tool_description_cache(self._registry.func_list)
+
+        return [
+            t.name for t in self._registry.func_list if not isinstance(t, MCPTool)
+        ]
+
     def register_preset(self, preset_name: str, toolset: ToolSetModel) -> None:
         """注册一个工具预设组"""
         self._preset_manager.register_preset(preset_name, toolset)
@@ -1018,6 +1097,10 @@ class ToolCalls(ServiceBase):
     def presets(self) -> Dict[str, ToolSetModel]:
         """工具预设字典"""
         return self._preset_manager.presets
+
+    def get_preset_deferred_names(self, preset_name: str) -> List[str]:
+        """获取预设的待发现（deferred）工具名单；未配置时返回空列表"""
+        return list((self._preset_manager.deferred or {}).get(preset_name, []))
 
     @property
     def func_list(self) -> List[FunctionTool]:

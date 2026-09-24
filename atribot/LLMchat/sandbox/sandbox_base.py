@@ -54,6 +54,11 @@ class SandBoxBase(ABC):
     backend: str = "base"
     backend_display: str = "未知沙盒后端"
 
+    # 工作区根目录（容器内绝对路径 / 本机绝对路径），子类应覆盖
+    work_dir: str = "/workspace"
+    # shell 方言标识：sh / bash / cmd / powershell（工具描述据此提示命令写法）
+    shell_kind: str = "sh"
+
     def __init__(self, config: dict = None):
         self.config = config or {}
         self.is_running = False

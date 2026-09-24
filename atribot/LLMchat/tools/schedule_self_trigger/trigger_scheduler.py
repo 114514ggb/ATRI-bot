@@ -17,9 +17,6 @@ from atribot.core.type.bot_types import atriMessageEvent
 from atribot.core.type.onebot_event_types import OneBotEvent
 from atribot.LLMchat.chat import GroupChat, PrivateChat
 
-SCHEDULER_SERVICE_NAME = "SelfTriggerScheduler"
-"""调度器在服务容器中的注册名"""
-
 DEFAULT_STORE_FILENAME = "scheduled_triggers.json"
 """默认的持久化文件名"""
 
@@ -374,17 +371,15 @@ class SelfTriggerScheduler:
 
 
 def get_scheduler() -> SelfTriggerScheduler:
-    """获取(必要时创建)调度器单例
-
-    通过 container 以服务名注册来保证幂等: 工具的 __init__.py 会被动态加载器以
-    文件方式执行一次、又被真实包导入执行一次, 单例必须挂在 container 上才能避免
-    双实例与任务重复注册。
-    """
-    if container.exists(SCHEDULER_SERVICE_NAME):
-        return container.get(SCHEDULER_SERVICE_NAME)
+    """获取(必要时创建)调度器单例"""
+    
+    try:
+        return container.get_by_type(SelfTriggerScheduler)
+    except Exception:
+        pass
 
     scheduler = SelfTriggerScheduler()
-    container.register(SCHEDULER_SERVICE_NAME, scheduler)
+    container.register("SelfTriggerScheduler", scheduler)
 
     try:
         loop = asyncio.get_running_loop()

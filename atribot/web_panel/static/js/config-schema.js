@@ -106,9 +106,12 @@ export const SCHEMA = [
     id: 'sandbox',
     label: '沙盒',
     icon: 'terminal',
-    desc: 'LLM 代码执行沙盒（Docker），供 run_python_code 等工具使用。',
+    desc: 'LLM 代码执行沙盒，供 run_python_code / run_command / send_file / add_file 使用。工具描述按后端与平台自动生成，可在此追加定制。修改后可用「刷新工具」按钮（POST /api/sandbox/refresh-tools）立即生效，无需重启。',
     fields: [
-      { path: 'sand_box.image', label: 'Docker 镜像', type: 'text', span: true, desc: '如 atri-sandbox:latest' },
+      { path: 'sand_box.type', label: '后端类型', type: 'select', options: ['docker', 'none', 'e2b'], desc: 'docker=容器隔离；none=本机直执行（无隔离，注意安全）；e2b=云端沙盒' },
+      { path: 'sand_box.image', label: 'Docker 镜像', type: 'text', desc: '如 atri-sandbox:latest（仅 docker 后端使用）' },
+      { path: 'sand_box.work_dir', label: '工作区目录', type: 'text', span: true, optional: true, desc: '本机直执行后端的工作区根目录，留空默认 document/work' },
+      { path: 'sand_box.shell', label: 'Shell 程序', type: 'text', optional: true, desc: '本机直执行后端指定 shell，留空自动探测（Windows 优先 Git Bash，其次 cmd）' },
     ],
   },
   {
@@ -116,7 +119,7 @@ export const SCHEMA = [
     label: '工具预设',
     icon: 'sliders',
     type: 'tool-presets',
-    desc: '各聊天模块可用的工具，每一项对应 LLMchat/tools/ 下的工具目录名。default 中的工具直接暴露给模型；deferred 中的需模型通过 default 里的 tool_search 搜索后当轮临时启用；私聊/子代理的「限制工具」开关关闭 = 保存为 null = 全部工具（不推荐）。',
+    desc: 'deferred 中的需模型通过 default 里的 tool_search 搜索后当轮临时启用；「限制工具」开关关闭 = 保存为 null = 全部工具（不推荐，webui 关闭后聊天页将没有可用工具）。',
   },
   {
     id: 'whitelist',

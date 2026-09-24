@@ -46,7 +46,8 @@ class NoSandbox(SandBoxBase):
     - WSL 的 bash(System32 下)会被排除,避免文件系统映射混乱
 
     config 支持的键:
-        - work_dir: 本地工作区根目录,默认为 项目根目录/sandbox_workspace
+        - work_dir: 本地工作区根目录,默认为 项目根目录/sandbox_workspace;
+          正常启动时 bot 会注入 document/work(见 sandbox.factory.resolve_sandbox_config)
         - shell: 显式指定 shell 程序路径(如 "/bin/bash"、
           r"C:\\Program Files\\Git\\bin\\bash.exe"、"powershell"),
           默认按上述规则自动探测
@@ -54,6 +55,8 @@ class NoSandbox(SandBoxBase):
 
     backend = "no-sandbox"
     backend_display = "本机直执行（无隔离）"
+
+    shell_kind: str = "sh"
 
     def __init__(self, config: dict = None):
         super().__init__(config)
@@ -65,6 +68,7 @@ class NoSandbox(SandBoxBase):
         self._is_powershell = "powershell" in shell_prog or shell_prog == "pwsh"
         # 哨兵与 POSIX 拼接语法只适配 sh/bash/cmd；powershell 不支持面板终端
         self._posix_shell = not self._is_powershell and "cmd" not in shell_prog
+        self.shell_kind = self._detect_shell_kind(shell_prog)
 
         default_root = Path(__file__).resolve().parents[3]
         work_dir = self.config.get("work_dir") or (default_root / "sandbox_workspace")
@@ -72,6 +76,24 @@ class NoSandbox(SandBoxBase):
         self.work_dir: str = Path(work_dir).expanduser().resolve().as_posix()
 
         atexit.register(self._cleanup_sessions_sync)
+
+    @staticmethod
+    def _detect_shell_kind(shell_prog: str) -> str:
+        """按 shell 程序名推导方言标识（供工具描述提示命令写法）
+
+        Args:
+            shell_prog: shell 程序名（小写，不含路径）
+
+        Returns:
+            ``"cmd"`` / ``"powershell"`` / ``"bash"`` / ``"sh"``
+        """
+        if "cmd" in shell_prog:
+            return "cmd"
+        if "powershell" in shell_prog or shell_prog == "pwsh":
+            return "powershell"
+        if "bash" in shell_prog:
+            return "bash"
+        return "sh"
 
 
     async def start(self):
@@ -166,14 +188,21 @@ class NoSandbox(SandBoxBase):
                 pass
 
     async def _execute(
-        self, args: list[str], timeout: float | None = None, cwd: str | None = None
+        self,
+        args: list[str],
+        timeout: float | None = None,
+        cwd: str | None = None,
+        shell_command: str | None = None,
     ) -> ExecutionResult:
         """执行一个进程并收集输出,超时时杀死整个进程树
 
         Args:
-            args: 完整的进程启动参数
+            args: 完整的进程启动参数(shell_command 为空时使用)
             timeout: 超时秒数,None/0 表示不限时
             cwd: 工作目录,默认为 work_dir
+            shell_command: 非空时经平台默认 shell 执行该命令字符串。cmd.exe 的
+                引号解析与 MSVC(list2cmdline) 转义冲突(会把 " 变成 \"),
+                因此 Windows cmd 必须走 shell 拼接路径,与面板终端一致
 
         Returns:
             ExecutionResult: 超时时 exit_code 为 124,与 Docker 版保持一致
@@ -185,15 +214,18 @@ class NoSandbox(SandBoxBase):
             except OSError:
                 cwd = None
 
+        common = dict(
+            cwd=cwd,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            **self._spawn_kwargs(),
+        )
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *args,
-                cwd=cwd,
-                stdin=asyncio.subprocess.DEVNULL,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                **self._spawn_kwargs(),
-            )
+            if shell_command is not None:
+                proc = await asyncio.create_subprocess_shell(shell_command, **common)
+            else:
+                proc = await asyncio.create_subprocess_exec(*args, **common)
         except Exception as e:
             return ExecutionResult(stdout="", stderr=str(e), exit_code=-1, text=str(e))
 
@@ -258,6 +290,10 @@ class NoSandbox(SandBoxBase):
         if not self.is_running:
             raise RuntimeError("Sandbox is not running")
 
+        if self.shell_kind == "cmd":
+            # cmd.exe 不吃 MSVC 转义(list2cmdline 会把 " 变成 \")，命令里的引号会被
+            # 破坏，故改走 shell 拼接路径把命令字符串原样交给 cmd(与面板终端一致)
+            return await self._execute([], timeout=timeout, shell_command=command)
         return await self._execute([*self._shell_args, command], timeout=timeout)
 
     async def run_code(self, code: str, language: str = "python", timeout: int = 30) -> ExecutionResult:

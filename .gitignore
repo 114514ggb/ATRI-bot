@@ -14,6 +14,7 @@ test.py
 *.log
 assets/config.json
 assets/supplier_config.json
+config.json.bak
 
 # 图片
 /document/**/*.jpg

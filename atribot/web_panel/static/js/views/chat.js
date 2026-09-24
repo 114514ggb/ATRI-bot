@@ -3,6 +3,12 @@
 
 import { api, getToken } from '../api.js';
 import { icon, toast, escapeHtml, openModal, confirmDialog, fmtTokens } from '../ui.js';
+import {
+  bindChipInteractions,
+  readChips,
+  renderToolPresetModule,
+  validatePresetPairing,
+} from '../components/tool-preset-editor.js';
 
 const SETTINGS_KEY = 'atri_chat_settings_v1';
 const LAST_SESSION_KEY = 'atri_chat_last_session';
@@ -31,9 +37,8 @@ let lastUserMeta = null;
 let info = { defaults: {}, webui_preset: {}, limits: {} };
 let suppliers = [];
 let personas = [];
-let toolsData = { tools: [] };
 let sessions = [];
-let settings = { supplier: '', model: '', persona: 'none', tools: null, params: null };
+let settings = { supplier: '', model: '', persona: 'none', params: null };
 
 /* ---------- 设置持久化 ---------- */
 
@@ -42,6 +47,8 @@ function loadSettings() {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
     settings = { ...settings, ...saved };
   } catch { /* 忽略损坏的本地设置 */ }
+  /* 旧版本的「本轮自定义工具」旁路已废弃：工具集唯一来源是 config.json 的 webui 预设 */
+  delete settings.tools;
 }
 
 function saveSettings() {
@@ -75,7 +82,6 @@ function currentSettingsPayload() {
     model: settings.model,
     persona_key: settings.persona || 'none',
     custom_persona: settings.persona === 'custom' ? customPersonaText() : '',
-    tools: settings.tools,
     params: settings.params,
   };
 }
@@ -1076,134 +1082,88 @@ function openInitialSession(afterDelete) {
   else createSession();
 }
 
-/* ---------- 工具选择弹窗（默认启用 / 待发现 / 关闭 三态） ---------- */
+/* ---------- 工具预设弹窗（编辑 config.json 的 webui 预设，与配置页「工具预设」同界面同数据） ---------- */
 
-function openToolsModal() {
-  const presetMode = settings.tools === null;
-  const checkedSet = presetMode ? new Set(info.webui_preset?.default || []) : new Set(settings.tools || []);
-  const deferredDraft = new Set(info.webui_preset?.deferred || []);
-  /* 待发现组是 webui 预设级配置：改动仅暂存，保存预设时才持久化 */
+/* 默认预设名兜底（正常情况下由 /chat/info 的 webui_preset.name 提供） */
+const FALLBACK_PRESET = 'webui';
 
+function presetName() {
+  return info.webui_preset?.name || FALLBACK_PRESET;
+}
+
+async function refreshChatInfo() {
+  const res = await api.get('/chat/info');
+  info = { ...info, ...res };
+}
+
+/* 弹窗内当前编辑值 → 预设取值（空 deferred 时按白名单列表保存，避免产生歧义配置） */
+function presetValueFromInfo() {
+  const preset = info.webui_preset || {};
+  if (!preset.exists) return null; /* 缺失 → 渲染成空白名单，保存即创建 */
+  const def = preset.default || [];
+  const deferred = preset.deferred || [];
+  return deferred.length ? { default: def, deferred } : def;
+}
+
+/* 从弹窗 DOM 读回 默认组 / 待发现组（模块可能是白名单或双列表两种形态） */
+function readPresetDraft(root) {
+  const name = presetName();
+  const defEl = root.querySelector(`[data-path="__tools.${name}.default"]`);
+  if (!defEl) return { def: readChips(root.querySelector(`[data-path="__tools.${name}"]`)), deferred: [] };
+  return {
+    def: readChips(defEl),
+    deferred: readChips(root.querySelector(`[data-path="__tools.${name}.deferred"]`)),
+  };
+}
+
+async function openToolsModal() {
+  try {
+    await refreshChatInfo();
+  } catch (e) {
+    toast(`获取工具预设失败：${e.message}`, 'error', 5000);
+    return;
+  }
+
+  const name = presetName();
   const modal = openModal({
-    title: '本轮可用工具',
+    title: `工具预设 · ${name}（AI 聊天页）`,
     wide: true,
     bodyHtml: `
-      <div class="filter-bar" style="margin-bottom:10px">
-        <input class="input" id="chat-tool-search" placeholder="搜索工具名/描述…" style="max-width:260px">
-        <span class="spacer"></span>
-        <span class="badge ${presetMode ? 'blue' : 'gray'}" id="chat-tool-mode">${presetMode ? 'webui 预设' : '自定义选择'}</span>
-      </div>
-      <div class="chat-tool-list" id="chat-tool-list"></div>
-      <p class="muted small" style="margin-top:8px">
-        勾选 = 默认启用（直接进入本轮工具列表）；「待发现」= 不占上下文，仅在提示词中列出名字，
-        模型需要时先调用 tool_search 按需启用；两者互斥，都不选即关闭。
-      </p>`,
+      <div class="notice info">${icon('info')}<div>这里编辑的就是 <code>config.json</code> 的 <code>tool_presets.${escapeHtml(name)}</code>，与配置页「工具预设」区块共用同一份数据。<b>默认</b>中的工具直接进入本轮工具列表；<b>待发现</b>中的工具不占上下文，模型先调用 <code>tool_search</code> 按需启用，两者互斥。</div></div>
+      ${renderToolPresetModule(name, presetValueFromInfo(), { withToggle: false, nullAsEmpty: true })}
+      <p class="field-desc">保存后立即写入配置文件（同时生成 <code>.bak</code> 备份并在运行中热重载），无需重启。</p>`,
     actions: [
+      { label: '取消', class: 'ghost', onClick: ({ close }) => close() },
       {
-        label: '恢复 webui 预设',
-        class: 'ghost',
-        onClick: ({ close }) => {
-          settings.tools = null;
-          saveSettings();
-          checkedSet.clear();
-          (info.webui_preset?.default || []).forEach((n) => checkedSet.add(n));
-          deferredDraft.clear();
-          (info.webui_preset?.deferred || []).forEach((n) => deferredDraft.add(n));
-          modeBadge.textContent = 'webui 预设';
-          modeBadge.className = 'badge blue';
-          render();
-          toast('已恢复为 webui 预设', 'success');
-        },
-      },
-      {
-        label: '保存为 webui 预设',
-        class: 'ghost',
-        onClick: async ({ close, el: overlay }) => {
-          const picked = [...overlay.querySelectorAll('.chat-tool-check:checked')].map((c) => c.value);
+        label: '保存',
+        class: 'primary',
+        onClick: async ({ close, el }) => {
+          const { def, deferred } = readPresetDraft(el);
+          const errors = validatePresetPairing(name, deferred.length ? { default: def, deferred } : def);
+          if (errors.length) {
+            toast(errors[0], 'error', 8000);
+            return;
+          }
+          if (!def.length && !deferred.length) {
+            toast('工具列表为空：请至少勾选一个工具，或改用配置页的「限制工具」开关', 'error', 6000);
+            return;
+          }
           try {
-            await api.post('/chat/tools', { tools: picked, deferred: [...deferredDraft] });
-            settings.tools = null;
-            saveSettings();
-            const res = await api.get('/chat/info');
-            info = { ...info, ...res };
-            toast(`已保存：默认 ${picked.length} 个 · 待发现 ${deferredDraft.size} 个`, 'success');
+            await api.post('/chat/tools', { tools: def, deferred });
+            await refreshChatInfo();
             updateToolsCount();
+            toast(`已保存：默认 ${def.length} 个 · 待发现 ${deferred.length} 个`, 'success');
             close();
           } catch (e) {
-            toast(`保存失败：${e.message}`, 'error');
+            toast(`保存失败：${e.message}`, 'error', 5000);
           }
         },
       },
-      { label: '完成', class: 'primary', onClick: ({ close }) => { close(); } },
     ],
   });
 
-  const listEl = modal.el.querySelector('#chat-tool-list');
-  const searchEl = modal.el.querySelector('#chat-tool-search');
-  const modeBadge = modal.el.querySelector('#chat-tool-mode');
-
-  const render = () => {
-    const kw = (searchEl.value || '').trim().toLowerCase();
-    const items = (toolsData.tools || []).filter((t) =>
-      !kw || t.name.toLowerCase().includes(kw) || (t.description || '').toLowerCase().includes(kw));
-    listEl.innerHTML = items.map((t) => `
-      <label class="chat-tool-item">
-        <input type="checkbox" class="chat-tool-check" value="${escapeHtml(t.name)}" ${checkedSet.has(t.name) ? 'checked' : ''}>
-        <span class="mono chat-tool-name">${escapeHtml(t.name)}</span>
-        <span class="chat-tool-defer ${deferredDraft.has(t.name) ? 'on' : ''}" data-defer="${escapeHtml(t.name)}"
-              title="待发现：不进入本轮工具列表，模型需先调用 tool_search 启用">待发现</span>
-        ${t.source === 'mcp' ? '<span class="badge purple">MCP</span>' : ''}
-        ${t.chat_scope && t.chat_scope !== 'both' ? `<span class="badge teal">${t.chat_scope === 'private' ? '私聊' : '群聊'}</span>` : ''}
-        <span class="chat-tool-desc">${escapeHtml(t.description || '')}</span>
-      </label>`).join('') || '<p class="muted">没有匹配的工具</p>';
-  };
-
-  const markCustom = () => {
-    settings.tools = [...checkedSet];
-    saveSettings();
-    modeBadge.textContent = '自定义选择';
-    modeBadge.className = 'badge gray';
-  };
-
-  const syncPill = (name) => {
-    const pill = listEl.querySelector(`.chat-tool-defer[data-defer="${CSS.escape(name)}"]`);
-    if (pill) pill.classList.toggle('on', deferredDraft.has(name));
-  };
-
-  /* 点 pill 会触发 label 默认行为（切换勾选），必须阻止 */
-  listEl.addEventListener('click', (e) => {
-    const pill = e.target.closest('.chat-tool-defer');
-    if (!pill) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const name = pill.dataset.defer;
-    if (deferredDraft.has(name)) {
-      deferredDraft.delete(name);
-    } else {
-      deferredDraft.add(name);
-      if (checkedSet.has(name)) {  /* 两组互斥：取消默认勾选 */
-        checkedSet.delete(name);
-        const cb = listEl.querySelector(`.chat-tool-check[value="${CSS.escape(name)}"]`);
-        if (cb) cb.checked = false;
-        if (!presetMode) markCustom();
-      }
-    }
-    syncPill(name);
-  });
-
-  listEl.addEventListener('change', (e) => {
-    const check = e.target.closest('.chat-tool-check');
-    if (!check) return;
-    if (check.checked) checkedSet.add(check.value);
-    else checkedSet.delete(check.value);
-    if (check.checked && deferredDraft.has(check.value)) {  /* 两组互斥 */
-      deferredDraft.delete(check.value);
-      syncPill(check.value);
-    }
-    markCustom();
-  });
-  searchEl.addEventListener('input', render);
-  render();
+  /* chips 回车添加 / 删除 / 「从列表选择」全部复用共享组件（与配置页行为一致） */
+  bindChipInteractions(modal.el);
 }
 
 /* ---------- 附件上传 ---------- */
@@ -1320,10 +1280,12 @@ function toggleCustomPersonaBox() {
 function updateToolsCount() {
   const badge = sectionEl?.querySelector('#chat-tools-count');
   if (!badge) return;
-  const defCount = info.webui_preset?.deferred?.length ?? 0;
-  badge.textContent = settings.tools === null
-    ? `预设：默认 ${info.webui_preset?.default?.length ?? 0} 个 · 待发现 ${defCount} 个`
-    : `自定义 ${settings.tools?.length ?? 0} 个工具（预设待发现 ${defCount} 个）`;
+  const preset = info.webui_preset || {};
+  if (!preset.exists) {
+    badge.textContent = '工具预设未配置（点击设置）';
+    return;
+  }
+  badge.textContent = `预设 ${presetName()}：默认 ${preset.default?.length ?? 0} 个 · 待发现 ${preset.deferred?.length ?? 0} 个`;
 }
 
 function initParamsUI() {
@@ -1502,16 +1464,14 @@ async function init(section) {
   }, true);
 
   /* ---- 引导数据 ---- */
-  const [infoRes, supplierRes, personaRes, toolRes] = await Promise.allSettled([
+  const [infoRes, supplierRes, personaRes] = await Promise.allSettled([
     api.get('/chat/info'),
     api.get('/supplier_config'),
     api.get('/personas'),
-    api.get('/tools'),
   ]);
   if (infoRes.status === 'fulfilled') info = { ...info, ...infoRes.value };
   if (supplierRes.status === 'fulfilled') suppliers = supplierRes.value.suppliers || [];
   if (personaRes.status === 'fulfilled') personas = personaRes.value.items || [];
-  if (toolRes.status === 'fulfilled') toolsData = toolRes.value;
   if (infoRes.status === 'rejected') toast(`聊天服务信息加载失败：${infoRes.value.reason?.message || infoRes.value.reason}`, 'error', 5000);
 
   populateSuppliers();

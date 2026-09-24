@@ -48,7 +48,7 @@ MAX_TURNS = 20
 """单轮对话内 Agent 最大步数（与 sub_agent 工具一致）"""
 
 WEBUI_PRESET = "webui"
-"""聊天页默认使用的工具预设名（config.json tool_presets）"""
+"""聊天页固定使用的工具预设名（config.json tool_presets；缺失时保存会自动补齐）"""
 
 PERSONA_CUSTOM = "custom"
 """play_role 列中标记自定义人设的值（自定义人设全文只保存在浏览器本地）"""
@@ -1065,7 +1065,6 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
 
     supplier = settings.get("supplier") or ""
     model = settings.get("model") or ""
-    tools = settings.get("tools")  # None -> 用 webui 预设；[] -> 无工具
 
     try:
         try:
@@ -1084,12 +1083,14 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
             return
 
         kwargs = _chat_parameter_kwargs(settings.get("params"))
+        # 工具集唯一来源 = config.json 的 tool_presets[WEBUI_PRESET]（与配置页「工具预设」一致），
+        # 不再支持前端传入的自定义工具名单，避免两处配置互相覆盖
         agent_data = AgentData(
             context=session.context,
             model_name=model,
             supplier=supplier,
-            tools=tools or [],
-            tool_preset=WEBUI_PRESET if tools is None else None,
+            tools=[],
+            tool_preset=WEBUI_PRESET,
             kwargs=kwargs,
         )
         try:

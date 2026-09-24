@@ -21,6 +21,7 @@ from atribot.LLMchat.tools.schedule_self_trigger.trigger_scheduler import (
     format_remaining,
 )
 
+SCHEDULER_SERVICE_NAME = "SelfTriggerScheduler"
 
 class _FakeSendClient(SendClientBase):
     """最小可用的发送客户端替身"""
@@ -117,9 +118,9 @@ def fake_chats():
 
 @pytest.fixture(autouse=True)
 def _clean_scheduler_service():
-    container.unregister(ts.SCHEDULER_SERVICE_NAME)
+    container.unregister(SCHEDULER_SERVICE_NAME)
     yield
-    container.unregister(ts.SCHEDULER_SERVICE_NAME)
+    container.unregister(SCHEDULER_SERVICE_NAME)
 
 
 def _group_primeval(note: str = "测试") -> dict[str, Any]:
@@ -439,4 +440,4 @@ async def test_get_scheduler_idempotent(tmp_path: Path, monkeypatch: pytest.Monk
     second = ts.get_scheduler()
 
     assert first is second
-    assert container.exists(ts.SCHEDULER_SERVICE_NAME)
+    assert container.exists(SCHEDULER_SERVICE_NAME)

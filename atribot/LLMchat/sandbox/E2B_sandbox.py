@@ -21,12 +21,22 @@ class E2BSandbox(SandBoxBase):
     基于 E2B (e2b_code_interpreter) 的沙盒实现。
     """
 
+    backend = "e2b"
+    backend_display = "E2B 云端沙盒"
+    shell_kind = "sh"
+
     def __init__(self, config: dict = None):
         super().__init__(config)
         self._sandbox: Optional[AsyncSandbox] = None
         self._api_key = self.config.get("api_key", os.environ.get("E2B_API_KEY"))
         self._template = self.config.get("template", "code-interpreter-v1")
         self._sessions: dict[str, dict] = {}  # session_name -> {process, buffer}
+        # 云端实例的文件系统根目录，供工具层拼接会话工作区路径
+        self.work_dir: str = str(self.config.get("work_dir") or "/home/user")
+
+    def panel_capabilities(self) -> dict:
+        """E2B 云端后端不支持 Docker 风格的资源指标与本地终端"""
+        return {"start_stop": True, "terminal": False, "metrics": False}
 
     async def start(self):
         """启动 E2B 沙盒实例"""

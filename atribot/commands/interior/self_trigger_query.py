@@ -5,7 +5,6 @@ from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.LLMchat.tools.schedule_self_trigger.trigger_scheduler import (
-    SCHEDULER_SERVICE_NAME,
     SelfTriggerScheduler,
     format_remaining,
 )
@@ -48,11 +47,7 @@ async def cmd_self_trigger(
     message_data: MessageEventEnvelope,
 ) -> None:
     """查询持久化定时自触发任务"""
-    if not container.exists(SCHEDULER_SERVICE_NAME):
-        await message_data.send(message_data.reply_text("当前没有持久化自触发任务。"))
-        return
-
-    scheduler: SelfTriggerScheduler = container.get(SCHEDULER_SERVICE_NAME)
+    scheduler = container.get_by_type(SelfTriggerScheduler)
     pending = scheduler.list_pending()
 
     if not pending:
