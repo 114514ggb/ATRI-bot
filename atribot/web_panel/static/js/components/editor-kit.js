@@ -1,4 +1,4 @@
-/* 配置编辑器共享套件：保存栏 / diff 模态 / 保存后重启流程 / 深度工具 */
+/* 配置编辑器共享套件：保存栏 / diff 模态 / 保存后关闭提示 / 深度工具 */
 
 import { api } from '../api.js';
 import { icon, toast, openModal, confirmDialog, escapeHtml } from '../ui.js';
@@ -108,49 +108,61 @@ export function showDiffModal(diffs) {
 
 /* ---------- 保存后流程 ---------- */
 
-/** 保存成功后的「需要重启」询问，返回是否触发了重启 */
+/**
+ * 保存成功后的「需要重启」提示
+ *
+ * 面板不提供重启，只提供「立即关闭」：关闭后由用户在终端重新启动。
+ * @returns {Promise<boolean>} 是否触发了关闭
+ */
 export async function needsRestartFlow(thing = '配置') {
   const ok = await confirmDialog({
     title: '需要重启生效',
-    message: `${thing}已写入文件。大部分配置在服务启动时加载，<b>需要重启 bot 进程</b>才能生效。<br>是否立即重启？`,
-    confirmText: '立即重启',
+    message: `${thing}已写入文件。大部分配置在服务启动时加载，<b>需要重启 bot 进程</b>才能生效。<br>现在关闭 bot 吗？关闭后请在终端重新启动（等同于按 Ctrl+C，会先回收资源）。`,
+    confirmText: '立即关闭',
     cancelText: '稍后手动重启',
     danger: true,
   });
   if (!ok) return false;
-  await restartAndWait();
+  await stopAndWait();
   return true;
 }
 
-export async function restartAndWait() {
+/**
+ * 请求面板优雅关闭 bot（Ctrl+C 语义），并等待进程退出
+ */
+export async function stopAndWait() {
   try {
-    await api.post('/system/restart');
+    await api.post('/system/stop');
   } catch { /* 进程可能立即退出导致请求中断，忽略 */ }
 
   const mask = document.createElement('div');
   mask.className = 'fullscreen-mask';
   mask.innerHTML = `
     <div class="spinner"></div>
-    <div class="mask-title">正在重启…</div>
-    <div class="mask-sub">等待服务恢复（如果长时间未恢复，请手动检查 bot 进程）</div>`;
+    <div class="mask-title">正在关闭…</div>
+    <div class="mask-sub">等待 bot 回收资源并退出（如果长时间未关闭，请检查终端日志）</div>`;
   document.body.appendChild(mask);
 
   const started = Date.now();
   const poll = async () => {
+    // 面板已不可达 = 进程已经退出；HTTP 层面能应答（如鉴权失败）说明还活着，继续等
     try {
       await api.get('/status');
-      mask.remove();
-      toast('服务已恢复运行', 'success');
-    } catch {
-      if (Date.now() - started > 120000) {
+    } catch (e) {
+      if (!e || !e.status) {
         mask.remove();
-        toast('等待恢复超时，请手动检查 bot 状态', 'error', 6000);
+        toast('bot 已关闭，请在终端重新启动', 'success', 6000);
         return;
       }
-      setTimeout(poll, 2000);
     }
+    if (Date.now() - started > 60000) {
+      mask.remove();
+      toast('等待关闭超时，请检查终端日志', 'error', 6000);
+      return;
+    }
+    setTimeout(poll, 1500);
   };
-  setTimeout(poll, 2500);
+  setTimeout(poll, 1500);
 }
 
 /* ---------- 保存操作栏 ---------- */

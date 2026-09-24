@@ -232,7 +232,7 @@ class BotFramework:
         self.create_background_task(self._start_admin_panel(), name="BotFramework.admin_panel")
 
     async def _start_admin_panel(self) -> None:
-        """在独立端口启动 Web 管理面板（web_panel.enable=false 时跳过）"""
+        """在独立端口启动 Web 管理面板"""
         panel_cfg = self.config._raw_config.get("web_panel") or {}
         if panel_cfg.get("enable") is False:
             self.log.info("管理面板已在配置中禁用（web_panel.enable = false），跳过启动")

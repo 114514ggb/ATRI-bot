@@ -1,9 +1,9 @@
 /* 面板入口：登录 / 路由注册 / 顶栏与系统菜单 */
 
 import { api, getToken, setToken, onUnauthorized } from './api.js';
-import { icon, toast, initTheme, toggleTheme, confirmDialog, initSelectMenus, mountLogoImage, upgradeFavicon } from './ui.js';
+import { icon, initTheme, toggleTheme, confirmDialog, initSelectMenus, mountLogoImage, upgradeFavicon } from './ui.js';
 import { registerRoute, startRouter } from './router.js';
-import { restartAndWait } from './components/editor-kit.js';
+import { stopAndWait } from './components/editor-kit.js';
 
 import { dashboardView } from './views/dashboard.js';
 import { groupsView, usersView, messagesView, commandsView } from './views/data.js';
@@ -206,7 +206,6 @@ function openSystemMenu(anchor) {
   const menu = document.createElement('div');
   menu.className = 'menu';
   menu.innerHTML = `
-    <button class="menu-item" data-sys="restart">${icon('refresh')} 重启服务</button>
     <button class="menu-item danger" data-sys="stop">${icon('power')} 停止服务</button>
     <div class="menu-sep"></div>
     <button class="menu-item" data-sys="logout">${icon('x')} 退出登录</button>`;
@@ -223,21 +222,15 @@ function openSystemMenu(anchor) {
       showLogin();
       return;
     }
-    if (action === 'restart') {
-      const ok = await confirmDialog({ title: '重启服务', message: '重启会短暂中断 bot 服务，确定继续吗？', confirmText: '重启', danger: true });
-      if (ok) await restartAndWait();
-      return;
-    }
     if (action === 'stop') {
       const ok = await confirmDialog({
         title: '停止服务',
-        message: '停止后 bot 将完全下线，<b>需要手动重新启动</b>。确定继续吗？',
+        message: '停止后 bot 将完全下线（会先回收沙盒 / MCP / 数据库连接等资源），<b>需要手动重新启动</b>。确定继续吗？',
         confirmText: '停止',
         danger: true,
       });
       if (!ok) return;
-      try { await api.post('/system/stop'); } catch { /* 进程退出导致中断 */ }
-      toast('服务停止指令已发送', 'info');
+      await stopAndWait();
     }
   });
 }

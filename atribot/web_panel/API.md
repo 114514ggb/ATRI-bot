@@ -101,7 +101,7 @@
 
 ## 配置管理（config.py）
 
-三个配置文件的读写接口形态一致：GET 返回 `{content, path, valid}`，POST 保存前先备份为 `*.bak` 并返回 `{status, needs_restart: true, backup}`。
+三个配置文件的读写接口形态一致：GET 返回 `{content, path, valid}`，POST 保存前先备份为 `*.bak` 并返回 `{status, needs_restart: true, backup}`（`needs_restart` 为真表示需**手动**重启 bot 进程才能生效，面板不提供自动重启）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -187,8 +187,7 @@
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| POST | `/api/system/stop` | 0.5 秒后退出进程。返回 `{status: "stopping"}` |
-| POST | `/api/system/restart` | 以相同命令行重启进程。返回 `{status: "restarting"}` |
+| POST | `/api/system/stop` | 请求主进程以 Ctrl+C 语义优雅关闭（回收沙盒 / MCP / 数据库连接池 / 插件等资源）后退出。返回 `{status: "stopping"}`。不可撤销，关闭后需**手动**重新启动（面板不提供自动重启，旧 `/api/system/restart` 已移除，请求会得到 404） |
 
 ### WebSocket `/api/ws/logs?token=`
 

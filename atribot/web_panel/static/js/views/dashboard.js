@@ -1,8 +1,8 @@
 /* 视图：仪表盘（统计卡片 + token 图表 + 系统状态 + 平台状态） */
 
 import { api } from '../api.js';
-import { icon, toast, countUp, fmtTokens, escapeHtml, confirmDialog } from '../ui.js';
-import { restartAndWait } from '../components/editor-kit.js';
+import { icon, countUp, fmtTokens, escapeHtml, confirmDialog } from '../ui.js';
+import { stopAndWait } from '../components/editor-kit.js';
 
 const STAT_DEFS = [
   { key: 'groups', label: '群组总计', icon: 'group', tint: 'tint-blue' },
@@ -77,7 +77,7 @@ async function init(section) {
             <span class="v">${statusBool(status.sandbox)} ${statusBool(status.mcp)} ${statusBool(status.rag)}</span></div>
         </div>
         <div style="display:flex;gap:10px;margin-top:16px">
-          <button class="btn sm" id="dash-restart">${icon('refresh')} 重启服务</button>
+          <button class="btn sm ghost" id="dash-stop">${icon('power')} 停止服务</button>
           <button class="btn sm ghost" id="dash-refresh">${icon('activity')} 刷新数据</button>
         </div>
       </div>
@@ -91,13 +91,13 @@ async function init(section) {
   });
 
   section.querySelector('#dash-refresh').addEventListener('click', () => init(section));
-  section.querySelector('#dash-restart').addEventListener('click', async () => {
+  section.querySelector('#dash-stop').addEventListener('click', async () => {
     const ok = await confirmDialog({
-      title: '重启服务',
-      message: '重启会短暂中断 bot 服务（断开平台连接数秒），确定继续吗？',
-      confirmText: '重启', danger: true,
+      title: '停止服务',
+      message: '停止后 bot 将完全下线（会先回收沙盒 / MCP / 数据库连接等资源），<b>需要手动重新启动</b>。确定继续吗？',
+      confirmText: '停止', danger: true,
     });
-    if (ok) await restartAndWait();
+    if (ok) await stopAndWait();
   });
 }
 
