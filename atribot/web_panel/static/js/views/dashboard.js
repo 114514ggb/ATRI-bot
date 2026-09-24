@@ -3,6 +3,7 @@
 import { api } from '../api.js';
 import { icon, countUp, fmtTokens, escapeHtml, confirmDialog } from '../ui.js';
 import { stopAndWait } from '../components/editor-kit.js';
+import { STOP_SERVICE_CONFIRM } from '../copy.js';
 
 const STAT_DEFS = [
   { key: 'groups', label: '群组总计', icon: 'group', tint: 'tint-blue' },
@@ -93,8 +94,7 @@ async function init(section) {
   section.querySelector('#dash-refresh').addEventListener('click', () => init(section));
   section.querySelector('#dash-stop').addEventListener('click', async () => {
     const ok = await confirmDialog({
-      title: '停止服务',
-      message: '停止后 bot 将完全下线（会先回收沙盒 / MCP / 数据库连接等资源），<b>需要手动重新启动</b>。确定继续吗？',
+      ...STOP_SERVICE_CONFIRM,
       confirmText: '停止', danger: true,
     });
     if (ok) await stopAndWait();

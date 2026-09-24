@@ -49,7 +49,7 @@ function renderSupplierCard(supplier, idx) {
         <div class="field span-2">
           <div class="field-label">接口地址 base_url</div>
           <input class="input mono" data-sup="base_url" value="${escapeHtml(supplier.base_url || '')}" placeholder="https://api.example.com/v1/chat/completions">
-          <p class="field-desc">只接受 OpenAI 兼容地址。聊天模型一般要以 /v1/chat/completions 结尾；嵌入模型通常不需要</p>
+          <p class="field-desc">OpenAI 兼容地址：聊天模型以 /v1/chat/completions 结尾，嵌入模型通常不需要</p>
         </div>
         <div class="field span-2">
           <div class="field-label">API 密钥</div>

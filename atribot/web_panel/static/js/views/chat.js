@@ -2,7 +2,8 @@
    分级展示：每步 = 思考过程(折叠) + 工具调用块(参数/结果) + 正文(Markdown+公式图片) */
 
 import { api, getToken } from '../api.js';
-import { icon, toast, escapeHtml, openModal, confirmDialog, fmtTokens } from '../ui.js';
+import { icon, toast, escapeHtml, openModal, confirmDialog, fmtTokens, helpFold } from '../ui.js';
+import { TOOL_SEARCH_BRIEF, TOOL_SEARCH_RULES, TOOL_SEARCH_HELP_LABEL } from '../copy.js';
 import {
   bindChipInteractions,
   readChips,
@@ -794,7 +795,7 @@ function renderHistory(items) {
       <div class="chat-empty">
         <div class="chat-empty-logo" id="chat-empty-logo">A</div>
         <p>开始新对话吧</p>
-        <p class="muted small">支持图片 / 音频 / 视频附件 · 工具调用与思考过程分级展示</p>
+        <p class="muted small">支持图片 / 音频 / 视频附件</p>
       </div>`;
     mountEmptyLogo();
   }
@@ -1026,7 +1027,7 @@ async function deleteSession(target) {
   if (target === null || target === undefined) return;
   const ok = await confirmDialog({
     title: '删除会话',
-    message: `将删除会话 <b>聊天${target}</b> 的全部聊天历史（含数据库记录），id 会被后续新会话复用。确定继续吗？`,
+    message: `将删除会话 <b>聊天${target}</b> 的全部聊天历史（含数据库记录）。确定继续吗？`,
     confirmText: '删除',
     danger: true,
   });
@@ -1129,9 +1130,9 @@ async function openToolsModal() {
     title: `工具预设 · ${name}（AI 聊天页）`,
     wide: true,
     bodyHtml: `
-      <div class="notice info">${icon('info')}<div>这里编辑的就是 <code>config.json</code> 的 <code>tool_presets.${escapeHtml(name)}</code>，与配置页「工具预设」区块共用同一份数据。<b>默认</b>中的工具直接进入本轮工具列表；<b>待发现</b>中的工具不占上下文，模型先调用 <code>tool_search</code> 按需启用，两者互斥。</div></div>
+      <div class="notice info">${icon('info')}<div>编辑的是 <code>tool_presets.${escapeHtml(name)}</code>，与配置页「工具预设」共用同一份数据。${TOOL_SEARCH_BRIEF}${helpFold(TOOL_SEARCH_HELP_LABEL, TOOL_SEARCH_RULES)}</div></div>
       ${renderToolPresetModule(name, presetValueFromInfo(), { withToggle: false, nullAsEmpty: true })}
-      <p class="field-desc">保存后立即写入配置文件（同时生成 <code>.bak</code> 备份并在运行中热重载），无需重启。</p>`,
+      <p class="field-desc">保存后立即写入配置文件并热重载，无需重启。</p>`,
     actions: [
       { label: '取消', class: 'ghost', onClick: ({ close }) => close() },
       {
@@ -1370,7 +1371,7 @@ async function init(section) {
           <div class="chat-empty">
             <div class="chat-empty-logo" id="chat-empty-logo">A</div>
             <p>连接聊天服务后即可开始对话</p>
-            <p class="muted small">支持图片 / 音频 / 视频附件 · 工具调用与思考过程分级展示</p>
+            <p class="muted small">支持图片 / 音频 / 视频附件</p>
           </div>
         </div>
 
@@ -1411,7 +1412,7 @@ async function init(section) {
         </div>
         <div class="field">
           <div class="field-label">工具</div>
-          <div class="field-desc">默认启用的工具直接进入本轮列表，「待发现」工具由模型经 tool_search 按需启用，可保存为 webui 预设</div>
+          <div class="field-desc">默认工具直接可用，待发现工具由 tool_search 按需启用</div>
           <button class="btn sm ghost" id="chat-tools-btn" style="width:100%">${icon('settings')} <span id="chat-tools-count"></span></button>
         </div>
 

@@ -15,7 +15,7 @@ async function init(section) {
   original = res.valid ? JSON.parse(res.content) : {};
 
   section.innerHTML = `
-    <div class="notice info">${icon('info')}<div>MCP 工具服务器配置。每个条目包含 <code>command/args/env</code>（本地进程）或 <code>url</code>（远程服务），以及 <code>active</code> 开关。修改后需重启 bot 生效。</div></div>
+    <div class="notice info">${icon('info')}<div>MCP 工具服务器配置（本地进程或远程服务条目），修改后需重启 bot 生效。</div></div>
     <div id="mcp-savebar"></div>
     <div id="mcp-editor"></div>`;
 

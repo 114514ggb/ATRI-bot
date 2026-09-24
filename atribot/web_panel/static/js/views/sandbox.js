@@ -3,6 +3,7 @@
 
 import { api, sandboxWsUrl } from '../api.js';
 import { icon, escapeHtml, confirmDialog, toast } from '../ui.js';
+import { TERMINAL_HINT_SANDBOX } from '../copy.js';
 import { createTerminal } from '../components/term-core.js';
 
 let term = null;
@@ -20,7 +21,7 @@ async function init(section) {
       <span class="sb-type js-type"></span>
       <span style="flex:1"></span>
       <button class="btn sm ghost js-refresh">${icon('refresh')} 刷新</button>
-      <button class="btn sm ghost js-sync-tools" title="按当前 config.json 重建沙盒并刷新沙盒工具的描述与启用状态">${icon('refresh')} 同步工具</button>
+      <button class="btn sm ghost js-sync-tools" title="按当前配置重建沙盒并刷新工具描述">${icon('refresh')} 同步工具</button>
       <button class="btn sm ghost js-action" data-action="restart">${icon('refresh')} 重启</button>
       <button class="btn sm ghost js-action" data-action="stop">${icon('power')} 停止</button>
       <button class="btn sm primary js-action" data-action="start">${icon('activity')} 启动</button>
@@ -88,7 +89,7 @@ function render(section, st) {
   if (!st.configured) {
     const na = q('.js-na');
     na.style.display = '';
-    na.innerHTML = `${icon('info')}<div>沙盒尚未初始化：bot 启动时会按 <b>sand_box.type</b> 自动创建；也可点击"启动"以当前配置（${escapeHtml(st.type || 'docker')}）立即拉起。</div>`;
+    na.innerHTML = `${icon('info')}<div>沙盒尚未初始化：点击“启动”按当前配置（${escapeHtml(st.type || 'docker')}）立即创建。</div>`;
   } else {
     q('.js-na').style.display = 'none';
   }
@@ -104,7 +105,7 @@ function render(section, st) {
         allowComplete: false,
         banner: (info) => [
           `沙盒终端 · ${info.user}@${info.host} · ${info.platform || ''}`,
-          '命令在沙盒环境内执行 · ↑↓ 历史 · Ctrl+C 终止 · Ctrl+L 清屏',
+          TERMINAL_HINT_SANDBOX,
         ],
       });
     }

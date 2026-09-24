@@ -124,7 +124,7 @@ function userActions(user) {
 
 async function initUsers(section) {
   section.innerHTML = `
-    <div class="notice info">${icon('info')}<div>权限说明：管理员可使用管理类命令；黑名单用户的消息会被完全忽略。更改立即生效并写入数据库。</div></div>
+    <div class="notice info">${icon('info')}<div>管理员可使用管理类命令；黑名单用户的消息会被忽略。更改立即生效。</div></div>
     <div class="filter-bar">
       <input class="input" id="usr-search" placeholder="搜索 QQ 号或昵称…" value="${escapeHtml(usersState.search)}" style="width:260px">
       <span class="spacer"></span>

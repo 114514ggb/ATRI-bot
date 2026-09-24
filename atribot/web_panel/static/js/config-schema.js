@@ -1,6 +1,8 @@
 /* config.json 表单 schema：驱动配置编辑器的结构化表单
    字段说明整理自 assets/如何配置配置文件.md */
 
+import { TOOL_SEARCH_BRIEF, TOOL_SEARCH_RULES } from './copy.js';
+
 export const SCHEMA = [
   {
     id: 'platforms',
@@ -8,7 +10,7 @@ export const SCHEMA = [
     icon: 'plug',
     type: 'platforms',
     path: 'platforms',
-    desc: 'QQ 平台连接配置（目前支持 napcat / OneBot 协议）。条目的 key 可随意命名，可同时配置多个平台实例。',
+    desc: 'QQ 平台连接配置（napcat / OneBot 协议），可同时配置多个实例。',
     itemFields: [
       { key: 'adapter', label: '适配器类型', type: 'select', options: ['onebot'], desc: '目前只有 onebot' },
       { key: 'connection_type', label: '连接方式', type: 'select', options: ['WebSocket_client', 'WebSocket_server', 'http'], desc: 'client=主动连接 napcat；server=等 napcat 来连；http=HTTP 回调' },
@@ -25,7 +27,7 @@ export const SCHEMA = [
     label: '账号信息',
     icon: 'bot',
     fields: [
-      { path: 'root_user_id', label: 'Root QQ 号', type: 'number', desc: '最高权限用户。无视一切名单配置，强制接收此 QQ 的消息' },
+      { path: 'root_user_id', label: 'Root QQ 号', type: 'number', desc: '最高权限用户，无视名单配置强制接收消息' },
       { path: 'account.id', label: 'Bot QQ 号', type: 'number', desc: '机器人自己的账号' },
       { path: 'account.name', label: 'Bot 名称', type: 'text', desc: '机器人账号名称' },
     ],
@@ -38,7 +40,7 @@ export const SCHEMA = [
     fields: [
       { path: 'model.connect.supplier', label: '供应商', type: 'supplier-select', desc: '对应供应商配置（supplier_config.json）中的 name' },
       { path: 'model.connect.model_name', label: '模型名称', type: 'model-select', depends: 'model.connect.supplier', desc: '对应供应商配置中 models 的 key' },
-      { path: 'model.connect.user_global_context', label: '独立上下文', type: 'toggle', span: true, desc: '开启后群聊中每人使用自己的私聊上下文；关闭则整个群共享一个上下文' },
+      { path: 'model.connect.user_global_context', label: '独立上下文', type: 'toggle', span: true, desc: '开启后群聊内每人使用独立上下文，关闭则全群共享' },
       { path: 'model.tavily_search_API_key', label: 'Tavily 搜索 Key', type: 'password', span: true, optional: true, desc: '联网搜索 API 密钥（免费）：docs.tavily.com' },
     ],
   },
@@ -48,13 +50,13 @@ export const SCHEMA = [
     icon: 'gauge',
     type: 'chat-params',
     path: 'model.chat_parameter',
-    desc: '发送聊天请求时携带的参数，键值对会原样并入请求体（OpenAI 兼容格式），可自由添加 API 支持的任意参数。stream 为特殊键：true 时走流式接口。列表为空时使用内置默认参数。',
+    desc: '聊天请求携带的参数，键值对原样并入请求体；stream=true 走流式接口。',
   },
   {
     id: 'aux-models',
     label: '辅助模型',
     icon: 'layers',
-    desc: '视觉/音频/视频辅助描述、群聊摘要等使用的模型。为无对应感知能力的模型提供文字描述支持。未配置的项请留空。',
+    desc: '视觉/音频/视频描述、群聊摘要等辅助模型，未配置留空。',
     fields: [
       { path: 'model.detection_image.supplier', label: '视觉辅助 · 供应商', type: 'supplier-select', optional: true },
       { path: 'model.detection_image.model_name', label: '视觉辅助 · 模型', type: 'model-select', depends: 'model.detection_image.supplier', optional: true },
@@ -74,7 +76,7 @@ export const SCHEMA = [
     icon: 'refresh',
     type: 'standby-list',
     path: 'model.standby_model',
-    desc: '主聊天模型请求失败后，按列表顺序依次尝试切换。备用模型使用内置的通用参数。',
+    desc: '主模型失败后按顺序切换，备用模型使用内置通用参数。',
   },
   {
     id: 'rag',
@@ -96,8 +98,8 @@ export const SCHEMA = [
     icon: 'message',
     desc: '人设与上下文窗口设置。',
     fields: [
-      { path: 'ai_chat.playRole', label: '默认人设', type: 'persona-select', desc: '人设文件位于 character_setting 目录，可切换后保存生效' },
-      { path: 'ai_chat.ai_max_record', label: '上下文轮数', type: 'number', desc: 'AI 上下文保存的消息轮数（一轮 = 你一条 + AI 一次回复，可能含多次工具调用）' },
+      { path: 'ai_chat.playRole', label: '默认人设', type: 'persona-select', desc: '对应 character_setting 目录下的人设文件' },
+      { path: 'ai_chat.ai_max_record', label: '上下文轮数', type: 'number', desc: '上下文保留的对话轮数（1 轮 = 用户 1 条 + AI 回复）' },
       { path: 'ai_chat.group_max_record', label: '群消息缓存', type: 'number', desc: '群消息缓存条数（作为 AI 上下文）' },
       { path: 'ai_chat.private_max_record', label: '私聊上下文轮数', type: 'number' },
     ],
@@ -106,12 +108,12 @@ export const SCHEMA = [
     id: 'sandbox',
     label: '沙盒',
     icon: 'terminal',
-    desc: 'LLM 代码执行沙盒，供 run_python_code / run_command / send_file / add_file 使用。工具描述按后端与平台自动生成，可在此追加定制。修改后可用「刷新工具」按钮（POST /api/sandbox/refresh-tools）立即生效，无需重启。',
+    desc: 'LLM 执行代码/命令的沙盒；工具描述可追加定制，修改后点「刷新工具」立即生效。',
     fields: [
       { path: 'sand_box.type', label: '后端类型', type: 'select', options: ['docker', 'none', 'e2b'], desc: 'docker=容器隔离；none=本机直执行（无隔离，注意安全）；e2b=云端沙盒' },
       { path: 'sand_box.image', label: 'Docker 镜像', type: 'text', desc: '如 atri-sandbox:latest（仅 docker 后端使用）' },
-      { path: 'sand_box.work_dir', label: '工作区目录', type: 'text', span: true, optional: true, desc: '本机直执行后端的工作区根目录，留空默认 document/work' },
-      { path: 'sand_box.shell', label: 'Shell 程序', type: 'text', optional: true, desc: '本机直执行后端指定 shell，留空自动探测（Windows 优先 Git Bash，其次 cmd）' },
+      { path: 'sand_box.work_dir', label: '工作区目录', type: 'text', span: true, optional: true, desc: '本机直执行的工作目录，默认 document/work' },
+      { path: 'sand_box.shell', label: 'Shell 程序', type: 'text', optional: true, desc: '本机直执行使用的 shell，留空自动探测' },
     ],
   },
   {
@@ -119,7 +121,8 @@ export const SCHEMA = [
     label: '工具预设',
     icon: 'sliders',
     type: 'tool-presets',
-    desc: 'deferred 中的需模型通过 default 里的 tool_search 搜索后当轮临时启用；「限制工具」开关关闭 = 保存为 null = 全部工具（不推荐，webui 关闭后聊天页将没有可用工具）。',
+    desc: TOOL_SEARCH_BRIEF,
+    help: TOOL_SEARCH_RULES,
   },
   {
     id: 'whitelist',
@@ -173,7 +176,7 @@ export const CHAT_PARAM_DEFS = {
   temperature: { label: '采样温度', type: 'num', min: 0, max: 2, step: 0.05, desc: '值越低输出越稳定' },
   top_p: { label: 'Top P', type: 'num', min: 0, max: 1, step: 0.05 },
   max_tokens: { label: '最大 Token', type: 'num', min: 1, step: 256 },
-  stream: { label: '流式输出', type: 'bool', desc: '特殊键：true 时走流式接口' },
+  stream: { label: '流式输出', type: 'bool', desc: 'true 时走流式接口' },
   tool_choice: { label: '工具选择', type: 'select', options: ['auto', 'none', 'required'], optional: true },
   thinking_level: { label: '思考等级', type: 'select', options: ['minimal', 'low', 'medium', 'high'], optional: true },
   reasoning_effort: { label: '推理力度', type: 'select', options: ['minimal', 'low', 'medium', 'high'], optional: true },

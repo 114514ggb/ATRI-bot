@@ -10,7 +10,7 @@ let defaultRole = 'none';
 
 async function init(section) {
   section.innerHTML = `
-    <div class="notice info">${icon('info')}<div>保存人设会立即热刷新内存中的人设列表；但<b>已进行中的会话仍持有旧人设文本</b>，需要在群里用 <code>/chat reset</code> 重置上下文后才会完全生效。删除当前默认人设前需先切换默认。</div></div>
+    <div class="notice info">${icon('info')}<div>保存后立即生效；<b>进行中的会话</b>需 <code>/chat reset</code> 重置后完全生效。删除默认人设前请先切换默认。</div></div>
     <div class="persona-layout">
       <div>
         <div class="persona-list" id="persona-list">${'<div class="skeleton" style="height:56px;border-radius:12px;margin-bottom:8px"></div>'.repeat(4)}</div>

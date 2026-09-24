@@ -131,7 +131,7 @@ function renderPage(section, ctx, status, tables) {
             placeholder="SELECT * FROM users LIMIT 100;"></textarea>
           <div class="db-console-foot">
             <button class="btn primary" id="db-run">${icon('send')} 运行</button>
-            <span class="muted small">写语句执行前会要求确认；超长文本与向量列会被截断，最多返回 500 行</span>
+            <span class="muted small">写语句需确认；超长文本与向量列会截断，最多返回 500 行</span>
           </div>
           <div id="db-result"></div>
         </div>

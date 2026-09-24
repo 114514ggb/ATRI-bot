@@ -169,6 +169,20 @@ export function confirmDialog({ title, message, confirmText = '确认', cancelTe
   });
 }
 
+/* ---------- 折叠说明（长规则收纳，默认收起） ---------- */
+
+/**
+ * 折叠说明块：默认收起，点击摘要展开详情（纯 HTML，无 JS 绑定）
+ * @param {string} summary 摘要行文案（可含 HTML）
+ * @param {string} detail 展开后的详情 HTML
+ * @param {boolean} open 是否默认展开
+ */
+export function helpFold(summary, detail, open = false) {
+  return `<details class="help-fold"${open ? ' open' : ''}>`
+    + `<summary>${summary}</summary>`
+    + `<div class="help-fold-body">${detail}</div></details>`;
+}
+
 /* ---------- 骨架屏 ---------- */
 
 export function skeletonRows(n = 6, className = 'skeleton-row') {

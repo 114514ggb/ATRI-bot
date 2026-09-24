@@ -1,8 +1,9 @@
 /* 视图：主配置编辑（表单 + 源码双模式） */
 
 import { api } from '../api.js';
-import { icon, toast, escapeHtml, confirmDialog, openModal, attachSuggest } from '../ui.js';
+import { icon, toast, escapeHtml, confirmDialog, openModal, attachSuggest, helpFold } from '../ui.js';
 import { SCHEMA, CHAT_PARAM_DEFS, CHAT_PARAM_VALUE_TYPES } from '../config-schema.js';
+import { TOOL_SEARCH_BRIEF, TOOL_SEARCH_RULES, TOOL_SEARCH_HELP_LABEL } from '../copy.js';
 import { createJsonEditor } from '../components/json-editor.js';
 import * as kit from '../components/editor-kit.js';
 import {
@@ -291,10 +292,10 @@ function readPresetModule(key) {
 function renderToolPresets() {
   const presets = presetSourceOf();
   if (!presetKeysCache.length) {
-    return `<div class="notice info">${icon('info')}<div>配置中尚无工具预设。可在源码模式向 <code>tool_presets</code> 添加预设名（对应 <code>atribot/LLMchat/chat.py</code> 等处的预设标识），保存后切回表单模式即可在此编辑。</div></div>`;
+    return `<div class="notice info">${icon('info')}<div>尚无工具预设：可在源码模式向 <code>tool_presets</code> 添加预设名，保存后切回表单模式编辑。</div></div>`;
   }
   return `
-    <div class="notice info">${icon('info')}<div>预设清单取自 <code>config.json</code> 的 <code>tool_presets</code>（新增预设后需重新加载配置或切回表单模式）。<b>default</b> 中的工具直接暴露给模型；<b>deferred</b>（待发现）中的工具不直接暴露，模型需通过 default 里的 <code>tool_search</code> 搜索后才在当轮临时启用。<code>tool_search</code> 与 deferred 必须成对出现——配了 tool_search 就要在 deferred 中至少放一个工具，配了 deferred 就必须把 tool_search 加进 default，否则保存时会被拦截。在白名单里输入 <code>tool_search</code> 回车即可切换为双列表模式；「限制工具」开关关闭 = 保存为 <code>null</code> = 全部工具（不推荐）。</div></div>
+    <div class="notice info">${icon('info')}<div>预设清单取自 <code>tool_presets</code>（新增后需切回表单模式加载）。${TOOL_SEARCH_BRIEF}${helpFold(TOOL_SEARCH_HELP_LABEL, TOOL_SEARCH_RULES)}</div></div>
     <div class="field-grid">
       ${presetKeysCache.map((key) => renderToolPresetModule(key, presets[key])).join('')}
     </div>`;
@@ -445,6 +446,7 @@ function renderForm(section) {
     return `<div class="config-section" id="cfgsec-${s.id}" style="animation-delay:${Math.min(i * 50, 400)}ms">
       <h3>${icon(s.icon)} ${escapeHtml(s.label)}</h3>
       ${s.desc ? `<p class="section-desc">${s.desc}</p>` : ''}
+      ${s.help ? helpFold(TOOL_SEARCH_HELP_LABEL, s.help) : ''}
       ${inner}
     </div>`;
   }).join('');
@@ -811,7 +813,7 @@ async function save() {
 async function rollback() {
   const ok = await confirmDialog({
     title: '回滚配置',
-    message: '将把上一次保存时的备份（.bak）写回主配置文件，<b>当前未保存的编辑会丢失</b>。当前内容会转存到 .bak，可再次回滚撤销。',
+    message: '将把上一次保存的备份（.bak）写回主配置文件，<b>未保存的编辑会丢失</b>。',
     danger: true,
     confirmText: '回滚',
   });

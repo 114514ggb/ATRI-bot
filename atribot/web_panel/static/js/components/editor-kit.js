@@ -117,7 +117,7 @@ export function showDiffModal(diffs) {
 export async function needsRestartFlow(thing = '配置') {
   const ok = await confirmDialog({
     title: '需要重启生效',
-    message: `${thing}已写入文件。大部分配置在服务启动时加载，<b>需要重启 bot 进程</b>才能生效。<br>现在关闭 bot 吗？关闭后请在终端重新启动（等同于按 Ctrl+C，会先回收资源）。`,
+    message: `${thing}已写入文件，<b>需重启 bot</b> 才能生效。<br>现在关闭吗？关闭后请在终端重新启动。`,
     confirmText: '立即关闭',
     cancelText: '稍后手动重启',
     danger: true,
@@ -140,7 +140,7 @@ export async function stopAndWait() {
   mask.innerHTML = `
     <div class="spinner"></div>
     <div class="mask-title">正在关闭…</div>
-    <div class="mask-sub">等待 bot 回收资源并退出（如果长时间未关闭，请检查终端日志）</div>`;
+    <div class="mask-sub">等待 bot 回收资源并退出，长时间未关闭请检查终端日志</div>`;
   document.body.appendChild(mask);
 
   const started = Date.now();

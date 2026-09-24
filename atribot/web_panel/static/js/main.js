@@ -4,6 +4,7 @@ import { api, getToken, setToken, onUnauthorized } from './api.js';
 import { icon, initTheme, toggleTheme, confirmDialog, initSelectMenus, mountLogoImage, upgradeFavicon } from './ui.js';
 import { registerRoute, startRouter } from './router.js';
 import { stopAndWait } from './components/editor-kit.js';
+import { STOP_SERVICE_CONFIRM } from './copy.js';
 
 import { dashboardView } from './views/dashboard.js';
 import { groupsView, usersView, messagesView, commandsView } from './views/data.js';
@@ -224,8 +225,7 @@ function openSystemMenu(anchor) {
     }
     if (action === 'stop') {
       const ok = await confirmDialog({
-        title: '停止服务',
-        message: '停止后 bot 将完全下线（会先回收沙盒 / MCP / 数据库连接等资源），<b>需要手动重新启动</b>。确定继续吗？',
+        ...STOP_SERVICE_CONFIRM,
         confirmText: '停止',
         danger: true,
       });

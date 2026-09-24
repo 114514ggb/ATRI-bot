@@ -768,6 +768,41 @@ table.tbl {
 .notice.warn { background: var(--orange-soft); color: var(--orange); }
 .notice.danger { background: var(--red-soft); color: var(--red); }
 
+/* ---------- 折叠说明（长规则收纳，默认收起） ---------- */
+
+.help-fold { margin: 6px 0 2px; }
+
+.help-fold > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--accent);
+  user-select: none;
+  list-style: none;
+}
+
+.help-fold > summary::-webkit-details-marker { display: none; }
+
+.help-fold > summary::before {
+  content: '▸';
+  font-size: 10px;
+  transition: transform 0.18s var(--ease-out);
+}
+
+.help-fold[open] > summary::before { transform: rotate(90deg); }
+
+.help-fold-body {
+  margin-top: 6px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--border);
+  line-height: 1.6;
+}
+
+.help-fold-body ul { margin: 0; padding-left: 18px; }
+.help-fold-body li + li { margin-top: 4px; }
+.help-fold-body p { margin: 0; }
+
 /* ---------- 键值描述列表 ---------- */
 
 .kv-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 22px; font-size: 13.5px; }

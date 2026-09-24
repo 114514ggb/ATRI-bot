@@ -11,7 +11,8 @@
  */
 
 import { api } from '../api.js';
-import { icon, toast, escapeHtml, openModal } from '../ui.js';
+import { icon, toast, escapeHtml, openModal, helpFold } from '../ui.js';
+import { TOOL_SEARCH_RULES, TOOL_SEARCH_HELP_LABEL, TOOL_RESTRICT_NOTE } from '../copy.js';
 
 /* 预设别名：未登记的预设回退显示原始 key（预设清单由 config.json 动态决定） */
 const PRESET_ALIASES = {
@@ -29,7 +30,7 @@ const TOOL_SEARCH_NAME = 'tool_search';
 
 /* 需要额外说明的预设（渲染在「限制工具」描述之后） */
 const PRESET_NOTES = {
-  webui: '该预设供管理面板的 AI 聊天页使用：「限制工具」关闭会保存为 <code>null</code>，聊天页将没有任何可用工具。',
+  webui: '供面板 AI 聊天页使用：关闭「限制工具」会导致聊天页没有可用工具。',
 };
 
 const SCOPE_BADGES = {
@@ -86,9 +87,9 @@ export function validatePresetPairing(key, value, label) {
   const deferred = Array.isArray(value?.deferred) ? value.deferred : [];
   const name = label || `${presetLabel(key)} ${key}`;
   if (def.includes('tool_search') && deferred.length === 0) {
-    errors.push(`${name}：default 中配置了 tool_search，但 deferred 为空，没有可发现的内容。请在 deferred 中至少添加一个工具，或删除 tool_search 切回白名单模式`);
+    errors.push(`${name}：待发现组为空，请添加工具或从默认组移除 tool_search`);
   } else if (!def.includes('tool_search') && deferred.length > 0) {
-    errors.push(`${name}：配置了 deferred 工具，但 default 中没有 tool_search，这些工具将永远无法被模型发现。请把 tool_search 加进 default 或清空 deferred`);
+    errors.push(`${name}：默认组缺少 tool_search，待发现工具将无法被搜索到`);
   }
   return errors;
 }
@@ -141,7 +142,7 @@ export function renderToolPresetModule(key, value, opts = {}) {
         <div class="field-label" style="margin:0">${escapeHtml(presetLabel(key))} ${escapeHtml(key)} · 限制工具</div>
         <label class="toggle"><input type="checkbox" data-tools-restrict="${escapeHtml(key)}" ${st.isNull ? '' : 'checked'}><span class="track"></span><span class="thumb"></span></label>
       </div>
-      <p class="field-desc">开关开启 = 白名单模式：该模块只能使用下方列出的工具。开关关闭 = 不限制：向模型暴露全部已加载的工具（保存为 <code>null</code>，不推荐——其中包含禁言、执行命令等场景专用工具），下方列表不生效。</p>`
+      <div class="field-desc">${TOOL_RESTRICT_NOTE}</div>`
     : `<div class="field-label" style="margin:0">${escapeHtml(presetLabel(key))} ${escapeHtml(key)} · 工具列表</div>`;
 
   const body = st.isDict
@@ -150,11 +151,11 @@ export function renderToolPresetModule(key, value, opts = {}) {
       ${renderChips(`__tools.${key}.default`, 'str', st.def)}
       ${toolListHead('待发现工具 deferred · 不直接暴露给模型', `__tools.${key}.deferred`)}
       ${renderChips(`__tools.${key}.deferred`, 'str', st.deferred)}
-      <p class="field-desc">deferred 中的工具不出现在模型的工具列表里；模型须先调用 default 中的 <code>tool_search</code> 搜索到它，才会在当轮临时启用（仅当轮有效）。两条硬性规则（保存时会校验）：① default 必须保留 <code>tool_search</code>，否则整个 deferred 列表无效；② 配置了 <code>tool_search</code> 就必须在 deferred 中至少放一个工具，否则没有可发现的内容。若删除 default 中的 tool_search 且 deferred 为空，会自动切回单列表白名单模式。</p>`
+      <div class="field-desc">${helpFold(TOOL_SEARCH_HELP_LABEL, TOOL_SEARCH_RULES)}</div>`
     : `
       ${toolListHead('工具白名单 · 只有此处列出的工具会暴露给模型', `__tools.${key}`)}
       ${renderChips(`__tools.${key}`, 'str', st.def)}
-      <p class="field-desc">列表为空 = 该模块没有任何可用工具。在上方输入 <code>tool_search</code> 并回车，自动切换为「默认 + 待发现」双列表模式。</p>`;
+      <div class="field-desc">白名单为空 = 无可用工具；输入 <code>tool_search</code> 回车切换双列表模式。</div>`;
 
   /* 预设专属说明只在带「限制工具」开关时展示（聊天页弹窗没有该开关，避免误导） */
   const extraNote = withToggle ? lookup(PRESET_NOTES, key) : undefined;
@@ -189,7 +190,7 @@ function afterToolChipRemoved(fieldWrap) {
   const deferredNames = readChips(fieldWrap.querySelector(`[data-path="__tools.${key}.deferred"]`));
   if (defNames.includes('tool_search')) {
     if (deferredNames.length === 0) {
-      toast('deferred 已清空：请至少添加一个待发现工具，或删除 default 中的 tool_search 切回白名单，否则无法保存', 'error', 6000);
+      toast('待发现组已空：请添加工具或移除 tool_search，否则无法保存', 'error', 6000);
     }
     return;
   }
@@ -197,7 +198,7 @@ function afterToolChipRemoved(fieldWrap) {
     replaceModuleInPlace(fieldWrap, key, defNames);
     toast('已切回工具白名单模式', 'info');
   } else {
-    toast('default 中已没有 tool_search，deferred 里的工具将无法被模型发现', 'error');
+    toast('缺少 tool_search，待发现工具将无法被发现', 'error');
   }
 }
 
@@ -233,7 +234,7 @@ function applyChips(path, names, root = document) {
   /* 白名单勾入 tool_search → 自动升级为「默认+待发现」双列表（与手动输入一致） */
   if (moduleKey && path === `__tools.${moduleKey}` && names.includes('tool_search')) {
     replaceModuleInPlace(moduleField, moduleKey, { default: names, deferred: [] });
-    toast('已切换为「默认 + 待发现」双列表模式，请继续为 deferred 选择待发现工具', 'success');
+    toast('已切换双列表模式，请继续选择待发现工具', 'success');
     return;
   }
 
@@ -261,7 +262,7 @@ async function openToolPicker(path, { root = document } = {}) {
     return;
   }
   if (!catalog) {
-    toast('工具服务未就绪（bot 未启动或工具未加载），暂无法勾选，可继续手动输入工具名', 'error', 5000);
+    toast('工具服务未就绪，暂无法勾选（可手动输入工具名）', 'error', 5000);
     return;
   }
 
@@ -298,7 +299,7 @@ async function openToolPicker(path, { root = document } = {}) {
           <span class="tp-name mono">${escapeHtml(n)}</span>
           <span class="badge orange">未加载</span>
         </div>
-        <div class="tp-desc muted small">不在当前工具列表中（工具未加载、已改名或所属 MCP 服务离线）；保留勾选则配置维持原样</div>
+        <div class="tp-desc muted small">不在当前工具列表中（未加载 / 已改名 / MCP 离线），保留勾选则配置不变</div>
       </div>
     </label>`).join('');
 
@@ -313,7 +314,7 @@ async function openToolPicker(path, { root = document } = {}) {
         <button type="button" class="btn sm ghost" id="tp-refresh" title="重新拉取工具列表">${icon('refresh')} 刷新</button>
       </div>
       <div class="tool-pick-list" id="tp-list">${missingRows}${rows || (missingRows ? '' : '<p class="muted" style="padding:12px">当前没有已加载的工具</p>')}</div>
-      <p class="field-desc">勾选状态即该列表的最终内容（保存前不会写入配置）。未启用的工具无法勾选；场景不符的工具运行时会被剔除，建议只选适用的。</p>`,
+      <p class="field-desc">未启用的工具无法勾选；场景不符的工具运行时会被剔除。</p>`,
     actions: [
       { label: '取消', class: 'ghost', onClick: ({ close }) => close() },
       {
@@ -388,7 +389,7 @@ export function bindChipInteractions(root) {
       const defNames = readChips(chipsEl);
       if (!defNames.includes(TOOL_SEARCH_NAME)) defNames.push(TOOL_SEARCH_NAME);
       replaceModuleInPlace(chipsEl.closest('[data-tools-field]'), toolMod[1], { default: defNames, deferred: [] });
-      toast('已切换为「默认 + 待发现」双列表模式，可在 deferred 中添加待发现工具', 'success');
+      toast('已切换双列表模式，可在待发现组中添加工具', 'success');
       return;
     }
     const chip = document.createElement('span');
