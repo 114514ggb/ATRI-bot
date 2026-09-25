@@ -1,6 +1,6 @@
 /* 视图：实时日志（WebSocket 流 + 级别过滤 + 暂停 + 关键词） */
 
-import { logsWsUrl } from '../api.js';
+import { wsUrl } from '../api.js';
 import { icon, escapeHtml } from '../ui.js';
 
 const MAX_DOM_LINES = 500;
@@ -73,7 +73,7 @@ async function init(section) {
   connect(section);
 }
 
-function connect(section) {
+async function connect(section) {
   if (!running) return;
   const dot = section.querySelector('#log-conn-dot');
   const text = section.querySelector('#log-conn-text');
@@ -86,8 +86,18 @@ function connect(section) {
     ws = null;
   }
 
+  // 每次（重）连都现取一张一次性票据
+  let url;
   try {
-    ws = new WebSocket(logsWsUrl());
+    url = await wsUrl('/ws/logs');
+  } catch {
+    text.textContent = '获取连接票据失败，将自动重试';
+    scheduleReconnect(section);
+    return;
+  }
+
+  try {
+    ws = new WebSocket(url);
   } catch {
     scheduleReconnect(section);
     return;

@@ -8,18 +8,27 @@
 
 所有 API 路径都挂在 `/admin` 前缀下，例如完整路径为 `/admin/api/status`。下文表格只写 `/api/...` 相对路径。
 
-### 鉴权（除标注"免鉴权"外全部需要）
+### 鉴权模型（除标注"免鉴权"外全部需要）
 
-- HTTP 端点使用 Bearer 令牌：请求头 `Authorization: Bearer <token>`。
-- WebSocket 与 `<img>`/`<audio>`/`<video>` 标签无法带请求头，令牌走 query 参数：`?token=<token>`。
-- 令牌来源优先级（`deps.py::_access_token`）：
+面板采用「登录换发会话令牌」：
+
+1. 先调用 `POST /api/login`，用**主令牌**（面板口令）换取**会话令牌**；
+2. 之后所有请求携带会话令牌——HTTP 端点用 `Authorization: Bearer <session_token>`；
+3. WebSocket 不能带自定义请求头，采用**一次性票据**：先 `POST /api/ws_ticket`（会话令牌鉴权）拿 `ticket`，再用 `?ticket=<ticket>` 建连（30 秒有效、单次使用；旧 `?token=<session_token>` 仍兼容）；
+4. `<img>`/`<audio>`/`<video>` 标签既不能带请求头也不能先取票，仍用 `?token=<session_token>`（配合 `Referrer-Policy: no-referrer` 防 Referer 外泄）。
+
+- 主令牌来源优先级（`deps.py::_access_token`）：
   1. `config.json` 的 `web_panel.access_token`
   2. 环境变量 `ATRI_PANEL_TOKEN`
-  3. `platforms` 中第一个配置了 `access_token` 的平台令牌
+  不会回退到平台 `access_token`；未配置主令牌时接口返回 503。
+- 弱主令牌：长度不足 16 字符、或与平台 `access_token` 相同时只告警不阻断；把 `web_panel.block_weak_token` 设为 `true` 后，登录端点会直接 403 拒绝（防弱口令猜解）。
+- 会话令牌：内存态存储（进程重启失效）、**固定有效期**（默认 4 小时，可由 `web_panel.session_ttl_hours` 调整为 1-24 小时，签发后计时、不滑动）、容量上限 100；`POST /api/logout` 可即时吊销；主令牌轮换（改配置/环境变量）会立刻清空全部会话与未用票据；前端在到期时刻自动退出登录。
+- 已建立的 WebSocket 会周期性复验会话，吊销/过期后以 4401 断开。
+- 所有 `/admin*` 响应带安全头（`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、CSP `frame-ancestors 'none'` 等），`/admin/api/*` 强制 `Cache-Control: no-store`。
 
-### 防暴力破解
+### 防暴力破解（仅登录端点）
 
-按 IP 记录连续鉴权失败，第 n 次失败后锁定 `60·n²` 秒（封顶 24 小时），鉴权成功即清零。不信任 `X-Forwarded-For`。
+`POST /api/login` 采用**全局统一计数**（不区分来源 IP）——连续失败 1-2 次返回 401（附剩余尝试次数），第 3 次起触发锁定，时长 `10 分钟 × 2^(连续失败次数-3)` 封顶 24 小时；**锁定期内所有登录请求一律 429（正确口令也拒绝）**，期间新的失败不计数、不续期；登录成功清零。计数与锁定为进程内存态，重启 bot 即清空。会话令牌为 256 位随机值，不参与失败计数。
 
 ### 统一错误格式（FastAPI 标准）
 
@@ -30,10 +39,10 @@
 | 状态码 | 含义 |
 |---|---|
 | 400 | 参数非法（detail 中带具体原因） |
-| 401 | 令牌错误 |
+| 401 | 会话令牌无效/过期（重新登录获取）；登录端点则为主令牌错误 |
 | 404 | 资源不存在 |
 | 413 | 上传文件超过大小限制 |
-| 429 | 处于防爆破锁定期，带 `Retry-After` 响应头 |
+| 429 | 登录处于防爆破锁定期，带 `Retry-After` 响应头 |
 | 500 | 服务端执行失败 |
 | 503 | 依赖服务不可用（bot 未启动 / 数据库未连接 / 未配置令牌等） |
 
@@ -45,12 +54,19 @@
 
 | 关闭码 | 含义 |
 |---|---|
-| 4401 | 令牌错误或未配置令牌 |
-| 4429 | 处于防爆破锁定期 |
+| 4401 | 会话令牌无效/过期，或未配置令牌 |
 | 4450 | 沙盒未初始化（仅沙盒终端） |
 | 4451 | 当前沙盒后端不支持终端（仅沙盒终端） |
 
 ---
+
+## 登录（auth.py）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/login` | 用主令牌换取会话令牌。Body：`{ "token": "<主令牌>" }`。返回 `{status, session_token, expires_in}`（`expires_in` 为会话有效期秒数，默认 4 小时）。失败：401 令牌错误（附剩余尝试次数）/ 403 `block_weak_token` 且主令牌过弱 / 429 锁定期或连续失败达阈值（带 `Retry-After`）/ 503 未配置主令牌 |
+| POST | `/api/logout` | 吊销当前会话令牌（需携带会话令牌）。返回 `{status: "ok"}` |
+| POST | `/api/ws_ticket` | 为当前会话签发一次性 WebSocket 票据。返回 `{status, ticket, expires_in}`（默认 30 秒、单次使用）；会话失效 401 |
 
 ## 仪表盘（dashboard.py）
 
@@ -97,11 +113,13 @@
 | GET | `/api/db/status` | 连接状态：PG 版本、库名、库大小、启动时长、连接数、连接池信息、host/port/user（不含密码）。不可用时 `{available: false, reason}` |
 | GET | `/api/db/tables` | public 下所有表：行数估计、大小、列数、注释（按大小倒序） |
 | GET | `/api/db/table` | 单表结构。Query：`name`（表名，白名单正则校验）。返回列 / 索引 / 约束 / 精确行数 |
-| POST | `/api/db/query` | 执行 SQL。Body：`{ "sql": "..." }`（上限 100k 字符）。返回结果集的语句（select/show/explain/values/table/with 或含 RETURNING）返回 `{ok, kind:"rows", columns, rows, row_count, truncated, duration_ms}`（最多 500 行，超长文本截断）；写语句返回 `{ok, kind:"status", status, duration_ms}`。失败返回 `{ok: false, error}`。单条 30 秒超时 |
+| POST | `/api/db/query` | 执行 SQL。Body：`{ "sql": "..." }`（上限 100k 字符）。返回结果集的语句（select/show/explain/values/table/with 或含 RETURNING）返回 `{ok, kind:"rows", columns, rows, row_count, truncated, duration_ms}`（最多 500 行，超长文本截断）；写语句返回 `{ok, kind:"status", status, duration_ms}`。失败返回 `{ok: false, error}`。单条 30 秒超时。每次执行写审计日志（日志器 `atri-bot.WebPanelDB`）；`web_panel.db_console_readonly` 为 `true` 时非查询语句 403 |
 
 ## 配置管理（config.py）
 
-三个配置文件的读写接口形态一致：GET 返回 `{content, path, valid}`，POST 保存前先备份为 `*.bak` 并返回 `{status, needs_restart: true, backup}`（`needs_restart` 为真表示需**手动**重启 bot 进程才能生效，面板不提供自动重启）。
+三个配置文件的读写接口形态一致：GET 返回 `{content, path, valid, masked}`，POST 保存前先备份为 `*.bak` 并返回 `{status, needs_restart: true, backup}`（`needs_restart` 为真表示需**手动**重启 bot 进程才能生效，面板不提供自动重启）。
+
+> **密钥打码（默认开启）**：`web_panel.mask_secrets` 不为 `false` 时，GET 会把敏感值替换为哨兵 `"__KEEP__"`——主配置的 `web_panel.access_token`、`database.password`、`platforms.*.access_token`；供应商配置的 `api_key`（单值或号池数组）；MCP 配置的 `mcpServers.*.env.*` 值。POST 保存时哨兵自动还原为磁盘旧值（按供应商 name / MCP 服务名匹配），因此"只改其他字段"不会弄丢密钥；若填了哨兵却无旧值可还原，返回 400 而非写入半套密钥。想直接看/改真实密钥可把该开关设为 `false`（不建议）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
@@ -142,14 +160,16 @@
 |---|---|---|
 | GET | `/api/chat/info` | 聊天页启动信息：`defaults`（supplier/model/persona/chat_parameter）、`webui_preset`（工具预设 default/deferred 名单）、`limits`（image/audio/video/file 上传限额，字节）、`max_turns`、`id_range` |
 | POST | `/api/chat/upload` | 上传聊天附件（multipart `file` 字段，流式读取，按类别限大小）。返回 `{status, file}`（附件摘要，含 `id`）；超限 413 |
-| GET | `/api/chat/files/{file_id}` | 附件预览/下载（query 令牌鉴权）。不存在或已过期 404 |
-| GET | `/api/chat/avatar` | 机器人头像（query 令牌鉴权）：配置目录下的 ATRI-bot 图（png/jpg/jpeg/webp/gif） |
+| GET | `/api/chat/files/{file_id}` | 附件预览/下载（会话令牌走 query 参数鉴权）。不存在或已过期 404 |
+| GET | `/api/chat/avatar` | 机器人头像（会话令牌走 query 参数鉴权）：配置目录下的 ATRI-bot 图（png/jpg/jpeg/webp/gif） |
 | GET | `/api/panel/logo` | 面板品牌图。**免鉴权**（登录页与 favicon 用）；文件不存在 404 |
 | POST | `/api/chat/tools` | 保存 webui 工具预设。Body：`{ "tools": ["工具名"...], "deferred": ["工具名"...] \| 省略 }`。`deferred` 缺省表示不改动待发现组。持久化到 config.json。返回 `{status, tools, deferred}` |
 | GET | `/api/chat/sessions` | 全部会话概览。返回 `{ items: [...] }` |
 | DELETE | `/api/chat/sessions/{session_id}` | 删除会话。返回 `{status, deleted}` |
 
-### WebSocket `/api/ws/chat?token=`
+### WebSocket `/api/ws/chat`
+
+鉴权：`?ticket=<一次性票据>`（先 `POST /api/ws_ticket` 获取），旧 `?token=<会话令牌>` 兼容。
 
 客户端 → 服务端（JSON 消息）：
 
@@ -189,7 +209,9 @@
 |---|---|---|
 | POST | `/api/system/stop` | 请求主进程以 Ctrl+C 语义优雅关闭（回收沙盒 / MCP / 数据库连接池 / 插件等资源）后退出。返回 `{status: "stopping"}`。不可撤销，关闭后需**手动**重新启动（面板不提供自动重启，旧 `/api/system/restart` 已移除，请求会得到 404） |
 
-### WebSocket `/api/ws/logs?token=`
+### WebSocket `/api/ws/logs`
+
+鉴权：`?ticket=<一次性票据>`（旧 `?token=` 兼容）。
 
 连接成功后先推 `{"type": "history", "items": [...]}`（环形缓冲最近 500 条），之后每 0.25 秒批量推送 `{"type": "logs", "items": [...]}`。
 
@@ -197,9 +219,11 @@
 
 ## 终端（terminal.py）— 主机 Shell
 
-在 bot 所在主机上执行命令。**拿到面板令牌即等于拿到主机权限**。
+在 bot 所在主机上执行命令。**拿到有效会话即等于拿到主机权限**；所有从面板执行的命令都会写入审计日志（日志器 `atri-bot.Terminal`）。
 
-### WebSocket `/api/ws/terminal?token=`
+### WebSocket `/api/ws/terminal`
+
+鉴权：`?ticket=<一次性票据>`（旧 `?token=` 兼容）。
 
 连接成功后服务端推 hello：
 
@@ -240,9 +264,9 @@
 | POST | `/api/sandbox/restart` | 重启沙盒。返回 `{status: "restarted", backend}`；成功后自动刷新沙盒依赖工具 |
 | POST | `/api/sandbox/refresh-tools` | 按当前 `config.json` 的 `sand_box` 段重建沙盒（原先运行中则启动新实例），并刷新沙盒依赖工具的 `active` 与描述。返回 `{status: "refreshed", backend, running, changed_tools}` |
 
-### WebSocket `/api/ws/sandbox-terminal?token=`
+### WebSocket `/api/ws/sandbox-terminal`
 
-协议与主机终端一致（hello / exec / kill / ping / output / exit / pong）；差异：
+协议与主机终端一致（hello / exec / kill / ping / output / exit / pong）；鉴权同 `/api/ws/terminal`。差异：
 
 - `complete` 目前返回空 `items`（容器内文件系统补全未适配，保留协议应答）。
 - 沙盒未初始化关闭码 4450；后端不支持终端关闭码 4451。
@@ -256,6 +280,7 @@
 |---|---|
 | `GET /admin/` | 面板单页（templates/index.html），`Cache-Control: no-store` |
 | `/admin/static/*` | 静态 JS/CSS，同样强制 no-store，改动后普通刷新即可生效 |
+| 安全头 | 全部 `/admin*` 响应：`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、CSP（`script-src 'self'`、`frame-ancestors 'none'` 等）；`/admin/api/*` 额外 `Cache-Control: no-store` |
 
 ## 路由 → 源文件速查
 

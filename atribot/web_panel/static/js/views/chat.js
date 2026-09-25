@@ -1,7 +1,7 @@
 /* 视图：AI 聊天（SubAgentRunner 驱动的多会话流式聊天）
    分级展示：每步 = 思考过程(折叠) + 工具调用块(参数/结果) + 正文(Markdown+公式图片) */
 
-import { api, getToken } from '../api.js';
+import { api, getToken, wsUrl } from '../api.js';
 import { icon, toast, escapeHtml, openModal, confirmDialog, fmtTokens, helpFold } from '../ui.js';
 import { TOOL_SEARCH_BRIEF, TOOL_SEARCH_RULES, TOOL_SEARCH_HELP_LABEL } from '../copy.js';
 import {
@@ -804,15 +804,19 @@ function renderHistory(items) {
 
 /* ---------- WebSocket 客户端 ---------- */
 
-function chatWsUrl() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${proto}://${location.host}/admin/api/ws/chat?token=${encodeURIComponent(getToken())}`;
-}
-
-function connectWs() {
+async function connectWs() {
   if (destroyed) return;
   try { ws?.close(); } catch { /* 旧连接关闭失败不影响重连 */ }
-  ws = new WebSocket(chatWsUrl());
+
+  let url;
+  try {
+    url = await wsUrl('/ws/chat');
+  } catch {
+    const delay = Math.min(15000, 1000 * Math.pow(1.6, wsRetry++));
+    wsRetryTimer = setTimeout(connectWs, delay);
+    return;
+  }
+  ws = new WebSocket(url);
 
   ws.addEventListener('open', () => {
     wsOpen = true;

@@ -1,6 +1,6 @@
 /* 面板入口：登录 / 路由注册 / 顶栏与系统菜单 */
 
-import { api, getToken, setToken, onUnauthorized } from './api.js';
+import { api, getToken, setSession, setToken, getSessionRemainingMs, onUnauthorized } from './api.js';
 import { icon, initTheme, toggleTheme, confirmDialog, initSelectMenus, mountLogoImage, upgradeFavicon } from './ui.js';
 import { registerRoute, startRouter } from './router.js';
 import { stopAndWait } from './components/editor-kit.js';
@@ -52,6 +52,7 @@ function showLogin(message = null) {
   app().classList.add('hidden');
   resetLoginBtn();
   stopLockCountdown();
+  stopSessionTimer();
   const err = document.getElementById('login-error');
   if (message) {
     err.textContent = message;
@@ -110,6 +111,29 @@ function startLockCountdown(seconds) {
   _lockTimer = setInterval(tick, 1000);
 }
 
+/* ---------- 会话到期：到点自动退出登录（与后端会话有效期一致） ---------- */
+
+let _expiryTimer = null;
+
+function stopSessionTimer() {
+  if (_expiryTimer) { clearTimeout(_expiryTimer); _expiryTimer = null; }
+}
+
+function scheduleSessionTimer() {
+  stopSessionTimer();
+  const remaining = getSessionRemainingMs();
+  if (remaining === null) return;  // 无到期信息（旧存储等）：交给 401 兜底
+  if (remaining <= 0) { expireSession(); return; }
+  _expiryTimer = setTimeout(expireSession, remaining);
+}
+
+/* 会话到期：清除本地凭证并回到登录层 */
+function expireSession() {
+  stopSessionTimer();
+  setToken('');
+  showLogin('会话已过期，请重新登录');
+}
+
 /* 每个浏览器会话只在第一次进入时播完整欢迎揭幕，之后刷新只播轻量级联 */
 const WELCOMED_KEY = 'atri_welcomed';
 
@@ -123,6 +147,8 @@ function showApp() {
 
   const appEl = app();
   appEl.classList.remove('hidden');
+
+  scheduleSessionTimer();  // 到点自动退出登录
 
   const firstVisit = !sessionStorage.getItem(WELCOMED_KEY);
   if (firstVisit) sessionStorage.setItem(WELCOMED_KEY, '1');
@@ -187,9 +213,10 @@ async function checkAuth() {
       startLockCountdown(e.retryAfter || 60);
     } else if (e.status === 401) {
       setToken('');
-      showLogin('访问令牌无效，请重新输入');
-    } else if (e.message.includes('令牌')) {
-      showLogin('访问令牌无效，请重新输入');
+      showLogin('会话已失效，请重新输入访问令牌');
+    } else if (e.message.includes('令牌') || e.message.includes('会话')) {
+      setToken('');
+      showLogin('会话已失效，请重新输入访问令牌');
     } else {
       showLogin(`无法连接面板服务：${e.message}`);
     }
@@ -219,6 +246,7 @@ function openSystemMenu(anchor) {
     const action = item.dataset.sys;
 
     if (action === 'logout') {
+      await api.logout();  // 吊销服务端会话（失败不影响本地登出）
       setToken('');
       showLogin();
       return;
@@ -238,11 +266,27 @@ function openSystemMenu(anchor) {
 /* ---------- 初始化 ---------- */
 
 function bindChrome() {
-  document.getElementById('login-btn').addEventListener('click', () => {
+  document.getElementById('login-btn').addEventListener('click', async () => {
     const token = document.getElementById('access-token').value.trim();
     if (!token) { showLogin('请输入访问令牌'); return; }
-    setToken(token);
-    checkAuth();
+    const btn = document.getElementById('login-btn');
+    btn.classList.add('loading');
+    stopLockCountdown();
+    try {
+      const session = await api.login(token);  // 访问令牌 → 短期会话令牌
+      setSession(session.session_token, session.expires_in);
+      document.getElementById('access-token').value = '';  // 不在输入框里保留口令
+      checkAuth();  // 用会话令牌探针进入应用（保留成功态与欢迎编排）
+    } catch (e) {
+      btn.classList.remove('loading');
+      if (e.status === 429) {
+        startLockCountdown(e.retryAfter || 60);
+      } else if (e.status === 401) {
+        showLogin(e.message || '访问令牌无效，请重新输入');  // 服务端会附剩余尝试次数
+      } else {
+        showLogin(`无法连接面板服务：${e.message}`);
+      }
+    }
   });
   document.getElementById('access-token').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') document.getElementById('login-btn').click();
@@ -281,7 +325,7 @@ function bindChrome() {
     if (!e.target.closest('.menu-wrap')) closeMenus();
   });
 
-  onUnauthorized(() => showLogin('登录已过期，请重新输入令牌'));
+  onUnauthorized(() => showLogin('会话已过期，请重新输入访问令牌'));
 }
 
 initTheme();
@@ -294,8 +338,14 @@ mountLogoImage(document.querySelector('.brand-badge'));
 upgradeFavicon();
 
 if (getToken()) {
-  document.getElementById('access-token').value = getToken();
-  checkAuth();
+  /* 已存会话令牌：先看是否已到期，未到期直接探针进入（不回填输入框，避免令牌出现在 DOM 里） */
+  const remaining = getSessionRemainingMs();
+  if (remaining !== null && remaining <= 0) {
+    setToken('');
+    showLogin('会话已过期，请重新登录');
+  } else {
+    checkAuth();
+  }
 } else {
   showLogin();
 }

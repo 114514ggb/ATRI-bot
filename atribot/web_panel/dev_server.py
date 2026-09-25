@@ -127,7 +127,12 @@ def main() -> None:
         make_media_processor_mock,
         make_memory_mock,
     )
-    from atribot.web_panel.panel_router import _ensure_log_handler, mount_static, router
+    from atribot.web_panel.panel_router import (
+        _ensure_log_handler,
+        install_security_headers,
+        mount_static,
+        router,
+    )
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s | %(message)s")
 
@@ -147,9 +152,10 @@ def main() -> None:
     container.register("MediaProcessor", make_media_processor_mock())
     container.register("LLMConnectionManager", make_llm_supplier_mock())
 
-    app = FastAPI(title="ATRI Admin Panel (dev)")
+    app = FastAPI(title="ATRI Admin Panel (dev)", docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(router)
     mount_static(app)  # 静态资源 no-store 由 mount_static 统一注册
+    install_security_headers(app)
 
     @app.middleware("http")
     async def _slow_api_sim(request, call_next):

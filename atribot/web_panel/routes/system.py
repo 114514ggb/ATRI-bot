@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, WebSocket
 from ..deps import (
     _auth,
     _ensure_log_handler,
+    _ensure_ws_session,
     _log_buffer,
     _log_buffer_lock,
     _ws_auth,
@@ -51,9 +52,10 @@ async def api_system_stop(_: None = Depends(_auth)) -> Dict[str, str]:
 
 
 @router.websocket("/api/ws/logs")
-async def ws_logs(websocket: WebSocket, token: str = "") -> None:
-    # _ws_auth 内部已 accept（失败时带 4401/4429 关闭）
-    if not await _ws_auth(websocket, token):
+async def ws_logs(websocket: WebSocket, token: str = "", ticket: str = "") -> None:
+    # _ws_auth 内部已 accept（失败时以 4401 关闭）；优先一次性票据，兼容旧 ?token=
+    session_ref = await _ws_auth(websocket, token, ticket)
+    if session_ref is None:
         return
 
     _ensure_log_handler()
@@ -67,6 +69,9 @@ async def ws_logs(websocket: WebSocket, token: str = "") -> None:
 
         while True:
             await asyncio.sleep(0.25)
+            # 会话吊销/过期后主动断开长连接（否则已建立的 WS 会终身有效）
+            if not await _ensure_ws_session(websocket, session_ref):
+                return
             with _log_buffer_lock:
                 pending = [item for item in _log_buffer if item["seq"] > last_seq]
             if pending:

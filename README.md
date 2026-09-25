@@ -205,7 +205,7 @@ docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 5.  **Skills 文件夹**：默认路径在 `atribot/LLMchat/skills/agent_skills`。
 6.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
 7.  **表情包**：在 `document/img/emojis` 文件夹下新建**文件名代表内部表情的文件夹**，放入对应名称的图片（支持 .jpg, .jpeg, .png, .gif），LLM 即可在聊天中自然发送。
-8.  **Web 管理面板**：`config.web_panel` 控制管理面板（`enable` 默认开启、`port` 未配置时缺省 `5125`（本仓库为 `5308`）、`access_token` 为登录口令，建议部署后务必修改；登录令牌也支持环境变量 `ATRI_PANEL_TOKEN`）。
+8.  **Web 管理面板**：`config.web_panel` 控制管理面板（`enable` 默认开启、`port` 未配置时缺省 `5125`、`access_token` 为主令牌/登录口令，仓库默认已替换为随机强口令，部署前请改成自建随机值；主令牌也支持环境变量 `ATRI_PANEL_TOKEN`）。
 9.  **路径映射**：Bot 与协议端（NapCat）不在同一文件系统时（例如 Bot 跑在 WSL 而 NapCat 在 Windows），在 `file_path.path_mapping` 中配置「本地路径前缀 → 协议端路径前缀」映射（如 `"E:/": "/mnt/e/"`），发送 `file://` 路径时会自动转换；留空则不做转换。
 
 
@@ -256,7 +256,7 @@ cp .env.docker.example .env
 | `ATRI_ACCESS_TOKEN` | NapCat 连接验证 Token | `ATRI114514` |
 | `ATRI_NAPCAT_URL` | NapCat WebSocket 地址（仅客户端模式使用） | `host.docker.internal:3001` |
 | `ATRI_PANEL_PORT` | Web 管理面板端口（容器内与宿主映射一致） | `5308` |
-| `ATRI_PANEL_TOKEN` | Web 管理面板令牌（⚠️ 会被 `web_panel.access_token` 覆盖，见下） | 空 |
+| `ATRI_PANEL_TOKEN` | Web 管理面板登录口令（Docker 下必填；⚠️ 会被 `web_panel.access_token` 覆盖，见下） | 空 |
 | `ATRI_SANDBOX_IMAGE` | AI 沙盒镜像（需先手动构建，见第 4 节） | `atri-sandbox:latest` |
 | `ATRI_FILE_LOG` | `1`=同时写文件日志，`0`=只输出 stdout | `1` |
 | `TZ` | 容器时区 | `Asia/Shanghai` |
@@ -292,7 +292,9 @@ docker compose exec db psql -U postgres -d postgres
 ```
 http://localhost:5308/admin/
 ```
-令牌取 `assets/config.json` 的 `web_panel.access_token`（当前是弱口令 `ATRI`，**部署前务必改掉**）；若想让 `.env` 里的 `ATRI_PANEL_TOKEN` 生效，需要先把配置文件里的 `access_token` 删掉（它优先级更高）。
+宿主侧端口映射默认只绑 `127.0.0.1`（远程访问请自行改端口映射并优先走反向代理）。
+
+登录口令取 `assets/config.json` 的 `web_panel.access_token`；若想让 `.env` 里的 `ATRI_PANEL_TOKEN` 生效，需要先把配置文件里的 `access_token` 删掉（它优先级更高）。面板不会回退使用平台 `access_token`；未配置口令时所有接口返回 503。登录页用口令换取会话令牌（**固定有效期**，默认 4 小时，可在 `web_panel.session_ttl_hours` 调整 1-24 小时），到期后 WebUI 自动退出登录；登出、修改口令都会立即让全部会话失效。连续输错口令 3 次会触发**全局锁定**（10 分钟起步、指数递增、封顶 24 小时；锁定期间口令正确也拒绝）。
 
 **⚠️ 路径映射（Docker 部署必配）**：Bot 给 NapCat 发本地媒体时用的是 `file://` **容器内**路径（如 `/app/document/...`），宿主机上的 NapCat 读不到。请在宿主机的 `assets/config.json` 中配置：
 ```json

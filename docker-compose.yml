@@ -70,14 +70,18 @@ services:
       # Web 管理面板：容器内绑 0.0.0.0，端口与宿主机映射保持一致
       ATRI_WEB_PANEL_HOST: 0.0.0.0
       ATRI_WEB_PANEL_PORT: ${ATRI_PANEL_PORT:-5308}
-      ATRI_PANEL_TOKEN: ${ATRI_PANEL_TOKEN:-}
+      # 面板登录口令（必填；未配置时面板接口全部拒绝）：
+      # 先在 .env 设置 ATRI_PANEL_TOKEN（或在 config.json 配置 web_panel.access_token，优先级更高）
+      ATRI_PANEL_TOKEN: ${ATRI_PANEL_TOKEN:?set ATRI_PANEL_TOKEN in .env first (panel login token)}
       # 1 = 同时写文件日志（挂载在 ./atribot/log）；0 = 只输出 stdout，交给 docker 日志轮转
       ATRI_FILE_LOG: ${ATRI_FILE_LOG:-1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${ATRI_BOT_PORT:-8888}:8888"
-      - "${ATRI_PANEL_PORT:-5308}:5308"
+      # 面板默认只绑宿主机回环地址，防止弱口令面板暴露到局域网；
+      # 要远程访问请改成 "${ATRI_PANEL_PORT:-5308}:5308" 并优先走反向代理（HTTPS）
+      - "127.0.0.1:${ATRI_PANEL_PORT:-5308}:5308"
     volumes:
       - ./assets:/app/assets
       - ./document:/app/document

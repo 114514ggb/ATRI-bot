@@ -235,7 +235,8 @@
         "enable":True,#是否启动管理面板，启动后浏览器访问 http://127.0.0.1:端口/admin/
         "host":"127.0.0.1",#面板监听的地址，默认只绑本机；容器部署要写 0.0.0.0 才能从宿主机访问(可用环境变量 ATRI_WEB_PANEL_HOST 覆盖)
         "port":5125,#面板监听的端口，默认 5125(可用环境变量 ATRI_WEB_PANEL_PORT 覆盖)
-        "access_token":""#面板登录令牌，留空就用第一个平台的 access_token，也可以用环境变量 ATRI_PANEL_TOKEN 指定
+        "access_token":"ATRI",#面板主令牌(登录口令)，建议32字符以上随机值；留空读环境变量 ATRI_PANEL_TOKEN，两者都没有时面板接口全部返回503，登录页用口令换取会话令牌（默认 4 小时有效）
+        "session_ttl_hours":4#登录会话的固定有效期（小时，1-24），默认 4；到期后 WebUI 自动退出登录
     }
 }
 

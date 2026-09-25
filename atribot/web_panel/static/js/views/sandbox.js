@@ -1,7 +1,7 @@
 /* 视图：容器管理（沙盒状态 / 启停 / 重启 + 沙盒内终端）
    页面完全由后端的 panel_* 扩展点驱动，切换沙盒实现无需改这里 */
 
-import { api, sandboxWsUrl } from '../api.js';
+import { api, wsUrl } from '../api.js';
 import { icon, escapeHtml, confirmDialog, toast } from '../ui.js';
 import { TERMINAL_HINT_SANDBOX } from '../copy.js';
 import { createTerminal } from '../components/term-core.js';
@@ -100,7 +100,7 @@ function render(section, st) {
     mount.style.display = '';
     if (!term) {
       term = createTerminal(mount, {
-        wsUrl: sandboxWsUrl(),
+        wsUrl: () => wsUrl('/ws/sandbox-terminal'),  /* 传函数：每次（重）连现取一次性票据 */
         historyKey: 'atri_sterm_history',
         allowComplete: false,
         banner: (info) => [

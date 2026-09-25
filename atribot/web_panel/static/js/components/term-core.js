@@ -17,7 +17,7 @@ const MAX_DOM_NODES = 1200;
 /**
  * 在 mount 元素内创建一个终端实例
  * opts:
- *   - wsUrl: 终端 WebSocket 地址（token 已含在 query）
+ *   - wsUrl: 终端 WebSocket 地址：字符串，或返回地址的异步函数（每次连接前现取票据）
  *   - historyKey: 历史记录的 localStorage 键
  *   - banner(info): 首次 hello 时打印的问候行数组
  *   - allowComplete: 是否启用 Tab 补全（默认 true；后端不回应 complete 即为空）
@@ -141,7 +141,7 @@ export function createTerminal(mount, opts = {}) {
     appendNote(`[${new Date().toTimeString().slice(0, 8)}] ${text}`);
   }
 
-  function connect() {
+  async function connect() {
     if (!running) return;
     setDot(q('.js-conn-dot'), 'yellow');
     q('.js-conn-text').textContent = reconnectAttempts > 0 ? `第 ${reconnectAttempts + 1} 次尝试连接…` : '连接中…';
@@ -153,9 +153,19 @@ export function createTerminal(mount, opts = {}) {
       ws = null;
     }
 
+    /* 每次（重）连都现取一张一次性票据；取票失败按掉线处理等下次重试 */
+    let url;
+    try {
+      url = typeof opts.wsUrl === 'function' ? await opts.wsUrl() : opts.wsUrl;
+    } catch {
+      q('.js-conn-text').textContent = '获取连接票据失败，将自动重试';
+      scheduleReconnect();
+      return;
+    }
+
     let sock;
     try {
-      sock = new WebSocket(opts.wsUrl);
+      sock = new WebSocket(url);
     } catch {
       scheduleReconnect();
       return;

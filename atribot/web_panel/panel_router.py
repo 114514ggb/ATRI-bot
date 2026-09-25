@@ -37,6 +37,52 @@ def mount_static(app) -> None:
         return resp
 
 
+_CSP = (
+    "default-src 'none'; "
+    "script-src 'self'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data: https://latex.codecogs.com; "
+    "media-src 'self' blob:; "
+    "connect-src 'self'; "
+    "font-src 'self'; "
+    "frame-ancestors 'none'; "
+    "base-uri 'none'; "
+    "form-action 'none'; "
+    "object-src 'none'"
+)
+"""面板 CSP：脚本只允许同源外部文件（index.html 的内联主题脚本已抽到 theme-init.js），
+样式保留 'unsafe-inline'（视图大量使用行内 style 属性），图片仅同源 + data: + 公式服务"""
+
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+    "Content-Security-Policy": _CSP,
+}
+
+
+def install_security_headers(app) -> None:
+    """给面板全部响应补齐安全头，并让 /admin/api 响应禁缓存
+
+    - nosniff：阻止浏览器对上传附件做 MIME 嗅探（配合 FileResponse 的 attachment）
+    - X-Frame-Options / CSP frame-ancestors：禁止被 iframe 嵌套（防点击劫持）
+    - Referrer-Policy: no-referrer：避免把含 ?token= 的 URL 通过 Referer 泄给外站
+    - Cache-Control: no-store：配置/密钥/日志等敏感 JSON 不留在浏览器与代理缓存里
+    正式环境（bot_framework）与开发服务器共用此处，必须在应用开始接请求前调用。
+    """
+
+    @app.middleware("http")
+    async def _panel_security_headers(request, call_next):
+        resp = await call_next(request)
+        path = request.url.path
+        if path.startswith("/admin"):
+            for name, value in _SECURITY_HEADERS.items():
+                resp.headers.setdefault(name, value)
+            if path.startswith("/admin/api"):
+                resp.headers.setdefault("Cache-Control", "no-store")
+        return resp
+
+
 @router.get("/", response_class=HTMLResponse)
 async def panel_index() -> HTMLResponse:
     html_path = os.path.join(os.path.dirname(__file__), "templates", "index.html")

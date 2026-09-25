@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..deps import _auth, _cfg, _read_config_text, _save_config_file
+from ..deps import _auth, _backup_file, _cfg, _parse_json_or_400, _read_config_text, _write_json
 
 router = APIRouter()
 
@@ -18,6 +18,119 @@ log = logging.getLogger("atri-bot.WebPanelConfig")
 _VALID_CONN_TYPES = {"WebSocket_client", "WebSocket_server", "http"}
 
 _TOOL_SEARCH_NAME = "tool_search"
+
+_KEEP_SENTINEL = "__KEEP__"
+"""密钥打码哨兵：GET 用哨兵替换真实密钥，POST 保存时哨兵还原为磁盘上的旧值"""
+
+
+def _mask_secrets_enabled() -> bool:
+    """web_panel.mask_secrets（默认 true）：配置接口是否对密钥打码"""
+    try:
+        return (_cfg()._raw_config.get("web_panel") or {}).get("mask_secrets", True) is not False
+    except Exception:
+        return True
+
+
+def _current_json(path) -> dict:
+    """读磁盘上的当前配置（用于哨兵还原）；不可读时返回空 dict"""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def mask_secrets(kind: str, data: dict) -> dict:
+    """按配置类型把敏感字段换成哨兵（就地修改并返回入参）"""
+    if kind == "main":
+        wp = data.get("web_panel")
+        if isinstance(wp, dict) and wp.get("access_token"):
+            wp["access_token"] = _KEEP_SENTINEL
+        db = data.get("database")
+        if isinstance(db, dict) and db.get("password"):
+            db["password"] = _KEEP_SENTINEL
+        for platform in (data.get("platforms") or {}).values():
+            if isinstance(platform, dict) and platform.get("access_token"):
+                platform["access_token"] = _KEEP_SENTINEL
+    elif kind == "supplier":
+        for item in data.get("api") or []:
+            if isinstance(item, dict) and item.get("api_key"):
+                item["api_key"] = [_KEEP_SENTINEL] if isinstance(item["api_key"], list) else _KEEP_SENTINEL
+    elif kind == "mcp":
+        for server in (data.get("mcpServers") or {}).values():
+            if isinstance(server, dict) and isinstance(server.get("env"), dict):
+                for env_key, value in list(server["env"].items()):
+                    if value:
+                        server["env"][env_key] = _KEEP_SENTINEL
+    return data
+
+
+def restore_secrets(kind: str, new: dict, old: dict) -> None:
+    """保存前把哨兵还原为磁盘旧值；哨兵但无旧值时报 400（不落盘半套密钥）"""
+    if kind == "main":
+        wp_new, wp_old = new.get("web_panel"), old.get("web_panel")
+        if isinstance(wp_new, dict) and wp_new.get("access_token") == _KEEP_SENTINEL:
+            previous = wp_old.get("access_token") if isinstance(wp_old, dict) else None
+            if not previous:
+                raise HTTPException(400, "web_panel.access_token 是占位符但没有可还原的旧值，请填写真实口令")
+            wp_new["access_token"] = previous
+        db_new, db_old = new.get("database"), old.get("database")
+        if isinstance(db_new, dict) and db_new.get("password") == _KEEP_SENTINEL:
+            previous = db_old.get("password") if isinstance(db_old, dict) else None
+            if not previous:
+                raise HTTPException(400, "database.password 是占位符但没有可还原的旧值，请填写真实密码")
+            db_new["password"] = previous
+        platforms_old = old.get("platforms") or {}
+        for name, platform in (new.get("platforms") or {}).items():
+            if not isinstance(platform, dict) or platform.get("access_token") != _KEEP_SENTINEL:
+                continue
+            old_platform = platforms_old.get(name)
+            previous = old_platform.get("access_token") if isinstance(old_platform, dict) else None
+            if not previous:
+                raise HTTPException(400, f"platforms.{name}.access_token 是占位符但没有可还原的旧值，请填写真实 token")
+            platform["access_token"] = previous
+    elif kind == "supplier":
+        old_keys = {
+            item.get("name"): item.get("api_key")
+            for item in old.get("api") or []
+            if isinstance(item, dict) and item.get("name")
+        }
+        for item in new.get("api") or []:
+            if not isinstance(item, dict):
+                continue
+            key = item.get("api_key")
+            masked = key == _KEEP_SENTINEL or (
+                isinstance(key, list) and bool(key) and all(k == _KEEP_SENTINEL for k in key)
+            )
+            if not masked:
+                continue
+            previous = old_keys.get(item.get("name"))
+            if not previous:
+                raise HTTPException(400, f"供应商 {item.get('name')} 的 api_key 是占位符但没有可还原的旧值，请填写真实密钥")
+            item["api_key"] = previous
+    elif kind == "mcp":
+        old_servers = old.get("mcpServers") or {}
+        for name, server in (new.get("mcpServers") or {}).items():
+            if not isinstance(server, dict) or not isinstance(server.get("env"), dict):
+                continue
+            old_server = old_servers.get(name)
+            old_env = old_server.get("env") if isinstance(old_server, dict) and isinstance(old_server.get("env"), dict) else {}
+            for env_key, value in list(server["env"].items()):
+                if value != _KEEP_SENTINEL:
+                    continue
+                if not old_env.get(env_key):
+                    raise HTTPException(400, f"mcpServers.{name}.env.{env_key} 是占位符但没有可还原的旧值，请填写真实值")
+                server["env"][env_key] = old_env[env_key]
+
+
+def mask_text(kind: str, content: str, valid: bool) -> tuple:
+    """把合法配置文本打码后重新序列化；返回 (content, masked)"""
+    if not valid or not _mask_secrets_enabled():
+        return content, False
+    parsed = json.loads(content)
+    if not isinstance(parsed, dict):
+        return content, False
+    return json.dumps(mask_secrets(kind, parsed), ensure_ascii=False, indent=2), True
 
 
 def _name_list(key: str, group: str, raw: Any, errors: List[str]) -> List[str]:
@@ -142,7 +255,8 @@ def _validate_supplier_config(data: dict) -> None:
 async def api_get_config(_: None = Depends(_auth)) -> Dict[str, Any]:
     path = _cfg().config_file_path
     content, valid = _read_config_text(path)
-    return {"content": content, "path": str(path), "valid": valid}
+    content, masked = mask_text("main", content, valid)
+    return {"content": content, "path": str(path), "valid": valid, "masked": masked}
 
 
 class ConfigBody(BaseModel):
@@ -151,15 +265,22 @@ class ConfigBody(BaseModel):
 
 @router.post("/api/config")
 async def api_save_config(body: ConfigBody, _: None = Depends(_auth)) -> Dict[str, Any]:
-    backup = _save_config_file(_cfg().config_file_path, body.content, _validate_main_config)
+    path = _cfg().config_file_path
+    parsed = _parse_json_or_400(body.content)
+    if _mask_secrets_enabled():
+        restore_secrets("main", parsed, _current_json(path))
+    _validate_main_config(parsed)
+    backup = _backup_file(path)
+    _write_json(path, parsed)
     presets_reloaded = _reload_tool_presets()  # 工具预设立即生效，其余配置段仍需重启
-    return {"status": "ok", "needs_restart": True, "backup": backup, "presets_reloaded": presets_reloaded}
+    return {"status": "ok", "needs_restart": True, "backup": str(backup), "presets_reloaded": presets_reloaded}
 
 
 @router.get("/api/supplier_config")
 async def api_get_supplier_config(_: None = Depends(_auth)) -> Dict[str, Any]:
     path = _cfg().file_path.supplier_config_path
     content, valid = _read_config_text(path)
+    content, masked = mask_text("supplier", content, valid)
     data = json.loads(content) if valid else {}
 
     suppliers = []
@@ -181,28 +302,40 @@ async def api_get_supplier_config(_: None = Depends(_auth)) -> Dict[str, Any]:
                 "models": models,
             }
         )
-    return {"content": content, "path": str(path), "valid": valid, "suppliers": suppliers}
+    return {"content": content, "path": str(path), "valid": valid, "suppliers": suppliers, "masked": masked}
 
 
 @router.post("/api/supplier_config")
 async def api_save_supplier_config(body: ConfigBody, _: None = Depends(_auth)) -> Dict[str, Any]:
-    backup = _save_config_file(_cfg().file_path.supplier_config_path, body.content, _validate_supplier_config)
-    return {"status": "ok", "needs_restart": True, "backup": backup}
+    path = _cfg().file_path.supplier_config_path
+    parsed = _parse_json_or_400(body.content)
+    if _mask_secrets_enabled():
+        restore_secrets("supplier", parsed, _current_json(path))
+    _validate_supplier_config(parsed)
+    backup = _backup_file(path)
+    _write_json(path, parsed)
+    return {"status": "ok", "needs_restart": True, "backup": str(backup)}
 
 
 @router.get("/api/mcp_config")
 async def api_get_mcp_config(_: None = Depends(_auth)) -> Dict[str, Any]:
     path = _cfg().file_path.mcp_config
     if not path.exists():
-        return {"content": "{\n    \"mcpServers\": {}\n}\n", "path": str(path), "valid": True, "exists": False}
+        return {"content": "{\n    \"mcpServers\": {}\n}\n", "path": str(path), "valid": True, "exists": False, "masked": False}
     content, valid = _read_config_text(path)
-    return {"content": content, "path": str(path), "valid": valid, "exists": True}
+    content, masked = mask_text("mcp", content, valid)
+    return {"content": content, "path": str(path), "valid": valid, "exists": True, "masked": masked}
 
 
 @router.post("/api/mcp_config")
 async def api_save_mcp_config(body: ConfigBody, _: None = Depends(_auth)) -> Dict[str, Any]:
-    backup = _save_config_file(_cfg().file_path.mcp_config, body.content)
-    return {"status": "ok", "needs_restart": True, "backup": backup}
+    path = _cfg().file_path.mcp_config
+    parsed = _parse_json_or_400(body.content)
+    if _mask_secrets_enabled():
+        restore_secrets("mcp", parsed, _current_json(path))
+    backup = _backup_file(path)
+    _write_json(path, parsed)
+    return {"status": "ok", "needs_restart": True, "backup": str(backup)}
 
 
 class RollbackBody(BaseModel):

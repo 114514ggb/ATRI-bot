@@ -5,6 +5,7 @@
 使面板可以在不完整的运行环境中安全导入与独立调试。
 """
 
+import hashlib
 import json
 import logging
 import os
@@ -17,10 +18,14 @@ from pathlib import Path
 from threading import Lock
 from typing import Optional
 
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from atribot.core.service_container import container
+
+from . import session_store
+
+log = logging.getLogger("atri-bot.WebPanel")
 
 _LOG_BUFFER_MAX = 500
 _log_buffer: deque = deque(maxlen=_LOG_BUFFER_MAX)
@@ -74,119 +79,220 @@ def _db():
     return container.get("database")
 
 
-def _access_token() -> Optional[str]:
-    """面板访问令牌:web_panel.access_token > 环境变量 ATRI_PANEL_TOKEN > 第一个平台的 access_token"""
+_MIN_TOKEN_LEN = 8
+"""主令牌最小建议长度：短于此值在首次读取时告警（不阻断运行）"""
+
+_master_token_seen: Optional[str] = None
+"""上次读取到的主令牌摘要（SHA-256），用于检测轮换并清空旧会话"""
+
+_weak_token_warned = False
+
+
+def weak_token_reasons(token: str) -> list:
+    """主令牌过弱的原因列表（空列表 = 通过）；登录端点与启动告警共用"""
+    reasons = []
+    if len(token) < _MIN_TOKEN_LEN:
+        reasons.append(f"长度不足 {_MIN_TOKEN_LEN} 字符")
     try:
-        cfg = _cfg()
-        raw = cfg._raw_config
-    except Exception:
-        return os.environ.get("ATRI_PANEL_TOKEN") or None
-    token = (raw.get("web_panel") or {}).get("access_token") or os.environ.get("ATRI_PANEL_TOKEN")
-    if not token:
-        for platform in (raw.get("platforms") or {}).values():
-            if isinstance(platform, dict) and platform.get("access_token"):
-                token = platform["access_token"]
+        for name, platform in (_cfg()._raw_config.get("platforms") or {}).items():
+            if isinstance(platform, dict) and platform.get("access_token") == token:
+                reasons.append(f"与平台 {name} 的 access_token 相同")
                 break
-    return token or None
+    except Exception:
+        pass
+    return reasons
+
+
+WEAK_TOKEN_HINT = (
+    "请在 config.json 的 web_panel.access_token 或环境变量 ATRI_PANEL_TOKEN "
+    '设置 32 字符以上随机值：python -c "import secrets; print(secrets.token_urlsafe(32))"'
+)
+
+
+def weak_token_blocked() -> bool:
+    """是否硬性拒绝弱主令牌登录：web_panel.block_weak_token（默认 false，仅告警不阻断）"""
+    try:
+        return bool((_cfg()._raw_config.get("web_panel") or {}).get("block_weak_token"))
+    except Exception:
+        return False
+
+
+def _warn_weak_token(token: str) -> None:
+    """弱主令牌告警（进程生命周期内只提示一次）"""
+    global _weak_token_warned
+    if _weak_token_warned:
+        return
+    reasons = weak_token_reasons(token)
+    if reasons:
+        _weak_token_warned = True
+        log.warning("面板主令牌过弱（%s），%s", "；".join(reasons), WEAK_TOKEN_HINT)
+
+
+def _access_token() -> Optional[str]:
+    """面板主令牌（登录口令）:web_panel.access_token > 环境变量 ATRI_PANEL_TOKEN
+
+    不回退到平台 access_token（避免 OneBot 凭据等同于面板口令）；未配置时返回 None，
+    各鉴权入口据此返回 503（fail-closed）。每次读取顺带做两件事：
+    - 弱口令检测（warn-once）；
+    - 主令牌轮换检测：摘要变化即清空全部会话，强制重新登录。
+    """
+    global _master_token_seen
+    try:
+        raw = _cfg()._raw_config
+        token = (raw.get("web_panel") or {}).get("access_token") or os.environ.get("ATRI_PANEL_TOKEN")
+    except Exception:
+        token = os.environ.get("ATRI_PANEL_TOKEN")
+    token = token or None
+
+    digest = hashlib.sha256(token.encode("utf-8")).hexdigest() if token else None
+    if _master_token_seen is not None and digest != _master_token_seen:
+        # 主令牌轮换 / 被清空：旧会话全部作废，强制重新登录
+        cleared = session_store.revoke_all()
+        if cleared:
+            log.warning("检测到面板主令牌变更，%d 个旧会话全部作废", cleared)
+    _master_token_seen = digest
+
+    if token:
+        _warn_weak_token(token)
+    return token
 
 
 _security = HTTPBearer(auto_error=False)
 
-
-# ---------- 登录防暴力破解：按 IP 记录连续失败，平方递增锁定 ----------
-# 第 n 次连续失败后锁定该 IP 60*n² 秒（封顶 24 小时），登录成功即清零。
-# 只取 request.client.host，不信任 X-Forwarded-For（可被伪造绕过锁定）；
-# 将来若挂反向代理暴露面板，需改为从代理头取真实客户端 IP。
-
-_AUTH_INITIAL_LOCKOUT = 60  # 首次失败锁定秒数
-_AUTH_LOCKOUT_MAX = 86400  # 锁定上限（24 小时）
-
-_auth_failures: dict = {}  # IP -> 连续失败时间戳列表（time.monotonic()）
-_auth_failures_lock = Lock()
+_NO_TOKEN_DETAIL = "未配置访问令牌：请在 config.json 添加 web_panel.access_token 或设置环境变量 ATRI_PANEL_TOKEN"
 
 
-def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "?"
+# ---------- 登录防暴力破解：全局统一计数（不区分来源 IP） ----------
+# 任何来源的错误尝试都累计到同一计数器：连续失败达到 _LOGIN_FAIL_THRESHOLD 次即触发锁定，
+# 时长 _LOCK_BASE_SECONDS × 2^(失败次数-阈值)，封顶 _LOCK_MAX_SECONDS（24 小时）。
+# 锁定期内所有登录请求一律 429（即使口令正确也不放行，用户明确要求的硬锁定）；
+# 锁定期内的新失败不计数、不续期；登录成功清零。计数与锁定为进程内存态，重启即清空。
+#
+# 注意：这是「防爆破优先于可用性」的取舍——外部可故意多次输错把面板锁在门外。
+# 缓解：锁定只拦登录端点，已登录会话不受影响；重启进程可立即清空锁定。
+
+_LOGIN_FAIL_THRESHOLD = 3
+_LOCK_BASE_SECONDS = 600
+_LOCK_MAX_SECONDS = 86400
+
+_login_failures = 0
+_lock_until = 0.0  # 锁定截止时间（time.monotonic() 秒）
+_login_lock = Lock()
 
 
 def _lockout_seconds(fails: int) -> int:
-    return min(_AUTH_INITIAL_LOCKOUT * fails * fails, _AUTH_LOCKOUT_MAX)
+    """第 fails 次连续失败对应的锁定时长（仅 fails >= 阈值时有意义）"""
+    return min(_LOCK_BASE_SECONDS * (2 ** (fails - _LOGIN_FAIL_THRESHOLD)), _LOCK_MAX_SECONDS)
 
 
-def _auth_rate_limited(ip: str) -> Optional[float]:
-    """该 IP 是否处于锁定期，是则返回剩余秒数，否则 None"""
-    with _auth_failures_lock:
-        stamps = _auth_failures.get(ip)
-        if not stamps:
-            return None
-        remaining = _lockout_seconds(len(stamps)) - (time.monotonic() - stamps[-1])
+def login_lock_remaining() -> Optional[float]:
+    """登录是否处于锁定期：是则返回剩余秒数，否则 None"""
+    with _login_lock:
+        remaining = _lock_until - time.monotonic()
         return remaining if remaining > 0 else None
 
 
-def _register_auth_failure(ip: str) -> None:
-    with _auth_failures_lock:
-        now = time.monotonic()
-        _auth_failures.setdefault(ip, []).append(now)
-        # 清扫超过 24 小时无失败的 IP（其锁定期必然已过），防内存无限增长
-        for stale in [k for k, v in _auth_failures.items() if now - v[-1] > _AUTH_LOCKOUT_MAX]:
-            del _auth_failures[stale]
+def login_failures() -> int:
+    """当前连续失败次数（用于登录错误提示）"""
+    with _login_lock:
+        return _login_failures
 
 
-def _clear_auth_failures(ip: str) -> None:
-    with _auth_failures_lock:
-        _auth_failures.pop(ip, None)
+def register_login_failure() -> Optional[float]:
+    """登记一次登录失败；达到阈值则进入锁定并返回剩余秒数，否则返回 None"""
+    global _login_failures, _lock_until
+    with _login_lock:
+        _login_failures += 1
+        if _login_failures < _LOGIN_FAIL_THRESHOLD:
+            return None
+        _lock_until = time.monotonic() + _lockout_seconds(_login_failures)
+        return max(0.0, _lock_until - time.monotonic())
+
+
+def clear_login_failures() -> None:
+    """登录成功：清零失败计数并解除锁定"""
+    global _login_failures, _lock_until
+    with _login_lock:
+        _login_failures = 0
+        _lock_until = 0.0
+
+
+def verify_master_token(candidate: str) -> bool:
+    """常量时间比较主令牌（仅登录端点调用）"""
+    expected = _access_token()
+    if not expected:
+        return False
+    return secrets.compare_digest(candidate.encode("utf-8"), expected.encode("utf-8"))
+
+
+def _session_ttl_seconds() -> int:
+    """会话有效期（秒）：web_panel.session_ttl_hours（默认 4，钳制 1-24 小时）"""
+    hours: float = session_store.DEFAULT_TTL_SECONDS / 3600
+    try:
+        raw = (_cfg()._raw_config.get("web_panel") or {}).get("session_ttl_hours")
+        if raw is not None:
+            hours = float(raw)
+    except Exception:
+        pass
+    hours = max(session_store.MIN_TTL_HOURS, min(session_store.MAX_TTL_HOURS, hours))
+    return int(hours * 3600)
+
+
+def _require_session(token: str) -> None:
+    """会话令牌校验（HTTP 端点共用）：未配置主令牌 503，令牌无效/过期 401"""
+    if not _access_token():
+        raise HTTPException(status_code=503, detail=_NO_TOKEN_DETAIL)
+    if not session_store.validate_session(token):
+        raise HTTPException(status_code=401, detail="会话不存在或已过期，请重新登录")
+
+
+def _session_digest_valid(digest: str) -> bool:
+    """会话摘要当前是否可用（主令牌已配置且未过期/被吊销）；WS 建连与复验共用"""
+    return bool(_access_token()) and session_store.validate_digest(digest)
 
 
 async def _auth(
-    request: Request,
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_security),
-) -> None:
-    token = _access_token()
-    if not token:
-        raise HTTPException(
-            status_code=503,
-            detail="未配置访问令牌：请在 config.json 添加 web_panel.access_token 或设置环境变量 ATRI_PANEL_TOKEN",
-        )
-    ip = _client_ip(request)
-    # 先验令牌：正确令牌立即放行并清零失败计数（即使处于锁定期），
-    # 锁定只针对错误猜测——攻击者拿不到正确令牌，放行不损失防爆破强度
-    if creds is not None and secrets.compare_digest(
-        creds.credentials.encode("utf-8"), token.encode("utf-8")
-    ):
-        _clear_auth_failures(ip)
-        return
-    remaining = _auth_rate_limited(ip)
-    if remaining is not None:
-        # 锁定期内的错误令牌：直接拒绝且不再计数，避免持续探测把锁无限续期
-        raise HTTPException(
-            status_code=429,
-            detail=f"尝试次数过多，请 {int(remaining) + 1} 秒后重试",
-            headers={"Retry-After": str(int(remaining) + 1)},
-        )
-    _register_auth_failure(ip)
-    raise HTTPException(status_code=401, detail="Unauthorized")
+) -> str:
+    """HTTP 端点鉴权：只认会话令牌（Authorization: Bearer <会话令牌>），返回该令牌
+
+    主令牌仅用于 POST /api/login 换取会话令牌，不再直接放行任何端点。
+    """
+    token = creds.credentials if creds is not None else ""
+    _require_session(token)
+    return token
 
 
-async def _ws_auth(websocket, token: str) -> bool:
-    """WebSocket 令牌校验（与 HTTP _auth 同一顺序），失败时关闭连接并返回 False
+async def _ws_auth(websocket, token: str = "", ticket: str = "") -> Optional[str]:
+    """WebSocket 握手鉴权：优先一次性票据（?ticket=），兼容旧 ?token=（会话令牌）
 
+    成功返回「会话摘要」，后续用 :func:`_ensure_ws_session` 复验；失败以 4401 关闭并返回 None。
     注意必须先 accept 再 close：accept 之前 close 会被 uvicorn 转成 HTTP 403
-    拒绝握手，浏览器端只能看到抽象的 1006，自定义 close code（4401 等）
-    永远到不了前端，导致前端无法展示真实失败原因。
+    拒绝握手，浏览器端只能看到抽象的 1006，自定义 close code 永远到不了前端，
+    导致前端无法展示真实失败原因。
     """
     await websocket.accept()
-    expected = _access_token()
-    if not expected:
-        await websocket.close(code=4401)
-        return False
-    ip = websocket.client.host if websocket.client else "?"
-    if secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
-        _clear_auth_failures(ip)
+    if ticket:
+        session_ref: Optional[str] = session_store.consume_ws_ticket(ticket)
+    elif token:
+        # 兼容旧 ?token= 通道：统一转成摘要，与票据走同一套复验
+        session_ref = session_store.token_digest(token)
+    else:
+        session_ref = None
+    if session_ref and _session_digest_valid(session_ref):
+        return session_ref
+    await websocket.close(code=4401)
+    return None
+
+
+async def _ensure_ws_session(websocket, session_ref: str) -> bool:
+    """WS 建连后的会话复验：失效则以 4401 关闭并返回 False
+
+    否则「登录一次、长连接终身有效」，登出 / 过期 / 主令牌轮换都拦不住已建立的连接。
+    参数为 :func:`_ws_auth` 返回的会话摘要（票据与令牌两条通道统一）。
+    """
+    if _session_digest_valid(session_ref):
         return True
-    if _auth_rate_limited(ip) is not None:
-        await websocket.close(code=4429)  # 锁定期内：拒绝且不计数
-        return False
-    _register_auth_failure(ip)
     await websocket.close(code=4401)
     return False
 
@@ -220,16 +326,6 @@ def _read_config_text(path) -> tuple:
         return json.dumps(json.loads(raw), ensure_ascii=False, indent=2), True
     except (json.JSONDecodeError, ValueError):
         return raw, False
-
-
-def _save_config_file(path, content: str, validate=None) -> str:
-    """解析 + 校验 + 备份 + 写入，返回备份路径"""
-    parsed = _parse_json_or_400(content)
-    if validate:
-        validate(parsed)
-    backup = _backup_file(path)
-    _write_json(path, parsed)
-    return str(backup)
 
 
 def _parse_json_or_400(content: str) -> dict:

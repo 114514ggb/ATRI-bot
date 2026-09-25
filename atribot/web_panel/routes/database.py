@@ -1,6 +1,7 @@
 """数据库控制台：连接状态 / 表结构 / SQL 执行"""
 
 import asyncio
+import logging
 import re
 import time
 from datetime import date, datetime
@@ -8,17 +9,40 @@ from datetime import time as dt_time
 from decimal import Decimal
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from ..deps import _auth, _cfg, _db
 
 router = APIRouter()
 
+log = logging.getLogger("atri-bot.WebPanelDB")
+"""面板 SQL 控制台审计日志（与终端一样可事后追溯；atri-bot.* 前缀会进面板日志流）"""
+
 _DB_TABLE_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _DB_QUERY_MAX_ROWS = 500
 _DB_QUERY_TIMEOUT = 30  # 秒
 _DB_READ_VERBS = {"select", "show", "explain", "values", "table", "with"}
+
+_DB_WRITE_HINTS = re.compile(
+    r"\b(insert|update|delete|drop|alter|truncate|create|grant|revoke|comment|copy|vacuum|reindex|refresh|call|do|merge|lock)\b",
+    re.IGNORECASE,
+)
+
+
+def _db_console_readonly() -> bool:
+    """web_panel.db_console_readonly（默认 false）：SQL 控制台是否只允许查询语句"""
+    try:
+        return bool((_cfg()._raw_config.get("web_panel") or {}).get("db_console_readonly"))
+    except Exception:
+        return False
+
+
+def _audit(client_ip: str, sql: str, result: str, duration_ms: int) -> None:
+    """记录一条 SQL 审计（单行化 + 截断，避免日志注入与刷屏）"""
+    one_line = " ".join(sql.split())
+    snippet = one_line if len(one_line) <= 300 else one_line[:300] + "…"
+    log.info("面板执行 SQL（%s，%dms，%s）：%s", client_ip, duration_ms, result, snippet)
 
 
 def _db_json_safe(v: Any) -> Any:
@@ -160,7 +184,7 @@ class DbQueryBody(BaseModel):
 
 
 @router.post("/api/db/query")
-async def api_db_query(body: DbQueryBody, _: None = Depends(_auth)) -> Dict[str, Any]:
+async def api_db_query(body: DbQueryBody, request: Request, _: None = Depends(_auth)) -> Dict[str, Any]:
     sql = body.sql.strip()
     if not sql:
         raise HTTPException(status_code=400, detail="SQL 不能为空")
@@ -176,6 +200,16 @@ async def api_db_query(body: DbQueryBody, _: None = Depends(_auth)) -> Dict[str,
     # asyncpg 的 fetch 不支持多语句，提前拒绝避免歧义报错
     if fetchable and ";" in cleaned:
         raise HTTPException(status_code=400, detail="返回结果集的语句一次只能执行一条，多条请分开运行")
+
+    if _db_console_readonly() and (first_word not in _DB_READ_VERBS or _DB_WRITE_HINTS.search(cleaned)):
+        # 只读模式：仅放行查询语句（字面量里出现写关键词会误拦，属保守取舍）；
+        # _DB_WRITE_HINTS 已覆盖 INSERT/UPDATE/DELETE/MERGE，无需再单独匹配 RETURNING
+        raise HTTPException(
+            status_code=403,
+            detail="数据库控制台已开启只读模式（web_panel.db_console_readonly），仅允许查询语句",
+        )
+
+    client_ip = request.client.host if request.client else "?"
 
     try:
         db = _db()
@@ -200,10 +234,13 @@ async def api_db_query(body: DbQueryBody, _: None = Depends(_auth)) -> Dict[str,
             await db.execute_SQL(sql)
             status = "(dev mock) OK"
     except asyncio.TimeoutError:
+        _audit(client_ip, sql, "超时", round((time.monotonic() - started) * 1000))
         return {"ok": False, "error": f"执行超时（上限 {_DB_QUERY_TIMEOUT} 秒）"}
     except Exception as e:
+        _audit(client_ip, sql, "失败", round((time.monotonic() - started) * 1000))
         return {"ok": False, "error": str(e).strip() or type(e).__name__}
     duration_ms = round((time.monotonic() - started) * 1000)
+    _audit(client_ip, sql, "成功", duration_ms)
 
     if not fetchable:
         return {"ok": True, "kind": "status", "status": status, "duration_ms": duration_ms}

@@ -15,6 +15,7 @@ import asyncio
 import json
 import logging
 import mimetypes
+import re
 import secrets
 import time
 from datetime import datetime
@@ -61,6 +62,39 @@ FILE_LIMIT = 100 * 1024 * 1024
 _IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif"}
 _AUDIO_EXTS = {".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a", ".opus", ".silk", ".amr"}
 _VIDEO_EXTS = {".mp4", ".webm", ".mov", ".avi", ".mkv", ".flv", ".m4v"}
+
+_EXT_MIME = {
+    # 服务端 MIME 白名单：只映射媒体与常见文档，绝不把客户端 content_type 原样回吐，
+    # 也不映射 .html/.svg/.js/.xml 之类可同源执行/渲染的类型
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".avif": "image/avif",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".flac": "audio/flac",
+    ".aac": "audio/aac",
+    ".m4a": "audio/mp4",
+    ".opus": "audio/opus",
+    ".silk": "audio/silk",
+    ".amr": "audio/amr",
+    ".mp4": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+    ".flv": "video/x-flv",
+    ".m4v": "video/x-m4v",
+    ".pdf": "application/pdf",
+    ".txt": "text/plain; charset=utf-8",
+    ".csv": "text/csv; charset=utf-8",
+    ".json": "application/json",
+    ".zip": "application/zip",
+}
 
 log = logging.getLogger("atri-bot.WebChat")
 
@@ -109,17 +143,26 @@ def size_limit_for(kind: str) -> int:
 
 
 def save_attachment(name: str, mime: str, data: bytes) -> Dict[str, Any]:
-    """落盘一个附件并登记注册表，返回描述信息"""
-    kind = classify_file(name, mime)
+    """落盘一个附件并登记注册表，返回描述信息
+
+    文件名与 MIME 一律在服务端推导：
+    - name 只保留 basename，落盘名由随机 id + 净化扩展名组成；
+    - MIME 查服务端白名单，绝不使用客户端 content_type（防把 HTML/SVG 伪装成媒体在同源渲染）。
+    - mime 参数仅用于 classify_file 的类别兜底判定。
+    """
+    safe_name = Path(name or "").name.replace("\\", "/").split("/")[-1].strip() or "file"
+    kind = classify_file(safe_name, mime)
     att_id = secrets.token_hex(8)
-    ext = Path(name).suffix.lower()[:10]
+    # 扩展名净化：只留字母数字（防 ':'/路径分隔符进入落盘名）；无有效扩展名时用魔数兜底
+    cleaned = re.sub(r"[^a-z0-9]", "", Path(safe_name).suffix.lower().lstrip("."))[:10]
+    ext = f".{cleaned}" if cleaned else _sniff_ext(data)
     path = upload_dir() / f"{att_id}{ext}"
     path.write_bytes(data)
     info = {
         "id": att_id,
         "path": str(path),
-        "name": name or f"file{ext}",
-        "mime": mime or "application/octet-stream",
+        "name": safe_name,
+        "mime": _EXT_MIME.get(ext, "application/octet-stream"),
         "kind": kind,
         "size": len(data),
     }

@@ -10,127 +10,135 @@
         }
     },
     "root_user_id": 114514,
-    "account":{
-        "id":168238719,
-        "name":"ATRI-bot"
+    "account": {
+        "id": 168238719,
+        "name": "ATRI-bot"
     },
-    "file_path":{
+    "file_path": {
         "resolve_paths": false,
         "create_dirs": false,
         "document_root": null,
         "emoji": null,
-        "relative_to_root":{
-            "commands":"atribot/commands",
-            "chat_manager":"atribot/LLMchat/character_setting",
-            "supplier_config_path":"assets/supplier_config.json",
-            "mcp_config":"atribot/LLMchat/MCP/mcp_server.json",
-            "tool_calls":"atribot/LLMchat/tools",
-            "agent_skills":"atribot/LLMchat/skills/agent_skills",
-            "plugins":"atribot/plugins"
+        "relative_to_root": {
+            "commands": "atribot/commands",
+            "chat_manager": "atribot/LLMchat/character_setting",
+            "supplier_config_path": "assets/supplier_config.json",
+            "mcp_config": "atribot/LLMchat/MCP/mcp_server.json",
+            "tool_calls": "atribot/LLMchat/tools",
+            "agent_skills": "atribot/LLMchat/skills/agent_skills",
+            "plugins": "atribot/plugins"
         },
-        "relative_to_document":{
-            "audio":"audio",
-            "file":"file",
-            "img":"img",
-            "video":"video",
-            "temp":"temp"
+        "relative_to_document": {
+            "audio": "audio",
+            "file": "file",
+            "img": "img",
+            "video": "video",
+            "temp": "temp"
         },
         "path_mapping": {}
     },
-    "model":{ 
-        "connect":
-        {
-            "supplier":"deepseek",
-            "model_name":"deepseek-chat",
-            "user_global_context":true
+    "model": {
+        "connect": {
+            "supplier": "deepseek",
+            "model_name": "deepseek-chat",
+            "user_global_context": true
         },
-        "chat_parameter":{
-            "temperature":0.6,
-            "top_p":0.90,
+        "chat_parameter": {
+            "temperature": 0.6,
+            "top_p": 0.9,
             "max_tokens": 65536,
-            "response_format":{ "type": "json_object" },
-            "stream":false,
+            "response_format": {
+                "type": "json_object"
+            },
+            "stream": false,
             "tool_choice": "auto"
         },
-        "tavily_search_API_key":"",
-        "detection_image":{
-            "supplier":"bigModel",
-            "model_name":"GLM-4.1V-Thinking-Flash"
+        "tavily_search_API_key": "",
+        "detection_image": {
+            "supplier": "bigModel",
+            "model_name": "GLM-4.1V-Thinking-Flash"
         },
-        "memory":{
-            "summarize_model":{
-                "supplier":"",
-                "model_name":""
+        "memory": {
+            "summarize_model": {
+                "supplier": "",
+                "model_name": ""
             }
         },
-        "agency_Agent":{
-            "supplier":"",
-            "model_name":""
+        "agency_Agent": {
+            "supplier": "",
+            "model_name": ""
         },
-        "standby_model":[
+        "standby_model": [
             {
-                "supplier":"deepseek",
-                "model_name":"deepseek-chat"
+                "supplier": "deepseek",
+                "model_name": "deepseek-chat"
             },
             {
-                "supplier":"bigModel",
-                "model_name":"GLM-4.6V-Flash"
+                "supplier": "bigModel",
+                "model_name": "GLM-4.6V-Flash"
             }
         ],
-        "RAG":{
-            "enable":true,
-            "dimensions":1024,
-            "use_embedding_model":{
-                "supplier":"ollama_embed",
-                "model_name":"dengcao/Qwen3-Embedding-0.6B:F16"
+        "RAG": {
+            "enable": true,
+            "dimensions": 1024,
+            "use_embedding_model": {
+                "supplier": "ollama_embed",
+                "model_name": "dengcao/Qwen3-Embedding-0.6B:F16"
             },
-            "use_reranker_model":{
-                "supplier":"ollama_embed",
-                "model_name":"dengcao/Qwen3-Reranker-8B:Q4_K_M"
+            "use_reranker_model": {
+                "supplier": "ollama_embed",
+                "model_name": "dengcao/Qwen3-Reranker-8B:Q4_K_M"
             },
-            "vector_database":{
-
-            }
+            "vector_database": {}
         }
     },
-    "ai_chat":{
-        "playRole":"ATRI_simplify",
-        "ai_max_record":20,
-        "group_max_record":20,
-        "private_max_record":20
+    "ai_chat": {
+        "playRole": "ATRI_simplify",
+        "ai_max_record": 20,
+        "group_max_record": 20,
+        "private_max_record": 20
     },
-    "sand_box":{
-        "image":"atri-sandbox:latest"
+    "sand_box": {
+        "image": "atri-sandbox:latest"
     },
     "tool_presets": {
         "group_chat": {
             "default": [
-                "web_search", 
-                "memory_search", "memory_storage",
+                "web_search",
+                "memory_search",
+                "memory_storage",
                 "load_skill_prompt",
-                "tool_search", "sub_agent"
+                "tool_search",
+                "sub_agent"
             ],
             "deferred": [
                 "run_python_code",
-                "run_command", "web_extract",
+                "run_command",
+                "web_extract",
                 "get_user_info",
                 "set_group_ban",
-                "send_file","add_file",
-                "send_image_message","send_speech_message",
+                "send_file",
+                "add_file",
+                "send_image_message",
+                "send_speech_message",
                 "schedule_self_trigger"
             ]
         },
         "private_chat": [
-            "web_search", "memory_search",
+            "web_search",
+            "memory_search",
             "load_skill_prompt",
             "tool_search",
             "schedule_self_trigger"
         ],
         "agency_Agent": [
             "run_command",
-            "send_file","add_file",
-            "get_user_info", "memory_search",
-            "web_search", "web_extract"
+            "send_file",
+            "add_file",
+            "get_user_info",
+            "memory_search",
+            "web_search",
+            "web_extract"
         ],
         "webui": {
             "default": [
@@ -141,35 +149,34 @@
             ],
             "deferred": [
                 "run_python_code",
-                "run_command", "web_extract",
+                "run_command",
+                "web_extract",
                 "memory_storage",
-                "send_file","add_file",
-                "send_image_message","send_speech_message",
+                "send_file",
+                "add_file",
+                "send_image_message",
+                "send_speech_message",
                 "sub_agent",
                 "schedule_self_trigger"
             ]
         },
         "使用全部工具": null
     },
-    "group_white_list":[
-    ],
-    "group_initiative_chat_white_list":[
-    ],
-    "group_information_extraction":[
-    ],
-    "private_chat_white_list":[
-    ],
-    "database":
-    {
-        "host":"127.0.0.1",
-        "port":5432,
-        "user":"postgres",
-        "password":"atri",
-        "database":"atri"
+    "group_white_list": [],
+    "group_initiative_chat_white_list": [],
+    "group_information_extraction": [],
+    "private_chat_white_list": [],
+    "database": {
+        "host": "127.0.0.1",
+        "port": 5432,
+        "user": "postgres",
+        "password": "atri",
+        "database": "atri"
     },
-    "web_panel":{
-        "enable":true,
-        "port":5125,
-        "access_token":"ATRI"
+    "web_panel": {
+        "enable": true,
+        "port": 5125,
+        "access_token": "ATRI",
+        "session_ttl_hours": 4
     }
 }

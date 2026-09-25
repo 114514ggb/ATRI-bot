@@ -14,7 +14,7 @@ from atribot.core.service_container import container
 from atribot.LLMchat.sandbox.factory import create_sandbox, resolve_sandbox_config
 from atribot.LLMchat.sandbox.sandbox_base import SandBoxBase
 
-from ..deps import _auth, _cfg, _ws_auth
+from ..deps import _auth, _cfg, _ensure_ws_session, _ws_auth
 
 router = APIRouter()
 
@@ -170,9 +170,10 @@ class _TerminalSession:
 
 
 @router.websocket("/api/ws/sandbox-terminal")
-async def ws_sandbox_terminal(websocket: WebSocket, token: str = "") -> None:
-    # _ws_auth 内部已 accept（失败时带 4401/4429 关闭）
-    if not await _ws_auth(websocket, token):
+async def ws_sandbox_terminal(websocket: WebSocket, token: str = "", ticket: str = "") -> None:
+    # _ws_auth 内部已 accept（失败时以 4401 关闭）；优先一次性票据，兼容旧 ?token=
+    session_ref = await _ws_auth(websocket, token, ticket)
+    if session_ref is None:
         return
 
     sb = _sandbox()
@@ -199,6 +200,9 @@ async def ws_sandbox_terminal(websocket: WebSocket, token: str = "") -> None:
                 cmd = str(msg.get("cmd") or "").strip()
                 if not cmd or len(cmd) > 8192:
                     continue
+                # 会话复验：吊销/过期后立即断开，不再接受新命令
+                if not await _ensure_ws_session(websocket, session_ref):
+                    return
                 if session.busy:
                     await _send(websocket, {"type": "output", "data": "[atri] 已有命令在执行，请等待完成或先终止\n"})
                     continue

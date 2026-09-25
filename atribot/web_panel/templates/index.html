@@ -10,14 +10,8 @@
   <link rel="stylesheet" href="/admin/static/css/layout.css">
   <link rel="stylesheet" href="/admin/static/css/components.css">
   <link rel="stylesheet" href="/admin/static/css/views.css">
-  <script>
-    /* 主题在 CSS 加载前应用，避免闪烁 */
-    (function () {
-      var saved = localStorage.getItem('atri_theme');
-      var theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
-    })();
-  </script>
+  <!-- 主题在 CSS 加载前应用，避免闪烁；独立文件以便 CSP 只放行同源脚本 -->
+  <script src="/admin/static/js/theme-init.js"></script>
 </head>
 <body>
 
@@ -32,7 +26,7 @@
       <button class="btn primary" id="login-btn" style="width:100%;margin-top:16px;padding:11px">登 录</button>
       <div class="login-error" id="login-error"></div>
       <p class="small" style="margin-top:22px;color:var(--text-caption)">
-        忘记密码？可以查看配置文件
+        忘记口令：修改 config.json 的 web_panel.access_token（或环境变量 ATRI_PANEL_TOKEN）后重启，旧会话会全部作废
       </p>
     </div>
   </div>

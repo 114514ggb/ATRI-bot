@@ -104,7 +104,7 @@ A web admin panel runs as an in-process background task when the bot starts (sam
 
 - **Visual management**: Online config editing (model suppliers, MCP tools, etc.), database status, memory browsing, persona switching, log viewing, and more — all adapted for mobile browsers.
 - **Web chat**: A built-in chat page lets you talk to the bot directly in the browser, with multi-session management, streaming agent output, attachment uploads, and a dedicated `webui` tool preset (`default` loaded by default / `deferred` loaded on demand).
-- **Security**: `access_token` authentication with rate limiting on repeated failures to prevent brute-force attacks.
+- **Security**: the master token is only used at login to exchange a session token with a fixed lifetime (default 4 hours, adjustable via `web_panel.session_ttl_hours`, revocable via logout, with auto-logout in the WebUI on expiry); three consecutive login failures trigger a global lockout (starting at 10 minutes, doubling, capped at 24 hours) to prevent brute-force attacks.
 
 ### 🛠️ Other Practical Features
 - **Plugin system**: Plugins under `atribot/plugins/` are auto-loaded at startup, supporting message/notice/request event subscriptions and pipeline middleware, with explicit hot-reload (`PluginManager.reload_plugin`).
@@ -181,7 +181,7 @@ Before starting, ensure to check the  `assets` folder:
 4.  Configure `config.json` (project basic settings).
 5.  **MCP Configuration**：Default path is `atribot\LLMchat\MCP\mcp_server.json`. Specific MCP tools can be toggled via `"active": false`; remote servers use SSE by default, set `"transport": "streamable_http"` to use Streamable HTTP.
 6.  Under root `document/`, you can add corresponding audio, emoji, and file configurations according to the project structure.
-7.  **Web admin panel**: `config.web_panel` controls the admin panel (`enable` on by default, `port` falls back to `5125` when unset (this repo uses `5308`), `access_token` is the login token — make sure to change it after deployment; the token can also be provided via the `ATRI_PANEL_TOKEN` env var).
+7.  **Web admin panel**: `config.web_panel` controls the admin panel (`enable` on by default, `port` falls back to `5125` when unset (this repo uses `5308`), `access_token` is the master token / login credential — this repo ships a random strong default, replace it with your own before deployment; the master token can also be provided via the `ATRI_PANEL_TOKEN` env var).
 8.  **Path mapping**: When the bot and the protocol frontend (NapCat) run on different filesystems (e.g. bot in WSL, NapCat on Windows), configure a "local path prefix → frontend path prefix" mapping in `file_path.path_mapping` (e.g. `"E:/": "/mnt/e/"`); `file://` paths are converted automatically when sending. Leave empty to disable.
 ### 4. Start the Project
 The project requires **Python 3.14**. Using `uv` for package management is recommended.
@@ -239,7 +239,7 @@ cp .env.docker.example .env
 | `ATRI_ACCESS_TOKEN` | NapCat connection token | `ATRI114514` |
 | `ATRI_NAPCAT_URL` | NapCat WebSocket URL (client mode only) | `host.docker.internal:3001` |
 | `ATRI_PANEL_PORT` | Web admin panel port (inside the container equals the host mapping) | `5308` |
-| `ATRI_PANEL_TOKEN` | Web admin panel token (⚠️ overridden by `web_panel.access_token`, see below) | empty |
+| `ATRI_PANEL_TOKEN` | Web admin panel login credential (required for Docker; ⚠️ overridden by `web_panel.access_token`, see below) | empty |
 | `ATRI_SANDBOX_IMAGE` | AI sandbox image (build it manually first, see section 4) | `atri-sandbox:latest` |
 | `ATRI_FILE_LOG` | `1` = also write file logs, `0` = stdout only | `1` |
 | `TZ` | Container timezone | `Asia/Shanghai` |
@@ -275,7 +275,7 @@ docker compose exec db psql -U postgres -d postgres
 ```
 http://localhost:5308/admin/
 ```
-The token is `web_panel.access_token` in `assets/config.json` (currently the weak value `ATRI` — **change it before deploying**). To make `ATRI_PANEL_TOKEN` from `.env` effective, remove `access_token` from the config file first (it has higher priority).
+The login credential is `web_panel.access_token` in `assets/config.json` (this repo ships a random strong default — **replace it with your own before deploying**). To make `ATRI_PANEL_TOKEN` from `.env` effective, remove `access_token` from the config file first (it has higher priority). The panel no longer falls back to a platform `access_token`; when unconfigured every API returns 503. Login exchanges the credential for a session token with a fixed lifetime (default 4 hours, adjustable via `web_panel.session_ttl_hours`, 1-24 h); the WebUI logs out automatically on expiry, and logout or changing the credential invalidates all sessions immediately. Three consecutive wrong attempts trigger a global lockout (starting at 10 minutes, doubling, capped at 24 hours; the correct credential is rejected while locked). The host port mapping binds `127.0.0.1` only by default.
 
 **⚠️ Path mapping (required for Docker)**: when sending local media, the bot hands NapCat a `file://` path **inside the container** (e.g. `/app/document/...`), which the host NapCat cannot read. Configure `assets/config.json` on the host:
 ```json

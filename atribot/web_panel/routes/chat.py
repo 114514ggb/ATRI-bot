@@ -7,22 +7,19 @@ WebSocket 负责收发消息与逐事件转发 Agent 流式输出。
 
 import asyncio
 import json
-import secrets
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, WebSocket
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, WebSocket
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from ..deps import (
-    _access_token,
     _auth,
-    _auth_rate_limited,
     _cfg,
-    _clear_auth_failures,
-    _register_auth_failure,
+    _ensure_ws_session,
+    _require_session,
     _ws_auth,
 )
 from . import chat_engine as engine
@@ -105,38 +102,24 @@ async def api_chat_upload(file: UploadFile, _: None = Depends(_auth)) -> Dict[st
     return {"status": "ok", "file": engine.attachment_brief(info)}
 
 
-async def _check_query_token(request: Request, token: str) -> None:
-    """img/audio/video 标签无法带 Header 的端点共用鉴权（令牌走 query 参数，带防爆破）"""
-    expected = _access_token()
-    if not expected:
-        raise HTTPException(status_code=503, detail="未配置访问令牌")
-    ip = request.client.host if request.client else "?"
-    if secrets.compare_digest(token.encode("utf-8"), expected.encode("utf-8")):
-        _clear_auth_failures(ip)
-    else:
-        remaining = _auth_rate_limited(ip)
-        if remaining is not None:
-            raise HTTPException(
-                status_code=429,
-                detail=f"尝试次数过多，请 {int(remaining) + 1} 秒后重试",
-                headers={"Retry-After": str(int(remaining) + 1)},
-            )
-        _register_auth_failure(ip)
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-
 @router.get("/api/chat/files/{file_id}")
 async def api_chat_file(
     file_id: str,
-    request: Request,
     token: str = "",
 ) -> FileResponse:
-    """附件预览（img/audio/video 标签无法带 Header，令牌走 query 参数）"""
-    await _check_query_token(request, token)
+    """附件预览（img/audio/video 标签无法带 Header，会话令牌走 query 参数）"""
+    _require_session(token)
     info = engine.get_attachment(file_id)
     if info is None:
         raise HTTPException(status_code=404, detail="附件不存在或已过期")
-    return FileResponse(info["path"], media_type=info["mime"], filename=info["name"])
+    # FileResponse 的 filename 已带 attachment；再挂一道 CSP，即便将来丢掉 disposition 也不会同源渲染
+    # （nosniff 由 install_security_headers 对 /admin 全量下发，不在此重复）
+    return FileResponse(
+        info["path"],
+        media_type=info["mime"],
+        filename=info["name"],
+        headers={"Content-Security-Policy": "default-src 'none'"},
+    )
 
 
 _AVATAR_CANDIDATES = ("ATRI-bot.png", "ATRI-bot.jpg", "ATRI-bot.jpeg", "ATRI-bot.webp", "ATRI-bot.gif")
@@ -154,9 +137,9 @@ def _find_bot_image() -> Optional[Path]:
 
 
 @router.get("/api/chat/avatar")
-async def api_chat_avatar(request: Request, token: str = "") -> FileResponse:
+async def api_chat_avatar(token: str = "") -> FileResponse:
     """机器人头像：配置文件同级的 ATRI-bot 图（img 标签走 query 令牌；FileResponse 自带 ETag，换图自动失效）"""
-    await _check_query_token(request, token)
+    _require_session(token)
     path = _find_bot_image()
     if path is None:
         raise HTTPException(status_code=404, detail="未找到头像图片（在配置目录下放置 ATRI-bot.png）")
@@ -266,9 +249,10 @@ def _history_payload(session: "engine.ChatSession") -> Dict[str, Any]:
 
 
 @router.websocket("/api/ws/chat")
-async def ws_chat(websocket: WebSocket, token: str = "") -> None:
-    # _ws_auth 内部已 accept（失败时带 4401/4429 关闭）
-    if not await _ws_auth(websocket, token):
+async def ws_chat(websocket: WebSocket, token: str = "", ticket: str = "") -> None:
+    # _ws_auth 内部已 accept（失败时以 4401 关闭）；优先一次性票据，兼容旧 ?token=
+    session_ref = await _ws_auth(websocket, token, ticket)
+    if session_ref is None:
         return
 
     queue: asyncio.Queue = asyncio.Queue()
@@ -306,6 +290,10 @@ async def ws_chat(websocket: WebSocket, token: str = "") -> None:
             if not isinstance(data, dict):
                 await websocket.send_json({"type": "error", "message": "消息必须是 JSON 对象"})
                 continue
+
+            # 会话可能已被吊销/过期：逐条复验，失效则断开（防长连接绕过登出）
+            if not await _ensure_ws_session(websocket, session_ref):
+                return
 
             msg_type = data.get("type")
 

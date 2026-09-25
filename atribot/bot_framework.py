@@ -6,7 +6,6 @@ from typing import Any, Awaitable
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 from atribot.common_utils.http_client import HTTPClient
@@ -239,20 +238,21 @@ class BotFramework:
             self.log.info("管理面板已在配置中禁用（web_panel.enable = false），跳过启动")
             return
 
-        from atribot.web_panel.panel_router import _ensure_log_handler, mount_static
+        from atribot.web_panel.panel_router import (
+            _ensure_log_handler,
+            install_security_headers,
+            mount_static,
+        )
         from atribot.web_panel.panel_router import router as admin_router
 
         _ensure_log_handler()
 
-        admin_app = FastAPI(title="ATRI Admin Panel", docs_url=None, redoc_url=None)
-        admin_app.add_middleware(
-            CORSMiddleware,
-            allow_origins=["http://localhost", "http://127.0.0.1"],
-            allow_methods=["GET", "POST", "PUT", "DELETE"],
-            allow_headers=["Authorization", "Content-Type"],
-        )
+        # 面板前端全部同源访问，无需 CORS 中间件（其白名单也从未真正生效），
+        # 直接移除可减少攻击面；跨域请求一律由浏览器同源策略挡下
+        admin_app = FastAPI(title="ATRI Admin Panel", docs_url=None, redoc_url=None, openapi_url=None)
         admin_app.include_router(admin_router)
         mount_static(admin_app)
+        install_security_headers(admin_app)
 
         @admin_app.get("/", include_in_schema=False)
         async def _redirect_to_admin():

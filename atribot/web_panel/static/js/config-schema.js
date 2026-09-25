@@ -157,7 +157,8 @@ export const SCHEMA = [
     fields: [
       { path: 'web_panel.enable', label: '启用管理面板', type: 'toggle', desc: '关闭后重启 bot 将不再启动面板' },
       { path: 'web_panel.port', label: '面板端口', type: 'number', optional: true, desc: '默认 5125，修改后需重启 bot' },
-      { path: 'web_panel.access_token', label: '面板访问令牌', type: 'password', span: true, optional: true, desc: '未配置时回退使用第一个平台的 access_token' },
+      { path: 'web_panel.access_token', label: '面板访问令牌', type: 'password', span: true, optional: true, desc: '主令牌/登录口令：登录页用它换取会话令牌；未配置时接口全部返回 503，修改后全部会话失效' },
+      { path: 'web_panel.session_ttl_hours', label: '会话有效期（小时）', type: 'number', optional: true, desc: '登录会话的固定有效期，默认 4（范围 1-24）；到期后 WebUI 自动退出登录' },
     ],
   },
 ];

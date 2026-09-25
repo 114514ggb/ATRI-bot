@@ -1,11 +1,13 @@
 """终端：WebSocket 在 bot 所在主机上执行 Shell 命令
 
 命令执行/输出流/哨兵解析复用 sandbox.stream_exec 共享核心；
-鉴权与日志流一致——拿到面板令牌即等于拿到主机权限，令牌务必妥善保管。
+鉴权使用面板会话令牌——拿到有效会话即等于拿到主机权限，面板口令务必妥善保管。
+所有从面板执行过的命令均写入审计日志（atri-bot.Terminal），便于事后追溯。
 """
 
 import asyncio
 import getpass
+import logging
 import os
 import re
 import socket
@@ -18,9 +20,11 @@ from fastapi import APIRouter, WebSocket
 
 from atribot.LLMchat.sandbox.stream_exec import LocalCommandStream
 
-from ..deps import _ws_auth
+from ..deps import _ensure_ws_session, _ws_auth
 
 router = APIRouter()
+
+log = logging.getLogger("atri-bot.Terminal")
 
 _IS_WINDOWS = sys.platform == "win32"
 
@@ -187,9 +191,10 @@ def _complete_for(msg: dict, cwd: str) -> List[Dict]:
 
 
 @router.websocket("/api/ws/terminal")
-async def ws_terminal(websocket: WebSocket, token: str = "") -> None:
-    # _ws_auth 内部已 accept（失败时带 4401/4429 关闭）
-    if not await _ws_auth(websocket, token):
+async def ws_terminal(websocket: WebSocket, token: str = "", ticket: str = "") -> None:
+    # _ws_auth 内部已 accept（失败时以 4401 关闭）；优先一次性票据，兼容旧 ?token=
+    session_ref = await _ws_auth(websocket, token, ticket)
+    if session_ref is None:
         return
 
     session = _TerminalSession()
@@ -221,6 +226,11 @@ async def ws_terminal(websocket: WebSocket, token: str = "") -> None:
                 cmd = str(msg.get("cmd") or "").strip()
                 if not cmd or len(cmd) > 8192:
                     continue
+                # 会话复验：吊销/过期后立即断开，不再接受新命令
+                if not await _ensure_ws_session(websocket, session_ref):
+                    return
+                client = websocket.client.host if websocket.client else "?"
+                log.info("终端执行命令（%s）：%s", client, cmd if len(cmd) <= 500 else cmd[:500] + "…")
                 if session.busy:
                     await _send(websocket, {"type": "output", "data": "[atri] 已有命令在执行，请等待完成或先终止\n"})
                     continue

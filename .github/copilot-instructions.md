@@ -467,9 +467,9 @@ URL 格式：`http(s)://...`、`file://绝对路径`（需 `local_Path_type=True
 
 ## Web 管理面板（web_panel）
 - 与 Bot **同进程**运行：`BotFramework._start_runtime_services()` 以受控后台任务（名称 `BotFramework.admin_panel`）启动 FastAPI + uvicorn（`atribot/web_panel/`），路由前缀 `/admin/`；端口被占用或启动失败不影响主服务
-- 监听地址/端口取值顺序：环境变量 `ATRI_WEB_PANEL_HOST` / `ATRI_WEB_PANEL_PORT` > `config.web_panel.host` / `port` > 默认 `127.0.0.1:5125`（Docker 部署用 env 绑 `0.0.0.0` 才能从宿主机访问；本仓库 `assets/config.json` 使用 5308）
+- 监听地址/端口取值顺序：环境变量 `ATRI_WEB_PANEL_HOST` / `ATRI_WEB_PANEL_PORT` > `config.web_panel.host` / `port` > 默认 `127.0.0.1:5125`（Docker 部署用 env 绑 `0.0.0.0` 才能从宿主机访问；本仓库 `assets/config.json` 使用 5308，compose 宿主映射默认仅绑 `127.0.0.1`）
 - 配置 `config.web_panel`：`enable`（默认启用）、`host`、`port`、`access_token`；关闭时 `_stop_admin_panel()` 等待后台任务退出（≤8s）
-- 鉴权（`web_panel/deps.py`）：Bearer Token，优先级 `web_panel.access_token` > 环境变量 `ATRI_PANEL_TOKEN` > 首个平台的 `access_token`；未配置任何令牌时接口返回 503；连续登录失败按 IP 锁定（60·n² 秒，封顶 24h）；WebSocket 用 `?token=`
+- 鉴权（`web_panel/deps.py` + `routes/auth.py` + `session_store.py`）：主令牌（`web_panel.access_token` > 环境变量 `ATRI_PANEL_TOKEN`，**无平台令牌兜底**，未配置时接口 503）仅用于 `POST /api/login` 换取**会话令牌**（内存态、固定有效期默认 4 小时可由 `web_panel.session_ttl_hours` 调 1-24、容量 100、`POST /api/logout` 可吊销、主令牌轮换清空全部会话、前端到点自动退出）；其余 HTTP/WS/query 端点一律只认会话令牌（Bearer / `?token=`）；登录失败**全局计数**（不区分 IP）：连续 3 次触发锁定（10min×2^(n-3) 封顶 24h），锁定期内一律 429（正确口令也拒绝），成功登录清零；已建立 WS 会周期复验会话并以 4401 断开；terminal WS 命令写入 `atri-bot.Terminal` 审计日志
 - 路由分 12 组（`web_panel/routes/`）：dashboard（状态/统计）、data、memory（记忆管理）、tools（工具管理/测试）、database、config（config/supplier/mcp 在线编辑，保存前备份 `.bak`）、personas、message、chat（多会话/流式/附件）、system（**仅 `POST /api/system/stop` 优雅关闭，无重启** + `GET /api/ws/logs` 日志流）、terminal（沙盒终端 WS）、sandbox（沙盒管理/刷新工具）
 - 开发模式：`python -m atribot.web_panel.dev_server`（mock 环境 + `dev-token`）；接口文档见 `atribot/web_panel/API.md`
 
