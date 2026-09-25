@@ -4,8 +4,13 @@ from typing import List, Literal, Optional, Tuple, overload
 
 import asyncpg
 from asyncpg import Record
-from asyncpg.exceptions import ForeignKeyViolationError, UniqueViolationError
+from asyncpg.exceptions import (
+    CharacterNotInRepertoireError,
+    ForeignKeyViolationError,
+    UniqueViolationError,
+)
 
+from atribot.common_utils.text_sanitize import sanitize_db_params
 from atribot.core.atri_config import atriConfig
 from atribot.core.db.async_db_basics import AsyncDatabaseBase
 from atribot.core.service_container import ServiceBase
@@ -171,15 +176,8 @@ class AsyncPostgreSQL(AsyncDatabaseBase, ServiceBase):
                 temp_conn = await self._pool.acquire()
                 conn = temp_conn
 
-            args = params or ()
-            
-            if fetch_type == "one":
-                return await conn.fetchrow(query, *args)
-            elif fetch_type == "all":
-                return await conn.fetch(query, *args)
-            else:
-                return await conn.execute(query, *args)
-                
+            return await self._execute_with_retry(conn, query, params or (), fetch_type)
+
         except (UniqueViolationError, ForeignKeyViolationError) as e:
             self.log.error(f"数据库约束冲突: {e}")
             raise
@@ -189,6 +187,59 @@ class AsyncPostgreSQL(AsyncDatabaseBase, ServiceBase):
         finally:
             if temp_conn:
                 await self._pool.release(temp_conn)
+
+    async def _dispatch_execute(
+        self,
+        conn: asyncpg.Connection,
+        query: str,
+        args: Tuple,
+        fetch_type: Literal["one", "all"] | None,
+    ) -> tuple[Record] | Record | None:
+        """按 fetch_type 将单条语句分发到 fetchrow / fetch / execute"""
+        if fetch_type == "one":
+            return await conn.fetchrow(query, *args)
+        if fetch_type == "all":
+            return await conn.fetch(query, *args)
+        return await conn.execute(query, *args)
+
+    async def _execute_with_retry(
+        self,
+        conn: asyncpg.Connection,
+        query: str,
+        args: Tuple,
+        fetch_type: Literal["one", "all"] | None,
+    ) -> tuple[Record] | Record | None:
+        """执行单条语句；仅当因非法字符编码错误失败时，清洗参数后重试一次"""
+        try:
+            return await self._dispatch_execute(conn, query, args, fetch_type)
+        except CharacterNotInRepertoireError as e:
+            cleaned_args, removed = sanitize_db_params(args)
+            if removed == 0:
+                raise
+            self.log.warning(
+                f"检测到非法字符导致执行失败，已清洗 {removed} 个字符并重试: {query[:200]}"
+            )
+            self.log.debug(f"清洗后参数: {cleaned_args} (原始错误: {e})")
+            return await self._dispatch_execute(conn, query, cleaned_args, fetch_type)
+
+    async def _executemany_with_retry(
+        self,
+        conn: asyncpg.Connection,
+        query: str,
+        args_list: List[Tuple],
+    ) -> None:
+        """批量执行；仅当因非法字符编码错误失败时，清洗全部参数后重试一次"""
+        try:
+            await conn.executemany(query, args_list)
+        except CharacterNotInRepertoireError as e:
+            cleaned_list, removed = sanitize_db_params(args_list)
+            if removed == 0:
+                raise
+            self.log.warning(
+                f"检测到非法字符导致批量执行失败，已清洗 {removed} 个字符并重试: {query[:200]}"
+            )
+            self.log.debug(f"清洗后参数: {cleaned_list} (原始错误: {e})")
+            await conn.executemany(query, cleaned_list)
 
     @overload
     async def execute_with_pool(
@@ -224,15 +275,10 @@ class AsyncPostgreSQL(AsyncDatabaseBase, ServiceBase):
         conn = self._context_conn.get()
 
         try:
-            args = params or ()
-
-            if fetch_type == "one":
-                return await conn.fetchrow(query, *args)
-            elif fetch_type == "all":
-                return await conn.fetch(query, *args)
-            else:
-                await conn.execute(query, *args)
+            result = await self._execute_with_retry(conn, query, params or (), fetch_type)
+            if fetch_type is None:
                 return
+            return result
 
         except (UniqueViolationError, ForeignKeyViolationError) as e:
             self.log.error(f"数据库约束冲突: {e}")
@@ -256,7 +302,7 @@ class AsyncPostgreSQL(AsyncDatabaseBase, ServiceBase):
         """
         conn = self._context_conn.get()
         try:
-            await conn.executemany(query, args_list)
+            await self._executemany_with_retry(conn, query, args_list)
         except (UniqueViolationError, ForeignKeyViolationError) as e:
             self.log.error(f"数据库约束冲突: {e}")
             raise

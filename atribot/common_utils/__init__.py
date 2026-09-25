@@ -30,6 +30,7 @@ from .similarity import (
     jaro_winkler_similarity,
     levenshtein_distance,
 )
+from .text_sanitize import sanitize_db_params, sanitize_text
 from .timer import poll_until_done, timer
 from .validation import is_qq
 
@@ -53,6 +54,8 @@ __all__ = [
     "levenshtein_distance",
     "parse_time_to_timestamp",
     "resolve_file_to_bytes",
+    "sanitize_db_params",
+    "sanitize_text",
     "search_music",
     "count_estimate_tokens",
     "MediaConvertResult",
