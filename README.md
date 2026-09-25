@@ -82,7 +82,7 @@
 
 - **全异步高并发**：回复流程完全异步，支持多供应商 Key 池轮询，多群并发场景下也能稳定运行。
 - **结构化决策输出**：模型以 JSON 格式返回结构化决策（`speak` 回复 / `update` 更新画像 / `silence` 静默），工具调用通过 Function Calling 循环执行，行为完全可控且易于扩展。
-- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词；内置 18 个工具（网页搜索、记忆读写、沙盒执行 Python/Shell、子代理、定时自触发、工具搜索发现等），并提供 `tool_search` 工具让模型按需发现和加载工具。
+- **工具扩展能力**：支持 Function Calling、**MCP (Model Context Protocol)** 协议工具集，以及 **Skills** 自定义提示词；内置 18 个工具（网页搜索、记忆读写、沙盒执行 Python/Shell、子代理、定时自触发、工具搜索发现等），并通过 `tool_search` 按需发现 deferred 工具（预设见 `config.tool_presets`）。
 - **两级记忆系统**：
   - *短期*：每个群 / 用户维护独立的滑动上下文窗口，超限时由 LLM 自动压缩摘要、无损续接。
   - *长期*：对话结束后提取关键事件，经 Embedding 向量化后存入 PostgreSQL（pgvector），检索时采用**向量 + 全文双路召回 + RRF 融合 + 时间衰减**评分，让 Bot 有个比较可靠的长期记忆。
@@ -105,15 +105,14 @@
 
 ### 🖥️ Web 管理面板
 
-Bot 启动时会在独立端口拉起一个 Web 管理面板（`web_panel.enable` 默认开启，端口与登录口令见 `config.web_panel`，默认 `5125`），面板异常不会影响 Bot 主服务运行：
-
+Bot 启动时会以内置后台任务的形式拉起一个 Web 管理面板
 - **可视化管理**：配置文件在线编辑（模型供应商、MCP 工具等）、数据库状态查看、记忆检索与浏览、人设切换、日志查看等页面，并已适配手机端浏览器。
 - **Web 在线聊天**：内置聊天页，可以直接在浏览器里与 Bot 对话，支持多会话管理、Agent 流式输出、附件上传
 - **安全防护**：`access_token` 登录校验，连续认证失败会触发限制，防止密码被暴力破解。
 
 ### 🛠️ 其他实用功能
 
-- **插件系统**：`atribot/plugins/` 下的插件启动时自动加载，支持消息/通知/请求事件订阅与管道中间件，可热重载。
+- **插件系统**：`atribot/plugins/` 下的插件启动时自动加载，支持消息/通知/请求事件订阅与管道中间件，可显式热重载。
 - **子 Agent 协作**：`sub_agent` 工具可将复杂多步任务委派给独立子代理（自带工具集 + LLM 循环）执行。
 - **定时自触发**：`schedule_self_trigger` 工具可让 Bot 在指定时间主动发起一次群聊思考。
 - **高性能关键词匹配**：关键词响应底层采用 **AC 自动机**，即使配置上万条规则也能保持毫秒级响应。
@@ -178,7 +177,7 @@ ollama run dengcao/Qwen3-Embedding-0.6B:F16
 
 #### 📦 沙盒环境 (sandbox) - 可选
 
-为 AI 模型配备了默认的**代码沙盒环境**，使其能够安全地执行用户请求或自主生成的代码片段。当前实现基于 **Docker** 🐳沙盒，支持运行 Python 等语言的代码，可用于代码解释、数据计算等场景。
+为 AI 模型配备了默认的**代码沙盒环境**，使其能够安全地执行用户请求或自主生成的代码片段。默认实现基于 **Docker** 🐳沙盒，也可在 `sand_box.type` 切换为本机直执行（`none` / `no_sandbox` / `local`）沙盒，支持运行 Python 等语言的代码，可用于代码解释、数据计算等场景。
 
 - **扩展性**：如需支持其他类型的沙盒（如 Web 沙盒、系统命令沙盒），可继承 `atribot/LLMchat/sandbox/sandbox_base.py` 中的基类并实现相应接口。
 - **文件操作**：AI 上下文中能够看到的文件可以放到 Python 环境中进行简单处理。
@@ -189,25 +188,25 @@ ollama run dengcao/Qwen3-Embedding-0.6B:F16
 docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 ```
 
-然后在 `assets/config.json` 的 `sand_box` 中指定该镜像名（默认 `atri-sandbox:latest`）即可。沙盒为**可选**能力，初始化失败不会阻断 Bot 启动。
+沙盒为**可选**能力，初始化失败不会阻断 Bot 启动；随后在 `assets/config.json` 的 `sand_box` 中指定镜像名（默认 `atri-sandbox:latest`）即可。镜像内已预装 numpy/pandas/matplotlib/seaborn/opencv/scipy/sympy 等科学计算库与 ffmpeg、中文字体；工具描述会按沙盒后端/系统/Shell 自动适配，可用 `sand_box.tool_prompts` / `sand_box.tools` 覆盖描述或禁用单个工具。
 
 > 关于沙盒镜像的构建、逐段解读、自定义扩展与常见问题，详见 [沙盒 Dockerfile 教程](atribot/docs/沙盒Dockerfile教程.md)。
 
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
-1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.md 或 如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表。
+1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.md 或 如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表；`tool_presets` 配置各会话工具预设（支持 list 或 `{"default": [...], "deferred": [...]}`，deferred 工具由 `tool_search` 动态发现）。
 2.  **平台连接**：`config.platforms.<name>` 配置与 NapCat 的对接方式（`adapter` 固定为 `onebot`，`connection_type` 支持 `WebSocket_client` / `WebSocket_server` / `http`，`access_token` 需与 NapCat 一致，`url` 为地址）。
 3.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
     ```bash
     cp "assets/config copy.json" assets/config.json
     cp "assets/supplier_config copy.json" assets/supplier_config.json
     ```
-4.  **MCP 配置**：默认路径在 `atribot/LLMchat/MCP/mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用。
+4.  **MCP 配置**：默认路径在 `atribot/LLMchat/MCP/mcp_server.json`，可通过 `"active": false` 控制特定 MCP 工具是否启用；远程服务默认使用 SSE，配置 `"transport": "streamable_http"` 可切换为 Streamable HTTP。
 5.  **Skills 文件夹**：默认路径在 `atribot/LLMchat/skills/agent_skills`。
 6.  根目录 `document/` 下可按项目结构放置音频、表情包等资源文件。
 7.  **表情包**：在 `document/img/emojis` 文件夹下新建**文件名代表内部表情的文件夹**，放入对应名称的图片（支持 .jpg, .jpeg, .png, .gif），LLM 即可在聊天中自然发送。
-8.  **Web 管理面板**：`config.web_panel` 控制管理面板（`enable` 默认开启、`port` 默认 `5125`、`access_token` 为登录口令，建议部署后务必修改）。
-9.  **路径映射**：Bot 与协议端（NapCat）不在同一文件系统时（例如 Bot 跑在 WSL 而 NapCat 在 Windows），在 `paths.path_mapping` 中配置「本地路径前缀 → 协议端路径前缀」映射（如 `"E:/": "/mnt/e/"`），发送 `file://` 路径时会自动转换；留空则不做转换。
+8.  **Web 管理面板**：`config.web_panel` 控制管理面板（`enable` 默认开启、`port` 未配置时缺省 `5125`（本仓库为 `5308`）、`access_token` 为登录口令，建议部署后务必修改；登录令牌也支持环境变量 `ATRI_PANEL_TOKEN`）。
+9.  **路径映射**：Bot 与协议端（NapCat）不在同一文件系统时（例如 Bot 跑在 WSL 而 NapCat 在 Windows），在 `file_path.path_mapping` 中配置「本地路径前缀 → 协议端路径前缀」映射（如 `"E:/": "/mnt/e/"`），发送 `file://` 路径时会自动转换；留空则不做转换。
 
 
 ### 4. 启动项目
@@ -255,9 +254,9 @@ cp .env.docker.example .env
 | `ATRI_DB_PORT_FORWARD` | 宿主机映射端口 | `5432` |
 | `ATRI_BOT_PORT` | Bot WebSocket 服务端口 | `8888` |
 | `ATRI_ACCESS_TOKEN` | NapCat 连接验证 Token | `ATRI114514` |
-| `ATRI_CONNECTION_TYPE` | 连接类型（WebSocket_server/client） | `WebSocket_server` |
+| `ATRI_CONNECTION_TYPE` | 连接类型（预留字段，当前 Compose 固定使用 `WebSocket_server`） | `WebSocket_server` |
 | `ATRI_NAPCAT_URL` | NapCat WebSocket 地址（客户端模式） | `host.docker.internal:3001` |
-| `ATRI_SANDBOX_IMAGE` | AI 沙盒使用的 Docker 镜像 | `python:3.14-slim` |
+| `ATRI_SANDBOX_IMAGE` | AI 沙盒使用的 Docker 镜像 `atri-sandbox:latest` | `python:3.13-slim` |
 | `TZ` | 容器时区 | `Asia/Shanghai` |
 
 然后直接启动：
@@ -289,8 +288,8 @@ docker compose exec db psql -U postgres -d postgres
 
 说明：
 - 容器启动时会基于 `assets/config.json` 生成一份运行时配置，不会覆盖你原本的本地配置。
-- 默认把宿主机的 `assets/`、`document/`、`log/`、`temp/` 挂进容器，便于直接改配置和保留运行数据。
-- 内置 AI 沙盒默认只做镜像名覆盖；如果你还想让容器内再调用 Docker 沙盒，需要额外挂载 Docker Socket。
+- 默认把宿主机的 `assets/`、`document/`、`log/`、`temp/` 挂进容器，便于直接改配置和保留运行数据（Bot 的文件日志写入容器内 `atribot/log/`）。
+- 内置 AI 沙盒默认只做镜像名覆盖；Compose 已默认挂载 Docker Socket（`/var/run/docker.sock`），容器内可直接调用宿主 Docker 拉起的沙盒。
 
 ---
 ## 📂 项目结构
@@ -315,7 +314,6 @@ ATRI-main/
 │  │  └─test/                   # 实验性 / 测试命令
 │  ├─common_utils/              # 通用工具函数
 │  │  ├─cluster_utils.py        # 图聚类与连通分量分析
-│  │  ├─data_manage.py          # 数据管理工具
 │  │  ├─db_format.py            # 数据库格式化
 │  │  ├─http_client.py          # 异步 HTTP 客户端
 │  │  ├─json_utils.py           # JSON 处理与序列化
@@ -341,19 +339,21 @@ ATRI-main/
 │  │  ├─event_bus/              # 事件总线（按 PostType 分发监听器）
 │  │  ├─pipeline/               # 中间件管道（含群白名单 WhitelistMiddleware）
 │  │  ├─platform/               # 多平台适配层（适配器 / 消息队列 / 发送客户端）
-│  │  ├─network_connections/    # 发送客户端（QQAPIClient 等）
+│  │  ├─network_connections/    # 遗留 WebSocket 客户端基类
 │  │  └─type/                   # 核心类型定义（事件信封 / 消息段）
 │  ├─docs/                      # 开发文档与笔记
 │  ├─LLMchat/                   # 🧠 LLM 聊天与 Agent 能力
 │  │  ├─chat.py                 # 群聊/私聊对话处理入口
 │  │  ├─emoji_system.py         # 表情包管理与自然发送
 │  │  ├─initiative_chat.py      # 主动发起群聊话题
-│  │  ├─LLM_supervisor.py       # LLM 调度与降级策略
+│  │  ├─LLM_supervisor.py       # LLM 调度与工具循环
 │  │  ├─media_processor.py      # 多模态消息转文本
+│  │  ├─message_sender.py       # AI 输出格式化与发送
 │  │  ├─prepare_model_prompt.py # 提示词构建与组装
+│  │  ├─private_chat_trigger.py # 私聊触发白名单与消息聚合窗口
 │  │  ├─token_manage.py         # Token 用量统计与管理
 │  │  ├─agent/                  # 子 Agent 系统
-│  │  ├─character_setting/      # 人设预设（15+ 角色）
+│  │  ├─character_setting/      # 人设预设（19 个角色）
 │  │  ├─discard_tools/          # 已废弃 / 旧版工具
 │  │  ├─MCP/                    # MCP 协议工具集成
 │  │  │  ├─mcp_tool_manager.py  # MCP 工具管理器
@@ -377,16 +377,14 @@ ATRI-main/
 │  │  │  ├─parser.py            # Markdown 解析
 │  │  │  ├─models.py            # 数据模型
 │  │  │  └─agent_skills/        # Skills 提示词文件
-│  │  └─tools/                  # 函数调用工具集（共 18 个）
+│  │  └─tools/                  # 函数调用工具集
 │  │     ├─web_search/          # 网页搜索
 │  │     ├─web_extract/         # 网页内容提取
-│  │     ├─run_python_code/     # 沙盒 Python 执行
-│  │     ├─run_command/         # 沙盒 Shell 命令
+│  │     ├─sandbox_tools/       # 沙盒 4 工具
 │  │     ├─memory_search/       # 记忆检索
 │  │     ├─memory_storage/      # 记忆写入
 │  │     ├─send_image_message/  # 图片消息发送
 │  │     ├─send_speech_message/ # 语音消息发送
-│  │     ├─send_file / add_file  # 沙盒文件进出
 │  │     ├─schedule_self_trigger # 定时自触发
 │  │     ├─sub_agent/           # 子代理
 │  │     ├─tool_search/         # 工具搜索与发现
@@ -394,7 +392,7 @@ ATRI-main/
 │  │     └─...                  # 其余工具
 │  ├─plugins/                   # 🔌 插件系统
 │  │  ├─plugin.py               # Plugin 基类（事件 / 中间件装饰器）
-│  │  ├─manager.py / loader.py  # 插件管理器与加载器（热重载）
+│  │  ├─manager.py / loader.py / runtime.py / registry.py # 插件管理、加载（热重载）与运行时挂载
 │  │  ├─emoji_like/             # 消息贴表情镜像
 │  │  ├─group_manager/          # 群管理 + 关键词回复 + 加群审批
 │  │  └─poke_reaction/          # 戳一戳反馈
@@ -402,6 +400,7 @@ ATRI-main/
 │  └─web_panel/                 # 🖥️ Web 管理面板
 │     ├─panel_router.py         # 面板路由挂载与静态资源
 │     ├─deps.py                 # 鉴权 / 配置等共享依赖
+│     ├─dev_server.py / API.md  # 开发服务器（mock 环境）与接口文档
 │     ├─routes/                 # 后端端点（chat / config / database / memory / personas / ...）
 │     ├─templates/              # 页面模板
 │     └─static/                 # 前端资源（JS / CSS）
@@ -413,9 +412,9 @@ ATRI-main/
 │  ├─file/                      # 通用文本 / 文件资源
 │  ├─img/                       # 图片资源
 │  │  ├─ATRI_qrcode/            # 二维码资源
-│  │  ├─emojis/                 # 表情包目录
-│  │  └─tmp/                    # 临时图片目录
+│  │  └─emojis/                 # 表情包目录
 │  ├─video/                     # 视频资源
+│  ├─work/                      # 本机沙盒（local 后端）工作区
 │  └─temp/                      # 临时运行文件
 ```
 
@@ -435,17 +434,18 @@ NapCat (QQ客户端)
 MessageQueue (消息队列)
       │
       ▼
-Pipeline (WhitelistMiddleware 群白名单过滤)
+Pipeline (WhitelistMiddleware 群白名单过滤 + ChatManager 上下文注入)
       │
       ▼
 EventBus (按 PostType 分发)
       │
+      ├──► 消息存储监听          (priority=101，入库 message 表)
       ├──► AtCommandRule 路由    (@bot /cmd 命令 → CommandSystem)
       ├──► 插件事件处理器        (Plugin.on_message / on_notice 等)
-      └──► initiativeChat 路由   (普通聊天 / 主动对话 → LLM 决策)
+      └──► 聊天路由              (priority=100：群聊 initiativeChat / 私聊 privateChatTrigger → LLM 决策)
 ```
 
-群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理；命令与聊天两条路由在 `bot_framework._register_at_routes()` 注册，插件处理器由 `PluginManager` 在启动时自动扫描并挂载。
+群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理；命令与聊天两条路由在 `bot_framework._register_at_routes()` 注册，白名单中间件与消息存储由 `_register_message_storage()` 接线（存储监听优先级 101，先于聊天路由 100 执行），插件处理器由 `PluginManager` 在启动时自动扫描并挂载。
 
 **支撑系统**：除了消息主干，项目还包含以下后台支撑模块——
 
@@ -457,7 +457,9 @@ EventBus (按 PostType 分发)
 | `MediaProcessor` | 多模态消息处理器，将图片 / 音频 / 视频统一转为文本供 LLM 理解 |
 | `agent/` 子 Agent 系统 | 用于委派复杂多步任务，支持上下文隔离与工具链编排 |
 | `PermissionsManagement` | 四级权限校验（黑名单 → 普通用户 → 管理员 → Root） |
-| `web_panel/` Web 管理面板 | 独立端口运行的可视化管理与在线聊天面板，异常不影响 Bot 主服务 |
+| `MessageSender` | AI 输出专用格式化与发送（LaTeX/表情标签→图片 CQ、回复前缀，失败降级纯文本） |
+| `CommandLoader` | 命令模块加载器，支持 `/reload` 热重载（清 `sys.modules` 后重扫） |
+| `web_panel/` Web 管理面板 | 同进程后台任务（uvicorn 仅监听 `127.0.0.1`，路由前缀 `/admin/`）提供可视化管理与在线聊天，异常不影响 Bot 主服务 |
 
 ---
 
@@ -480,11 +482,10 @@ chat.py → GroupChat.step()          ← 聊天主入口
       │
       ├─② LLMCoordinator.run()      调度模型请求
       │     ├─ 主模型请求 (model_api)
-      │     ├─ Function Calling 循环 (MCP/tools)
-      │     └─ 主模型失败时降级备用模型 (_request_model_with_fallback_)
+      │     └─ Function Calling 循环 (MCP/tools)
       │
       ├─③ 解析 JSON 响应            模型输出结构化决策
-      │     ├─ "speak"    → 回复消息 (分段发送 / 表情包)
+      │     ├─ "speak"    → 回复消息 (MessageSender 格式化，分段发送 / 表情包)
       │     ├─ "update"   → 更新用户画像
       │     ├─ "silence"  → 不回复
       │     └─ 工具调用    → 通过 Function Calling 循环执行 (MCP / 本地工具)
@@ -494,9 +495,9 @@ chat.py → GroupChat.step()          ← 聊天主入口
             └─ 上下文超长时触发 summarize_context() 压缩
 ```
 
-**高可用降级机制**：当主模型 API 响应异常时，`_request_model_with_fallback_` 会按照 `config.model.standby_model` 列表依次尝试备用供应商和模型，保证即使主力 Key 失效也能正常回复。
+**高可用降级机制**：当主模型 API 响应异常时，`chat.py` 中 `GroupChat`/`PrivateChat` 的请求封装（`_request_model_with_fallback_` / `_request_model_with_fallback_private_`）会按 `config.model.standby_model` 列表依次尝试备用供应商和模型（含视觉能力差异处理），保证即使主力 Key 失效也能正常回复。
 
-**结构化输出**：模型被要求返回 JSON 格式的决策列表（`return` 数组），每一项包含 `decision` 字段，使回复行为完全可控和可扩展。
+**结构化输出**：模型被要求返回 JSON 对象（`actions` 数组），每一项包含 `decision` 字段（`speak` / `update` / `silence`），使回复行为完全可控和可扩展。
 
 ---
 
@@ -572,7 +573,7 @@ MemorySystem.extract_stored_group_message()
 ```
 
 - **记忆动态更新**：不仅是单纯的追加记录，当新提取的记忆和旧记忆发生冲突或具备连续性时，系统会调用 LLM 对既有记忆进行内容更新和属性拓展，打破原有的只增不改限制。
-- **后台碎片整理**：内置定时记忆维护任务，利用连通图和簇（Cluster）聚类分析近期高频且相似的记忆，通过顺序安全的非并发机制交由 LLM 执行合并和去重操作，防止重复信息冗余堆叠。
+- **后台碎片整理**：内置定时记忆维护任务，利用连通图和簇（Cluster）聚类分析近期高频且相似的记忆，通过顺序安全的非并发机制交由 LLM 执行合并和去重操作，防止重复信息冗余堆叠；除定时任务外，门面亦提供 `cleanup_expired_memories()` / `consolidate_memories()` 手动维护入口。
 - **动态清理**：严格基于记忆类型和其特有的半衰期配置，定期自动触发过期清扫，自动遗忘失去时效性的高能群话题和日常零碎记忆。
 
 **用户画像 (UserSystem)**：为每个用户维护一份 JSON 画像文档（称呼、关系、性格、近期话题、偏好风格等），在每次对话的 prompt 中嵌入，确保 Bot 对同一用户的态度前后一致，画像由 LLM 在对话后自动更新。

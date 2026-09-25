@@ -16,7 +16,7 @@
 >
 > — **𝓐𝓣𝓡𝓘 -𝓜𝔂 𝓓𝓮𝓪𝓻 𝓜𝓸𝓶𝓮𝓷𝓽𝓼-**
 >
-项目Logo由[吖密](https://space.bilibili.com/1196260828)绘制  
+Logo illustrated by [吖密](https://space.bilibili.com/1196260828)  
 [![Python](https://img.shields.io/badge/Python-3.14-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg)](https://www.docker.com/)
@@ -81,7 +81,7 @@ A **NapCat**-connected QQ Bot deeply customized for group chat scenarios, with f
 ### 🧠 Deep LLM Chat Integration
 Fully self-implemented LLM chat pipeline with complete control from input processing to output response:
 - **Fully asynchronous & high concurrency**: The reply process is completely asynchronous, supporting key pool rotation, easily handling high-concurrency scenarios across multiple group chats.
-- **Self-controllable**: Supports function calling and **MCP (Model Context Protocol)** configuration. The model returns structured JSON decisions (`speak` / `update` / `silence`), and 18 built-in tools are available (web search, memory read/write, sandboxed Python/Shell execution, sub-agent, scheduled self-trigger, etc.), plus a `tool_search` tool for on-demand tool discovery.
+- **Self-controllable**: Supports function calling and **MCP (Model Context Protocol)** configuration. The model returns structured JSON decisions (`speak` / `update` / `silence`), and 18 built-in tools are available (web search, memory read/write, sandboxed Python/Shell execution, sub-agent, scheduled self-trigger, tool discovery, etc.), with `tool_search` discovering `deferred` tools on demand (see `config.tool_presets`).
 - **RAG Memory System**: Memory function based on RAG (Retrieval-Augmented Generation), supporting knowledge base Q&A, giving the bot "long-term memory".
 - **LaTeX formula rendering**: Formulas in replies (`$...$`, `$$...$$`, `\(...\)`, `\[...\]`) are automatically rendered as images before sending, so discussing math in chat doesn't mean a wall of raw source code.
 - **High availability design**: Implements fallback API response mechanism. If the primary model responds with an error, it automatically downgrades to other configured models (may be slower but ensures responses).
@@ -100,14 +100,14 @@ Features a usable command mechanism. Trigger by mentioning the bot followed by `
 
 ### 🖥️ Web Admin Panel
 
-A web admin panel is launched on a separate port when the bot starts (`web_panel.enable` is on by default; port and login token are configured in `config.web_panel`, default port `5125`). Panel failures do not affect the bot's main service:
+A web admin panel runs as an in-process background task when the bot starts (same process, bound to `127.0.0.1`, route prefix `/admin/`; `web_panel.enable` is on by default; port and login token are configured in `config.web_panel`, port falls back to `5125` when unset, this repo uses `5308`). Panel failures do not affect the bot's main service:
 
 - **Visual management**: Online config editing (model suppliers, MCP tools, etc.), database status, memory browsing, persona switching, log viewing, and more — all adapted for mobile browsers.
 - **Web chat**: A built-in chat page lets you talk to the bot directly in the browser, with multi-session management, streaming agent output, attachment uploads, and a dedicated `webui` tool preset (`default` loaded by default / `deferred` loaded on demand).
 - **Security**: `access_token` authentication with rate limiting on repeated failures to prevent brute-force attacks.
 
 ### 🛠️ Other Practical Features
-- **Plugin system**: Plugins under `atribot/plugins/` are auto-loaded at startup, supporting message/notice/request event subscriptions and pipeline middleware, with hot-reload.
+- **Plugin system**: Plugins under `atribot/plugins/` are auto-loaded at startup, supporting message/notice/request event subscriptions and pipeline middleware, with explicit hot-reload (`PluginManager.reload_plugin`).
 - **Sub-agent collaboration**: The `sub_agent` tool can delegate complex multi-step tasks to an independent sub-agent (own toolset + LLM loop).
 - **Scheduled self-trigger**: The `schedule_self_trigger` tool lets the bot proactively start a new group chat thinking at a specified time.
 - **High-performance keyword matching**: Configuration files support keyword responses, using the **AC Automaton** algorithm underneath for millisecond-level response even with tens of thousands of entries.
@@ -158,7 +158,7 @@ Before use, modify `atribot/commands/audio/TTS.py` to set the reference audio pa
         "prompt_language": "language_of_reference_text"
     },
     "calm": {
-        "refer_wav_path": "/home/atri/tts_reference/夏生さんが望むのでしたら.mp3",
+        "refer_wav_path": "/home/atri/音乐/tts_reference/夏生さんが望むのでしたら.mp3",
         "prompt_text": "夏生さんが望むのでしたら",
         "prompt_language": "ja"
     }
@@ -168,7 +168,7 @@ Before use, modify `atribot/commands/audio/TTS.py` to set the reference audio pa
 
 #### 📦 Sandbox Environment (Optional)
 
-Equips the AI model with a default **code sandbox environment** to safely execute user-requested or self-generated code snippets. The current implementation uses a **Docker** 🐳-based sandbox supporting languages like Python, useful for code interpretation, data calculation, etc.
+Equips the AI model with a default **code sandbox environment** to safely execute user-requested or self-generated code snippets. The default implementation uses a **Docker** 🐳-based sandbox (switchable via `sand_box.type` to local execution (`none` / `no_sandbox` / `local`) or the E2B cloud sandbox), supporting languages like Python, useful for code interpretation, data calculation, etc. The image (`sand_box.image`) ships with numpy/pandas/matplotlib/seaborn/opencv/scipy/sympy, ffmpeg and CJK fonts; tool descriptions adapt to backend/OS/shell, and `sand_box.tool_prompts` / `sand_box.tools` can override or disable individual tools.
 
 - **Extensibility**: To support other sandbox types (e.g., web sandbox, system command sandbox), inherit from the base class in `atribot/LLMchat/sandbox/sandbox_base.py` and implement the corresponding interface.
 - **File Operations**: Files visible in the AI context can be placed into the Python environment for simple processing.
@@ -179,10 +179,10 @@ Before starting, ensure to check the  `assets` folder:
 2.  **Platform connection**: `config.platforms.<name>` configures the connection to NapCat (`adapter` fixed as `onebot`, `connection_type` supports `WebSocket_client` / `WebSocket_server` / `http`, `access_token` must match NapCat, `url` is the address).
 3.  Configure `supplier_config.json` (model supplier settings).
 4.  Configure `config.json` (project basic settings).
-5.  **MCP Configuration**：Default path is `atribot\LLMchat\MCP\mcp_server.json`. Specific MCP tools can be toggled via `"active": false`.
+5.  **MCP Configuration**：Default path is `atribot\LLMchat\MCP\mcp_server.json`. Specific MCP tools can be toggled via `"active": false`; remote servers use SSE by default, set `"transport": "streamable_http"` to use Streamable HTTP.
 6.  Under root `document/`, you can add corresponding audio, emoji, and file configurations according to the project structure.
-7.  **Web admin panel**: `config.web_panel` controls the admin panel (`enable` on by default, `port` defaults to `5125`, `access_token` is the login token — make sure to change it after deployment).
-8.  **Path mapping**: When the bot and the protocol frontend (NapCat) run on different filesystems (e.g. bot in WSL, NapCat on Windows), configure a "local path prefix → frontend path prefix" mapping in `paths.path_mapping` (e.g. `"E:/": "/mnt/e/"`); `file://` paths are converted automatically when sending. Leave empty to disable.
+7.  **Web admin panel**: `config.web_panel` controls the admin panel (`enable` on by default, `port` falls back to `5125` when unset (this repo uses `5308`), `access_token` is the login token — make sure to change it after deployment; the token can also be provided via the `ATRI_PANEL_TOKEN` env var).
+8.  **Path mapping**: When the bot and the protocol frontend (NapCat) run on different filesystems (e.g. bot in WSL, NapCat on Windows), configure a "local path prefix → frontend path prefix" mapping in `file_path.path_mapping` (e.g. `"E:/": "/mnt/e/"`); `file://` paths are converted automatically when sending. Leave empty to disable.
 ### 4. Start the Project
 The project requires **Python 3.14**. Using `uv` for package management is recommended.
 
@@ -237,9 +237,9 @@ cp .env.docker.example .env
 | `ATRI_DB_PORT_FORWARD` | Host port mapping | `5432` |
 | `ATRI_BOT_PORT` | Bot WebSocket service port | `8888` |
 | `ATRI_ACCESS_TOKEN` | NapCat connection token | `ATRI114514` |
-| `ATRI_CONNECTION_TYPE` | Connection type (WebSocket_server/client) | `WebSocket_server` |
+| `ATRI_CONNECTION_TYPE` | Connection type (reserved; Compose currently hardcodes `WebSocket_server`) | `WebSocket_server` |
 | `ATRI_NAPCAT_URL` | NapCat WebSocket URL (client mode) | `host.docker.internal:3001` |
-| `ATRI_SANDBOX_IMAGE` | AI sandbox Docker image | `python:3.14-slim` |
+| `ATRI_SANDBOX_IMAGE` | AI sandbox Docker image (Compose falls back to `atri-sandbox:latest` when unset) | `python:3.13-slim` |
 | `TZ` | Container timezone | `Asia/Shanghai` |
 
 Then start:
@@ -271,8 +271,8 @@ docker compose exec db psql -U postgres -d postgres
 
 Notes:
 - The container generates a runtime config based on `assets/config.json` without overwriting your local setup.
-- Host directories `assets/`, `document/`, `log/`, `temp/` are mounted into the container for easy configuration and data persistence.
-- AI sandbox only overrides the image name by default; to call Docker sandbox from within the container, you need to additionally mount the Docker socket.
+- Host directories `assets/`, `document/`, `log/`, `temp/` are mounted into the container for easy configuration and data persistence (file logs are written to `atribot/log/` inside the container).
+- AI sandbox only overrides the image name by default; Compose already mounts the Docker socket (`/var/run/docker.sock`), so the sandbox can talk to the host Docker daemon out of the box.
 
 ---
 ## 📂 Project Structure
@@ -304,7 +304,7 @@ ATRI-main/
 │  │  ├─event_bus/              # Event bus (dispatch by PostType)
 │  │  ├─pipeline/               # Middleware pipeline (incl. group whitelist)
 │  │  ├─platform/               # Multi-platform adapter layer
-│  │  ├─network_connections/    # Send clients (QQAPIClient, etc.)
+│  │  ├─network_connections/    # Legacy WebSocket client base (sending goes through SendClientBase / PlatformManager)
 │  │  └─type/                   # Core type definitions (event envelope / segments)
 │  ├─docs/                      # Development notes & documentation
 │  ├─LLMchat/                   # 🧠 LLM chat & Agent capabilities
@@ -316,10 +316,10 @@ ATRI-main/
 │  │  ├─RAG/                    # Retrieval-Augmented Generation logic
 │  │  ├─sandbox/                # Sandbox
 │  │  ├─skills/                 # Skills prompt modules
-│  │  └─tools/                  # Function calling toolset (18 tools)
+│  │  └─tools/                  # Function calling toolset (18 tools: 13 dir tools + sub_agent + 4 sandbox tools)
 │  ├─plugins/                   # 🔌 Plugin system
 │  │  ├─plugin.py               # Plugin base class (event / middleware decorators)
-│  │  ├─manager.py / loader.py  # Plugin manager & loader (hot-reload)
+│  │  ├─manager.py / loader.py / runtime.py / registry.py # Plugin management, loading (hot-reload) & runtime mounting
 │  │  ├─emoji_like/             # Message emoji mirror
 │  │  ├─group_manager/          # Group management + keyword replies + join approval
 │  │  └─poke_reaction/          # Poke feedback
@@ -327,6 +327,7 @@ ATRI-main/
 │  └─web_panel/                 # 🖥️ Web admin panel
 │     ├─panel_router.py         # Panel routing & static assets
 │     ├─deps.py                 # Auth / config shared dependencies
+│     ├─dev_server.py / API.md  # Dev server (mock env) & API docs
 │     ├─routes/                 # Backend endpoints (chat / config / database / memory / personas / ...)
 │     ├─templates/              # Page templates
 │     └─static/                 # Frontend assets (JS / CSS)
@@ -338,9 +339,9 @@ ATRI-main/
 │  ├─file/                      # Generic text / file resources
 │  ├─img/                       # Image assets
 │  │  ├─ATRI_qrcode/            # QR code resources
-│  │  ├─emojis/                 # Emoji/sticker directory
-│  │  └─tmp/                    # Temporary image directory
+│  │  └─emojis/                 # Emoji/sticker directory
 │  ├─video/                     # Video assets
+│  ├─work/                      # Local sandbox (local backend) workspace
 │  └─temp/                      # Temporary runtime files
 ├─privacy/                      # Development notes & private files
 ```
@@ -361,19 +362,20 @@ Platform Adapter (OneBotAdapter, multi-platform)
 MessageQueue (message queue)
       │
       ▼
-Pipeline (WhitelistMiddleware group whitelist filtering)
+Pipeline (WhitelistMiddleware group whitelist filtering + ChatManager context injection)
       │
       ▼
 EventBus (dispatch by PostType)
       │
+      ├──► Message storage listener (priority=101, persists to message table)
       ├──► AtCommandRule route  (@bot /cmd commands → CommandSystem)
       ├──► Plugin event handlers (Plugin.on_message / on_notice, etc.)
-      └──► initiativeChat route  (normal chat / proactive talk → LLM decision)
+      └──► Chat route (priority=100: group initiativeChat / private privateChatTrigger → LLM decision)
 ```
 
-Group chats are handled by `GroupChat`, private chats by `PrivateChat`. The command and chat routes are registered in `bot_framework._register_at_routes()`, and plugin handlers are auto-scanned and mounted by `PluginManager` at startup.
+Group chats are handled by `GroupChat`, private chats by `PrivateChat`. The command and chat routes are registered in `bot_framework._register_at_routes()`; the whitelist middleware and message storage are wired by `_register_message_storage()` (storage listener priority 101 runs before the chat route at 100); plugin handlers are auto-scanned and mounted by `PluginManager` at startup.
 
-Besides the message backbone, the `web_panel/` module runs a visual admin & chat panel on a separate port — panel failures never affect the bot's main service.
+Besides the message backbone, the `web_panel/` module runs a visual admin & chat panel as an in-process background task (uvicorn bound to `127.0.0.1`, route prefix `/admin/`) — panel failures never affect the bot's main service.
 
 ---
 
@@ -396,11 +398,10 @@ chat.py → GroupChat.step()          ← Chat entry point
       │
       ├─② LLMCoordinator.run()      Dispatch model request
       │     ├─ Primary model request (model_api)
-      │     ├─ Function Calling loop (MCP/tools)
-      │     └─ Fallback to standby models on failure (_request_model_with_fallback_)
+      │     └─ Function Calling loop (MCP/tools)
       │
       ├─③ Parse JSON response       Model outputs structured decisions
-      │     ├─ "speak"    → Send response (segmented / with emojis)
+      │     ├─ "speak"    → Send response via MessageSender (segmented / with emojis)
       │     ├─ "update"   → Update user profile
       │     ├─ "silence"  → No reply
       │     └─ tool calls → Via Function Calling loop (MCP / local tools)
@@ -410,9 +411,9 @@ chat.py → GroupChat.step()          ← Chat entry point
             └─ Trigger summarize_context() when context exceeds token limit
 ```
 
-**High-Availability Fallback**: When the primary model API returns an error, `_request_model_with_fallback_` iterates through `config.model.standby_model` list to try backup providers and models, ensuring responses even when the primary key fails.
+**High-Availability Fallback**: When the primary model API returns an error, the request wrappers of `GroupChat`/`PrivateChat` in `chat.py` (`_request_model_with_fallback_` / `_request_model_with_fallback_private_`) iterate through the `config.model.standby_model` list to try backup providers and models (including vision-capability differences), ensuring responses even when the primary key fails.
 
-**Structured Output**: The model is instructed to return JSON-formatted decision lists (with a `return` array), each item containing a `decision` field, making response behavior fully controllable and extensible.
+**Structured Output**: The model is instructed to return a JSON object (with an `actions` array), each item containing a `decision` field (`speak` / `update` / `silence`), making response behavior fully controllable and extensible.
 
 ---
 
@@ -488,7 +489,7 @@ Conflict Detection & Clustering (Cluster Utils)
 ```
 
 - **Dynamic Memory Updates**: Beyond simple appending, when newly extracted memories conflict with or extend existing ones, the system invokes LLM to update content and attributes, breaking the append-only limitation.
-- **Background Defragmentation**: A scheduled maintenance task clusters recently active, highly similar memories using connected graph analysis, then safely merges and deduplicates them via LLM, preventing redundant information buildup.
+- **Background Defragmentation**: A scheduled maintenance task clusters recently active, highly similar memories using connected graph analysis, then safely merges and deduplicates them via LLM, preventing redundant information buildup; the facade also exposes `cleanup_expired_memories()` / `consolidate_memories()` for manual maintenance.
 - **Dynamic Cleanup**: Based on memory categories and their distinct half-life configurations, expired memories are automatically purged on schedule — highly active group topics and daily scattered memories lose relevance naturally.
 
 **User Profiles (UserSystem)**: A JSON profile document (name, relationship, personality, recent topics, style preferences, etc.) is maintained for each user and embedded into every conversation prompt, ensuring the bot's attitude toward the same user remains consistent. Profiles are automatically updated by the LLM after each conversation.
