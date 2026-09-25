@@ -146,6 +146,7 @@ export const SCHEMA = [
       { path: 'database.port', label: '端口', type: 'number' },
       { path: 'database.user', label: '用户名', type: 'text' },
       { path: 'database.password', label: '密码', type: 'password' },
+      { path: 'database.database', label: '库名', type: 'text' },
     ],
   },
   {

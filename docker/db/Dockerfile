@@ -1,5 +1,22 @@
 # db/Dockerfile
-FROM postgres:18
+
+FROM postgres:18-bookworm AS pgvector-builder
+
+ARG PGVECTOR_VERSION=v0.8.6
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    make \
+    gcc \
+    postgresql-server-dev-18 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch ${PGVECTOR_VERSION} https://github.com/pgvector/pgvector.git /tmp/pgvector \
+    && cd /tmp/pgvector \
+    && make \
+    && make install DESTDIR=/pgvector-artifacts
+
+FROM postgres:18-bookworm
 
 RUN apt-get update && apt-get install -y --fix-missing \
     curl \
@@ -19,18 +36,10 @@ RUN . /etc/os-release && \
     sh -c "echo 'deb [signed-by=/usr/share/keyrings/groonga-archive-keyring.gpg] https://packages.groonga.org/debian/ ${VERSION_CODENAME} main' > /etc/apt/sources.list.d/groonga.list"
 
 RUN apt-get update && apt-get install -y --fix-missing \
-    git \
-    make \
-    gcc \
-    postgresql-server-dev-18 \
     postgresql-18-pgdg-pgroonga \
-    && cd /tmp \
-    && git clone --branch v0.8.2 https://github.com/pgvector/pgvector.git \
-    && cd pgvector \
-    && make \
-    && make install \
-    && cd .. \
-    && rm -rf pgvector \
-    && apt-get remove -y git make gcc postgresql-server-dev-18 curl ca-certificates gnupg \
+    && apt-get purge -y curl ca-certificates gnupg \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
+
+# 拷贝编译好的 pgvector（vector.so + control + SQL 脚本），自动落到 PG18 的 lib/extension 目录
+COPY --from=pgvector-builder /pgvector-artifacts/ /

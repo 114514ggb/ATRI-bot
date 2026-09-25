@@ -24,11 +24,13 @@ class AsyncPostgreSQL(AsyncDatabaseBase, ServiceBase):
 
     @classmethod
     async def factory(cls, config: atriConfig) -> "AsyncPostgreSQL":
+        """从配置提取连接参数（库名取自 config.database.database）"""
         return await cls.create(
             host=config.database.host,
             user=config.database.user,
             port=config.database.port,
             password=config.database.password,
+            database=config.database.database,
         )
         
     async def cleanup(self) -> None:

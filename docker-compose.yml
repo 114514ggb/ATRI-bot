@@ -9,6 +9,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_DB: postgres
       POSTGRES_PASSWORD: ${ATRI_DB_SUPERUSER_PASSWORD:-180710}
+
       ATRI_DB_NAME: ${ATRI_DB_NAME:-atri}
       ATRI_DB_APP_USER: ${ATRI_DB_APP_USER:-atri}
       ATRI_DB_APP_PASSWORD: ${ATRI_DB_APP_PASSWORD:-180710}
@@ -22,8 +23,17 @@ services:
       timeout: 5s
       retries: 10
       start_period: 10s
+    stop_grace_period: 60s
+    # 默认只绑定宿主机回环地址；需要从局域网/其他机器连库时改成 "${ATRI_DB_PORT_FORWARD:-5432}:5432"
     ports:
-      - "${ATRI_DB_PORT_FORWARD:-5432}:5432"
+      - "127.0.0.1:${ATRI_DB_PORT_FORWARD:-5432}:5432"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - atri-net
 
   app:
     build:
@@ -31,9 +41,14 @@ services:
       dockerfile: docker/python/Dockerfile
     container_name: atri-bot
     restart: unless-stopped
+    init: true
     depends_on:
       db:
         condition: service_healthy
+    # Python 的优雅关闭挂在 KeyboardInterrupt / 主任务取消路径上（见 main.py）：
+    # Docker 默认发 SIGTERM 会直接杀进程，graceful_shutdown 不执行，故改用 SIGINT
+    stop_signal: SIGINT
+    stop_grace_period: 30s
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       ATRI_SUPPLIER_CONFIG_PATH: /app/assets/supplier_config.json
@@ -42,6 +57,8 @@ services:
       ATRI_DB_PORT: 5432
       ATRI_DB_USER: ${ATRI_DB_APP_USER:-atri}
       ATRI_DB_PASSWORD: ${ATRI_DB_APP_PASSWORD:-180710}
+      # 库名写入运行时配置的 database.database，需与 db 容器初始化时创建的库一致
+      ATRI_DB_NAME: ${ATRI_DB_NAME:-atri}
       ATRI_PLATFORM_NAPCAT_ADAPTER: onebot
       ATRI_PLATFORM_NAPCAT_CONNECTION_TYPE: WebSocket_server
       ATRI_PLATFORM_NAPCAT_HOST: 0.0.0.0
@@ -50,16 +67,42 @@ services:
       ATRI_PLATFORM_NAPCAT_ACCESS_TOKEN: ${ATRI_ACCESS_TOKEN:-ATRI114514}
       ATRI_PLATFORM_NAPCAT_ENABLED: "true"
       ATRI_SANDBOX_IMAGE: ${ATRI_SANDBOX_IMAGE:-atri-sandbox:latest}
+      # Web 管理面板：容器内绑 0.0.0.0，端口与宿主机映射保持一致
+      ATRI_WEB_PANEL_HOST: 0.0.0.0
+      ATRI_WEB_PANEL_PORT: ${ATRI_PANEL_PORT:-5308}
+      ATRI_PANEL_TOKEN: ${ATRI_PANEL_TOKEN:-}
+      # 1 = 同时写文件日志（挂载在 ./atribot/log）；0 = 只输出 stdout，交给 docker 日志轮转
+      ATRI_FILE_LOG: ${ATRI_FILE_LOG:-1}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "${ATRI_BOT_PORT:-8888}:8888"
+      - "${ATRI_PANEL_PORT:-5308}:5308"
     volumes:
       - ./assets:/app/assets
       - ./document:/app/document
-      - ./log:/app/log
+      # 日志实际写在 <项目>/atribot/log（见 atribot/core/logger.py），不是 /app/log
+      - ./atribot/log:/app/atribot/log
       - ./temp:/app/temp
       - /var/run/docker.sock:/var/run/docker.sock
+    # 探活：默认探 OneBot WebSocket 服务端口；若禁用了平台服务可删掉本段
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8888), 3).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - atri-net
 
 volumes:
   atri-postgres-data:
+
+networks:
+  atri-net:
+    driver: bridge

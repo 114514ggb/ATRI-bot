@@ -248,15 +248,17 @@ cp .env.docker.example .env
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
 | `ATRI_DB_SUPERUSER_PASSWORD` | PostgreSQL 超级用户密码 | `180710` |
-| `ATRI_DB_NAME` | 应用数据库名称 | `atri` |
+| `ATRI_DB_NAME` | 应用数据库名称（写入运行时配置 `database.database`） | `atri` |
 | `ATRI_DB_APP_USER` | 应用数据库用户 | `atri` |
 | `ATRI_DB_APP_PASSWORD` | 应用数据库密码 | `180710` |
-| `ATRI_DB_PORT_FORWARD` | 宿主机映射端口 | `5432` |
+| `ATRI_DB_PORT_FORWARD` | 数据库的宿主机映射端口（仅绑定 127.0.0.1） | `5432` |
 | `ATRI_BOT_PORT` | Bot WebSocket 服务端口 | `8888` |
 | `ATRI_ACCESS_TOKEN` | NapCat 连接验证 Token | `ATRI114514` |
-| `ATRI_CONNECTION_TYPE` | 连接类型（预留字段，当前 Compose 固定使用 `WebSocket_server`） | `WebSocket_server` |
-| `ATRI_NAPCAT_URL` | NapCat WebSocket 地址（客户端模式） | `host.docker.internal:3001` |
-| `ATRI_SANDBOX_IMAGE` | AI 沙盒使用的 Docker 镜像 `atri-sandbox:latest` | `python:3.13-slim` |
+| `ATRI_NAPCAT_URL` | NapCat WebSocket 地址（仅客户端模式使用） | `host.docker.internal:3001` |
+| `ATRI_PANEL_PORT` | Web 管理面板端口（容器内与宿主映射一致） | `5308` |
+| `ATRI_PANEL_TOKEN` | Web 管理面板令牌（⚠️ 会被 `web_panel.access_token` 覆盖，见下） | 空 |
+| `ATRI_SANDBOX_IMAGE` | AI 沙盒镜像（需先手动构建，见第 4 节） | `atri-sandbox:latest` |
+| `ATRI_FILE_LOG` | `1`=同时写文件日志，`0`=只输出 stdout | `1` |
 | `TZ` | 容器时区 | `Asia/Shanghai` |
 
 然后直接启动：
@@ -286,10 +288,36 @@ docker compose down
 docker compose exec db psql -U postgres -d postgres
 ```
 
+**访问 Web 管理面板**：
+```
+http://localhost:5308/admin/
+```
+令牌取 `assets/config.json` 的 `web_panel.access_token`（当前是弱口令 `ATRI`，**部署前务必改掉**）；若想让 `.env` 里的 `ATRI_PANEL_TOKEN` 生效，需要先把配置文件里的 `access_token` 删掉（它优先级更高）。
+
+**⚠️ 路径映射（Docker 部署必配）**：Bot 给 NapCat 发本地媒体时用的是 `file://` **容器内**路径（如 `/app/document/...`），宿主机上的 NapCat 读不到。请在宿主机的 `assets/config.json` 中配置：
+```json
+"file_path": {
+    "path_mapping": {
+        "/app/document": "<宿主机 document 目录绝对路径>",
+        "/app/assets": "<宿主机 assets 目录绝对路径>"
+    }
+}
+```
+不配置的典型症状：TTS 语音、表情包、本地图片/文件发送失败（NapCat 报文件不存在）。
+
+**停止与优雅关闭**：Compose 给 app 容器设了 `stop_signal: SIGINT`（Python 的优雅关闭挂在 Ctrl+C 路径上，SIGTERM 会直接杀进程），并留了 30s 宽限：
+```bash
+docker compose stop app        # 优雅停止（面板、数据库连接池、沙盒容器都会清理）
+docker compose down            # 停止并删除容器
+docker compose down -v         # 连数据卷一起删除（清库重建）
+```
+
 说明：
 - 容器启动时会基于 `assets/config.json` 生成一份运行时配置，不会覆盖你原本的本地配置。
-- 默认把宿主机的 `assets/`、`document/`、`log/`、`temp/` 挂进容器，便于直接改配置和保留运行数据（Bot 的文件日志写入容器内 `atribot/log/`）。
-- 内置 AI 沙盒默认只做镜像名覆盖；Compose 已默认挂载 Docker Socket（`/var/run/docker.sock`），容器内可直接调用宿主 Docker 拉起的沙盒。
+- 默认把宿主机的 `assets/`、`document/`、`atribot/log/`、`temp/` 挂进容器；Bot 的文件日志写在 `atribot/log/`（设 `ATRI_FILE_LOG=0` 可改为只输出 stdout，交给 Docker 日志轮转）。
+- 内置 AI 沙盒只覆盖镜像名，沙盒镜像需要**先手动构建**（`docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .`）；不构建不会阻断启动，但 AI 的代码执行能力会缺失。Compose 已挂载 Docker Socket（`/var/run/docker.sock`），容器内可直接调用宿主 Docker 拉起沙盒。
+- 镜像内已装 `uv`（供 `uvx`）与 Node.js（供 `npx`），stdio 型 MCP 服务可直接启动；不需要 Node 时可用 `docker build --build-arg WITH_NODE=0` 减小体积。
+- ⚠️ 安全提醒：默认口令（数据库 `180710`、平台 Token `ATRI114514`、面板口令 `ATRI`）都是公开弱口令，请务必修改；挂载 `/var/run/docker.sock` 等价于把宿主机 root 权限给了容器，请勿把面板/端口暴露到公网。
 
 ---
 ## 📂 项目结构

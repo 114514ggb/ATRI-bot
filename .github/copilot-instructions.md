@@ -59,7 +59,7 @@
       async def initialize(self) -> None: ...   # 异步初始化（resolve 后自动调用）
       async def cleanup(self) -> None: ...      # 异步清理（shutdown 时自动调用）
   ```
-  - `factory()` — 若覆写，`resolve()` 会用自定义工厂替代默认构造器典型用法：`AsyncPostgreSQL.factory(config)` 通过 `config` 从容器获取 `atriConfig` 并提取数据库连接参数
+  - `factory()` — 若覆写，`resolve()` 会用自定义工厂替代默认构造器典型用法：`AsyncPostgreSQL.factory(config)` 通过 `config` 从容器获取 `atriConfig` 并提取数据库连接参数（`host`/`port`/`user`/`password`，**库名取 `config.database.database`**）
   - `initialize()` — 若覆写，`resolve()` 在实例化后自动调用（同样注入参数），用于异步初始化逻辑
   - `cleanup()` — 若覆写，`resolve()` 自动提取为清理回调注册到容器，`shutdown` 时逆序调用
   - **不强制继承**：即使不继承 `ServiceBase`，只要在 `container.register(name, obj, cleanup=fn)` 时手动传入清理回调即可
@@ -466,8 +466,9 @@ URL 格式：`http(s)://...`、`file://绝对路径`（需 `local_Path_type=True
 > **MessageSender（AI 输出专用格式化发送）**：`container.get_by_type(MessageSender)`（`atribot/LLMchat/message_sender.py`）。`format_text()` 把 LLM 输出转为 CQ 消息：LaTeX 公式（`$...$` / `$$...$$` / `\(...\)` / `\[...\]`）→ codecogs 图片、表情标签 → 图片 CQ、回复引用前缀（`max_emoji=3`）；发送失败时用 `fallback_text()` 剥标签降级重发。主要方法：`send_group_text` / `send_group_text_list` / `send_private_text` / `send_private_text_list`（均需传 `send_client`，列表版支持 `delay` 控制分条间隔，`chat.py` 使用 `MESSAGE_DELAY=1.5`）
 
 ## Web 管理面板（web_panel）
-- 与 Bot **同进程**运行：`BotFramework._start_runtime_services()` 以受控后台任务（名称 `BotFramework.admin_panel`）启动 FastAPI + uvicorn（`atribot/web_panel/`），绑定 `127.0.0.1`，路由前缀 `/admin/`；端口被占用或启动失败不影响主服务
-- 配置 `config.web_panel`：`enable`（默认启用）、`port`（缺省 5125，本仓库 `assets/config.json` 使用 5308）、`access_token`；关闭时 `_stop_admin_panel()` 等待后台任务退出（≤8s）
+- 与 Bot **同进程**运行：`BotFramework._start_runtime_services()` 以受控后台任务（名称 `BotFramework.admin_panel`）启动 FastAPI + uvicorn（`atribot/web_panel/`），路由前缀 `/admin/`；端口被占用或启动失败不影响主服务
+- 监听地址/端口取值顺序：环境变量 `ATRI_WEB_PANEL_HOST` / `ATRI_WEB_PANEL_PORT` > `config.web_panel.host` / `port` > 默认 `127.0.0.1:5125`（Docker 部署用 env 绑 `0.0.0.0` 才能从宿主机访问；本仓库 `assets/config.json` 使用 5308）
+- 配置 `config.web_panel`：`enable`（默认启用）、`host`、`port`、`access_token`；关闭时 `_stop_admin_panel()` 等待后台任务退出（≤8s）
 - 鉴权（`web_panel/deps.py`）：Bearer Token，优先级 `web_panel.access_token` > 环境变量 `ATRI_PANEL_TOKEN` > 首个平台的 `access_token`；未配置任何令牌时接口返回 503；连续登录失败按 IP 锁定（60·n² 秒，封顶 24h）；WebSocket 用 `?token=`
 - 路由分 12 组（`web_panel/routes/`）：dashboard（状态/统计）、data、memory（记忆管理）、tools（工具管理/测试）、database、config（config/supplier/mcp 在线编辑，保存前备份 `.bak`）、personas、message、chat（多会话/流式/附件）、system（**仅 `POST /api/system/stop` 优雅关闭，无重启** + `GET /api/ws/logs` 日志流）、terminal（沙盒终端 WS）、sandbox（沙盒管理/刷新工具）
 - 开发模式：`python -m atribot.web_panel.dev_server`（mock 环境 + `dev-token`）；接口文档见 `atribot/web_panel/API.md`
@@ -507,6 +508,7 @@ async with db as db:
     await db.add_message(message_id, content, ...)
     await db.add_group(group_id, group_name)
 ```
+连接参数取自 `config.database`（`host`/`port`/`user`/`password`/`database`，库名默认 `atri`，Docker 部署可用 `ATRI_DB_NAME` 覆盖）
 核心表：`users`、`user_group`、`user_info`（JSONB 用户画像）、`permissions`、`message`、`atri_memory`（pgvector 1024维 + importance/credibility + access_count/last_accessed）、`chat_context`（JSONB 上下文）、`token_statistics`（Token 用量统计，配合 `TokenManager`）
 
 ## Coding Standards

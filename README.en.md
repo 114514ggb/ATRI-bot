@@ -231,15 +231,17 @@ cp .env.docker.example .env
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `ATRI_DB_SUPERUSER_PASSWORD` | PostgreSQL superuser password | `180710` |
-| `ATRI_DB_NAME` | Application database name | `atri` |
+| `ATRI_DB_NAME` | Application database name (written into `database.database` of the runtime config) | `atri` |
 | `ATRI_DB_APP_USER` | Application database user | `atri` |
 | `ATRI_DB_APP_PASSWORD` | Application database password | `180710` |
-| `ATRI_DB_PORT_FORWARD` | Host port mapping | `5432` |
+| `ATRI_DB_PORT_FORWARD` | Host port for the database (bound to 127.0.0.1 only) | `5432` |
 | `ATRI_BOT_PORT` | Bot WebSocket service port | `8888` |
 | `ATRI_ACCESS_TOKEN` | NapCat connection token | `ATRI114514` |
-| `ATRI_CONNECTION_TYPE` | Connection type (reserved; Compose currently hardcodes `WebSocket_server`) | `WebSocket_server` |
-| `ATRI_NAPCAT_URL` | NapCat WebSocket URL (client mode) | `host.docker.internal:3001` |
-| `ATRI_SANDBOX_IMAGE` | AI sandbox Docker image (Compose falls back to `atri-sandbox:latest` when unset) | `python:3.13-slim` |
+| `ATRI_NAPCAT_URL` | NapCat WebSocket URL (client mode only) | `host.docker.internal:3001` |
+| `ATRI_PANEL_PORT` | Web admin panel port (inside the container equals the host mapping) | `5308` |
+| `ATRI_PANEL_TOKEN` | Web admin panel token (⚠️ overridden by `web_panel.access_token`, see below) | empty |
+| `ATRI_SANDBOX_IMAGE` | AI sandbox image (build it manually first, see section 4) | `atri-sandbox:latest` |
+| `ATRI_FILE_LOG` | `1` = also write file logs, `0` = stdout only | `1` |
 | `TZ` | Container timezone | `Asia/Shanghai` |
 
 Then start:
@@ -269,10 +271,36 @@ Connect to the database:
 docker compose exec db psql -U postgres -d postgres
 ```
 
+**Access the Web admin panel** (the container listens on `0.0.0.0`, port equals `ATRI_PANEL_PORT`):
+```
+http://localhost:5308/admin/
+```
+The token is `web_panel.access_token` in `assets/config.json` (currently the weak value `ATRI` — **change it before deploying**). To make `ATRI_PANEL_TOKEN` from `.env` effective, remove `access_token` from the config file first (it has higher priority).
+
+**⚠️ Path mapping (required for Docker)**: when sending local media, the bot hands NapCat a `file://` path **inside the container** (e.g. `/app/document/...`), which the host NapCat cannot read. Configure `assets/config.json` on the host:
+```json
+"file_path": {
+    "path_mapping": {
+        "/app/document": "<absolute path of the host document directory>",
+        "/app/assets": "<absolute path of the host assets directory>"
+    }
+}
+```
+Typical symptoms without it: TTS voice, emoji, local images/files fail to send (NapCat reports the file does not exist).
+
+**Stop & graceful shutdown**: the app container uses `stop_signal: SIGINT` (Python's graceful shutdown is wired to the Ctrl+C path; SIGTERM kills the process immediately) plus a 30s grace period:
+```bash
+docker compose stop app        # graceful stop (panel, DB pool and sandbox containers are cleaned up)
+docker compose down            # stop and remove containers
+docker compose down -v         # also remove the data volume (recreate the database)
+```
+
 Notes:
 - The container generates a runtime config based on `assets/config.json` without overwriting your local setup.
-- Host directories `assets/`, `document/`, `log/`, `temp/` are mounted into the container for easy configuration and data persistence (file logs are written to `atribot/log/` inside the container).
-- AI sandbox only overrides the image name by default; Compose already mounts the Docker socket (`/var/run/docker.sock`), so the sandbox can talk to the host Docker daemon out of the box.
+- Host directories `assets/`, `document/`, `atribot/log/` and `temp/` are mounted into the container; file logs are written to `atribot/log/` (`ATRI_FILE_LOG=0` switches to stdout-only so Docker log rotation handles them).
+- The sandbox only overrides the image name, so build the sandbox image **manually first** (`docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .`). Without it the bot still starts, but AI code execution is unavailable. Compose mounts the Docker socket (`/var/run/docker.sock`), so the sandbox can talk to the host Docker daemon out of the box.
+- The image ships `uv` (for `uvx`) and Node.js (for `npx`), so stdio MCP servers work out of the box; use `docker build --build-arg WITH_NODE=0` to drop Node and shrink the image.
+- ⚠️ Security: the default credentials (DB `180710`, platform token `ATRI114514`, panel token `ATRI`) are public weak values — change them; mounting `/var/run/docker.sock` grants host root access to the container, so never expose the panel/ports to the public internet.
 
 ---
 ## 📂 Project Structure

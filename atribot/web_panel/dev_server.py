@@ -73,7 +73,7 @@ def _prepare_files() -> Path:
         "group_initiative_chat_white_list": [123456],
         "group_information_extraction": [],
         "private_chat_white_list": [10086],
-        "database": {"host": "127.0.0.1", "port": 5432, "user": "postgres", "password": "dev"},
+        "database": {"host": "127.0.0.1", "port": 5432, "user": "postgres", "password": "dev", "database": "atri"},
     }
     (tmp / "config.json").write_text(json.dumps(config, ensure_ascii=False, indent=4), encoding="utf-8")
 

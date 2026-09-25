@@ -164,7 +164,8 @@
         "host":"127.0.0.1",
         "port":5432,
         "user":"postgres",
-        "password":"atri"
+        "password":"atri",
+        "database":"atri"
     },
     "web_panel":{
         "enable":true,

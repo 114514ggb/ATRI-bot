@@ -1,38 +1,20 @@
 #!/bin/sh
 set -e
 
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<-EOSQL
-DO
+# 说明：本脚本只会在数据卷为空时由官方镜像的初始化流程执行一次。
+# 需要"重建库/清空数据"请用 `docker compose down -v` 再 up —— PostgreSQL 的
+# DROP DATABASE 不能在事务块（含 DO 语句）内执行，所以这里不做任何删除操作。
+# 表结构改动请同时更新本文件与 docker/db/info.sql（见 atribot/docs/db_migrations.md）。
 
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \
+    -v app_user="${ATRI_DB_APP_USER}" \
+    -v app_password="${ATRI_DB_APP_PASSWORD}" \
+    -v app_db="${ATRI_DB_NAME}" <<-'EOSQL'
+SELECT format('CREATE USER %I WITH PASSWORD %L', :'app_user', :'app_password')
+WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = :'app_user') \gexec
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-\$\$
-BEGIN
-    IF EXISTS (SELECT 1 FROM pg_database WHERE datname = '${ATRI_DB_NAME}') THEN
-        EXECUTE format('DROP DATABASE %I', '${ATRI_DB_NAME}');
-    END IF;
-
-    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${ATRI_DB_APP_USER}') THEN
-        EXECUTE format('DROP ROLE %I', '${ATRI_DB_APP_USER}');
-    END IF;
-END
-\$\$;
-
-CREATE USER ${ATRI_DB_APP_USER} WITH PASSWORD '${ATRI_DB_APP_PASSWORD}';
-CREATE DATABASE ${ATRI_DB_NAME} OWNER ${ATRI_DB_APP_USER};
+SELECT format('CREATE DATABASE %I OWNER %I', :'app_db', :'app_user')
+WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = :'app_db') \gexec
 EOSQL
 
 export PGPASSWORD="$POSTGRES_PASSWORD"

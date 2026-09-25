@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import os
 from logging import Logger
 from typing import Any, Awaitable
 
@@ -258,18 +259,25 @@ class BotFramework:
             """访问根路径时重定向到管理面板"""
             return RedirectResponse(url="/admin/")
 
-        admin_port = int(panel_cfg.get("port") or 5125)
-        sock = try_bind_port("127.0.0.1", admin_port)
+        admin_host: str = os.environ.get("ATRI_WEB_PANEL_HOST") or panel_cfg.get("host") or "127.0.0.1"
+        raw_port = os.environ.get("ATRI_WEB_PANEL_PORT") or panel_cfg.get("port") or 5125
+        try:
+            admin_port = int(raw_port)
+        except (TypeError, ValueError):
+            self.log.warning(f"管理面板端口配置无效（{raw_port!r}），已回退到默认端口 5125")
+            admin_port = 5125
+
+        sock = try_bind_port(admin_host, admin_port)
         if sock is None:
             self.log.warning(
-                f"管理面板端口 127.0.0.1:{admin_port} 已被占用，本次跳过管理面板启动，"
+                f"管理面板端口 {admin_host}:{admin_port} 已被占用，本次跳过管理面板启动，"
                 f"不影响机器人运行（请检查是否已有实例在运行，或修改 config 中 web_panel.port）"
             )
             return
 
         cfg = uvicorn.Config(
             admin_app,
-            host="127.0.0.1",
+            host=admin_host,
             port=admin_port,
             log_level="warning",
             timeout_graceful_shutdown=3,
@@ -278,7 +286,7 @@ class BotFramework:
 
         server.capture_signals = lambda: contextlib.nullcontext()
         self._admin_server = server
-        self.log.info(f"管理面板已就绪: http://127.0.0.1:{admin_port}/admin/")
+        self.log.info(f"管理面板已就绪: http://{admin_host}:{admin_port}/admin/")
         # 传入预绑定的 socket：绕开 uvicorn 绑定失败时内部 sys.exit 拖垮整个进程的分支
         await server.serve(sockets=[sock])
 

@@ -88,6 +88,7 @@ def main() -> None:
         ("ATRI_DB_PORT", ("database", "port"), int),
         ("ATRI_DB_USER", ("database", "user"), None),
         ("ATRI_DB_PASSWORD", ("database", "password"), None),
+        ("ATRI_DB_NAME", ("database", "database"), None),
         ("ATRI_SANDBOX_IMAGE", ("sand_box", "image"), None),
     ]
 
