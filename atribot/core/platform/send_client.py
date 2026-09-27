@@ -43,6 +43,13 @@ class SendClientBase(ABC):
                    send_personal_file, send_personal_music
         - 查询: get_group_info, get_stranger_info, get_msg_details,
                get_img_details, get_recordg_details
+        - 群扩展: set_group_admin, set_group_special_title, send_group_sign,
+                 upload_image_to_qun_album, set_essence_msg, delete_essence_msg,
+                 get_group_info_ex, get_group_list, get_group_member_list,
+                 get_group_member_info, get_essence_msg_list
+        - 账号/用户: set_qq_avatar, set_self_longnick, send_like,
+                    set_input_status, set_friend_add_request
+        - QQ空间: send_qzone_msg, delete_qzone_msg
     """
 
     @abstractmethod
@@ -390,6 +397,282 @@ class SendClientBase(ABC):
     ) -> dict | None:
         """获取语音消息详情"""
         raise NotImplementedError(f"{type(self).__name__} 未实现 get_recordg_details")
+
+    async def set_group_admin(
+        self,
+        group_id: int | str,
+        user_id: int | str,
+        enable: bool = True,
+    ) -> dict | None:
+        """设置或取消群管理员
+
+        Args:
+            group_id (int | str): 群号
+            user_id (int | str): 目标成员 QQ 号
+            enable (bool): True=设为管理员，False=取消管理员。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 set_group_admin")
+
+    async def set_group_special_title(
+        self,
+        group_id: int | str,
+        user_id: int | str,
+        special_title: str = "",
+    ) -> dict | None:
+        """设置群成员的专属头衔
+
+        Args:
+            group_id (int | str): 群号
+            user_id (int | str): 目标成员 QQ 号
+            special_title (str): 专属头衔内容，空字符串表示清除头衔。默认为空字符串
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 set_group_special_title")
+
+    async def send_group_sign(self, group_id: int | str) -> dict | None:
+        """群打卡（群签到）
+
+        Args:
+            group_id (int | str): 群号
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_group_sign")
+
+    async def upload_image_to_qun_album(
+        self,
+        group_id: int | str,
+        album_id: str,
+        album_name: str,
+        file: str,
+        local_Path_type: bool = True,
+    ) -> dict | None:
+        """上传图片到群相册
+
+        Args:
+            group_id (int | str): 群号
+            album_id (str): 相册 ID
+            album_name (str): 相册名称
+            file (str): 图片路径、URL 或 Base64，支持 ``file://`` / ``http(s)://`` / ``base64://``
+            local_Path_type (bool): 是否将本地路径按 ``file://`` 协议处理。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 upload_image_to_qun_album")
+
+    async def set_essence_msg(self, message_id: int | str) -> dict | None:
+        """将一条消息设置为群精华消息
+
+        Args:
+            message_id (int | str): 消息 ID
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 set_essence_msg")
+
+    async def delete_essence_msg(
+        self,
+        message_id: int | str,
+        msg_seq: str | None = None,
+        msg_random: str | None = None,
+        group_id: int | str | None = None,
+    ) -> dict | None:
+        """将一条消息移出群精华消息列表
+
+        Args:
+            message_id (int | str): 消息 ID
+            msg_seq (str | None): 消息序号，None=不提交该字段
+            msg_random (str | None): 消息随机数，None=不提交该字段
+            group_id (int | str | None): 群号，None=不提交该字段
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 delete_essence_msg")
+
+    # ---------- 群扩展查询 ----------
+
+    async def get_group_info_ex(self, group_id: int | str) -> dict | None:
+        """获取群详细信息（扩展接口）
+
+        Args:
+            group_id (int | str): 群号
+
+        Returns:
+            dict | None: 解包后的 data 字段（群详细信息）；失败返回 None
+                （子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 get_group_info_ex")
+
+    async def get_group_list(self, no_cache: bool | None = None) -> list[dict] | None:
+        """获取当前账号的群列表
+
+        Args:
+            no_cache (bool | None): 是否忽略缓存强制拉取，None=不提交该字段。默认为 None
+
+        Returns:
+            list[dict] | None: 解包后的 data 字段（群信息列表）；失败返回 None
+                （子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 get_group_list")
+
+    async def get_group_member_list(
+        self,
+        group_id: int | str,
+        no_cache: bool | None = None,
+    ) -> list[dict] | None:
+        """获取群成员列表
+
+        Args:
+            group_id (int | str): 群号
+            no_cache (bool | None): 是否忽略缓存强制拉取，None=不提交该字段。默认为 None
+
+        Returns:
+            list[dict] | None: 解包后的 data 字段（成员列表）；失败返回 None
+                （子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 get_group_member_list")
+
+    async def get_group_member_info(
+        self,
+        group_id: int | str,
+        user_id: int | str,
+        no_cache: bool | None = None,
+    ) -> dict | None:
+        """获取群成员信息
+
+        Args:
+            group_id (int | str): 群号
+            user_id (int | str): 目标成员 QQ 号
+            no_cache (bool | None): 是否忽略缓存强制拉取，None=不提交该字段。默认为 None
+
+        Returns:
+            dict | None: 解包后的 data 字段（成员信息）；失败返回 None
+                （子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 get_group_member_info")
+
+    async def get_essence_msg_list(self, group_id: int | str) -> list[dict] | None:
+        """获取群精华消息列表
+
+        Args:
+            group_id (int | str): 群号
+
+        Returns:
+            list[dict] | None: 解包后的 data 字段（精华消息列表）；失败返回 None
+                （子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 get_essence_msg_list")
+
+    async def set_qq_avatar(self, file: str, local_Path_type: bool = True) -> dict | None:
+        """修改当前账号的 QQ 头像
+
+        Args:
+            file (str): 图片路径、URL 或 Base64，支持 ``file://`` / ``http(s)://`` / ``base64://``
+            local_Path_type (bool): 是否将本地路径按 ``file://`` 协议处理。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 set_qq_avatar")
+
+    async def set_self_longnick(self, long_nick: str) -> dict | None:
+        """修改当前登录账号的个性签名
+
+        Args:
+            long_nick (str): 新的签名内容
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 set_self_longnick")
+
+    async def send_like(self, user_id: int | str, times: int | str = 1) -> dict | None:
+        """给指定用户点赞
+
+        Args:
+            user_id (int | str): 对方 QQ 号
+            times (int | str): 点赞次数。默认为 1
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_like")
+
+    async def set_input_status(self, user_id: int | str, event_type: int) -> dict | None:
+        """设置输入状态（对方侧显示“正在输入”等提示）
+
+        Args:
+            user_id (int | str): 目标用户 QQ 号
+            event_type (int): 输入状态类型，取值由 NapCat 定义（如 1=正在输入），原样透传不校验
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 set_input_status")
+
+    async def set_friend_add_request(
+        self,
+        flag: str,
+        approve: bool = True,
+        remark: str = "",
+    ) -> dict | None:
+        """处理加好友请求
+
+        Args:
+            flag (str): 加好友请求的 flag（从请求事件上报中获取）
+            approve (bool): True=同意，False=拒绝。默认为 True
+            remark (str): 添加后的好友备注，空字符串=不提交该字段。默认为空字符串
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 set_friend_add_request")
+
+    async def send_qzone_msg(
+        self,
+        content: str,
+        images: list[str] | None = None,
+        ugc_right: int | str = 1,
+        target_uins: list[int | str] | None = None,
+        local_Path_type: bool = True,
+    ) -> dict | None:
+        """发表 QQ 空间说说
+
+        Args:
+            content (str): 说说正文
+            images (list[str] | None): 配图列表，元素支持 ``file://`` / ``http(s)://`` /
+                ``base64://``；None 或空列表=不提交该字段（纯文字说说）
+            ugc_right (int | str): 查看权限。1=所有人可见，4=好友可见，16=部分好友可见，
+                64=仅自己可见，128=部分好友不可见。默认为 1
+            target_uins (list[int | str] | None): ugc_right 为 16/128 时权限作用的 QQ 号列表；
+                None 或空列表=不提交该字段
+            local_Path_type (bool): 是否将本地路径按 ``file://`` 协议处理。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应；成功时 ``data.tid`` 为说说 ID（可用于 delete_qzone_msg）
+                （子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_qzone_msg")
+
+    async def delete_qzone_msg(self, tid: str) -> dict | None:
+        """删除 QQ 空间说说
+
+        Args:
+            tid (str): 说说 ID（来自 send_qzone_msg 或空间说说列表接口）
+
+        Returns:
+            dict | None: 原始 API 响应（子类未实现时抛出 NotImplementedError）
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 delete_qzone_msg")
 
     async def send_group_merge_text(
         self,

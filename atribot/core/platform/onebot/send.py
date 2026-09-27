@@ -1,5 +1,5 @@
 import logging
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 import aiohttp
 
@@ -112,6 +112,21 @@ class OneBotSendClient(SendClientBase):
             API 响应字典，或 None
         """
         return await self._send_impl(action, params)
+
+    async def _query(self, action: str, params: dict) -> Any:
+        """查询类 API 通用调用：成功时解包返回 ``data``
+
+        Args:
+            action (str): OneBot API 动作名称
+            params (dict): 请求参数字典
+
+        Returns:
+            Any: 响应中的 ``data`` 字段（列表或字典）；请求失败或 ``status != "ok"`` 时返回 None
+        """
+        resp = await self.async_send(action, params)
+        if resp and resp.get("status") == "ok":
+            return resp.get("data")
+        return None
 
     async def send_group_msg(
         self,
@@ -430,13 +445,13 @@ class OneBotSendClient(SendClientBase):
         Returns:
             解析后的 URL 字符串
         """
-        if default and self.file_paths:
+        if default:
             base = getattr(self.file_paths, base_dir, None)
             if base:
                 url = str(base / url)
         if local_Path_type and not url.startswith(("http://", "https://", "base64://")):
             url = f"file://{url}"
-        if url.startswith("file://") and self.file_paths:
+        if url.startswith("file://"):
             url = "file://" + self.file_paths.map_to_remote(url[len("file://"):])
         return url
 
@@ -685,7 +700,7 @@ class OneBotSendClient(SendClientBase):
             raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{item}'")
 
         async def _dynamic_api_call(**kwargs) -> dict | None:
-            return await self.async_send(url=item, payload={k: v for k, v in kwargs.items() if v is not None})
+            return await self.async_send(action=item, params={k: v for k, v in kwargs.items() if v is not None})
 
         return _dynamic_api_call
 
@@ -866,3 +881,319 @@ class OneBotSendClient(SendClientBase):
             "source": source,
         }
         return await self._send_impl("send_private_forward_msg", payload)
+
+
+    async def set_group_admin(
+        self,
+        group_id: int | str,
+        user_id: int | str,
+        enable: bool = True,
+    ) -> dict | None:
+        """设置或取消群管理员
+
+        Args:
+            group_id (int | str): 群号
+            user_id (int | str): 目标成员 QQ 号
+            enable (bool): True=设为管理员，False=取消管理员。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send(
+            "set_group_admin",
+            {"group_id": group_id, "user_id": user_id, "enable": enable},
+        )
+
+    async def set_group_special_title(
+        self,
+        group_id: int | str,
+        user_id: int | str,
+        special_title: str = "",
+    ) -> dict | None:
+        """设置群成员的专属头衔
+
+        Args:
+            group_id (int | str): 群号
+            user_id (int | str): 目标成员 QQ 号
+            special_title (str): 专属头衔内容，空字符串表示清除头衔。默认为空字符串
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send(
+            "set_group_special_title",
+            {"group_id": group_id, "user_id": user_id, "special_title": special_title},
+        )
+
+    async def send_group_sign(self, group_id: int | str) -> dict | None:
+        """群打卡（群签到）
+
+        Args:
+            group_id (int | str): 群号
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send("send_group_sign", {"group_id": group_id})
+
+    async def upload_image_to_qun_album(
+        self,
+        group_id: int | str,
+        album_id: str,
+        album_name: str,
+        file: str,
+        local_Path_type: bool = True,
+    ) -> dict | None:
+        """上传图片到群相册
+
+        Args:
+            group_id (int | str): 群号
+            album_id (str): 相册 ID
+            album_name (str): 相册名称
+            file (str): 图片路径、URL 或 Base64，支持 ``file://`` / ``http(s)://`` / ``base64://``
+            local_Path_type (bool): 是否将本地路径按 ``file://`` 协议处理。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        file_url = await self._resolve_file_url(file, local_Path_type=local_Path_type)
+        return await self.async_send(
+            "upload_image_to_qun_album",
+            {
+                "group_id": group_id,
+                "album_id": album_id,
+                "album_name": album_name,
+                "file": file_url,
+            },
+        )
+
+    async def set_essence_msg(self, message_id: int | str) -> dict | None:
+        """将一条消息设置为群精华消息
+
+        Args:
+            message_id (int | str): 消息 ID
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send("set_essence_msg", {"message_id": message_id})
+
+    async def delete_essence_msg(
+        self,
+        message_id: int | str,
+        msg_seq: str | None = None,
+        msg_random: str | None = None,
+        group_id: int | str | None = None,
+    ) -> dict | None:
+        """将一条消息移出群精华消息列表
+
+        Args:
+            message_id (int | str): 消息 ID
+            msg_seq (str | None): 消息序号，None=不提交该字段
+            msg_random (str | None): 消息随机数，None=不提交该字段
+            group_id (int | str | None): 群号，None=不提交该字段
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        payload: dict = {"message_id": message_id}
+        if msg_seq is not None:
+            payload["msg_seq"] = msg_seq
+        if msg_random is not None:
+            payload["msg_random"] = msg_random
+        if group_id is not None:
+            payload["group_id"] = group_id
+        return await self.async_send("delete_essence_msg", payload)
+
+
+    async def get_group_info_ex(self, group_id: int | str) -> dict | None:
+        """获取群详细信息（扩展接口）
+
+        Args:
+            group_id (int | str): 群号
+
+        Returns:
+            dict | None: 解包后的 data 字段（群详细信息）；请求失败返回 None
+        """
+        return await self._query("get_group_info_ex", {"group_id": group_id})
+
+    async def get_group_list(self, no_cache: bool | None = None) -> list[dict] | None:
+        """获取当前账号的群列表
+
+        Args:
+            no_cache (bool | None): 是否忽略缓存强制拉取，None=不提交该字段。默认为 None
+
+        Returns:
+            list[dict] | None: 解包后的 data 字段（群信息列表）；请求失败返回 None
+        """
+        params: dict = {}
+        if no_cache is not None:
+            params["no_cache"] = no_cache
+        return await self._query("get_group_list", params)
+
+    async def get_group_member_list(
+        self,
+        group_id: int | str,
+        no_cache: bool | None = None,
+    ) -> list[dict] | None:
+        """获取群成员列表
+
+        Args:
+            group_id (int | str): 群号
+            no_cache (bool | None): 是否忽略缓存强制拉取，None=不提交该字段。默认为 None
+
+        Returns:
+            list[dict] | None: 解包后的 data 字段（成员列表）；请求失败返回 None
+        """
+        params: dict = {"group_id": group_id}
+        if no_cache is not None:
+            params["no_cache"] = no_cache
+        return await self._query("get_group_member_list", params)
+
+    async def get_group_member_info(
+        self,
+        group_id: int | str,
+        user_id: int | str,
+        no_cache: bool | None = None,
+    ) -> dict | None:
+        """获取群成员信息
+
+        Args:
+            group_id (int | str): 群号
+            user_id (int | str): 目标成员 QQ 号
+            no_cache (bool | None): 是否忽略缓存强制拉取，None=不提交该字段。默认为 None
+
+        Returns:
+            dict | None: 解包后的 data 字段（成员信息）；请求失败返回 None
+        """
+        params: dict = {"group_id": group_id, "user_id": user_id}
+        if no_cache is not None:
+            params["no_cache"] = no_cache
+        return await self._query("get_group_member_info", params)
+
+    async def get_essence_msg_list(self, group_id: int | str) -> list[dict] | None:
+        """获取群精华消息列表
+
+        Args:
+            group_id (int | str): 群号
+
+        Returns:
+            list[dict] | None: 解包后的 data 字段（精华消息列表）；请求失败返回 None
+        """
+        return await self._query("get_essence_msg_list", {"group_id": group_id})
+
+    async def set_qq_avatar(self, file: str, local_Path_type: bool = True) -> dict | None:
+        """修改当前账号的 QQ 头像
+
+        Args:
+            file (str): 图片路径、URL 或 Base64，支持 ``file://`` / ``http(s)://`` / ``base64://``
+            local_Path_type (bool): 是否将本地路径按 ``file://`` 协议处理。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        file_url = await self._resolve_file_url(file, local_Path_type=local_Path_type)
+        return await self.async_send("set_qq_avatar", {"file": file_url})
+
+    async def set_self_longnick(self, long_nick: str) -> dict | None:
+        """修改当前登录账号的个性签名
+
+        Args:
+            long_nick (str): 新的签名内容
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send("set_self_longnick", {"longNick": long_nick})
+
+    async def send_like(self, user_id: int | str, times: int | str = 1) -> dict | None:
+        """给指定用户点赞
+
+        Args:
+            user_id (int | str): 对方 QQ 号
+            times (int | str): 点赞次数。默认为 1
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send("send_like", {"user_id": user_id, "times": times})
+
+    async def set_input_status(self, user_id: int | str, event_type: int) -> dict | None:
+        """设置输入状态（对方侧显示“正在输入”等提示）
+
+        Args:
+            user_id (int | str): 目标用户 QQ 号
+            event_type (int): 输入状态类型，取值由 NapCat 定义（如 1=正在输入），原样透传不校验
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send(
+            "set_input_status",
+            {"user_id": user_id, "event_type": event_type},
+        )
+
+    async def set_friend_add_request(
+        self,
+        flag: str,
+        approve: bool = True,
+        remark: str = "",
+    ) -> dict | None:
+        """处理加好友请求
+
+        Args:
+            flag (str): 加好友请求的 flag（从请求事件上报中获取）
+            approve (bool): True=同意，False=拒绝。默认为 True
+            remark (str): 添加后的好友备注，空字符串=不提交该字段。默认为空字符串
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        payload: dict = {"flag": flag, "approve": approve}
+        if remark:
+            payload["remark"] = remark
+        return await self.async_send("set_friend_add_request", payload)
+
+    async def send_qzone_msg(
+        self,
+        content: str,
+        images: list[str] | None = None,
+        ugc_right: int | str = 1,
+        target_uins: list[int | str] | None = None,
+        local_Path_type: bool = True,
+    ) -> dict | None:
+        """发表 QQ 空间说说
+
+        Args:
+            content (str): 说说正文
+            images (list[str] | None): 配图列表，元素支持 ``file://`` / ``http(s)://`` /
+                ``base64://``；None 或空列表=不提交该字段（纯文字说说）
+            ugc_right (int | str): 查看权限。1=所有人可见，4=好友可见，16=部分好友可见，
+                64=仅自己可见，128=部分好友不可见。默认为 1
+            target_uins (list[int | str] | None): ugc_right 为 16/128 时权限作用的 QQ 号列表；
+                None 或空列表=不提交该字段
+            local_Path_type (bool): 是否将本地路径按 ``file://`` 协议处理。默认为 True
+
+        Returns:
+            dict | None: 原始 API 响应；成功时 ``data.tid`` 为说说 ID（可用于 delete_qzone_msg）
+        """
+        payload: dict = {"content": content, "ugc_right": ugc_right}
+        if images:
+            payload["images"] = [
+                await self._resolve_file_url(img, local_Path_type=local_Path_type)
+                for img in images
+            ]
+        if target_uins:
+            payload["target_uins"] = target_uins
+        return await self.async_send("send_qzone_msg", payload)
+
+    async def delete_qzone_msg(self, tid: str) -> dict | None:
+        """删除 QQ 空间说说
+
+        Args:
+            tid (str): 说说 ID（来自 send_qzone_msg 或空间说说列表接口）
+
+        Returns:
+            dict | None: 原始 API 响应
+        """
+        return await self.async_send("delete_qzone_msg", {"tid": tid})
