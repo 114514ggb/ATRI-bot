@@ -175,6 +175,7 @@
     },
     "web_panel": {
         "enable": true,
+        "host": "127.0.0.1",
         "port": 5125,
         "access_token": "ATRI",
         "session_ttl_hours": 4

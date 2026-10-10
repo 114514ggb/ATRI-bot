@@ -148,7 +148,7 @@ class ChatManager(ServiceBase):
         )(self._store_message_context)
 
     async def cleanup(self) -> None:
-        """清理：注销上下文处理器"""
+        """清理：注销上下文处理器,并对剩余上下文做最终落盘"""
         if self._pm is not None:
             if self._mw_instance is not None:
                 await self._pm.pipeline.remove_middleware("context_loader")
@@ -156,6 +156,14 @@ class ChatManager(ServiceBase):
             if self._listener_fn is not None:
                 self._pm.event_bus.remove_listener(self._listener_fn)
                 self._listener_fn = None
+
+        try:
+            await self.lifecycle_manager.flush_all_contexts(
+                group_context_dict=self.group_dict,
+                private_context_dict=self.private_dict,
+            )
+        except Exception as e:
+            self.log.error("退出落盘上下文失败，忽略并继续关闭: %s", e, exc_info=True)
 
     async def _context_loader(self, msg: atriMessageEvent) -> atriMessageEvent | None:
         """加载上下文,更新时间窗口"""

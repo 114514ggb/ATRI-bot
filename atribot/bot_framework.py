@@ -247,8 +247,6 @@ class BotFramework:
 
         _ensure_log_handler()
 
-        # 面板前端全部同源访问，无需 CORS 中间件（其白名单也从未真正生效），
-        # 直接移除可减少攻击面；跨域请求一律由浏览器同源策略挡下
         admin_app = FastAPI(title="ATRI Admin Panel", docs_url=None, redoc_url=None, openapi_url=None)
         admin_app.include_router(admin_router)
         mount_static(admin_app)

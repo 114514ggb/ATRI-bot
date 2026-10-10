@@ -97,6 +97,78 @@ class ContextLifecycleManager:
             return await self.batch_save_user_contexts(contexts_to_save)
         else:
             return await self.batch_save_group_contexts(contexts_to_save)
+
+    async def flush_all_contexts(
+        self,
+        group_context_dict: dict[int, ContextContainer],
+        private_context_dict: dict[int, ContextContainer],
+    ) -> None:
+        """服务回收（关机）时的最终落盘
+
+        先对群聊、私聊上下文各自执行一次全量备份写入数据库，无论备份成功与否
+        最终都会清空两个内存字典，避免进程退出导致未归档的上下文丢失。
+
+        备份与清空过程中出现的异常都会被捕获并记录日志，不会中断上层清理流程。
+
+        Args:
+            group_context_dict (dict[int, ContextContainer]): 群聊上下文管理字典
+            private_context_dict (dict[int, ContextContainer]): 私聊上下文管理字典
+        """
+        group_total = len(group_context_dict)
+        private_total = len(private_context_dict)
+
+        if group_total == 0 and private_total == 0:
+            self.log.debug("退出落盘：当前没有需要保存的上下文")
+            return
+
+        self.log.info(
+            "退出落盘：开始保存群聊 %d 条、私聊 %d 条上下文", group_total, private_total
+        )
+
+        await self._flush_one_direction(
+            group_context_dict, is_user_context=False, label="群聊"
+        )
+        await self._flush_one_direction(
+            private_context_dict, is_user_context=True, label="私聊"
+        )
+
+    async def _flush_one_direction(
+        self,
+        management_context_dict: dict[int, ContextContainer],
+        is_user_context: bool,
+        label: str,
+    ) -> None:
+        """对单个方向的上下文做备份 + 清空，异常仅记录日志
+
+        Args:
+            management_context_dict (dict[int, ContextContainer]): 管理上下文的字典
+            is_user_context (bool): 是否是user上下文
+            label (str): 日志中使用的方向标签（如"群聊"/"私聊"）
+        """
+        if not management_context_dict:
+            return
+
+        try:
+            results = await self.backup_data(
+                management_context_dict=management_context_dict,
+                is_user_context=is_user_context,
+            )
+            failed = [ctx_id for ctx_id, ok in results.items() if not ok]
+            if failed:
+                self.log.warning(
+                    "退出落盘：%s 有 %d/%d 条保存失败（已保留在数据库原值），失败ID: %s",
+                    label, len(failed), len(results), failed,
+                )
+            else:
+                self.log.info("退出落盘：%s %d 条上下文保存成功", label, len(results))
+        except Exception as e:
+            self.log.error(
+                "退出落盘：%s 上下文保存异常，仍将清空内存缓存: %s", label, e, exc_info=True
+            )
+
+        cleared = len(management_context_dict)
+        management_context_dict.clear()
+        self.log.info("退出落盘：已清空 %s 内存缓存 %d 条", label, cleared)
         
     
     async def save_user_context(
