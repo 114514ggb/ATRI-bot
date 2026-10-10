@@ -1037,6 +1037,8 @@ class PrivateChat(ChatBasics):
 
         self.log.info(f"[{uid}]私聊LLM聊天json处理 user:{user_id} 共{len(events)}条消息")
 
+        await latest.send_client.set_input_status(user_id,1)
+
         message_builder: MessageBuilder = await self.prompt_structure(
             events=events,
             prompt=prompt,
