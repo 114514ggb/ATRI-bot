@@ -161,8 +161,8 @@
 | GET | `/api/chat/info` | 聊天页启动信息：`defaults`（supplier/model/persona/chat_parameter）、`webui_preset`（工具预设 default/deferred 名单）、`limits`（image/audio/video/file 上传限额，字节）、`max_turns`、`id_range` |
 | POST | `/api/chat/upload` | 上传聊天附件（multipart `file` 字段，流式读取，按类别限大小）。返回 `{status, file}`（附件摘要，含 `id`）；超限 413 |
 | GET | `/api/chat/files/{file_id}` | 附件预览/下载（会话令牌走 query 参数鉴权）。不存在或已过期 404 |
-| GET | `/api/chat/avatar` | 机器人头像（会话令牌走 query 参数鉴权）：配置目录下的 ATRI-bot 图（png/jpg/jpeg/webp/gif） |
-| GET | `/api/panel/logo` | 面板品牌图。**免鉴权**（登录页与 favicon 用）；文件不存在 404 |
+| GET | `/api/chat/avatar` | 机器人头像（会话令牌走 query 参数鉴权）：ATRI-bot 图（png/jpg/jpeg/webp/gif）。查找顺序：配置文件同级目录 → `ATRI_SOURCE_CONFIG_PATH` 同级目录（Docker 的 `/app/assets`）→ `<project_root>/assets` → `<project_root>` |
+| GET | `/api/panel/logo` | 面板品牌图（与 `/api/chat/avatar` 同一张图、同一查找顺序）。**免鉴权**（登录页与 favicon 用）；文件不存在 404 |
 | POST | `/api/chat/tools` | 保存 webui 工具预设。Body：`{ "tools": ["工具名"...], "deferred": ["工具名"...] \| 省略 }`。`deferred` 缺省表示不改动待发现组。持久化到 config.json。返回 `{status, tools, deferred}` |
 | GET | `/api/chat/sessions` | 全部会话概览。返回 `{ items: [...] }` |
 | DELETE | `/api/chat/sessions/{session_id}` | 删除会话。返回 `{status, deleted}` |
@@ -280,7 +280,7 @@
 |---|---|
 | `GET /admin/` | 面板单页（templates/index.html），`Cache-Control: no-store` |
 | `/admin/static/*` | 静态 JS/CSS，同样强制 no-store，改动后普通刷新即可生效 |
-| 安全头 | 全部 `/admin*` 响应：`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、CSP（`script-src 'self'`、`frame-ancestors 'none'` 等）；`/admin/api/*` 额外 `Cache-Control: no-store` |
+| 安全头 | 全部 `/admin*` 响应：`X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、CSP（`script-src 'self'`、`frame-ancestors 'none'` 等，`img-src` 额外放行 `latex.codecogs.com` 与 `q1.qlogo.cn`）；`/admin/api/*` 额外 `Cache-Control: no-store` |
 
 ## 路由 → 源文件速查
 

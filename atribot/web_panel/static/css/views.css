@@ -1326,7 +1326,7 @@
 }
 
 .bot-avatar { background: var(--accent); color: #fff; }
-.user-avatar { background: var(--bg-hover); color: var(--text-2); border: 1px solid var(--border); }
+.user-avatar { background: var(--bg-hover); color: var(--text-2); }
 
 .chat-bubble {
   padding: 10px 14px;
@@ -1337,9 +1337,12 @@
   word-break: break-word;
 }
 
+/* 用户与助手气泡同款浅色卡片（身份仅靠对齐方向与右下/左下圆角区分） */
 .chat-msg.user .chat-bubble {
-  background: var(--accent);
-  color: #fff;
+  background: var(--bg-card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
   border-bottom-right-radius: 6px;
 }
 
@@ -1375,17 +1378,14 @@
   cursor: default;
 }
 
-/* 用户气泡为 accent 蓝底，时间戳改半透明白保证可读 */
-.chat-msg.user .chat-time { color: rgba(255, 255, 255, 0.75); }
-
 .chat-msg-action {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   border: none;
-  /* 深色半透明底：蓝色用户气泡上白图标/白字才看得清（白底会把白色内容吃掉） */
-  background: rgba(0, 0, 0, 0.24);
-  color: #fff;
+  /* 浅色卡片气泡（用户/助手同款）上的中性按钮，靠主题变量自适应明暗 */
+  background: var(--bg-hover);
+  color: var(--text-2);
   border-radius: 6px;
   padding: 3px 7px;
   cursor: pointer;
@@ -1393,36 +1393,48 @@
 }
 
 .chat-msg-action svg { width: 12px; height: 12px; }
-.chat-msg-action:hover { background: rgba(0, 0, 0, 0.38); }
+.chat-msg-action:hover { background: var(--border); color: var(--text-1); }
 
-/* ---------- 助手消息操作（复制/重试，浅色气泡变体，hover 显示） ---------- */
+/* ---------- 助手消息操作（复制/重试，hover 显示） ---------- */
 
 .chat-msg.assistant:hover .chat-msg-actions { opacity: 1; }
-
-.chat-msg.assistant .chat-msg-action {
-  background: var(--bg-hover);
-  color: var(--text-2);
-}
-
-.chat-msg.assistant .chat-msg-action:hover { background: var(--border); color: var(--text-1); }
 
 /* ---------- 工具弹窗 ----------
    聊天页的工具预设弹窗直接复用配置页的工具预设模块
    （components/tool-preset-editor.js：.field / .tool-list-head / .chips / .field-desc），
    故不再有独立的 .chat-tool-* 样式 */
 
+/* 就地编辑：不再套一层白色小盒子，编辑区与气泡浑然一体（外层气泡本身即卡片） */
 .chat-edit-box {
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 8px;
+  background: transparent;
+  padding: 0;
   width: 100%;
 }
 
-.chat-edit-box textarea {
+.chat-edit-box textarea,
+.chat-edit-box textarea:focus {
   width: 100%;
   min-height: 64px;
+  /* 兜底宽度：气泡为内容自适应，纯靠 width:100% 会被 textarea 默认 cols 撑成很窄的一条 */
+  min-width: min(360px, 68vw);
   margin-bottom: 8px;
-  color: var(--text-1);
+  padding: 8px 10px;
+  /* 必须带 :focus 选择器：全局 .input:focus 会改回 --bg-card，(0,2,0) 优先于单类选择器 */
+  background-color: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chat-edit-box textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3.5px var(--accent-soft);
 }
 
 .chat-edit-actions {
@@ -1443,7 +1455,8 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(255, 255, 255, 0.18);
+  /* 浅色卡片气泡（用户/助手同款）上的中性附件卡片 */
+  background: var(--bg-hover);
   border-radius: var(--radius-sm);
   padding: 4px 10px;
   font-size: 13px;
@@ -1451,9 +1464,7 @@
   text-decoration: none;
   cursor: pointer;
 }
-.chat-attach-file:hover { background: rgba(255, 255, 255, 0.3); }
-.chat-msg.assistant .chat-attach-file { background: var(--bg-hover); }
-.chat-msg.assistant .chat-attach-file:hover { background: var(--bg-active, rgba(0, 0, 0, 0.12)); }
+.chat-attach-file:hover { background: var(--bg-active, rgba(0, 0, 0, 0.12)); }
 
 /* ---------- 分级块：思考过程 / 工具调用 ---------- */
 

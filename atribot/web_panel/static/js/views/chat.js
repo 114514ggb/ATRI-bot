@@ -17,6 +17,10 @@ const CODECOGS = 'https://latex.codecogs.com/png.image?\\dpi{150}&space;';
 const MATH_HINT = /[\\^_{}=+<>|]/;
 const MAX_FORMULA_LEN = 300;
 
+/* 用户头像：直链 QQ 头像服务（q1.qlogo.cn 已在面板 CSP 的 img-src 白名单中）；
+   加载失败时降级为文字「我」，与机器人头像的字母 A 兜底同构 */
+const USER_AVATAR_URL = 'https://q1.qlogo.cn/g?b=qq&nk=1317196420&s=640';
+
 /* ---------- 模块级运行状态（destroy 时清理） ---------- */
 
 let ws = null;
@@ -230,6 +234,19 @@ function makeBotAvatar() {
   return wrap;
 }
 
+/* 用户头像：QQ 头像服务直链（见 USER_AVATAR_URL），加载失败回退文字「我」 */
+function makeUserAvatar() {
+  const wrap = el('div', 'chat-avatar user-avatar');
+  const img = document.createElement('img');
+  img.className = 'chat-avatar-img';
+  img.alt = '我';
+  img.referrerPolicy = 'no-referrer';
+  img.addEventListener('error', () => { img.remove(); wrap.textContent = '我'; });
+  img.src = USER_AVATAR_URL;
+  wrap.appendChild(img);
+  return wrap;
+}
+
 /* 空状态立绘：加载成功后替换容器内的字母 A */
 function mountEmptyLogo() {
   const holder = sectionEl?.querySelector('#chat-empty-logo');
@@ -334,13 +351,24 @@ function appendUserMessage(text, files = [], nonce = '', ts = 0) {
   const actions = el('div', 'chat-msg-actions');
   const badge = timeBadge(ts);
   if (badge) actions.appendChild(badge);
+  if (text) {
+    /* 复制该条用户消息原文（纯附件消息无文本，不显示该按钮） */
+    const copyBtn = el('button', 'chat-msg-action', `${icon('copy')} 复制`);
+    copyBtn.type = 'button';
+    copyBtn.title = '复制此消息';
+    copyBtn.addEventListener('click', async () => {
+      const ok = await copyText(row.querySelector('.chat-text')?.textContent || '');
+      toast(ok ? '已复制消息' : '复制失败', ok ? 'success' : 'error');
+    });
+    actions.appendChild(copyBtn);
+  }
   const editBtn = el('button', 'chat-msg-action', `${icon('edit')} 编辑`);
   editBtn.type = 'button';
   editBtn.title = '编辑此消息并回退后续对话';
   editBtn.addEventListener('click', () => startEditMessage(row));
   actions.appendChild(editBtn);
   bubble.appendChild(actions);
-  row.appendChild(el('div', 'chat-avatar user-avatar', '我'));
+  row.appendChild(makeUserAvatar());
   row.appendChild(bubble);
   messagesEl.appendChild(row);
   scrollToBottom();

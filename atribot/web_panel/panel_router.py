@@ -41,7 +41,7 @@ _CSP = (
     "default-src 'none'; "
     "script-src 'self'; "
     "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data: https://latex.codecogs.com; "
+    "img-src 'self' data: https://latex.codecogs.com https://q1.qlogo.cn; "
     "media-src 'self' blob:; "
     "connect-src 'self'; "
     "font-src 'self'; "
@@ -51,7 +51,8 @@ _CSP = (
     "object-src 'none'"
 )
 """面板 CSP：脚本只允许同源外部文件（index.html 的内联主题脚本已抽到 theme-init.js），
-样式保留 'unsafe-inline'（视图大量使用行内 style 属性），图片仅同源 + data: + 公式服务"""
+样式保留 'unsafe-inline'（视图大量使用行内 style 属性），
+图片仅同源 + data: + 公式服务 + QQ 头像服务（q1.qlogo.cn，聊天页用户头像直链）"""
 
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

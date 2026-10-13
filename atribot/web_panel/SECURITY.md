@@ -19,6 +19,7 @@
 | WebSocket | 一次性票据（30s、单次）；建连后周期复验，吊销后 4401 断开；旧 `?token=` 兼容 |
 | 安全响应头 | 全部 `/admin*`：`nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、CSP（`script-src 'self'`、`frame-ancestors 'none'` 等）；`/admin/api/*` 加 `Cache-Control: no-store` |
 | CSP 前提 | `index.html` 不含内联脚本（主题引导在 `static/js/theme-init.js`）；新增内联脚本会导致被 CSP 拦截 |
+| CSP 图片白名单 | `img-src` = `'self'` + `data:` + `https://latex.codecogs.com`（公式图）+ `https://q1.qlogo.cn`（聊天页用户头像直链）。新增外域图片来源必须在此登记，否则被 CSP 拦截 |
 | 附件 | 落盘名 = 随机 id + 净化扩展名；MIME 由服务端白名单推导（**不信任客户端 content_type**）；下载强制 attachment + `nosniff` + `CSP: default-src 'none'` |
 | 配置接口 | 密钥打码为 `__KEEP__`（`mask_secrets` 默认开）：面板口令 / 平台 token / DB 密码 / 供应商 api_key / MCP env；保存时按旧值还原 |
 | SQL 控制台 | 每次执行写审计日志（`atri-bot.WebPanelDB`）；可选只读模式 `db_console_readonly` |

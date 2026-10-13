@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import os
-import sys
 import uuid
 from typing import Optional
 
@@ -9,11 +8,15 @@ from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile,
 
 try:
     from e2b_code_interpreter import AsyncSandbox
-except ImportError:
-    print("错误:e2b_code_interpreter 模块未安装")
-    print("请使用以下命令安装：")
-    print("pip install e2b-code-interpreter")
-    sys.exit(1)
+except ImportError as _e2b_import_error:  # pragma: no cover - 取决于可选依赖
+    # 注意:这里不能用 sys.exit(),否则 sand_box.type == "e2b" 且缺少依赖时会直接杀掉整个 Bot 进程
+    # (SystemExit 不被 sandbox/factory.py 与 bot_framework 的 except Exception 捕获)。
+    # 改为抛 ImportError,由上层捕获后降级为"沙盒不可用",不阻断启动。
+    raise ImportError(
+        "e2b_code_interpreter 模块未安装，无法使用 E2B 云端沙盒。"
+        "请执行 `pip install e2b-code-interpreter`，或把 assets/config.json 的 "
+        "sand_box.type 改为 docker / none。"
+    ) from _e2b_import_error
 
 
 class E2BSandbox(SandBoxBase):

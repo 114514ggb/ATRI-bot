@@ -119,6 +119,16 @@ A web admin panel runs as an in-process background task when the bot starts (sam
 
 ## 🚀 Quick Start (How to Run)
 
+> **Platform support**: Linux and Windows are both officially supported. The two required
+> PostgreSQL server extensions (`pgvector` / `pgroonga`) must be installed manually on Windows,
+> so **Docker Compose is the recommended path** (extensions come preinstalled), followed by
+> WSL2, and native Windows last. See the
+> [Windows deployment guide](atribot/docs/windows-deploy.md) for the full native-Windows steps,
+> sandbox backend choices, and troubleshooting.
+>
+> To run the bot natively while keeping the database in a container:
+> `docker compose up -d db` → `uv sync` → `uv run main.py`.
+
 ### 1. Frontend Connection (NapCat)
 First, you need a frontend that can communicate with the QQ server. NapCat is recommended:  
 [NapCat Installation Guide](https://napneko.github.io/guide/napcat)  
@@ -131,6 +141,11 @@ The project only supports PostgreSQL.
 2.  **Install database extensions**:
     - Must install the `pgvector` extension for vector search. [pgvector Extension](https://github.com/pgvector/pgvector)
     - Must install the `pgroonga` extension for full-text search. [PGroonga Docs](https://pgroonga.github.io/)
+    > ⚠️ Both are **PostgreSQL server extensions**, not pip packages. On Windows, pgvector must be
+    > compiled with MSVC/nmake while PGroonga ships an official zip (see the
+    > [Windows deployment guide](atribot/docs/windows-deploy.md)).
+    > Without `pgroonga` the bot still starts (memory retrieval degrades to pure vector search),
+    > but the **init script aborts at `CREATE EXTENSION pgroonga`**, so the remaining tables are never created.
 3.  **Database initialization**:
     The project provides an initialization SQL file: `docker/db/info.sql` (recommended, includes full schema and extension setup).  
     Access the database (Linux example):
@@ -149,21 +164,20 @@ ollama run dengcao/Qwen3-Embedding-0.6B:F16
 > **Note**: If you change the Embedding model, previously built vector data needs to be rebuilt.
 #### 🗣️ Text-to-Speech (TTS) - Optional
 Supports integration with [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) to enable the bot to send voice messages or invoke TTS via commands, with configurable parameters like speed and emotion. You will also need your own voice model.
-Before use, modify `atribot/commands/audio/TTS.py` to set the reference audio path and GPT-SoVITS API port address:
+Reference audio paths are no longer hardcoded — configure them in `config.tts` (absolute paths recommended for cross-platform use):
 ```json
-{
-    "emotion_name_here": {
-        "refer_wav_path": "full_path_to_reference_audio",
-        "prompt_text": "corresponding_text_for_reference_audio",
-        "prompt_language": "language_of_reference_text"
-    },
-    "calm": {
-        "refer_wav_path": "/home/atri/音乐/tts_reference/夏生さんが望むのでしたら.mp3",
-        "prompt_text": "夏生さんが望むのでしたら",
-        "prompt_language": "ja"
+"tts": {
+    "api_url": "http://127.0.0.1:9880",
+    "emotions": {
+        "calm": {
+            "refer_wav_path": "D:/tts_reference/夏生さんが望むのでしたら.mp3",
+            "prompt_text": "夏生さんが望むのでしたら",
+            "prompt_language": "ja"
+        }
     }
 }
 ```
+If omitted, the built-in emotions (`高兴` / `机械` / `平静`) are used with reference audio resolved under `document/audio/tts_reference/`; missing files only produce a warning.
 
 
 #### 📦 Sandbox Environment (Optional)
@@ -194,12 +208,15 @@ uv run main.py
 ```
 
 **Using pip:**
-Use `requirements-linux.txt` or `requirements-macos.txt` on Linux / macOS respectively.
+Use `requirements-windows.txt`, `requirements-linux.txt`, or `requirements-macos.txt` for Windows / Linux / macOS respectively (they differ only in platform-specific packages such as `colorama` / `pywin32` / `tzdata`).
 ```bash
 pip install -r requirements-windows.txt
 python main.py
 ```
 > ⚠️ **Important**: Ensure you are in the project root directory when running these commands to avoid path errors.
+> ⚠️ **Python version**: 3.14 is required (`requires-python = ">=3.14"` in `pyproject.toml`).
+> Python 3.13 is rejected outright by `uv sync` / `pip install .`; do not bypass it with
+> `--ignore-requires-python`, or runtime behavior may diverge from CI.
 
 ### 5. Run Tests
 The project uses `pytest` with async mode enabled by default.
@@ -317,7 +334,6 @@ ATRI-main/
 ├─assets/                       # ⚙️ Configuration files & examples
 ├─atribot/                      # Core code
 │  ├─bot_framework.py           # Bot initialization & assembly entry point
-│  ├─C/                         # C extension modules (Levenshtein algorithm, etc.)
 │  ├─commands/                  # 💻 Group chat command implementations
 │  │  ├─audio/                  # Audio & TTS commands
 │  │  ├─bromidic/               # Image processing / token query & miscellaneous commands

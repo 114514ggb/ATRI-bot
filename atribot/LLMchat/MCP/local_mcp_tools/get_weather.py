@@ -1,8 +1,26 @@
+"""本地 MCP 工具示例：天气查询
+
+这是一个可独立运行的 stdio MCP 服务示例，用于演示如何自己写一个本地 MCP 工具。
+在 `atribot/LLMchat/MCP/mcp_server.json` 中注册后即可被 ToolManager 拉起：
+
+    "get_weather": {
+      "command": "python",
+      "args": ["atribot/LLMchat/MCP/local_mcp_tools/get_weather.py"],
+      "active": true
+    }
+
+依赖的 MCP SDK 版本为 2.x：服务器基类由 1.x 的 `FastMCP`
+（`from mcp.server.fastmcp import FastMCP`）更名为 `MCPServer`
+（`from mcp.server.mcpserver import MCPServer`）。
+若你需要使用旧写法，请为 MCP 服务单独固定 `mcp<2`（参见 mcp_server.json
+中 MS-ImgGen-MCP 的 `--with "mcp<2"` 写法）。
+"""
+
 import json
 from typing import Any
 
 import aiohttp
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 OPENWEATHER_API_BASE = "https://api.openweathermap.org/data/2.5/weather"
 API_KEY = "e32ece71180b8f54ab7ec20746186cdf"  
@@ -75,7 +93,7 @@ def format_weather(data: dict[str, Any] | str) -> str:
     )
     
 
-mcp = FastMCP("mcpServer")
+mcp = MCPServer("mcpServer")
 
 
 @mcp.tool()

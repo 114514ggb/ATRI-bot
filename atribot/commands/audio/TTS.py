@@ -1,3 +1,4 @@
+from logging import Logger
 from pathlib import Path
 from typing import Any, Dict
 
@@ -5,6 +6,19 @@ import aiohttp
 
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
+
+# GPT-SoVITS 接口默认地址，可用 config.tts.api_url 覆盖
+DEFAULT_TTS_API_URL = "http://127.0.0.1:9880"
+
+# 参考音频默认目录名（相对 config.file_path.audio，即 document/audio）
+DEFAULT_REFERENCE_DIR = "tts_reference"
+
+# 内置默认情感配置：{情感名: (参考音频文件名, 参考文本)}
+DEFAULT_EMOTIONS: Dict[str, tuple[str, str]] = {
+    "高兴": ("ああ、なんて高性能なんでしょ、私は.mp3", "ああ、なんて高性能なんでしょ、私は"),
+    "机械": ("あ，私です夏生さんのために動く理由が必要なんですか.mp3", "あ，私です夏生さんのために動く理由が必要なんですか"),
+    "平静": ("夏生さんが望むのでしたら.mp3", "夏生さんが望むのでしたら"),
+}
 
 
 class TTSService:
@@ -19,28 +33,72 @@ class TTSService:
     def __init__(self):
         if not self._initialized:
             self.audio_count = 1
-            self.api_url = "http://127.0.0.1:9880"
-            self.emotion_list = {
-                "高兴": {
-                    "refer_wav_path": "/home/atri/音乐/tts_reference/ああ、なんて高性能なんでしょ、私は.mp3",
-                    "prompt_text": "ああ、なんて高性能なんでしょ、私は",
-                    "prompt_language": "ja"
-                },
-                "机械": {
-                    "refer_wav_path": "/home/atri/音乐/tts_reference/あ，私です夏生さんのために動く理由が必要なんですか.mp3",
-                    "prompt_text": "あ，私です夏生さんのために動く理由が必要なんですか",
-                    "prompt_language": "ja"
-                },            
-                "平静": {
-                    "refer_wav_path": "/home/atri/音乐/tts_reference/夏生さんが望むのでしたら.mp3",
-                    "prompt_text": "夏生さんが望むのでしたら",
-                    "prompt_language": "ja"
-                }
-            }
-            config:atriConfig = container.get("config")
+            self.log: Logger = container.get_by_type(Logger).getChild("TTS")
+
+            config: atriConfig = container.get("config")
+            self.api_url, self.emotion_list = self._load_tts_config(config)
+
             self.base_output_path = config.file_path.audio
             self.relative_output_prefix = Path("TTS_output/output")
             self._initialized = True
+
+    def _load_tts_config(self, config: atriConfig) -> tuple[str, Dict[str, Dict[str, str]]]:
+        """读取 TTS 配置
+
+        优先使用 `config.tts`（供应商无关，跨平台友好的绝对路径）：
+
+            {
+              "tts": {
+                "api_url": "http://127.0.0.1:9880",
+                "emotions": {
+                  "高兴": {"refer_wav_path": "D:/tts/ref.mp3", "prompt_text": "...", "prompt_language": "ja"}
+                }
+              }
+            }
+
+        未配置时回退到内置默认情感，并把参考音频解析到
+        `document/audio/tts_reference/`（不再硬编码 `/home/atri/...`）。
+
+        Returns:
+            tuple[str, Dict[str, Dict[str, str]]]: (接口地址, 情感配置字典)
+        """
+        api_url = DEFAULT_TTS_API_URL
+        emotion_list: Dict[str, Dict[str, str]] = {}
+
+        raw = None
+        try:
+            raw = config.tts
+        except AttributeError:
+            raw = None
+
+        if raw:
+            configured_url = raw.get("api_url") if hasattr(raw, "get") else None
+            if configured_url:
+                api_url = str(configured_url)
+            for name, item in (raw.get("emotions") or {}).items():
+                if not isinstance(item, dict) or not item.get("refer_wav_path"):
+                    continue
+                emotion_list[str(name)] = {
+                    "refer_wav_path": str(item["refer_wav_path"]),
+                    "prompt_text": str(item.get("prompt_text", "")),
+                    "prompt_language": str(item.get("prompt_language", "auto")),
+                }
+
+        if not emotion_list:
+            reference_dir = Path(config.file_path.audio) / DEFAULT_REFERENCE_DIR
+            emotion_list = {
+                name: {
+                    "refer_wav_path": str(reference_dir / filename),
+                    "prompt_text": prompt_text,
+                    "prompt_language": "ja",
+                }
+                for name, (filename, prompt_text) in DEFAULT_EMOTIONS.items()
+            }
+            self.log.debug(
+                "未配置 config.tts.emotions，使用内置默认情感，参考音频目录: %s", reference_dir
+            )
+
+        return api_url, emotion_list
 
     async def get_tts_path(self, text: str, emotion: str = "高兴", speed: float = 0.9) -> Path:
         """TTS文本合成语音
@@ -60,10 +118,30 @@ class TTSService:
         # raise ValueError("语音因为资源分配问题暂时被关了,不要再尝试使用")
 
         self._validate_parameters(text, emotion, speed)
+        self._check_reference_audio(emotion)
         
         payload = self._build_payload(text, emotion, speed)
         
         return await self._send_tts_request(payload)
+
+    def _check_reference_audio(self, emotion: str) -> None:
+        """检查参考音频是否存在，缺失时给出可操作的提示
+
+        缺少提示时用户只会看到 GPT-SoVITS 侧的报错，难以定位是路径问题。
+        注意：远端 TTS 服务与 Bot 不在同一文件系统时（例如 Bot 在容器里、
+        GPT-SoVITS 在宿主机），此处只做提醒，不阻断流程。
+
+        Args:
+            emotion (str): 情感名称
+        """
+        refer_wav_path = self.emotion_list[emotion].get("refer_wav_path", "")
+        if not refer_wav_path or not Path(refer_wav_path).exists():
+            self.log.warning(
+                "TTS 参考音频不存在: %s（情感: %s）。请在 assets/config.json 的 "
+                "tts.emotions.%s.refer_wav_path 配置可访问的绝对路径，"
+                "或把参考音频放到 document/audio/%s/ 下。",
+                refer_wav_path or "<未配置>", emotion, emotion, DEFAULT_REFERENCE_DIR,
+            )
 
     def _validate_parameters(self, text: str, emotion: str, speed: float) -> None:
         """验证输入参数"""
@@ -85,10 +163,8 @@ class TTSService:
             "top_p": 0.6,
             "temperature": 0.6,
             "speed": speed,
-            "inp_refs": [
-                "/home/atri/音乐/tts_reference/ああ、なんて高性能なんでしょ、私は.mp3",
-                "/home/atri/音乐/tts_reference/あ，私です夏生さんのために動く理由が必要なんですか.mp3"
-            ]
+            # 额外参考音频直接取已解析的各情感参考路径，避免硬编码宿主机绝对路径
+            "inp_refs": [item["refer_wav_path"] for item in self.emotion_list.values()],
         }
         
         return base_payload | self.emotion_list[emotion]

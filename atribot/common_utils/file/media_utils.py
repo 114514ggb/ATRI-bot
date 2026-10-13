@@ -2,9 +2,11 @@ import asyncio
 import base64
 import os
 import shutil
+import sys
 import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
+from logging import Logger
 from typing import Awaitable, Callable
 
 from atribot.common_utils.file.file_utils import resolve_file_to_bytes
@@ -14,6 +16,7 @@ from atribot.common_utils.file.media_cache import (
     cache_put,
     make_cache_key,
 )
+from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import File
 
 AUDIO_MAX_BYTES = 50 * 1024 * 1024   
@@ -25,6 +28,9 @@ TRANSCODE_TIMEOUT = 60.0             # ffmpeg 转码超时(秒)
 
 _MAX_DOWNLOAD_RETRIES: int = 2
 """截断/损坏下载的最大重试次数"""
+
+_ffmpeg_missing_warned: bool = False
+"""ffmpeg 缺失提示是否已输出过（只提示一次，避免刷屏）"""
 
 _AUDIO_FORMAT_MAP: dict[str, str] = {
     "mp3": "mp3",
@@ -152,6 +158,33 @@ def _ffmpeg_path() -> str | None:
     return shutil.which("ffmpeg")
 
 
+def _log_ffmpeg_missing_once() -> None:
+    """首次发现 ffmpeg 缺失时输出一次可操作的 warning
+
+    原先缺失 ffmpeg 时音视频转码静默返回 None，用户只能看到"转换失败"，
+    很难联想到是 PATH 里没有 ffmpeg（Windows 上默认不会预装）。
+
+    Returns:
+        None
+    """
+    global _ffmpeg_missing_warned
+    if _ffmpeg_missing_warned:
+        return
+    _ffmpeg_missing_warned = True
+    install_hint = (
+        "官方下载: https://www.gyan.dev/ffmpeg/builds/ ，解压后把 bin 目录加入 PATH"
+        if sys.platform == "win32"
+        else "Debian/Ubuntu: apt install ffmpeg；macOS: brew install ffmpeg"
+    )
+    try:
+        logger: Logger = container.get_by_type(Logger).getChild("MediaUtils")
+        logger.warning(
+            "未检测到 ffmpeg，音视频转码将直接返回原文件（可能发送失败）。%s", install_hint
+        )
+    except Exception:
+        pass
+
+
 async def _run_ffmpeg(
     args: list[str],
     *,
@@ -192,6 +225,7 @@ async def _ffmpeg_transcode(
     """
     ffmpeg = _ffmpeg_path()
     if not ffmpeg:
+        _log_ffmpeg_missing_once()
         return None
 
     input_path = output_path = ""

@@ -58,7 +58,8 @@
             "file":"file", #文件目录
             "img":"img", #图片目录
             "video":"video", #视频目录
-            "temp":"temp" #临时目录
+            "temp":"temp", #临时目录
+            "work":"work" #沙盒本地工作区(none/non_sandbox/local 后端默认使用,可以不写由程序补默认值)
         },
         "path_mapping": {
             "c:/程序文件/python/ATRI-main": "/mnt/c/程序文件/python/ATRI-main" #路径前缀的映射，bot 和协议端不在同一文件系统时用于转换发送的 `file://` 路径。为空时不做任何转换
@@ -237,6 +238,16 @@
         "port":5125,#面板监听的端口，默认 5125(可用环境变量 ATRI_WEB_PANEL_PORT 覆盖)
         "access_token":"ATRI",#面板主令牌(登录口令)，建议32字符以上随机值；留空读环境变量 ATRI_PANEL_TOKEN，两者都没有时面板接口全部返回503，登录页用口令换取会话令牌（默认 4 小时有效）
         "session_ttl_hours":4#登录会话的固定有效期（小时，1-24），默认 4；到期后 WebUI 自动退出登录
+    },
+    "tts":{#语音合成(TTS,可选，需自备 GPT-SoVITS 服务)，不配则使用内置默认情感与 document/audio/tts_reference 下的参考音频
+        "api_url":"http://127.0.0.1:9880",#GPT-SoVITS 接口地址
+        "emotions":{#情感名 -> 参考音频；相对路径相对于该项目配置文件所在目录解析，跨平台建议直接写绝对路径
+            "平静":{#情感名（可自定义，命令/工具的 --emotion 取值即来源于此）
+                "refer_wav_path":"D:/tts_reference/夏生さんが望むのでしたら.mp3",#参考音频的完整路径（Windows 请用正斜杠或双反斜杠）
+                "prompt_text":"夏生さんが望むのでしたら",#参考音频的对应文本
+                "prompt_language":"ja"#参考文本对应的语言
+            }
+        }
     }
 }
 

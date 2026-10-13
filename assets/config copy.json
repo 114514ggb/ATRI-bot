@@ -33,7 +33,8 @@
             "file": "file",
             "img": "img",
             "video": "video",
-            "temp": "temp"
+            "temp": "temp",
+            "work": "work"
         },
         "path_mapping": {}
     },
@@ -99,6 +100,7 @@
         "private_max_record": 20
     },
     "sand_box": {
+        "type": "docker",
         "image": "atri-sandbox:latest"
     },
     "tool_presets": {
@@ -179,5 +181,9 @@
         "port": 5125,
         "access_token": "ATRI",
         "session_ttl_hours": 4
+    },
+    "tts": {
+        "api_url": "http://127.0.0.1:9880",
+        "emotions": {}
     }
 }

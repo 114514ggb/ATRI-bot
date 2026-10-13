@@ -7,6 +7,7 @@ WebSocket 负责收发消息与逐事件转发 Agent 流式输出。
 
 import asyncio
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -126,19 +127,67 @@ _AVATAR_CANDIDATES = ("ATRI-bot.png", "ATRI-bot.jpg", "ATRI-bot.jpeg", "ATRI-bot
 _AVATAR_MEDIA = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
 
 
+def _avatar_search_dirs() -> List[Path]:
+    """ATRI-bot 图的候选搜索目录（按优先级，已去重）
+
+    不能只看当前配置文件的同级目录：Docker 部署下 ATRI_CONFIG_PATH 指向
+    /tmp/atri-config.runtime.json（运行期覆写产物），而图片实际位于挂载进来的
+    /app/assets/。故依次尝试：
+      1. 当前配置文件所在目录（本机开发 / 直接把图放在 assets/ 的常规布局）
+      2. ATRI_SOURCE_CONFIG_PATH 所在目录（Docker 的 /app/assets，即真正的源配置目录）
+      3. <project_root>/assets
+      4. <project_root>
+    任一步失败（容器未就绪、字段缺失）都静默跳过，保证面板可独立导入与调试。
+    """
+    candidates: List[Path] = []
+
+    def _add(path: Optional[Path]) -> None:
+        if path is None:
+            return
+        try:
+            resolved = Path(path)
+        except (TypeError, ValueError):
+            return
+        if resolved not in candidates:
+            candidates.append(resolved)
+
+    try:
+        _add(Path(_cfg().config_file_path).parent)
+    except Exception:
+        pass
+
+    # 仅在显式配置时才加入（Dockerfile 已设该 ENV）：Windows 上默认值 "/app/assets" 会被解析成 "\app\assets"，
+    # 虽是无效目录，但没必要放进候选列表
+    source = os.environ.get("ATRI_SOURCE_CONFIG_PATH")
+    if source:
+        try:
+            _add(Path(source).parent)
+        except (TypeError, ValueError):
+            pass
+
+    try:
+        project_root = Path(_cfg().file_path.project_root)
+        _add(project_root / "assets")
+        _add(project_root)
+    except Exception:
+        pass
+
+    return candidates
+
+
 def _find_bot_image() -> Optional[Path]:
-    """配置文件同级的 ATRI-bot 图（固定候选文件名，无路径穿越风险）"""
-    base = Path(_cfg().config_file_path).parent
-    for name in _AVATAR_CANDIDATES:
-        path = base / name
-        if path.is_file():
-            return path
+    """配置文件同级 / 源配置目录 / 项目 assets 下的 ATRI-bot 图（固定候选文件名，无路径穿越风险）"""
+    for directory in _avatar_search_dirs():
+        for name in _AVATAR_CANDIDATES:
+            path = directory / name
+            if path.is_file():
+                return path
     return None
 
 
 @router.get("/api/chat/avatar")
 async def api_chat_avatar(token: str = "") -> FileResponse:
-    """机器人头像：配置文件同级的 ATRI-bot 图（img 标签走 query 令牌；FileResponse 自带 ETag，换图自动失效）"""
+    """机器人头像：ATRI-bot 图（img 标签走 query 令牌；FileResponse 自带 ETag，换图自动失效）"""
     _require_session(token)
     path = _find_bot_image()
     if path is None:
@@ -149,7 +198,7 @@ async def api_chat_avatar(token: str = "") -> FileResponse:
 @router.get("/api/panel/logo")
 async def api_panel_logo() -> FileResponse:
     """面板品牌图：免鉴权——登录页与 favicon 在拿到令牌之前就要显示，
-    且仅读取配置目录下固定文件名的 ATRI-bot 图，泄露面只是头像本身。
+    且仅读取固定候选文件名的 ATRI-bot 图，泄露面只是头像本身。
     FileResponse 自带 ETag，换图自动失效。"""
     path = _find_bot_image()
     if path is None:

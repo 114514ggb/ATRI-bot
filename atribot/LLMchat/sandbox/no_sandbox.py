@@ -35,9 +35,7 @@ def _decode_output(data: bytes) -> str:
 
 
 class NoSandbox(SandBoxBase):
-    """「没有沙盒」的沙盒:直接在宿主机本地环境中执行,不做任何隔离
-    适用于不想安装 Docker / 不需要隔离的场景。所有代码和命令都会以
-    当前用户权限直接运行在本机上,请确保仅在可信环境中使用。
+    """直接在宿主机本地环境中执行,不做任何隔离
 
     跨平台支持 Linux 与 Windows:
     - POSIX 系统使用 /bin/sh 执行命令(与 Docker 版行为一致)

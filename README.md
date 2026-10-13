@@ -124,6 +124,15 @@ Bot 启动时会以内置后台任务的形式拉起一个 Web 管理面板
 
 ## 🚀 快速开始 (How to Run)
 
+> **平台支持**：本项目官方支持 **Linux** 与 **Windows**。数据库依赖的两个 PostgreSQL
+> 服务端扩展（`pgvector` / `pgroonga`）在 Windows 上需要手工安装，因此**推荐优先用
+> Docker Compose 部署**（数据库与扩展开箱即用），其次 WSL2，最后才是原生 Windows。
+> 原生 Windows 的完整步骤、沙盒后端选择与故障排查见
+> [Windows 部署指南](atribot/docs/windows-deploy.md)。
+>
+> 若只想在原生 Windows 上跑 bot、数据库用容器，最短路径是：
+> `docker compose up -d db` → `uv sync` → `uv run main.py`。
+
 ### 1. 前端连接 (NapCat)
 首先需要一个能够与 QQ 通信的前端，推荐使用 NapCat：
 - [NapCat 安装指南](https://napneko.github.io/guide/napcat)
@@ -136,6 +145,11 @@ Bot 启动时会以内置后台任务的形式拉起一个 Web 管理面板
 2.  **安装数据库插件**：
     - 必须安装 `pgvector`（向量检索）[pgvector 项目地址](https://github.com/pgvector/pgvector)
     - 必须安装 `pgroonga`（全文检索）[PGroonga 文档](https://pgroonga.github.io/)
+    > ⚠️ 这两个都是 **PostgreSQL 服务端扩展**，不是 pip 包。Windows 上 pgvector 需要
+    > MSVC/nmake 编译、pgroonga 有官方 zip 包（见
+    > [Windows 部署指南](atribot/docs/windows-deploy.md)）。
+    > 缺 `pgroonga` 时 bot 仍能启动（记忆检索降级为纯向量），但**建库脚本会在
+    > `CREATE EXTENSION pgroonga` 处中断**，导致后续表结构全部不创建。
 3.  **数据库初始化**：
     项目提供了初始化 SQL 文件，推荐使用 `docker/db/info.sql`（含完整表结构与扩展配置）。
     也可参考 `atribot/docs/PostgreSQL基础.sql`（开发版）。
@@ -207,6 +221,8 @@ docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 7.  **表情包**：在 `document/img/emojis` 文件夹下新建**文件名代表内部表情的文件夹**，放入对应名称的图片（支持 .jpg, .jpeg, .png, .gif），LLM 即可在聊天中自然发送。
 8.  **Web 管理面板**：`config.web_panel` 控制管理面板（`enable` 默认开启、`port` 未配置时缺省 `5125`、`access_token` 为主令牌/登录口令，仓库默认已替换为随机强口令，部署前请改成自建随机值；主令牌也支持环境变量 `ATRI_PANEL_TOKEN`）。
 9.  **路径映射**：Bot 与协议端（NapCat）不在同一文件系统时（例如 Bot 跑在 WSL 而 NapCat 在 Windows），在 `file_path.path_mapping` 中配置「本地路径前缀 → 协议端路径前缀」映射（如 `"E:/": "/mnt/e/"`），发送 `file://` 路径时会自动转换；留空则不做转换。
+10. **TTS（可选）**：参考音频路径不再硬编码，在 `config.tts` 中配置 `api_url` 与 `emotions.<情感>.refer_wav_path`（建议写绝对路径）；不配置则回退内置情感并从 `document/audio/tts_reference/` 读取。
+11. **外部命令（可选）**：音视频转码依赖 **ffmpeg**（需自行安装并加入 `PATH`，缺失时转码降级且日志给出 warning）；Docker 沙盒依赖 Docker Desktop 正常运行。
 
 
 ### 4. 启动项目
@@ -220,13 +236,16 @@ uv run main.py
 ```
 
 **使用 pip:**
-Linux / macOS 请分别使用 `requirements-linux.txt`、`requirements-macos.txt`。
+Windows / Linux / macOS 请分别使用 `requirements-windows.txt`、`requirements-linux.txt`、`requirements-macos.txt`（三者仅差 `colorama` / `pywin32` / `tzdata` 等平台专属包）。
 ```bash
 pip install -r requirements-windows.txt
 python main.py
 ```
 
 > ⚠️ **重要**：请务必在项目根目录执行启动命令，否则可能出现路径解析错误。
+> ⚠️ **Python 版本**：必须是 3.14（`pyproject.toml` 的 `requires-python = ">=3.14"`）。
+> 用 3.13 会被 `uv sync` / `pip install .` 直接拒绝；不要用
+> `--ignore-requires-python` 绕过，否则运行时行为可能与 CI 不一致。
 
 ### 5. 使用 Docker 启动
 仓库已经补齐了可直接运行的 `Docker Compose` 配置，默认会启动：
@@ -319,6 +338,7 @@ docker compose down -v         # 连数据卷一起删除（清库重建）
 - 默认把宿主机的 `assets/`、`document/`、`atribot/log/`、`temp/` 挂进容器；Bot 的文件日志写在 `atribot/log/`（设 `ATRI_FILE_LOG=0` 可改为只输出 stdout，交给 Docker 日志轮转）。
 - 内置 AI 沙盒只覆盖镜像名，沙盒镜像需要**先手动构建**（`docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .`）；不构建不会阻断启动，但 AI 的代码执行能力会缺失。Compose 已挂载 Docker Socket（`/var/run/docker.sock`），容器内可直接调用宿主 Docker 拉起沙盒。
 - 镜像内已装 `uv`（供 `uvx`）与 Node.js（供 `npx`），stdio 型 MCP 服务可直接启动；不需要 Node 时可用 `docker build --build-arg WITH_NODE=0` 减小体积。
+- ⚠️ **Windows 下的 docker.sock**：Compose 挂载的 `/var/run/docker.sock` 在 Docker Desktop for Windows 上不成立（Windows 用 named pipe）。影响范围仅限容器内拉起 AI 沙盒（Docker 后端）；可改用 `sand_box.type: "none"` 本机后端，详见 [Windows 部署指南](atribot/docs/windows-deploy.md)。
 - ⚠️ 安全提醒：默认口令（数据库 `180710`、平台 Token `ATRI114514`、面板口令 `ATRI`）都是公开弱口令，请务必修改；挂载 `/var/run/docker.sock` 等价于把宿主机 root 权限给了容器，请勿把面板/端口暴露到公网。
 
 ---
@@ -336,7 +356,6 @@ ATRI-main/
 ├─assets/                       # ⚙️ 配置文件与示例
 ├─atribot/                      # 核心代码
 │  ├─bot_framework.py           # Bot 初始化与服务装配入口
-│  ├─C/                         # C 扩展模块（Levenshtein 距离等）
 │  ├─commands/                  # 💻 群聊命令实现
 │  │  ├─audio/                  # 音频与 TTS 相关命令
 │  │  ├─bromidic/               # 图片处理 / Token 查询等杂项功能命令

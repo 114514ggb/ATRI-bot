@@ -5,17 +5,20 @@ import io
 import mimetypes
 import os
 import shlex
+import sys
 import tarfile
 import threading
 import time
 import uuid
 import zipfile
+from logging import Logger
 from tarfile import TarInfo
 from typing import List
 
-from docker.errors import ImageNotFound, NotFound
+from docker.errors import DockerException, ImageNotFound, NotFound
 
 import docker
+from atribot.core.service_container import container
 from atribot.LLMchat.sandbox.sandbox_base import ExecutionResult, GeneratedFile, SandBoxBase
 from atribot.LLMchat.sandbox.stream_exec import (
     MAX_STREAM_OUTPUT as MAX_PANEL_OUTPUT,
@@ -25,6 +28,34 @@ from atribot.LLMchat.sandbox.stream_exec import (
     StreamDecoder,
     container_sentinel_line,
 )
+
+
+def _docker_connection_hint() -> str:
+    """构造 Docker daemon 连接失败时的可操作提示
+
+    Windows 原生部署最容易卡在这里：Docker Desktop 未运行、未开启
+    "Expose daemon on tcp://localhost:2375"，或者只装了 WSL 里的 docker 而
+    宿主机进程连不上 named pipe。原始报错只有一串 socket 信息，故补充提示。
+
+    Returns:
+        str: 面向用户的错误信息
+    """
+    if sys.platform == "win32":
+        return (
+            "无法连接 Docker daemon，AI 沙盒不可用。\n"
+            "  1. 确认 Docker Desktop 已启动（托盘图标为运行中）；\n"
+            "  2. 确认 Docker Desktop 的 named pipe 可用"
+            "（默认 npipe:////./pipe/docker_engine，无需额外配置）；\n"
+            "  3. 若 Docker 只装在 WSL 发行版内，请改把 Bot 也放进 WSL 运行，"
+            "或设置环境变量 DOCKER_HOST 指向可达的 daemon；\n"
+            "  4. 不想用 Docker 时可把 assets/config.json 的 "
+            "sand_box.type 改为 \"none\"（本机直执行，无隔离）。"
+        )
+    return (
+        "无法连接 Docker daemon，AI 沙盒不可用。请确认 Docker 服务已启动、"
+        "当前用户有权限访问 /var/run/docker.sock，或设置 DOCKER_HOST 环境变量；"
+        "也可把 assets/config.json 的 sand_box.type 改为 \"none\"。"
+    )
 
 
 class DockerSandbox(SandBoxBase):
@@ -46,7 +77,16 @@ class DockerSandbox(SandBoxBase):
                 - network_mode: 网络模式，默认为 'bridge'
         """
         super().__init__(config)
-        self.client = docker.from_env()
+        try:
+            self.log: Logger = container.get_by_type(Logger).getChild("SandBox")
+        except Exception:  # 容器未初始化时（如单测直接构造）退回模块日志器
+            import logging
+
+            self.log = logging.getLogger("atri-bot.SandBox")
+        try:
+            self.client = docker.from_env()
+        except DockerException as error:
+            raise RuntimeError(_docker_connection_hint()) from error
         self.image = self.config.get('image', 'python:3.12-slim')
         self.container_name = self.config.get('container_name', f"sandbox_{uuid.uuid4().hex[:8]}")
         self.container = None
@@ -111,6 +151,8 @@ class DockerSandbox(SandBoxBase):
         except Exception as e:
             self.is_running = False
             await self.stop()
+            if isinstance(e, DockerException):
+                raise RuntimeError(f"{_docker_connection_hint()}\n原始错误: {e}") from e
             raise RuntimeError(f"Failed to start Docker sandbox: {e}")
 
     async def stop(self):
