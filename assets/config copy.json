@@ -184,6 +184,22 @@
     },
     "tts": {
         "api_url": "http://127.0.0.1:9880",
-        "emotions": {}
+        "emotions": {
+            "高兴": {
+                "refer_wav_path": "/home/atri/tts_reference/ああ、なんて高性能なんでしょ、私は.mp3",
+                "prompt_text": "ああ、なんて高性能なんでしょ、私は",
+                "prompt_language": "ja"
+            },
+            "机械": {
+                "refer_wav_path": "/home/atri/tts_reference/あ，私です夏生さんのために動く理由が必要なんですか.mp3",
+                "prompt_text": "あ，私です夏生さんのために動く理由が必要なんですか",
+                "prompt_language": "ja"
+            },            
+            "平静": {
+                "refer_wav_path": "/home/atri/tts_reference/夏生さんが望むのでしたら.mp3",
+                "prompt_text": "夏生さんが望むのでしたら",
+                "prompt_language": "ja"
+            } 
+        }
     }
 }

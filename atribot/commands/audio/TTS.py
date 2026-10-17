@@ -80,8 +80,8 @@ class TTSService:
                     continue
                 emotion_list[str(name)] = {
                     "refer_wav_path": str(item["refer_wav_path"]),
-                    "prompt_text": str(item.get("prompt_text", "")),
-                    "prompt_language": str(item.get("prompt_language", "auto")),
+                    "prompt_text": str(item.get("prompt_text") or ""),
+                    "prompt_language": str(item.get("prompt_language") or "auto"),
                 }
 
         if not emotion_list:
@@ -146,7 +146,8 @@ class TTSService:
     def _validate_parameters(self, text: str, emotion: str, speed: float) -> None:
         """验证输入参数"""
         if emotion not in self.emotion_list:
-            raise ValueError(f"不支持的情感: {emotion}")
+            supported = ", ".join(self.emotion_list)
+            raise ValueError(f"不支持的情感: {emotion}（当前可选: {supported}）")
         
         if 0 < len(text) > 100:
             raise ValueError(f"输入字符应在1到100之间,当前有{len(text)}个")

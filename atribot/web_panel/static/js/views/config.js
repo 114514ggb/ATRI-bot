@@ -170,6 +170,48 @@ function renderStandby(list) {
     <button class="btn sm" id="btn-add-standby">${icon('plus')} 添加备用模型</button>`;
 }
 
+/* ---------- 语音合成（情感名 → 参考音频） ---------- */
+
+function ttsEmotionCardHtml(name, conf, idx) {
+  const item = conf && typeof conf === 'object' ? conf : {};
+  return `<div class="platform-card tts-emotion-card" data-tts-emotion style="animation-delay:${Math.min(idx * 60, 300)}ms">
+    <div class="platform-head">
+      <input class="input mono" data-tts="name" value="${escapeHtml(String(name ?? ''))}" placeholder="情感名（如 高兴）" spellcheck="false" autocomplete="off">
+      <span style="flex:1"></span>
+      <button class="icon-btn del" data-tts-del title="删除该情感">${icon('trash')}</button>
+    </div>
+    <div class="field-grid">
+      <div class="field span-2">
+        <div class="field-label">参考音频路径</div>
+        <input class="input mono" data-tts="refer_wav_path" value="${escapeHtml(String(item.refer_wav_path ?? ''))}" placeholder="如 D:/tts_reference/ref.mp3" spellcheck="false">
+        <p class="field-desc">给 GPT-SoVITS 读取的路径；相对路径按配置文件所在目录解析，跨平台建议写绝对路径</p>
+      </div>
+      <div class="field">
+        <div class="field-label">参考文本</div>
+        <input class="input" data-tts="prompt_text" value="${escapeHtml(String(item.prompt_text ?? ''))}" placeholder="参考音频对应的文本">
+      </div>
+      <div class="field">
+        <div class="field-label">参考文本语言</div>
+        <input class="input mono" data-tts="prompt_language" value="${escapeHtml(String(item.prompt_language ?? 'auto'))}" placeholder="ja / zh / auto" spellcheck="false">
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderTtsSection(tts) {
+  const def = SCHEMA.find((s) => s.id === 'tts');
+  const apiField = def.fields.find((f) => f.path === 'tts.api_url');
+  const emotions = tts && typeof tts === 'object' && tts.emotions && typeof tts.emotions === 'object' ? tts.emotions : {};
+  const cards = Object.entries(emotions)
+    .map(([name, conf], i) => ttsEmotionCardHtml(name, conf, i))
+    .join('');
+  return `
+    <div class="field-grid">${fieldHtml(apiField, kit.getPath(formBase, apiField.path))}</div>
+    <div class="tts-emotions-head"><span class="muted small">情感列表：留空时回退内置「高兴 / 机械 / 平静」；情感名即 /tts --emotion 与工具的取值</span></div>
+    <div id="tts-emotions-container">${cards || '<p class="muted tts-empty" style="margin:2px 0 12px">尚未配置情感，将使用内置默认情感。</p>'}</div>
+    <button class="btn sm" id="btn-add-tts-emotion">${icon('plus')} 添加情感</button>`;
+}
+
 /* ---------- 聊天请求参数（自由键值对，原样透传给模型 API） ---------- */
 
 /* 值的 JS 类型 → 通用控件类型 */
@@ -378,6 +420,25 @@ export function buildPayload() {
     else delete data.model.chat_parameter; /* 空 dict 在后端为 falsy，等价走内置默认参数，保持配置干净 */
   }
 
+  /* 语音合成：情感卡片逐个读回（空名称行忽略）；未配置情感时删除该键，运行时回退内置三情感 */
+  const ttsContainer = document.querySelector('#tts-emotions-container');
+  if (ttsContainer) {
+    const emotions = {};
+    ttsContainer.querySelectorAll('[data-tts-emotion]').forEach((card) => {
+      const name = card.querySelector('[data-tts="name"]')?.value.trim() ?? '';
+      if (!name) return;
+      emotions[name] = {
+        refer_wav_path: card.querySelector('[data-tts="refer_wav_path"]')?.value.trim() ?? '',
+        prompt_text: card.querySelector('[data-tts="prompt_text"]')?.value ?? '',
+        prompt_language: card.querySelector('[data-tts="prompt_language"]')?.value.trim() || 'auto',
+      };
+    });
+    data.tts = data.tts && typeof data.tts === 'object' ? data.tts : {};
+    if (Object.keys(emotions).length) data.tts.emotions = emotions;
+    else delete data.tts.emotions;
+    if (!Object.keys(data.tts).length) delete data.tts;
+  }
+
   /* 工具预设：以配置中既有预设为基底增量覆盖（未渲染的预设原样保留，避免表单模式误删） */
   const tools = { ...presetSourceOf() };
   for (const key of presetKeysCache) {
@@ -424,6 +485,46 @@ function validateChatParams() {
   return errors;
 }
 
+/* 语音合成校验（仅表单模式）：空名却填了内容 / 重名 / 缺少参考音频路径 */
+function validateTts() {
+  const box = document.querySelector('#tts-emotions-container');
+  if (!box) return [];
+  const errors = [];
+  const seen = new Set();
+  box.querySelectorAll('[data-tts-emotion]').forEach((card) => {
+    card.classList.remove('error');
+    const nameEl = card.querySelector('[data-tts="name"]');
+    const pathEl = card.querySelector('[data-tts="refer_wav_path"]');
+    const name = nameEl?.value.trim() ?? '';
+    const hasContent = !!pathEl?.value.trim()
+      || !!card.querySelector('[data-tts="prompt_text"]')?.value.trim()
+      || !!card.querySelector('[data-tts="prompt_language"]')?.value.trim();
+    if (!name) {
+      if (hasContent) {
+        errors.push('有一行情感未填写名称，该行会被忽略');
+        card.classList.add('error');
+      }
+      return;
+    }
+    if (/\s/.test(name)) {
+      errors.push(`情感名不能包含空白字符：${name}`);
+      card.classList.add('error');
+      return;
+    }
+    if (seen.has(name)) {
+      errors.push(`情感名重复：${name}`);
+      card.classList.add('error');
+      return;
+    }
+    seen.add(name);
+    if (!pathEl?.value.trim()) {
+      errors.push(`情感 ${name} 缺少参考音频路径`);
+      card.classList.add('error');
+    }
+  });
+  return errors;
+}
+
 /* ---------- 表单整体渲染 ---------- */
 
 function renderForm(section) {
@@ -440,6 +541,7 @@ function renderForm(section) {
     else if (s.type === 'standby-list') inner = renderStandby(formBase.model?.standby_model);
     else if (s.type === 'chat-params') inner = renderChatParams(kit.getPath(formBase, s.path));
     else if (s.type === 'tool-presets') inner = renderToolPresets();
+    else if (s.type === 'tts') inner = renderTtsSection(formBase.tts);
     else {
       inner = `<div class="field-grid">${s.fields.map((f) => fieldHtml(f, kit.getPath(formBase, f.path))).join('')}</div>`;
     }
@@ -618,6 +720,26 @@ function bindForm(section) {
       cpDel.closest('.kv-row').remove();
       toast('已删除该参数（尚未保存）', 'info');
       refreshDirty();
+      return;
+    }
+
+    /* 语音合成情感：添加 / 删除 */
+    if (e.target.closest('#btn-add-tts-emotion')) {
+      const box = section.querySelector('#tts-emotions-container');
+      if (!box) return;
+      box.querySelector('.tts-empty')?.remove();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = ttsEmotionCardHtml('', {}, box.querySelectorAll('[data-tts-emotion]').length);
+      box.appendChild(tmp.firstElementChild);
+      box.lastElementChild.querySelector('[data-tts="name"]').focus();
+      refreshDirty();
+      return;
+    }
+    const ttsDel = e.target.closest('[data-tts-del]');
+    if (ttsDel) {
+      ttsDel.closest('[data-tts-emotion]').remove();
+      toast('已删除该情感（尚未保存）', 'info');
+      refreshDirty();
     }
   });
 
@@ -782,11 +904,16 @@ async function save() {
     return;
   }
 
-  /* 聊天请求参数合法性校验（表单模式下读行；源码模式由 JSON 编辑器保证语法） */
+  /* 聊天请求参数 / 语音合成合法性校验（表单模式下读行；源码模式由 JSON 编辑器保证语法） */
   if (mode === 'form') {
     const cpErrors = validateChatParams();
     if (cpErrors.length) {
       toast(`无法保存：${cpErrors[0]}${cpErrors.length > 1 ? `（还有 ${cpErrors.length - 1} 处参数问题）` : ''}`, 'error', 8000);
+      return;
+    }
+    const ttsErrors = validateTts();
+    if (ttsErrors.length) {
+      toast(`无法保存：${ttsErrors[0]}${ttsErrors.length > 1 ? `（还有 ${ttsErrors.length - 1} 处情感配置问题）` : ''}`, 'error', 8000);
       return;
     }
   }

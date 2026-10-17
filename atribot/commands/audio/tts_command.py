@@ -7,6 +7,11 @@ from atribot.core.type.bot_types import MessageEventEnvelope
 
 cmd_system: CommandSystem = container.get("CommandSystem")
 
+# 情感枚举以 config.tts.emotions 为准（未配置时 TTSService 回退内置三情感）
+_tts_service = TTSService()
+_SUPPORTED_EMOTIONS = _tts_service.get_supported_emotions()
+_DEFAULT_EMOTION = _SUPPORTED_EMOTIONS[0] if _SUPPORTED_EMOTIONS else "高兴"
+
 
 @cmd_system.register_command(
     name="tts",
@@ -30,9 +35,9 @@ cmd_system: CommandSystem = container.get("CommandSystem")
     name="emotion",
     short="e",
     long="emotion",
-    description="音频的情感,可选值：高兴, 机械, 平静",
-    default="高兴",
-    choices=["高兴", "机械", "平静"],
+    description=f"音频的情感,可选值：{', '.join(_SUPPORTED_EMOTIONS)}",
+    default=_DEFAULT_EMOTION,
+    choices=_SUPPORTED_EMOTIONS,
     metavar="EMOTION"
 )
 @cmd_system.option(
@@ -44,13 +49,13 @@ cmd_system: CommandSystem = container.get("CommandSystem")
     type=float,
     metavar="SPEED"
 )
-async def tts_synthesis(message_data: MessageEventEnvelope, target_text: list[str], emotion: str = "高兴", speed: float = 1.0):
+async def tts_synthesis(message_data: MessageEventEnvelope, target_text: list[str], emotion: str = _DEFAULT_EMOTION, speed: float = 1.0):
     """TTS文本合成语音
         
     Args:
         message_data(dict): 每个命令固定传递
         target_text (str): 需要合成的文本,支持中日英韩,但是目前不要输入韩文
-        emotion (str): 音频的情感,枚举值：高兴,机械,平静
+        emotion (str): 音频的情感,取值来自 config.tts.emotions（未配置时为内置三情感）
         speed (float): 语速,取值范围0.6~1.65,默认1
     """
     tts_main = TTSService()

@@ -117,6 +117,16 @@ export const SCHEMA = [
     ],
   },
   {
+    id: 'tts',
+    label: '语音合成',
+    icon: 'mic',
+    type: 'tts',
+    desc: 'GPT-SoVITS 语音合成（/tts 命令与 send_speech_message 工具）。修改后需重启 bot；情感列表留空时回退内置「高兴 / 机械 / 平静」。',
+    fields: [
+      { path: 'tts.api_url', label: 'GPT-SoVITS 接口地址', type: 'text', span: true, optional: true, desc: '默认 http://127.0.0.1:9880，填 TTS 服务实际可访问的地址' },
+    ],
+  },
+  {
     id: 'tools',
     label: '工具预设',
     icon: 'sliders',

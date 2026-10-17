@@ -3,6 +3,10 @@ from atribot.core.type.bot_types import atriMessageEvent
 
 tts_main = TTSService()
 
+# 情感枚举以 config.tts.emotions 为准（未配置时 TTSService 回退内置三情感）
+_SUPPORTED_EMOTIONS = tts_main.get_supported_emotions()
+_DEFAULT_EMOTION = _SUPPORTED_EMOTIONS[0] if _SUPPORTED_EMOTIONS else "高兴"
+
 tool_json = {
     "name": "send_speech_message",
     "description": "在你想发语音或是有人让你说话（发声的那种）的时候使用,将文本内容转换为语音消息并进行发送,要避免输入符号等不可读文本",
@@ -13,9 +17,9 @@ tool_json = {
         },
         "emotion": {
             "type": "string",
-            "enum": ["高兴", "机械", "平静"],
+            "enum": _SUPPORTED_EMOTIONS,
             "description": "音频的情感",
-            "default": "高兴"
+            "default": _DEFAULT_EMOTION
         },
         "speed": {
             "type": "number",
@@ -25,7 +29,7 @@ tool_json = {
     }
 }
 
-async def main(text: str, message_data: atriMessageEvent, emotion: str = "高兴", speed: float | str = 0.9) -> str:
+async def main(text: str, message_data: atriMessageEvent, emotion: str = _DEFAULT_EMOTION, speed: float | str = 0.9) -> str:
     """发送语音消息"""
     try:
         speed = float(speed)

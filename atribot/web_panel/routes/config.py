@@ -177,6 +177,48 @@ def _validate_tool_presets(data: dict) -> List[str]:
     return errors
 
 
+def _validate_tts(data: dict) -> List[str]:
+    """校验 tts 区块：缺省合法（运行时回退内置三情感），配置了则要求字段形态正确"""
+    tts = data.get("tts")
+    if tts is None:
+        return []
+    if not isinstance(tts, dict):
+        return ["tts 必须是对象"]
+
+    errors: List[str] = []
+    api_url = tts.get("api_url")
+    if api_url is not None:
+        if not isinstance(api_url, str) or not api_url.strip():
+            errors.append("tts.api_url 必须是非空字符串")
+        elif not api_url.strip().lower().startswith(("http://", "https://")):
+            errors.append("tts.api_url 必须是 http:// 或 https:// 开头的地址")
+
+    emotions = tts.get("emotions")
+    if emotions is None:
+        return errors
+    if not isinstance(emotions, dict):
+        errors.append("tts.emotions 必须是对象（情感名 → 参考音频配置）")
+        return errors
+
+    for name, item in emotions.items():
+        if not isinstance(name, str) or not name.strip():
+            errors.append("tts.emotions 的情感名不能为空")
+            continue
+        if any(ch.isspace() for ch in name):
+            errors.append(f"tts.emotions.{name} 的情感名不能包含空白字符")
+        if not isinstance(item, dict):
+            errors.append(f"tts.emotions.{name} 必须是对象")
+            continue
+        path = item.get("refer_wav_path")
+        if not isinstance(path, str) or not path.strip():
+            errors.append(f"tts.emotions.{name}.refer_wav_path 不能为空")
+        for field in ("prompt_text", "prompt_language"):
+            value = item.get(field)
+            if value is not None and not isinstance(value, str):
+                errors.append(f"tts.emotions.{name}.{field} 必须是字符串")
+    return errors
+
+
 def _reload_tool_presets() -> bool:
     """把刚写盘的工具预设同步到运行中的 ToolCalls 与 atriConfig（面板与 bot 同进程）
 
@@ -231,6 +273,7 @@ def _validate_main_config(data: dict) -> None:
                 errors.append(f"database.{field} 不能为空")
 
     errors.extend(_validate_tool_presets(data))
+    errors.extend(_validate_tts(data))
 
     if errors:
         raise HTTPException(status_code=400, detail="；".join(errors))

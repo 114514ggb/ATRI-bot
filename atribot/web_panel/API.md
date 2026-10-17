@@ -124,7 +124,7 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/config` | 读取主配置 config.json |
-| POST | `/api/config` | 保存主配置。Body：`{ "content": "<json 文本>" }`。保存前做结构校验（platforms / account / root_user_id / database） |
+| POST | `/api/config` | 保存主配置。Body：`{ "content": "<json 文本>" }`。保存前做结构校验（platforms / account / root_user_id / database / tool_presets / tts） |
 | GET | `/api/supplier_config` | 读取供应商配置，额外返回解析好的 `suppliers: [{name, base_url, models: {模型名: {visual_sense, audio_sense, video_sense, document_sense}}}]` |
 | POST | `/api/supplier_config` | 保存供应商配置（校验 api 数组与 name/base_url/api_key） |
 | GET | `/api/mcp_config` | 读取 MCP 配置（文件不存在时返回默认 `{ "mcpServers": {} }` 模板，`exists: false`） |

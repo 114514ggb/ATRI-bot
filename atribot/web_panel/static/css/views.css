@@ -248,6 +248,15 @@
   font-family: var(--font-mono);
 }
 
+/* 语音合成情感卡片 */
+.tts-emotions-head { margin: 2px 0 10px; }
+.tts-emotion-card { padding: 14px 16px 2px; }
+.tts-emotion-card .platform-head { margin-bottom: 10px; }
+.tts-emotion-card .platform-head .input { max-width: 280px; }
+.tts-emotion-card .field { margin-bottom: 10px; }
+.tts-emotion-card.error { border-color: var(--red); box-shadow: 0 0 0 2.5px var(--red-soft); }
+#tts-emotions-container { margin-bottom: 12px; }
+
 .icon-btn.del:hover { background: var(--red-soft); color: var(--red); }
 
 /* 备用模型排序列表 */

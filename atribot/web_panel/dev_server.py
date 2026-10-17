@@ -63,6 +63,21 @@ def _prepare_files() -> Path:
         },
         "ai_chat": {"playRole": "ATRI_dev", "ai_max_record": 10, "group_max_record": 20, "private_max_record": 20},
         "sand_box": {"image": "atri-sandbox:latest"},
+        "tts": {
+            "api_url": "http://127.0.0.1:9880",
+            "emotions": {
+                "高兴": {
+                    "refer_wav_path": "D:/tts_reference/happy.mp3",
+                    "prompt_text": "高兴的参考文本",
+                    "prompt_language": "ja",
+                },
+                "平静": {
+                    "refer_wav_path": "D:/tts_reference/calm.mp3",
+                    "prompt_text": "平静的参考文本",
+                    "prompt_language": "ja",
+                },
+            },
+        },
         "tool_presets": {
             "group_chat": {"default": ["web_search", "memory_search", "tool_search"], "deferred": ["run_python_code"]},
             "private_chat": {"default": ["web_search", "tool_search"], "deferred": ["run_python_code", "send_file"]},
