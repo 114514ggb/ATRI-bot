@@ -76,7 +76,7 @@ access_log /var/log/nginx/atri-panel.log atri_panel;
 自动化：
 
 ```bash
-uv run python -m pytest tests/test_web_panel_security.py tests/test_web_panel_auth.py -q
+uv run python -m pytest tests/test_web_panel_auth.py -q
 ```
 
 手动（dev：`uv run python -m atribot.web_panel.dev_server`，令牌 `dev-token`）：

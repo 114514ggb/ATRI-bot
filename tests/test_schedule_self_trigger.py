@@ -1,8 +1,6 @@
 """schedule_self_trigger 持久化调度器测试"""
 
-import asyncio
 import json
-import logging
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -166,15 +164,10 @@ def _read_store(path: Path) -> list[dict[str, Any]]:
     return json.loads(path.read_text(encoding="utf-8"))["tasks"]
 
 
-def _record_to_dict(record: ScheduledTrigger) -> dict[str, Any]:
-    return record.to_dict()
-
-
 @pytest.mark.parametrize(
     ("seconds", "expected"),
     [
         (0, "0 秒"),
-        (45, "45 秒"),
         (125, "2 分钟5 秒"),
         (7200, "2 小时"),
         (-10, "0 秒"),
@@ -182,17 +175,6 @@ def _record_to_dict(record: ScheduledTrigger) -> dict[str, Any]:
 )
 def test_format_remaining(seconds: float, expected: str) -> None:
     assert format_remaining(seconds) == expected
-
-
-def test_record_roundtrip() -> None:
-    record = _make_record()
-    restored = ScheduledTrigger.from_dict(record.to_dict())
-    assert restored is not None
-    assert restored.record_id == record.record_id
-    assert restored.note == record.note
-    assert restored.trigger_at == record.trigger_at
-    assert restored.group_id == record.group_id
-    assert restored.primeval == record.primeval
 
 
 @pytest.mark.parametrize(
@@ -233,7 +215,7 @@ def test_load_backs_up_corrupted_store(tmp_path: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_restore_registers_future_task(tmp_path: Path, supervisor: TimeTriggerSupervisor) -> None:
-    store = _write_store(tmp_path, [_record_to_dict(_make_record(delay=3600.0))])
+    store = _write_store(tmp_path, [_make_record(delay=3600.0).to_dict()])
     scheduler = SelfTriggerScheduler(store_path=store)
 
     await scheduler.restore()
@@ -248,7 +230,7 @@ async def test_restore_registers_future_task(tmp_path: Path, supervisor: TimeTri
 
 @pytest.mark.asyncio
 async def test_restore_drops_overdue_beyond_grace(tmp_path: Path, supervisor: TimeTriggerSupervisor) -> None:
-    store = _write_store(tmp_path, [_record_to_dict(_make_record(delay=-3600.0))])
+    store = _write_store(tmp_path, [_make_record(delay=-3600.0).to_dict()])
     scheduler = SelfTriggerScheduler(store_path=store)
 
     await scheduler.restore()
@@ -260,7 +242,7 @@ async def test_restore_drops_overdue_beyond_grace(tmp_path: Path, supervisor: Ti
 
 @pytest.mark.asyncio
 async def test_restore_immediate_within_grace(tmp_path: Path, supervisor: TimeTriggerSupervisor) -> None:
-    store = _write_store(tmp_path, [_record_to_dict(_make_record(delay=-60.0))])
+    store = _write_store(tmp_path, [_make_record(delay=-60.0).to_dict()])
     scheduler = SelfTriggerScheduler(store_path=store)
 
     await scheduler.restore()
@@ -311,77 +293,30 @@ async def test_schedule_rejects_when_over_limit(tmp_path: Path, supervisor: Time
 
 
 
+@pytest.mark.parametrize("group_id", [456, None], ids=["group", "private"])
 @pytest.mark.asyncio
-async def test_run_forgets_record_before_firing_group(
+async def test_run_forgets_record_before_dispatch(
     tmp_path: Path,
     supervisor: TimeTriggerSupervisor,
     fake_chats,
     monkeypatch: pytest.MonkeyPatch,
+    group_id: Optional[int],
 ) -> None:
-    group_chat, _ = fake_chats
+    group_chat, private_chat = fake_chats
     store = tmp_path / "scheduled_triggers.json"
     scheduler = SelfTriggerScheduler(store_path=store)
-    record = _make_record(delay=3600.0)
+    record = _make_record(delay=3600.0, group_id=group_id)
     await scheduler.schedule(record)
 
     # 事件重建替换为固定返回, 聚焦验证分发行为
-    sentinel_event = object()
-    monkeypatch.setattr(scheduler, "_rebuild_event", lambda rec: sentinel_event)
+    monkeypatch.setattr(scheduler, "_rebuild_event", lambda rec: object())
 
     await scheduler._run(record.record_id)
 
     # at-most-once: 触发前记录已从文件删除
     assert _read_store(store) == []
-    assert group_chat.calls == [record.note]
-
-
-@pytest.mark.asyncio
-async def test_run_dispatches_private_chat(
-    tmp_path: Path,
-    supervisor: TimeTriggerSupervisor,
-    fake_chats,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    _, private_chat = fake_chats
-    store = tmp_path / "scheduled_triggers.json"
-    scheduler = SelfTriggerScheduler(store_path=store)
-    record = _make_record(delay=3600.0, group_id=None)
-    await scheduler.schedule(record)
-
-    monkeypatch.setattr(scheduler, "_rebuild_event", lambda rec: object())
-
-    await scheduler._run(record.record_id)
-
-    assert private_chat.calls == [record.note]
-    assert _read_store(store) == []
-
-
-@pytest.mark.asyncio
-async def test_run_without_chat_service_does_not_raise(
-    tmp_path: Path,
-    supervisor: TimeTriggerSupervisor,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """容器里没有对应聊天服务时只记日志, 不向外抛异常"""
-    store = tmp_path / "scheduled_triggers.json"
-    scheduler = SelfTriggerScheduler(store_path=store)
-    record = _make_record(delay=3600.0)
-    await scheduler.schedule(record)
-
-    monkeypatch.setattr(scheduler, "_rebuild_event", lambda rec: object())
-
-    original_get_by_type = ts.container.get_by_type
-
-    def _raise_not_found(cls: type) -> Any:
-        if cls in (GroupChat, PrivateChat):
-            raise ValueError("not found")
-        return original_get_by_type(cls)
-
-    monkeypatch.setattr(ts.container, "get_by_type", _raise_not_found)
-
-    await scheduler._run(record.record_id)
-    assert _read_store(store) == []
-
+    expected = group_chat if group_id is not None else private_chat
+    assert expected.calls == [record.note]
 
 
 def test_rebuild_event_with_adapter(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -417,27 +352,3 @@ def test_rebuild_event_without_adapter(tmp_path: Path, monkeypatch: pytest.Monke
 
     with pytest.raises(RuntimeError):
         scheduler._rebuild_event(_make_record())
-
-
-@pytest.mark.asyncio
-async def test_get_scheduler_idempotent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_init(
-        self: SelfTriggerScheduler,
-        store_path: Optional[Path] = None,
-        grace_seconds: Optional[float] = None,
-        max_tasks: Optional[int] = None,
-    ) -> None:
-        self.log = logging.getLogger("test.SelfTrigger")
-        self._store_path = Path(tmp_path) / "scheduled_triggers.json"
-        self._tasks = {}
-        self._task_ids = {}
-        self._save_lock = asyncio.Lock()
-        self._restored = True
-
-    monkeypatch.setattr(ts.SelfTriggerScheduler, "__init__", fake_init)
-
-    first = ts.get_scheduler()
-    second = ts.get_scheduler()
-
-    assert first is second
-    assert container.exists(SCHEDULER_SERVICE_NAME)

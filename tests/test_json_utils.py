@@ -1,3 +1,5 @@
+import pytest
+
 from atribot.common_utils.json_utils import extract_json_from_text
 
 
@@ -91,8 +93,6 @@ FULL_ACTIONS_JSON = """{
 
 def _parse_full_actions():
     return extract_json_from_text(FULL_ACTIONS_JSON)["actions"]
-
-
 def test_extract_json_parses_full_actions_reply():
     result = extract_json_from_text(f"```json\n{FULL_ACTIONS_JSON}\n```")
 
@@ -106,20 +106,11 @@ def test_extract_json_parses_full_actions_reply():
     assert actions[2]["user_id"] == 2731085291
 
 
-def test_extract_json_recovers_complete_actions_from_truncated_reply():
+@pytest.mark.parametrize("prefix", ["", "```json\n"], ids=["raw", "open-fence"])
+def test_extract_json_recovers_complete_actions_from_truncated_reply(prefix):
     # 模拟 max_tokens 截断：前两个 action 完整，第三个只输出了开头
     cut = FULL_ACTIONS_JSON.rindex("        {")
-    truncated = FULL_ACTIONS_JSON[:cut] + '        {\n            "decision": "update",\n      '
-
-    result = extract_json_from_text(truncated)
-
-    assert result["actions"] == _parse_full_actions()[:2]
-
-
-def test_extract_json_recovers_truncated_reply_inside_open_fence():
-    # 截断发生时闭合围栏 ``` 同样不会输出
-    cut = FULL_ACTIONS_JSON.rindex("        {")
-    truncated = "```json\n" + FULL_ACTIONS_JSON[:cut] + '        {\n            "decision": "update",\n      '
+    truncated = prefix + FULL_ACTIONS_JSON[:cut] + '        {\n            "decision": "update",\n      '
 
     result = extract_json_from_text(truncated)
 

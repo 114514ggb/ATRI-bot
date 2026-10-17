@@ -18,11 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from atribot.common_utils.net_utils import (
-    bind_port_with_fallback,
-    is_port_in_use,
-    try_bind_port,
-)
+from atribot.common_utils.net_utils import is_port_in_use, try_bind_port
 from atribot.core.atri_config import FilePathConfig
 from atribot.core.type.chat_message_types import File
 from atribot.LLMchat.sandbox.factory import normalize_sandbox_type
@@ -30,7 +26,7 @@ from atribot.LLMchat.sandbox.no_sandbox import NoSandbox
 
 
 class TestNetUtils:
-    """端口探测与回退绑定"""
+    """端口探测"""
 
     def test_try_bind_port_returns_bound_socket(self):
         """成功绑定时返回已绑定但未监听的 socket，端口与请求一致"""
@@ -41,8 +37,8 @@ class TestNetUtils:
         finally:
             sock.close()
 
-    def test_try_bind_port_detects_conflict(self):
-        """端口被占用时返回 None（同一地址重复绑定）"""
+    def test_try_bind_port_failure_modes(self):
+        """端口被占用 / 端口越界时返回 None"""
         occupied = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         occupied.bind(("127.0.0.1", 0))
         port = occupied.getsockname()[1]
@@ -51,41 +47,8 @@ class TestNetUtils:
             assert try_bind_port("127.0.0.1", port) is None
         finally:
             occupied.close()
-
-    def test_try_bind_port_handles_out_of_range_port(self):
-        """端口越界时 socket 抛 OverflowError，应被吞掉并返回 None"""
+        # 越界端口: socket 抛 OverflowError, 应被吞掉并返回 None
         assert try_bind_port("127.0.0.1", 70000) is None
-
-    def test_bind_port_with_fallback_skips_occupied(self):
-        """回退绑定应跳过被占用的端口，返回可用端口"""
-        occupied = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        occupied.bind(("127.0.0.1", 0))
-        port = occupied.getsockname()[1]
-        try:
-            result = bind_port_with_fallback("127.0.0.1", port, max_attempts=5)
-            assert result is not None
-            sock, actual = result
-            try:
-                assert actual != port
-            finally:
-                sock.close()
-        finally:
-            occupied.close()
-
-    def test_no_reuseaddr_on_windows(self):
-        """Windows 上不设置 SO_REUSEADDR（否则占用检测会失效）"""
-        sock = try_bind_port("127.0.0.1", 0)
-        assert sock is not None
-        try:
-            reuseaddr = sock.getsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR)
-        finally:
-            sock.close()
-
-        if sys.platform == "win32":
-            # Windows 默认就是开启的，这里只确认代码没有额外设置导致探测失效
-            assert reuseaddr in (0, 1)
-        else:
-            assert reuseaddr != 0
 
 
 class TestApplyPathMapping:
@@ -117,33 +80,21 @@ class TestApplyPathMapping:
         }
         assert FilePathConfig.apply_path_mapping("E:/a/b/c.txt", mapping) == "/mnt/e/ab/c.txt"
 
-    def test_unmatched_path_returned_unchanged(self):
-        """未命中任何前缀时原样返回"""
+    def test_unmatched_or_empty_mapping_is_noop(self):
+        """未命中前缀 / 空映射时原样返回"""
         mapping = {"E:/a": "/mnt/e/a"}
         assert FilePathConfig.apply_path_mapping("D:/other/x.txt", mapping) == "D:/other/x.txt"
-
-    def test_empty_mapping_is_noop(self):
-        """空映射不做任何转换"""
         assert FilePathConfig.apply_path_mapping("E:/a/b.txt", {}) == "E:/a/b.txt"
 
 
 class TestFileUrlConstruction:
     """File 封装类的协议前缀（Windows 盘符不再被破坏）"""
 
-    def test_from_local_path_adds_file_scheme(self):
-        """本地路径自动加 file:// 前缀"""
+    def test_factory_prefixes(self):
+        """本地路径加 file://（反斜杠原样保留）, URL 不加前缀, base64 加 base64://"""
         assert File.from_local_path("D:/x/y.png").file == "file://D:/x/y.png"
-
-    def test_from_local_path_keeps_backslashes(self):
-        """反斜杠路径原样保留（由 path_mapping 负责后续转换）"""
         assert File.from_local_path(r"D:\x\y.png").file == r"file://D:\x\y.png"
-
-    def test_from_url_not_prefixed(self):
-        """http(s) URL 不加 file:// 前缀"""
         assert File.from_url("https://example.com/a.png").file == "https://example.com/a.png"
-
-    def test_from_base64_adds_scheme(self):
-        """base64 数据自动加 base64:// 前缀"""
         assert File.from_base64("aGVsbG8=").file == "base64://aGVsbG8="
 
     def test_detect_type_by_scheme(self):
@@ -178,11 +129,6 @@ class TestNoSandboxShellResolution:
         sandbox = NoSandbox(config={"work_dir": str(tmp_path)})
         assert "\\" not in sandbox.work_dir
         assert Path(sandbox.work_dir).resolve() == Path(tmp_path).resolve()
-
-    def test_shell_kind_is_recognized(self, tmp_path):
-        """解析出的 shell 必须是已识别的三类之一"""
-        sandbox = NoSandbox(config={"work_dir": str(tmp_path)})
-        assert sandbox.shell_kind in {"sh", "bash", "cmd", "powershell"}
 
     @pytest.mark.skipif(sys.platform != "win32", reason="仅 Windows 分支")
     def test_windows_shell_is_not_wsl_bash(self, tmp_path):

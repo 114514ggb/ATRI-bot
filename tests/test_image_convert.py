@@ -70,6 +70,13 @@ def test_convert_to_jpeg_output_is_valid_jpeg():
             assert img.format == "JPEG"
             img.verify()
 
+    # compress_image 同样不吃透传:PNG 输入压缩后输出标准 JPEG
+    raw = _png_bytes()
+    compressed = compress_image(raw, 1024)
+    assert compressed != raw
+    with Image.open(io.BytesIO(compressed)) as img:
+        assert img.format == "JPEG"
+
 
 def test_convert_to_jpeg_animated_gif_takes_first_frame():
     """动画 GIF 转码后为单帧静态图"""
@@ -110,15 +117,6 @@ def test_compress_image_raises_on_corrupt():
     """compress_image 对损坏/截断数据抛 OSError,不静默回退为灰色填充"""
     with pytest.raises(OSError):
         compress_image(_corrupt_bytes(), 1024)
-
-
-def test_compress_image_transcodes_small_image():
-    """小图不再透传:PNG 输入压缩后输出为标准 JPEG"""
-    raw = _png_bytes()
-    result = compress_image(raw, 1024)
-    assert result != raw
-    with Image.open(io.BytesIO(result)) as img:
-        assert img.format == "JPEG"
 
 
 @pytest.fixture

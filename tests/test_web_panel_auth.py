@@ -296,15 +296,16 @@ def test_session_store_keeps_digest_only():
 # ---------- 主令牌读取：弱口令告警 / 轮换清空 / TTL ----------
 
 
-def test_weak_token_warning_once(monkeypatch, caplog):
+def test_weak_token_warnings(monkeypatch, caplog):
+    # 过短口令：进程内只告警一次
     _set_config(monkeypatch, {"web_panel": {"access_token": "short"}})
     with caplog.at_level(logging.WARNING, logger="atri-bot.WebPanel"):
         deps._access_token()
         deps._access_token()
     assert sum("过弱" in r.getMessage() for r in caplog.records) == 1
 
-
-def test_weak_token_warning_when_matches_platform(monkeypatch, caplog):
+    # 与平台 access_token 相同：额外提醒凭据复用
+    caplog.clear()
     _set_config(
         monkeypatch,
         {
@@ -312,6 +313,7 @@ def test_weak_token_warning_when_matches_platform(monkeypatch, caplog):
             "platforms": {"napcat": {"access_token": "platform-shared-token-123"}},
         },
     )
+    monkeypatch.setattr(deps, "_weak_token_warned", False)
     with caplog.at_level(logging.WARNING, logger="atri-bot.WebPanel"):
         deps._access_token()
     assert any("与平台 napcat 的 access_token 相同" in r.getMessage() for r in caplog.records)

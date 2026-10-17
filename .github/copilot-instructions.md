@@ -329,7 +329,6 @@ async def main(**kwargs) -> Any:
 - 每轮对话由 `ChatBasics._prepare_round_toolset()` 复制模板 `ToolSet`（`replace()` 为浅拷贝，必须每轮 `copy()`，否则会污染长生命周期模板预设）；`LLMCoordinator.get_chat_json()` 每次 API 请求重读 `request.tool_json`，本轮内动态追加的工具即时生效
 - `tool_search` 触发流程：抛 `ToolSearchRequested`（`atribot/core/type/context_types.py`）→ `LLMCoordinator._handle_tool_search_request` → `ToolCalls.enable_deferred_tools(query, limit, target_toolset, preset_name)` 评分并临时加入本轮可用工具，下一轮自动还原
 - 相关 API：`ToolCalls.resolve_toolset(preset=...)` / `get_openai(toolset=...)` / `enable_deferred_tools()` / `get_deferred_tools_prompt(preset)`；`ToolSet` 定义于 `atribot/LLMchat/MCP/tool_model.py`；评分函数 `score_tool` 位于 `tool_calls.py` 模块级
-- 测试：`tests/test_tool_search.py`
 
 ### 4. 定时任务
 - 通过 `container.get_by_type(TimeTriggerSupervisor)` 获取调度器，支持一次性延迟、固定间隔、Cron 三种模式：

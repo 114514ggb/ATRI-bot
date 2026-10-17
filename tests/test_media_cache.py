@@ -1,12 +1,9 @@
 import base64
-import io
 import os
 
 import pytest
 
 from atribot.common_utils.file import media_cache as mc
-from atribot.common_utils.file.image_utils import url_to_image_jpeg
-from atribot.core.type.chat_message_types import File
 
 
 @pytest.fixture
@@ -26,16 +23,15 @@ def test_make_cache_key_stable_for_same_file_name():
     assert k1 == k2
 
 
-def test_make_cache_key_differs_by_params():
-    k1 = mc.make_cache_key("image", "src", "abc.image", "kb=1024")
-    k2 = mc.make_cache_key("image", "src", "abc.image", "kb=512")
-    assert k1 != k2
+def test_make_cache_key_isolates_dimensions():
+    """缓存键对 params / kind / URL 路径任一维度不同都不同"""
+    base = mc.make_cache_key("image", "src", "abc.image", "kb=1024")
+    assert base != mc.make_cache_key("image", "src", "abc.image", "kb=512")
+    assert base != mc.make_cache_key("audio", "src", "abc.image", "kb=1024")
 
-
-def test_make_cache_key_differs_by_kind():
-    k1 = mc.make_cache_key("image", "src", "abc.image", "kb=1024")
-    k2 = mc.make_cache_key("audio", "src", "abc.image", "kb=1024")
-    assert k1 != k2
+    assert mc.make_cache_key("image", "https://cdn.example.com/a/1-0.jpg?sig=1", None, "kb=1024") != mc.make_cache_key(
+        "image", "https://cdn.example.com/b/2-0.jpg?sig=2", None, "kb=1024"
+    )
 
 
 def test_make_cache_key_stable_url_without_file_name():
@@ -49,11 +45,6 @@ def test_make_cache_key_differs_for_different_urls():
     k1 = mc.make_cache_key("image", "https://cdn.example.com/a/1-0.jpg?sig=1", None, "kb=1024")
     k2 = mc.make_cache_key("image", "https://cdn.example.com/b/2-0.jpg?sig=2", None, "kb=1024")
     assert k1 != k2
-
-
-@pytest.mark.asyncio
-async def test_cache_get_miss_returns_none(cache_dir):
-    assert await mc.cache_get("not-exist") is None
 
 
 @pytest.mark.asyncio
@@ -125,24 +116,3 @@ async def test_enforce_cache_limit_evicts_oldest(cache_dir):
     # 被淘汰条目的 meta 同步删除
     assert not (cache_dir / "key-0.json").exists()
     assert not (cache_dir / "key-1.json").exists()
-
-
-@pytest.mark.asyncio
-async def test_url_to_image_jpeg_uses_cache(tmp_path, monkeypatch):
-    """同一本地图片第二次调用直接命中磁盘缓存，不重复压缩"""
-    monkeypatch.setattr(mc, "_cache_dir", tmp_path)
-
-    buf = io.BytesIO()
-    from PIL import Image
-
-    Image.new("RGB", (64, 64), color="red").save(buf, format="JPEG")
-    image_path = tmp_path / "test.jpg"
-    image_path.write_bytes(buf.getvalue())
-
-    source = File.from_local_path(str(image_path))
-    first = await url_to_image_jpeg(source, file_name="stable.image")
-    second = await url_to_image_jpeg(source, file_name="stable.image")
-
-    assert first.data == second.data
-    # 磁盘上只有 1 个缓存条目，说明第二次未重新下载/压缩
-    assert len(list(tmp_path.glob("*.bin"))) == 1

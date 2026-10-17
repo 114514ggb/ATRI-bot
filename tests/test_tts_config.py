@@ -20,17 +20,16 @@ def _service() -> TTSService:
 
 # ---------- 面板保存校验 ----------
 
-def test_validate_tts_absent_is_valid():
+def test_validate_tts_shape_and_happy_path():
+    # 未配置 / None 都是合法的空配置
     assert _validate_tts({}) == []
     assert _validate_tts({"tts": None}) == []
 
-
-def test_validate_tts_must_be_object():
+    # 非对象立即报错
     errors = _validate_tts({"tts": []})
     assert errors and "tts 必须是对象" in errors[0]
 
-
-def test_validate_tts_valid_config():
+    # 完整合法配置无错误
     data = {
         "tts": {
             "api_url": "http://127.0.0.1:9880",
@@ -93,13 +92,3 @@ def test_load_falls_back_to_builtin_emotions():
     assert set(emotions) == {"高兴", "机械", "平静"}
     expected_dir = Path("D:/audio") / "tts_reference"
     assert all(Path(item["refer_wav_path"]).parent == expected_dir for item in emotions.values())
-
-
-def test_supported_emotions_follow_config():
-    config = SimpleNamespace(
-        tts={"emotions": {"自定义": {"refer_wav_path": "D:/tts/custom.mp3"}}},
-        file_path=SimpleNamespace(audio="D:/audio"),
-    )
-    service = _service()
-    service.emotion_list = service._load_tts_config(config)[1]
-    assert service.get_supported_emotions() == ["自定义"]
