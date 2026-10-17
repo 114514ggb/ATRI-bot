@@ -185,21 +185,14 @@ def _find_bot_image() -> Optional[Path]:
     return None
 
 
-@router.get("/api/chat/avatar")
-async def api_chat_avatar(token: str = "") -> FileResponse:
-    """机器人头像：ATRI-bot 图（img 标签走 query 令牌；FileResponse 自带 ETag，换图自动失效）"""
-    _require_session(token)
-    path = _find_bot_image()
-    if path is None:
-        raise HTTPException(status_code=404, detail="未找到头像图片（在配置目录下放置 ATRI-bot.png）")
-    return FileResponse(path, media_type=_AVATAR_MEDIA[path.suffix.lower()])
-
-
 @router.get("/api/panel/logo")
 async def api_panel_logo() -> FileResponse:
-    """面板品牌图：免鉴权——登录页与 favicon 在拿到令牌之前就要显示，
-    且仅读取固定候选文件名的 ATRI-bot 图，泄露面只是头像本身。
-    FileResponse 自带 ETag，换图自动失效。"""
+    """品牌图（ATRI-bot 图）：**免鉴权**——登录页、favicon、侧栏徽章与品牌位在拿到令牌之前就要显示。
+
+    仅读取固定候选文件名的 ATRI-bot 图（无路径穿越、无用户数据），泄露面只是头像本身；
+    文件不存在返回 404。FileResponse 自带 ETag，换图自动失效。
+    注：旧端点 /api/chat/avatar 已删除，统一走此处。
+    """
     path = _find_bot_image()
     if path is None:
         raise HTTPException(status_code=404, detail="未找到品牌图片（在配置目录下放置 ATRI-bot.png）")

@@ -108,7 +108,7 @@ def _prepare_files() -> Path:
     (tmp / "supplier_config.json").write_text(json.dumps(supplier, ensure_ascii=False, indent=4), encoding="utf-8")
     (tmp / "mcp_server.json").write_text(json.dumps({"mcpServers": {}}, ensure_ascii=False, indent=4), encoding="utf-8")
 
-    # 头像：把项目 assets 下的 ATRI-bot 图带进开发环境，聊天页可预览真实头像
+    # 品牌图：把项目 assets 下的 ATRI-bot 图带进开发环境，/api/panel/logo（登录页/侧栏/聊天页头像）可预览真实图片
     for cand in ("ATRI-bot.png", "ATRI-bot.jpg", "ATRI-bot.jpeg", "ATRI-bot.webp", "ATRI-bot.gif"):
         src = PROJECT_ROOT / "assets" / cand
         if src.is_file():

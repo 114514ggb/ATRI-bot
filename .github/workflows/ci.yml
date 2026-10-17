@@ -32,6 +32,9 @@ jobs:
         run: ruff check .
 
       - name: Compile Python sources
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
         run: python -m compileall main.py atribot tests
         
       - name: Run Pytest
@@ -63,6 +66,9 @@ jobs:
         run: ruff check .
 
       - name: Compile Python sources
+        env:
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
         run: python -m compileall main.py atribot tests
 
       - name: Run Pytest

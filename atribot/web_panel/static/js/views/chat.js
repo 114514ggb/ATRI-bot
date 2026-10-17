@@ -17,8 +17,8 @@ const CODECOGS = 'https://latex.codecogs.com/png.image?\\dpi{150}&space;';
 const MATH_HINT = /[\\^_{}=+<>|]/;
 const MAX_FORMULA_LEN = 300;
 
-/* 用户头像：直链 QQ 头像服务（q1.qlogo.cn 已在面板 CSP 的 img-src 白名单中）；
-   加载失败时降级为文字「我」，与机器人头像的字母 A 兜底同构 */
+
+const BOT_AVATAR_URL = 'https://q1.qlogo.cn/g?b=qq&nk=168238719&s=640';
 const USER_AVATAR_URL = 'https://q1.qlogo.cn/g?b=qq&nk=1317196420&s=640';
 
 /* ---------- 模块级运行状态（destroy 时清理） ---------- */
@@ -219,15 +219,16 @@ function el(tag, cls, html = '') {
 /* ---------- 头像与时间戳 ---------- */
 
 function avatarUrl() {
-  return `/admin/api/chat/avatar?token=${encodeURIComponent(getToken() || '')}`;
+  return BOT_AVATAR_URL;
 }
 
-/* 机器人头像：配置目录下的 ATRI-bot 图，加载失败（未配令牌/无图）回退字母 A */
+/* 机器人头像：直接使用 168238719 的 QQ 头像，加载失败时回退字母 A */
 function makeBotAvatar() {
   const wrap = el('div', 'chat-avatar bot-avatar');
   const img = document.createElement('img');
   img.className = 'chat-avatar-img';
   img.alt = 'ATRI';
+  img.referrerPolicy = 'no-referrer';
   img.addEventListener('error', () => { img.remove(); wrap.textContent = 'A'; });
   img.src = avatarUrl();
   wrap.appendChild(img);
@@ -1413,7 +1414,7 @@ async function init(section) {
           <div class="chat-attachments" id="chat-attachments"></div>
           <div class="chat-input-row">
             <button class="icon-btn" id="chat-attach-btn" title="添加附件（图片/音频/视频/文件）">${icon('file')}</button>
-            <textarea class="chat-textarea" id="chat-text" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行；可直接拖入文件"></textarea>
+            <textarea class="chat-textarea" id="chat-text" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行, 可直接拖入添加文件"></textarea>
             <button class="btn primary" id="chat-send">${icon('send')} 发送</button>
           </div>
         </div>

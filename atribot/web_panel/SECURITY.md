@@ -16,6 +16,7 @@
 |---|---|
 | 认证链 | 主令牌仅登录可用；常量时间比较；弱口令可硬拒（`block_weak_token`） |
 | 会话 | 固定 1-24h（默认 4h）、不滑动；登出/过期/主令牌轮换即失效；容量上限 100 |
+| 免鉴权端点 | 仅 `POST /api/login`（换令牌）与 `GET /api/panel/logo`（品牌图 / 机器人头像：只读固定候选文件名的 ATRI-bot 图，无路径穿越、无用户数据，登录页与 favicon 早于令牌就需要显示）。其余 `/admin/api/*` 一律要求会话令牌；旧 `/api/chat/avatar` 已删除，统一走 `/api/panel/logo` |
 | WebSocket | 一次性票据（30s、单次）；建连后周期复验，吊销后 4401 断开；旧 `?token=` 兼容 |
 | 安全响应头 | 全部 `/admin*`：`nosniff`、`X-Frame-Options: DENY`、`Referrer-Policy: no-referrer`、CSP（`script-src 'self'`、`frame-ancestors 'none'` 等）；`/admin/api/*` 加 `Cache-Control: no-store` |
 | CSP 前提 | `index.html` 不含内联脚本（主题引导在 `static/js/theme-init.js`）；新增内联脚本会导致被 CSP 拦截 |

@@ -351,7 +351,7 @@ def test_session_ttl_config_clamped(monkeypatch):
 
 
 def test_all_api_routes_require_session_auth():
-    """除登录/logo 白名单外，所有 HTTP API 路由必须挂 _auth 依赖"""
+    """除登录 + 免鉴权品牌图（panel/logo）白名单外，所有 HTTP API 路由必须挂 _auth 依赖"""
     from fastapi.routing import APIRoute
 
     from atribot.web_panel.routes import all_routers
@@ -359,7 +359,8 @@ def test_all_api_routes_require_session_auth():
     # 该 FastAPI 版本 include_router 为惰性（_IncludedRouter 占位），故直接遍历各子路由
     # 媒体端点（img/audio 标签无法带 Header）在函数体内调用 _require_session 校验会话，
     # 不通过依赖项；白名单外的路由必须显式挂 _auth。
-    query_token_endpoints = {"/admin/api/chat/files/{file_id}", "/admin/api/chat/avatar"}
+    # /api/panel/logo 免鉴权（登录页/favicon 早于令牌），旧 /api/chat/avatar 已删除。
+    query_token_endpoints = {"/admin/api/chat/files/{file_id}"}
     exempt = {"/admin/api/login", "/admin/api/panel/logo"} | query_token_endpoints
     checked = 0
     for sub_router in all_routers:

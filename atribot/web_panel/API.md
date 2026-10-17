@@ -15,7 +15,7 @@
 1. 先调用 `POST /api/login`，用**主令牌**（面板口令）换取**会话令牌**；
 2. 之后所有请求携带会话令牌——HTTP 端点用 `Authorization: Bearer <session_token>`；
 3. WebSocket 不能带自定义请求头，采用**一次性票据**：先 `POST /api/ws_ticket`（会话令牌鉴权）拿 `ticket`，再用 `?ticket=<ticket>` 建连（30 秒有效、单次使用；旧 `?token=<session_token>` 仍兼容）；
-4. `<img>`/`<audio>`/`<video>` 标签既不能带请求头也不能先取票，仍用 `?token=<session_token>`（配合 `Referrer-Policy: no-referrer` 防 Referer 外泄）。
+4. `<img>`/`<audio>`/`<video>` 标签既不能带请求头也不能先取票，仍用 `?token=<session_token>`（配合 `Referrer-Policy: no-referrer` 防 Referer 外泄）。唯一例外是免鉴权端点 `/api/panel/logo`（品牌图，见端点表）与 `/api/login`。
 
 - 主令牌来源优先级（`deps.py::_access_token`）：
   1. `config.json` 的 `web_panel.access_token`
@@ -161,8 +161,7 @@
 | GET | `/api/chat/info` | 聊天页启动信息：`defaults`（supplier/model/persona/chat_parameter）、`webui_preset`（工具预设 default/deferred 名单）、`limits`（image/audio/video/file 上传限额，字节）、`max_turns`、`id_range` |
 | POST | `/api/chat/upload` | 上传聊天附件（multipart `file` 字段，流式读取，按类别限大小）。返回 `{status, file}`（附件摘要，含 `id`）；超限 413 |
 | GET | `/api/chat/files/{file_id}` | 附件预览/下载（会话令牌走 query 参数鉴权）。不存在或已过期 404 |
-| GET | `/api/chat/avatar` | 机器人头像（会话令牌走 query 参数鉴权）：ATRI-bot 图（png/jpg/jpeg/webp/gif）。查找顺序：配置文件同级目录 → `ATRI_SOURCE_CONFIG_PATH` 同级目录（Docker 的 `/app/assets`）→ `<project_root>/assets` → `<project_root>` |
-| GET | `/api/panel/logo` | 面板品牌图（与 `/api/chat/avatar` 同一张图、同一查找顺序）。**免鉴权**（登录页与 favicon 用）；文件不存在 404 |
+| GET | `/api/panel/logo` | 品牌图 / 机器人头像（ATRI-bot 图，png/jpg/jpeg/webp/gif）。**免鉴权**（登录页、favicon、侧栏徽章与聊天页头像在拿到令牌之前就要显示）。查找顺序：配置文件同级目录 → `ATRI_SOURCE_CONFIG_PATH` 同级目录（Docker 的 `/app/assets`）→ `<project_root>/assets` → `<project_root>`；文件不存在 404。旧端点 `/api/chat/avatar` 已删除，统一走此处 |
 | POST | `/api/chat/tools` | 保存 webui 工具预设。Body：`{ "tools": ["工具名"...], "deferred": ["工具名"...] \| 省略 }`。`deferred` 缺省表示不改动待发现组。持久化到 config.json。返回 `{status, tools, deferred}` |
 | GET | `/api/chat/sessions` | 全部会话概览。返回 `{ items: [...] }` |
 | DELETE | `/api/chat/sessions/{session_id}` | 删除会话。返回 `{status, deleted}` |
