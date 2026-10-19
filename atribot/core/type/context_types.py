@@ -336,6 +336,8 @@ class Context():
     """user消息token限制"""
     play_role:str = ""
     """模型人物提示词"""
+    static_prompt:str = ""
+    """追加在人设后的静态提示词"""
     total_tokens:int = 0
     """上一轮api响应中给出的上下文token"""
     async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
@@ -383,7 +385,7 @@ class Context():
         Returns:
             List[Dict[str, Any]]: 上下文list
         """
-        if parts := [p for p in (self.play_role, inject_text) if p]:
+        if parts := [p for p in (self.play_role, self.static_prompt, inject_text) if p]:
             return [{"role": "system", "content": "\n\n".join(parts)}, *self.messages]
 
         return self.messages

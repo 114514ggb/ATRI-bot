@@ -69,6 +69,7 @@ MAX_SINGLE_MESSAGE_LENGTH = 4  # 分条发送长度阈值
 LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
 STRING_LENGTH_LIMIT = 500 #字符串长度限制
 
+
 class ChatBasics(ABC):
     """聊天基类"""
 
@@ -136,8 +137,63 @@ class ChatBasics(ABC):
         """主的聊天逻辑处理的全流程"""
 
     @abstractmethod
-    async def prompt_structure(self) -> None:
+    async def prompt_structure(self) -> MessageBuilder:
         """模型的提示词构建"""
+
+    @abstractmethod
+    def _static_rules(self) -> str:
+        """场景相关的纯静态决策规则"""
+
+    @staticmethod
+    def _format_stored_message(
+        user_id: int | None,
+        prompt: str,
+        group_id: int | None = None,
+        body: str = "",
+    ) -> str:
+        """构造写入历史的精简 user 消息,带上群号/用户等状态以便后续回看时定位来源
+
+        发送给模型的是完整提示词,这里只保留触发原因与消息本体,不重复存储每轮都重新构造的内容
+        """
+        attrs = f" time=\"{time.strftime('%Y-%m-%d %H:%M:%S')}\""
+        if group_id:
+            attrs += f" group_id=\"{group_id}\""
+        if user_id:
+            attrs += f" user_id=\"{user_id}\""
+        text = f"<context{attrs}><prompt>{prompt}</prompt></context>"
+        return f"{text}\n{body}" if body else text
+
+    def _build_static_system_prompt(self) -> str:
+        """构建追加在人设后的静态 system 文本
+
+        不得包含时间/群号/用户等随请求变化的内容,否则提示词缓存失效;
+        每次请求现算,保证技能/工具热重载后下一轮即生效
+        """
+        parts = [
+            self._static_rules(),
+            self.emoji_core.prompt,
+            self.skills.prompt,
+            self.tool_calls.get_deferred_tools_prompt(
+                self._tool_preset_name, chat_type=self._tool_chat_type
+            ),
+        ]
+        return "\n\n".join(p for p in parts if p)
+
+    def _log_cache_usage(self, uid: str, response: GenerationResponse) -> None:
+        """输出本轮提示词缓存命中情况(兼容 OpenAI/DeepSeek/Anthropic 的 usage 字段)"""
+        usage = response.metadata or {}
+        prompt_tokens = usage.get("prompt_tokens") or 0
+        details = usage.get("prompt_tokens_details") or {}
+        cached = (
+            details.get("cached_tokens")
+            or usage.get("prompt_cache_hit_tokens")
+            or usage.get("cache_read_input_tokens")
+            or 0
+        )
+        if prompt_tokens:
+            self.log.info(
+                f"[{uid}]提示词缓存命中 {cached}/{prompt_tokens} ({cached / prompt_tokens:.0%})"
+            )
 
     @abstractmethod
     async def send_reply_message_separator(self) -> None:
@@ -419,8 +475,12 @@ class ChatBasics(ABC):
         including_pictures: bool,
         including_audios: bool = False,
         including_videos: bool = False,
-    ) -> None:
-        """为当前用户输入附加结构化的消息片段"""
+    ) -> str:
+        """为当前用户输入附加结构化的消息片段
+
+        Returns:
+            相关记忆片段文本(随请求变化,由调用方放入临时尾巴);无则为空字符串
+        """
         role = event.event.sender.get("role")
         role_line = f"<group_role>{role}</group_role>" if role != "member" else ""
 
@@ -459,9 +519,9 @@ class ChatBasics(ABC):
                 )
             ])
         ):
-            message_builder.add_text(
-                f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>"
-            )
+            return f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>"
+
+        return ""
 
 
 class GroupChat(ChatBasics):
@@ -564,6 +624,7 @@ class GroupChat(ChatBasics):
             group_id = group_id,
             user_id = user_id
         )#以前决策的上下文
+        original_context.static_prompt = self._build_static_system_prompt()
         
         request: GenerationRequestSimplify = replace(
             self.template_request_simplify,
@@ -575,18 +636,31 @@ class GroupChat(ChatBasics):
         
         response = await self._request_model_with_fallback_(
             request = request, 
-            event = event,
-            prompt = prompt, 
+            rebuild = lambda including_pictures: self.prompt_structure(
+                event=event,
+                prompt=prompt,
+                group_id=group_id,
+                user_id=user_id,
+                including_pictures=including_pictures,
+            ),
             uid = uid
         )
 
         self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
+        self._log_cache_usage(uid, response)
 
         if not await self._dispatch_response_actions(response, event, uid):
             await self._send_unparseable_fallback(event, "".join(response.reply_text))
         
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
-        original_context.add_user_message(f"{prompt}\n用户消息:{event.llm_formatted_message}")
+        original_context.add_user_message(
+            self._format_stored_message(
+                group_id=group_id,
+                user_id=user_id,
+                prompt=prompt,
+                body=f"用户消息:{event.llm_formatted_message}",
+            )
+        )
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
@@ -643,31 +717,28 @@ class GroupChat(ChatBasics):
         group_id = event.group_id
         user_id = event.user_id or None
 
-        message_builder = MessageBuilder()
+        prompt = custom_prompt
+        if user_id:
+            prompt += f"\n触发定时消息用户:<user_id>{user_id}</user_id>"
 
-        await self.chat_manager.add_group_messages_builder(
-            group_id=group_id,
-            builder=message_builder,
-            including_pictures=self.visual_sense,
-            including_audios=self.audio_sense,
-            including_videos=self.video_sense,
-        )
-        message_builder.add_text_left(
-            self.skills.prompt #skills的提示词
-        )
-
-        prompt =(
-            f"{custom_prompt}\n触发定时消息用户:<user_id>{user_id}</user_id>"
-            f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>" if user_id else ""
-        )
-        
-        message_builder.add_text(
-            self.build_prompt.decision_whether_responses(
+        async def build_message(including_pictures: bool) -> MessageBuilder:
+            builder = MessageBuilder()
+            await self.chat_manager.add_group_messages_builder(
                 group_id=group_id,
-                prompt=prompt,
-                else_prompt=self.emoji_core.prompt
+                builder=builder,
+                including_pictures=including_pictures,
+                including_audios=self.audio_sense,
+                including_videos=self.video_sense,
             )
-        )
+            builder.add_text(f"<prompt>{prompt}</prompt>")
+            builder.add_text(self.build_prompt.group_environment_block(group_id))
+            if user_id:
+                builder.add_text(
+                    f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
+                )
+            return builder
+
+        message_builder = await build_message(self.visual_sense)
 
         if user_id:
             #如果一个user触发了定时，那么应该在他的上下文消息里
@@ -676,7 +747,8 @@ class GroupChat(ChatBasics):
                 user_id = user_id
             )
         else:
-            original_context = self.chat_manager.get_group_context(group_id)
+            original_context = (await self.chat_manager.get_group_context(group_id)).chat_context
+        original_context.static_prompt = self._build_static_system_prompt()
 
         round_toolset = self._prepare_round_toolset()
 
@@ -690,17 +762,19 @@ class GroupChat(ChatBasics):
         
         response = await self._request_model_with_fallback_(
             request = request, 
-            event = event,
-            prompt = prompt, 
+            rebuild = build_message,
             uid = uid
         )
 
         self.log.info(f"[{uid}]模型返回json_list:\n{"".join(response.reply_text)}")
+        self._log_cache_usage(uid, response)
 
         if not await self._dispatch_response_actions(response, event, uid):
             await self._send_unparseable_fallback(event, "".join(response.reply_text))
 
-        original_context.add_user_message(prompt)
+        original_context.add_user_message(
+            self._format_stored_message(group_id=group_id, user_id=user_id, prompt=prompt)
+        )
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
@@ -752,6 +826,9 @@ class GroupChat(ChatBasics):
     ) -> MessageBuilder:
         """构建提示结构
 
+        顺序:群历史 + 当前消息 + 触发提示 + 环境说明 + 用户画像 + 记忆片段;
+        固定规则/表情/技能已放入 system,这里只放随请求变化的内容
+
         Args:
             event: 当前传入的聊天消息事件
             prompt: 主要的决策提示文本
@@ -773,33 +850,25 @@ class GroupChat(ChatBasics):
             including_audios=including_audios,
             including_videos=including_videos,
         )
-        
-        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("group_chat", chat_type="group"):
-            message_builder.add_text_left(deferred_prompt+self.skills.prompt)#待发现工具的提示词
-        else:
-            message_builder.add_text_left(
-                self.skills.prompt#skills的提示词
-            )
-        
-        await self.append_message_segments_prompt(
+        memory_text = await self.append_message_segments_prompt(
             event,
             message_builder,
             including_pictures,
             including_audios,
             including_videos,
         )
+        message_builder.add_text(f"<prompt>{prompt}</prompt>")
+        message_builder.add_text(self.build_prompt.group_environment_block(group_id))
         message_builder.add_text(
             f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
         )
-        message_builder.add_text(
-            self.build_prompt.decision_whether_responses(
-                group_id=group_id,
-                prompt=prompt,
-                else_prompt=self.emoji_core.prompt#表情包的提示词
-            )
-        )
+        if memory_text:
+            message_builder.add_text(memory_text)
 
         return message_builder
+
+    def _static_rules(self) -> str:
+        return self.build_prompt.group_static_rules()
 
     async def reply_conduct(self, response_json:Dict, event:MessageEventEnvelope)->None:
         
@@ -823,16 +892,14 @@ class GroupChat(ChatBasics):
     async def _request_model_with_fallback_(
         self,
         request: GenerationRequestSimplify,
-        event: MessageEventEnvelope,
-        prompt: str,
+        rebuild: Callable[[bool], Awaitable[MessageBuilder]],
         uid: str
     ) -> GenerationResponse:
         """尝试模型请求,失败时自动降级到配置的备用API
 
         Args:
             request (GenerationRequestSimplify): 请求体
-            event (MessageEventEnvelope): 原始消息事件
-            prompt (str): 响应提示词
+            rebuild: 按目标模型是否支持图像重新构建提示负载
             uid (str): 唯一响应的标识
 
         Returns:
@@ -878,15 +945,7 @@ class GroupChat(ChatBasics):
             else:
                 if not opposite_structure_increment_messages:
                     #没有缓存重新构建消息
-                    message_builder = await self.prompt_structure(
-                        event=event,
-                        prompt=prompt,
-                        group_id=event.group_id,
-                        user_id=event.user_id,
-                        including_pictures=visual_sense,
-                    )
-                    
-                    opposite_structure_increment_messages = [message_builder.build()]
+                    opposite_structure_increment_messages = [(await rebuild(visual_sense)).build()]
 
                 new_request = replace(
                     request,
@@ -1050,6 +1109,7 @@ class PrivateChat(ChatBasics):
 
         private_context_obj = await self.chat_manager.get_private_context(user_id)
         original_context: Context = private_context_obj.chat_context
+        original_context.static_prompt = self._build_static_system_prompt()
 
         round_toolset = self._prepare_round_toolset()
 
@@ -1063,16 +1123,27 @@ class PrivateChat(ChatBasics):
 
         response = await self._request_model_with_fallback_private_(
             request=request,
-            events=events,
-            prompt=prompt,
+            rebuild=lambda including_pictures: self.prompt_structure(
+                events=events,
+                prompt=prompt,
+                user_id=user_id,
+                including_pictures=including_pictures,
+            ),
             uid=uid,
         )
 
         self.log.info(f"[{uid}]私聊模型返回json_list:\n{''.join(response.reply_text)}")
+        self._log_cache_usage(uid, response)
 
         await self._dispatch_private_actions(response, latest, uid)
 
-        original_context.add_user_message(self._format_private_batch_context(events, prompt))
+        original_context.add_user_message(
+            self._format_stored_message(
+                user_id=user_id,
+                prompt=prompt,
+                body=self._format_private_batch_body(events),
+            )
+        )
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
@@ -1111,12 +1182,9 @@ class PrivateChat(ChatBasics):
             except Exception as e:
                 self.log.exception(f"[{uid}]私聊上下文信息总结出现了错误:{e}")
 
-    def _format_private_batch_context(self, events: list[MessageEventEnvelope], prompt: str) -> str:
-        """把一批私聊消息格式化为上下文用户消息
-
-        用户级信息(user_id/昵称)只出现一次;每条消息带序号与
-        相对上一条的间隔标记,内容保留多模态CQ码
-        """
+    @staticmethod
+    def _format_private_batch_body(events: list[MessageEventEnvelope]) -> str:
+        """把一批私聊消息格式化为落库文本(内容保留多模态CQ码)"""
         latest = events[-1]
         parts = [
             f"<MESSAGE count=\"{len(events)}\""
@@ -1130,7 +1198,7 @@ class PrivateChat(ChatBasics):
             )
             prev_receive = event.receive_time
         parts.append("</MESSAGE>")
-        return f"{prompt}\n" + "".join(parts)
+        return "".join(parts)
 
     async def _dispatch_private_actions(
         self,
@@ -1152,24 +1220,22 @@ class PrivateChat(ChatBasics):
         user_id = event.user_id
         self.log.info(f"[{uid}]私聊内部触发思考处理")
 
-        message_builder = MessageBuilder()
-
-        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("private_chat", chat_type="private"):
-            message_builder.add_text_left(deferred_prompt + self.skills.prompt)  # 待发现工具的提示词
-        else:
-            message_builder.add_text_left(self.skills.prompt)  # skills 的提示词
-
         prompt = custom_prompt
-        message_builder.add_text(
-            self.build_prompt.decision_whether_private_responses(
-                user_id=user_id,
-                prompt=prompt,
-                else_prompt=self.emoji_core.prompt,#表情包的提示词
+
+        async def build_message(including_pictures: bool) -> MessageBuilder:
+            builder = MessageBuilder()
+            builder.add_text(f"<prompt>{prompt}</prompt>")
+            builder.add_text(self.build_prompt.private_environment_block(user_id))
+            builder.add_text(
+                f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
             )
-        )
+            return builder
+
+        message_builder = await build_message(self.visual_sense)
 
         private_context_obj = await self.chat_manager.get_private_context(user_id)
         original_context: Context = private_context_obj.chat_context
+        original_context.static_prompt = self._build_static_system_prompt()
 
         round_toolset = self._prepare_round_toolset()
 
@@ -1183,16 +1249,18 @@ class PrivateChat(ChatBasics):
 
         response = await self._request_model_with_fallback_private_(
             request=request,
-            events=[event],
-            prompt=prompt,
+            rebuild=build_message,
             uid=uid,
         )
 
         self.log.info(f"[{uid}]私聊内部触发模型返回json_list:\n{''.join(response.reply_text)}")
+        self._log_cache_usage(uid, response)
 
         await self._dispatch_private_actions(response, event, uid)
 
-        original_context.add_user_message(prompt)
+        original_context.add_user_message(
+            self._format_stored_message(user_id=user_id, prompt=prompt)
+        )
         original_context.extend(
             [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
         )
@@ -1242,6 +1310,8 @@ class PrivateChat(ChatBasics):
     ) -> MessageBuilder:
         """构建私聊提示结构(批次)
 
+        顺序:本批消息 + 触发提示 + 环境说明 + 用户画像 + 记忆片段;
+        固定规则/表情/技能已放入 system
         用户级信息只出现一次;每条消息带序号/自身时间/与上一条的
         间隔标记,内容走多模态降级处理;记忆检索用整批拼接文本
         """
@@ -1277,6 +1347,11 @@ class PrivateChat(ChatBasics):
             prev_receive = event.receive_time
 
         message_builder.add_text("</MESSAGE>")
+        message_builder.add_text(f"<prompt>{prompt}</prompt>")
+        message_builder.add_text(self.build_prompt.private_environment_block(user_id))
+        message_builder.add_text(
+            f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
+        )
 
         #记忆检索
         combined_text = "".join(e.event.pure_text for e in events)
@@ -1301,24 +1376,10 @@ class PrivateChat(ChatBasics):
                 f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>"
             )
 
-        if deferred_prompt := self.tool_calls.get_deferred_tools_prompt("private_chat", chat_type="private"):
-            message_builder.add_text_left(deferred_prompt+self.skills.prompt)#待发现工具的提示词
-        else:
-            message_builder.add_text_left(
-                self.skills.prompt#skills的提示词
-            )
-
-        message_builder.add_text(
-            f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
-        )
-        message_builder.add_text(
-            self.build_prompt.decision_whether_private_responses(
-                user_id=user_id,
-                prompt=prompt,
-                else_prompt=self.emoji_core.prompt,#表情包的提示词
-            )
-        )
         return message_builder
+
+    def _static_rules(self) -> str:
+        return self.build_prompt.private_static_rules()
 
     async def reply_conduct(self, response_json: Dict, event: MessageEventEnvelope) -> None:
         """发送消息决定"""
@@ -1364,8 +1425,7 @@ class PrivateChat(ChatBasics):
     async def _request_model_with_fallback_private_(
         self,
         request: GenerationRequestSimplify,
-        events: list[MessageEventEnvelope],
-        prompt: str,
+        rebuild: Callable[[bool], Awaitable[MessageBuilder]],
         uid: str,
     ) -> GenerationResponse:
         """尝试模型请求,失败时自动降级到配置的备用API"""
@@ -1405,13 +1465,7 @@ class PrivateChat(ChatBasics):
                 )
             else:
                 if not opposite_structure_increment_messages:
-                    message_builder = await self.prompt_structure(
-                        events=events,
-                        prompt=prompt,
-                        user_id=events[-1].user_id,
-                        including_pictures=visual_sense,
-                    )
-                    opposite_structure_increment_messages = [message_builder.build()]
+                    opposite_structure_increment_messages = [(await rebuild(visual_sense)).build()]
 
                 new_request = replace(
                     request,
