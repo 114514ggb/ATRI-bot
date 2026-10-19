@@ -18,8 +18,8 @@ async function init(section) {
         <option value="">全部类别</option>
         ${CATEGORIES.map((c) => `<option value="${c}" ${state.category === c ? 'selected' : ''}>${CAT_LABEL[c]} (${c})</option>`).join('')}
       </select>
-      <input class="input mono" id="mem-user" placeholder="用户 QQ 筛选" value="${escapeHtml(state.user)}" style="width:150px">
-      <input class="input" id="mem-search" placeholder="搜索记忆内容…" value="${escapeHtml(state.search)}" style="width:200px">
+      <input class="input mono" id="mem-user" placeholder="用户 QQ 筛选" value="${escapeHtml(state.user)}">
+      <input class="input" id="mem-search" placeholder="搜索记忆内容…" value="${escapeHtml(state.search)}">
       <button class="btn primary sm" id="mem-apply">${icon('search')} 筛选</button>
       <span class="spacer"></span>
       <button class="btn danger sm hidden" id="mem-batch-del">${icon('trash')} 删除选中 (<span id="mem-sel-count">0</span>)</button>

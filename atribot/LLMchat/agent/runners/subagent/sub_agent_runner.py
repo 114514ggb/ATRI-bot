@@ -290,7 +290,8 @@ class SubAgentRunner(BaseAgentRunner):
 
             delta = choices[0].get("delta", {})
 
-            if dr := delta.get("reasoning_content"):
+            # OpenRouter / Ollama 等使用 reasoning 字段
+            if dr := (delta.get("reasoning_content") or delta.get("reasoning")):
                 reasoning_content += dr
                 yield reasoning_delta(delta=dr, step_index=self._step_index)
 

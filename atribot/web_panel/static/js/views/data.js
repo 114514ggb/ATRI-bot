@@ -408,7 +408,7 @@ async function initCommands(section) {
   }
 
   if (!data.length) {
-    section.innerHTML = '<div class="card"><p class="muted">没有注册任何命令。</p></div>';
+    section.innerHTML = `<div class="card"><div class="empty-state">${icon('search')}<div class="empty-state-title">没有注册任何命令</div></div></div>`;
     return;
   }
 
@@ -434,7 +434,7 @@ async function initCommands(section) {
     section.querySelector('#cmd-count').textContent = `${list.length} / ${data.length} 个命令`;
     section.querySelector('#cmd-grid').innerHTML = list.length
       ? list.map(cmdCard).join('')
-      : '<div class="card"><p class="muted">没有匹配的命令。</p></div>';
+      : `<div class="card"><div class="empty-state">${icon('search')}<div class="empty-state-title">没有匹配的命令</div><div>换个关键词试试</div></div></div>`;
   };
 
   const searchInput = section.querySelector('#cmd-search');

@@ -372,6 +372,21 @@ table.tbl {
   font-size: 14px;
 }
 
+/* 统一空状态：图标 + 标题 + 说明 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: 13.5px;
+}
+
+.empty-state svg { width: 30px; height: 30px; margin-bottom: 4px; opacity: 0.55; }
+.empty-state-title { font-size: 14.5px; font-weight: 600; color: var(--text-2); }
+
 /* ---------- 徽章 ---------- */
 
 .badge {

@@ -74,7 +74,7 @@ async function init(section) {
     const wrap = section.querySelector('#tools-groups');
     wrap.innerHTML = groups.length
       ? groups.map(groupHtml).join('')
-      : '<div class="card"><p class="muted">没有匹配的工具。</p></div>';
+      : `<div class="card"><div class="empty-state">${icon('search')}<div class="empty-state-title">没有匹配的工具</div><div>换个关键词或筛选条件试试</div></div></div>`;
     wrap.querySelectorAll('[data-detail]').forEach((el) =>
       el.addEventListener('click', () => {
         const tool = toolsData.find((t) => t.name === el.dataset.detail);

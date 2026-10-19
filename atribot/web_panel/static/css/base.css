@@ -8,6 +8,7 @@
   --bg-card: #ffffff;
   --bg-elevated: #ffffff;
   --bg-hover: rgba(0, 0, 0, 0.04);
+  --bg-active: rgba(0, 0, 0, 0.09);
   --bg-input: #f5f5f7;
   --bg-sidebar: rgba(255, 255, 255, 0.86);
   --bg-topbar: rgba(245, 245, 247, 0.75);
@@ -76,6 +77,7 @@
   --bg-card: #212124;
   --bg-elevated: #2c2c30;
   --bg-hover: rgba(255, 255, 255, 0.06);
+  --bg-active: rgba(255, 255, 255, 0.12);
   --bg-input: #2a2a2e;
   --bg-sidebar: rgba(24, 24, 27, 0.9);
   --bg-topbar: rgba(22, 22, 24, 0.78);

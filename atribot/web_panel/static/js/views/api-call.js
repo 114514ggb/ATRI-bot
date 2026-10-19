@@ -58,7 +58,7 @@ async function init(section) {
           <span class="spacer"></span>
           <button class="btn sm ghost hidden" id="btn-copy-result">${icon('copy')} 复制</button>
         </div>
-        <pre class="mono" id="call-result" style="background:var(--bg-code);border-radius:12px;padding:16px;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-all;color:var(--text-3);min-height:200px;margin:0">尚无调用记录</pre>
+        <pre class="mono call-result" id="call-result">尚无调用记录</pre>
       </div>
     </div>`;
 

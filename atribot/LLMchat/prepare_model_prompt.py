@@ -279,7 +279,7 @@ class build_prompt:
         )
 
     def group_static_rules(self) -> str:
-        """群聊决策规则(纯静态,放入 system 以命中提示词缓存)"""
+        """群聊决策规则"""
         return (
             "<access_memory>有人问你记得什么事情或是问你某个人或事情的时候一定要使用查询记忆工具或网络搜索了解后再回答，比如有人问你记得matter吗？或是和某个人或事情相关问题就要想办法查询出matter相关结果,再结合回答</access_memory>"
             "<output_requirement>"

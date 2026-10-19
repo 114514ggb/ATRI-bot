@@ -928,8 +928,31 @@ def _validate_param(key: str, value: Any) -> Optional[Any]:
     return None
 
 
-def _chat_parameter_kwargs(params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """组装本轮 LLM 请求参数：配置默认 → 前端覆盖（逐项校验）→ 强制流式"""
+# 额外 JSON 中不允许覆盖的键（由 Agent 自身管理）
+_EXTRA_PARAM_BLOCKED = frozenset({"model", "messages", "stream", "tools"})
+_EXTRA_PARAM_MAX_BYTES = 16 * 1024
+
+
+def _sanitize_extra_params(extra: Any) -> Dict[str, Any]:
+    """校验前端传来的额外请求 JSON：必须是对象、可序列化、体积受限，并剔除受保护键"""
+    if not isinstance(extra, dict) or not extra:
+        return {}
+    try:
+        if len(json.dumps(extra, ensure_ascii=False)) > _EXTRA_PARAM_MAX_BYTES:
+            return {}
+    except (TypeError, ValueError):
+        return {}
+    return {k: v for k, v in extra.items() if isinstance(k, str) and k not in _EXTRA_PARAM_BLOCKED}
+
+
+def _chat_parameter_kwargs(
+    params: Optional[Dict[str, Any]] = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """组装本轮 LLM 请求参数：额外 JSON（最低）→ 配置默认 → 前端覆盖（逐项校验）→ 强制流式
+
+    额外 JSON 与已有配置项同名时，以已有配置项为准。
+    """
     try:
         raw = container.get("config")._raw_config.get("model", {}).get("chat_parameter") or {}
         kwargs = dict(raw) if isinstance(raw, dict) else {}
@@ -943,6 +966,7 @@ def _chat_parameter_kwargs(params: Optional[Dict[str, Any]] = None) -> Dict[str,
         parsed = _validate_param(key, value)
         if parsed is not None:
             kwargs[key] = parsed
+    kwargs = {**_sanitize_extra_params(extra), **kwargs}
     kwargs["stream"] = True  # 聊天页强制流式，覆盖配置中的 stream
     return kwargs
 
@@ -1125,7 +1149,7 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
             await _finish(session, "error")
             return
 
-        kwargs = _chat_parameter_kwargs(settings.get("params"))
+        kwargs = _chat_parameter_kwargs(settings.get("params"), settings.get("extra_params"))
         # 工具集唯一来源 = config.json 的 tool_presets[WEBUI_PRESET]（与配置页「工具预设」一致），
         # 不再支持前端传入的自定义工具名单，避免两处配置互相覆盖
         agent_data = AgentData(
@@ -1150,12 +1174,21 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
         tools_summary: List[Dict[str, Any]] = []
         total_text = ""
         total_usage: Optional[Dict[str, Any]] = None
+        # 思维链按 step 累计（含被停止的未完成步），落时间线供历史重放
+        reasoning_by_step: Dict[int, str] = {}
+
+        def joined_reasoning() -> str:
+            return "\n\n".join(t for _, t in sorted(reasoning_by_step.items()) if t)
+
         try:
             async for event in runner.run(max_turns=MAX_TURNS):
                 payload = event.to_dict()
                 session.broadcast({"type": "event", "event": payload})
                 name = payload.get("event_type")
-                if name == "RUN_SUMMARY":
+                if name == "REASONING_DELTA":
+                    step_idx = int(payload.get("step_index") or 0)
+                    reasoning_by_step[step_idx] = reasoning_by_step.get(step_idx, "") + (payload.get("delta") or "")
+                elif name == "RUN_SUMMARY":
                     finish_reason = payload.get("finish_reason", finish_reason)
                     total_usage = payload.get("total_usage")
                     if payload.get("total_content"):
@@ -1176,6 +1209,7 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
             _broadcast_error(session, "已手动停止生成", "CancelledError")
             session.append_assistant_timeline({
                 "text": total_text,
+                "reasoning": joined_reasoning(),
                 "tools": tools_summary,
                 "files": list(session.pending_files),
                 "usage": None,
@@ -1197,6 +1231,7 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
         duration = round(time.monotonic() - turn_started, 1)
         session.append_assistant_timeline({
             "text": total_text,
+            "reasoning": joined_reasoning(),
             "tools": tools_summary,
             "files": list(session.pending_files),
             "usage": total_usage,

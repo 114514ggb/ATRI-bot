@@ -13,7 +13,7 @@ async function init(section) {
     <div class="notice info">${icon('info')}<div>保存后立即生效；<b>进行中的会话</b>需 <code>/chat reset</code> 重置后完全生效。删除默认人设前请先切换默认。</div></div>
     <div class="persona-layout">
       <div>
-        <div class="persona-list" id="persona-list">${'<div class="skeleton" style="height:56px;border-radius:12px;margin-bottom:8px"></div>'.repeat(4)}</div>
+        <div class="persona-list" id="persona-list">${'<div class="skeleton persona-skel"></div>'.repeat(4)}</div>
         <button class="btn sm" id="btn-new-persona" style="margin-top:12px">${icon('plus')} 新建人设</button>
       </div>
       <div class="card persona-editor" id="persona-editor">
@@ -27,7 +27,7 @@ async function init(section) {
 
 async function reload(section) {
   const listBox = section.querySelector('#persona-list');
-  if (listBox) listBox.innerHTML = '<div class="skeleton" style="height:56px;border-radius:12px;margin-bottom:8px"></div>'.repeat(4);
+  if (listBox) listBox.innerHTML = '<div class="skeleton persona-skel"></div>'.repeat(4);
   try {
     const res = await api.get('/personas');
     list = res.items || [];
@@ -89,7 +89,7 @@ async function openPersona(key) {
 function renderEditor(section) {
   const box = section.querySelector('#persona-editor');
   if (!currentKey) {
-    box.innerHTML = '<p class="muted" style="margin:0">选择左侧人设开始编辑</p>';
+    box.innerHTML = `<div class="empty-state">${icon('edit')}<div class="empty-state-title">选择左侧人设开始编辑</div></div>`;
     return;
   }
   const isDefault = defaultRole === currentKey;
@@ -98,7 +98,7 @@ function renderEditor(section) {
       <h3 style="margin:0;font-size:16px">${escapeHtml(currentKey)} ${isDefault ? '<span class="badge orange">当前默认</span>' : ''}</h3>
       <span style="flex:1"></span>
       ${!isDefault ? `<button class="btn sm ghost" id="btn-set-default">${icon('star')} 设为默认</button>` : ''}
-      <button class="btn sm danger ghost" id="btn-del-persona" style="color:var(--red)">${icon('trash')} 删除</button>
+      <button class="btn sm danger ghost" id="btn-del-persona">${icon('trash')} 删除</button>
       <button class="btn sm primary" id="btn-save-persona">${icon('save')} 保存</button>
     </div>
     <textarea id="persona-content" spellcheck="false">${escapeHtml(currentContent)}</textarea>`;

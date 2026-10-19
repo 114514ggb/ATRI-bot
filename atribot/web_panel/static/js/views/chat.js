@@ -18,8 +18,15 @@ const MATH_HINT = /[\\^_{}=+<>|]/;
 const MAX_FORMULA_LEN = 300;
 
 
+const HIDE_SETTINGS_KEY = 'atri_chat_settings_hidden';
 const BOT_AVATAR_URL = 'https://q1.qlogo.cn/g?b=qq&nk=168238719&s=640';
-const USER_AVATAR_URL = 'https://q1.qlogo.cn/g?b=qq&nk=1317196420&s=640';
+
+const SUGGESTS = [
+  '介绍一下你自己，你都能做些什么？',
+  '用 Python 写一个快速排序并解释时间复杂度',
+  '用表格对比 PostgreSQL 与 SQLite 的差异',
+  '帮我检索一下最近有哪些值得关注的开源项目',
+];
 
 /* ---------- 模块级运行状态（destroy 时清理） ---------- */
 
@@ -32,6 +39,7 @@ let initialOpened = false;
 
 let sectionEl = null;
 let messagesEl = null;
+let scrollBtn = null;
 let activeTurn = null;
 let generating = false;
 let currentSession = null;
@@ -43,7 +51,7 @@ let info = { defaults: {}, webui_preset: {}, limits: {} };
 let suppliers = [];
 let personas = [];
 let sessions = [];
-let settings = { supplier: '', model: '', persona: 'none', params: null };
+let settings = { supplier: '', model: '', persona: 'none', params: null, extra_json: '' };
 
 /* ---------- 设置持久化 ---------- */
 
@@ -63,6 +71,38 @@ function saveSettings() {
     if (box) localStorage.setItem(`${SETTINGS_KEY}_custom`, box.value);
   }
   updateToolsCount();
+  updateMeta();
+}
+
+function personaLabel() {
+  if (settings.persona === 'custom') return '自定义人设';
+  if (!settings.persona || settings.persona === 'none') return '无人设';
+  return settings.persona;
+}
+
+function summaryText() {
+  return `${settings.model || '未选择模型'} · ${personaLabel()} · 支持图片 / 音频 / 视频附件`;
+}
+
+/* 状态栏模型/人设标签 + 空状态摘要 */
+function updateMeta() {
+  const model = sectionEl?.querySelector('#chat-meta-model span');
+  if (model) model.textContent = settings.model || '未选择模型';
+  const persona = sectionEl?.querySelector('#chat-meta-persona span');
+  if (persona) persona.textContent = personaLabel();
+  const sub = sectionEl?.querySelector('#chat-empty-sub');
+  if (sub) sub.textContent = summaryText();
+}
+
+function emptyHtml() {
+  const cards = SUGGESTS.map((s) => `<button type="button" class="chat-suggest">${icon('sparkles')}<span>${escapeHtml(s)}</span></button>`).join('');
+  return `
+    <div class="chat-empty">
+      <div class="chat-empty-logo" id="chat-empty-logo">A</div>
+      <h2 class="chat-empty-title">今天想聊点什么？</h2>
+      <p class="chat-empty-sub" id="chat-empty-sub">${escapeHtml(summaryText())}</p>
+      <div class="chat-suggests">${cards}</div>
+    </div>`;
 }
 
 function customPersonaText() {
@@ -81,13 +121,30 @@ function defaultParams() {
   };
 }
 
+/* 额外请求 JSON：空串视为未设置；需为 JSON 对象，否则 ok=false */
+function parseExtraJson(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text) return { ok: true, value: null, count: 0 };
+  try {
+    const value = JSON.parse(text);
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+      return { ok: false, error: '需要是 JSON 对象 { ... }' };
+    }
+    return { ok: true, value, count: Object.keys(value).length };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
 function currentSettingsPayload() {
+  const extra = parseExtraJson(settings.extra_json);
   return {
     supplier: settings.supplier,
     model: settings.model,
     persona_key: settings.persona || 'none',
     custom_persona: settings.persona === 'custom' ? customPersonaText() : '',
     params: settings.params,
+    extra_params: extra.ok && extra.value ? extra.value : undefined,
   };
 }
 
@@ -98,43 +155,118 @@ function formulaImgHtml(latex, display) {
   return `<img class="chat-formula${display ? ' display' : ''}" src="${escapeHtml(url)}" alt="${escapeHtml(latex)}" data-latex="${escapeHtml(latex)}" loading="lazy">`;
 }
 
-/* 把非代码文本中的公式替换为占位符，占位符在行内格式化后还原为公式图片 */
-function extractFormulas(text) {
-  const formulas = [];
+/* 公式占位符：\x01 包裹索引，全文提取后按行解析 Markdown，最终在 inlineMd 里还原 */
+const FORMULA_TOKEN = /\x01(\d+)\x01/g;
+/* 单个字母/希腊字母命令/下标上标等也当公式，排除 $5 这类金额 */
+const LATEX_LIKE = /^(?:\\[A-Za-z]+|[A-Za-z]\w{0,2}|[^\d\s][^$]*[\\^_{}=+\-*/<>|()][^$]*)$/;
+
+/* 把非代码文本中的公式替换为占位符（支持跨行的 $$..$$ 与 \[..\]） */
+function extractFormulas(text, formulas) {
   const stash = (latex, display) => {
-    formulas.push(formulaImgHtml(latex, display));
-    return `\x00${formulas.length - 1}\x00`;
+    formulas.push({ latex, display });
+    return display ? `\n\n\x01${formulas.length - 1}\x01\n\n` : `\x01${formulas.length - 1}\x01`;
   };
-  let out = text
-    .replace(/\$\$(.+?)\$\$/gs, (_, c) => stash(c.trim(), true))
-    .replace(/\\\[(.+?)\\\]/gs, (_, c) => stash(c.trim(), true))
-    .replace(/\\\((.+?)\\\)/gs, (_, c) => stash(c.trim(), false))
-    .replace(/\$([^$\n]+?)\$/g, (m, c) =>
-      c.trim() && c.length <= MAX_FORMULA_LEN && MATH_HINT.test(c) ? stash(c.trim(), false) : m);
-  return { out, formulas };
+  return text
+    .replace(/\$\$([\s\S]+?)\$\$/g, (_, c) => (c.trim() ? stash(c.trim(), true) : _))
+    .replace(/\\\[([\s\S]+?)\\\]/g, (_, c) => (c.trim() ? stash(c.trim(), true) : _))
+    .replace(/\\\(([\s\S]+?)\\\)/g, (_, c) => (c.trim() ? stash(c.trim(), false) : _))
+    .replace(/\$([^$\n]+?)\$/g, (m, c) => {
+      const body = c.trim();
+      /* 首尾有空格的 `$ a $` 多半是金额文字，保持原样 */
+      if (!body || body !== c || body.length > MAX_FORMULA_LEN) return m;
+      return (MATH_HINT.test(body) || LATEX_LIKE.test(body)) ? stash(body, false) : m;
+    });
 }
 
-function inlineMd(raw) {
-  const { out, formulas } = extractFormulas(raw);
-  let html = escapeHtml(out);
+/* ---------- 轻量代码高亮（无依赖，仅区分 关键字/字符串/注释/数字/布尔） ---------- */
+
+const LANG_ALIAS = {
+  py: 'py', python: 'py', python3: 'py',
+  js: 'js', javascript: 'js', ts: 'js', typescript: 'js', jsx: 'js', tsx: 'js', java: 'js', c: 'js', cpp: 'js', 'c++': 'js', cs: 'js', 'c#': 'js', go: 'js', rust: 'js', rs: 'js',
+  sh: 'sh', bash: 'sh', shell: 'sh', zsh: 'sh', powershell: 'sh', ps1: 'sh',
+  sql: 'sql', json: 'json', jsonc: 'json', yaml: 'sh', yml: 'sh', toml: 'sh',
+};
+
+const makeSet = (s) => new Set(s.split(' '));
+const LANG_KEYWORDS = {
+  py: makeSet('and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield match case self cls'),
+  js: makeSet('async await break case catch class const continue default delete do else export extends finally for from function if import in instanceof let new of return static super switch this throw try typeof var void while with yield interface type enum implements public private protected readonly package struct impl fn func def use mod pub mut int long float double char string bool'),
+  sh: makeSet('if then else elif fi for while do done case esac function in return export local source echo cd ls cat grep sed awk sudo pip uv npm git docker'),
+  sql: makeSet('select from where and or not insert into values update set delete create table alter drop index join left right inner outer on group by order limit offset as distinct having union all is in like between exists primary key foreign references default'),
+  json: new Set(),
+};
+const LANG_BOOLS = makeSet('True False None true false null NULL nil');
+
+const LANG_COMMENT = {
+  py: '#[^\\n]*',
+  sh: '#[^\\n]*',
+  sql: '--[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/',
+  js: '\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/',
+  json: '(?!)',
+};
+
+function highlightCode(code, lang) {
+  const key = LANG_ALIAS[String(lang || '').toLowerCase()];
+  if (!key) return escapeHtml(code);
+  const str = '"""[\\s\\S]*?"""|\'\'\'[\\s\\S]*?\'\'\'|"(?:\\\\.|[^"\\\\\\n])*"|\'(?:\\\\.|[^\'\\\\\\n])*\'|`(?:\\\\.|[^`\\\\])*`';
+  const re = new RegExp(`(${LANG_COMMENT[key]})|(${str})|(\\b\\d+(?:\\.\\d+)?\\b)|([A-Za-z_][\\w]*)`, 'g');
+  const keywords = LANG_KEYWORDS[key];
+  let out = '';
+  let last = 0;
+  let m;
+  while ((m = re.exec(code)) !== null) {
+    out += escapeHtml(code.slice(last, m.index));
+    last = m.index + m[0].length;
+    const text = escapeHtml(m[0]);
+    if (m[1] !== undefined) out += `<span class="tok-c">${text}</span>`;
+    else if (m[2] !== undefined) out += `<span class="tok-s">${text}</span>`;
+    else if (m[3] !== undefined) out += `<span class="tok-n">${text}</span>`;
+    else if (LANG_BOOLS.has(m[4])) out += `<span class="tok-b">${text}</span>`;
+    else if (keywords.has(key === 'sql' ? m[4].toLowerCase() : m[4])) out += `<span class="tok-k">${text}</span>`;
+    else out += text;
+  }
+  return out + escapeHtml(code.slice(last));
+}
+
+function codeBlockHtml(code, lang) {
+  return `<div class="chat-codeblock"><div class="chat-codeblock-head"><span class="chat-codeblock-lang">${escapeHtml(lang || 'text')}</span><button type="button" class="chat-codeblock-copy" aria-label="复制代码">${icon('copy')}<span>复制</span></button></div><pre class="chat-code"><code>${highlightCode(code, lang)}</code></pre></div>`;
+}
+
+function inlineMd(raw, formulas = []) {
+  let html = escapeHtml(raw);
+  /* 公式占位符先保护，避免公式内的 * _ ~ 被当成 Markdown 语法 */
+  const stash = [];
+  html = html.replace(FORMULA_TOKEN, (_, i) => `\x02${stash.push(formulas[Number(i)]) - 1}\x02`);
   html = html
     .replace(/`([^`\n]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*\n][^*]*?)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*\n]+?)\*(?!\*)/g, '$1<em>$2</em>')
     .replace(/~~([^~\n]+)~~/g, '<del>$1</del>')
-    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
-  html = html.replace(/\x00(\d+)\x00/g, (_, i) => formulas[Number(i)] ?? '');
-  return html;
+    .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|[\s(（])(https?:\/\/[^\s<)）]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  return html.replace(/\x02(\d+)\x02/g, (_, i) => {
+    const f = stash[Number(i)];
+    return f ? formulaImgHtml(f.latex, f.display) : '';
+  });
+}
+
+/* 公式提取只作用于代码围栏之外的文本，代码块内的 $ 保持原样 */
+function extractFormulasOutsideCode(text, formulas) {
+  /* 奇数段是围栏代码块或行内代码，原样保留 */
+  const segments = text.split(/(^```[^\n]*\n[\s\S]*?^```[ \t]*$|`[^`\n]+`)/m);
+  return segments.map((seg, idx) => (idx % 2 === 1 ? seg : extractFormulas(seg, formulas))).join('');
 }
 
 function renderMarkdown(raw) {
-  const text = String(raw ?? '');
+  const formulas = [];
+  const text = extractFormulasOutsideCode(String(raw ?? '').replace(/\x01|\x02/g, ''), formulas);
   const parts = [];
   const lines = text.split(/\r?\n/);
   let i = 0;
+  const inline = (s) => inlineMd(s, formulas);
 
   const flushParagraph = (buf) => {
-    if (buf.length) parts.push(`<p>${buf.map(inlineMd).join('<br>')}</p>`);
+    if (buf.length) parts.push(`<p>${buf.map(inline).join('<br>')}</p>`);
   };
 
   let para = [];
@@ -142,14 +274,14 @@ function renderMarkdown(raw) {
     const line = lines[i];
 
     /* 围栏代码块 */
-    const fence = line.match(/^```(\w*)\s*$/);
+    const fence = line.match(/^```([\w+#.-]*)\s*$/);
     if (fence) {
       flushParagraph(para); para = [];
       const code = [];
       i += 1;
       while (i < lines.length && !/^```\s*$/.test(lines[i])) { code.push(lines[i]); i += 1; }
       i += 1;
-      parts.push(`<pre class="chat-code"><code>${escapeHtml(code.join('\n'))}</code></pre>`);
+      parts.push(codeBlockHtml(code.join('\n'), fence[1]));
       continue;
     }
 
@@ -160,7 +292,7 @@ function renderMarkdown(raw) {
     if (h) {
       flushParagraph(para); para = [];
       const level = h[1].length;
-      parts.push(`<div class="chat-md-h chat-md-h${level}">${inlineMd(h[2])}</div>`);
+      parts.push(`<div class="chat-md-h chat-md-h${level}">${inline(h[2])}</div>`);
       i += 1; continue;
     }
     if (/^\s*([-*_])\s*\1\s*\1[\s\-*_]*$/.test(line)) {
@@ -174,7 +306,7 @@ function renderMarkdown(raw) {
       while (i < lines.length && /^\s*>/.test(lines[i])) {
         quote.push(lines[i].replace(/^\s*>\s?/, '')); i += 1;
       }
-      parts.push(`<blockquote class="chat-md-quote">${quote.map(inlineMd).join('<br>')}</blockquote>`);
+      parts.push(`<blockquote class="chat-md-quote">${quote.map(inline).join('<br>')}</blockquote>`);
       continue;
     }
     if (/^\s*([-*+]|\d+[.)])\s+/.test(line)) {
@@ -185,7 +317,13 @@ function renderMarkdown(raw) {
         items.push(lines[i].replace(/^\s*([-*+]|\d+[.)])\s+/, '')); i += 1;
       }
       const tag = ordered ? 'ol' : 'ul';
-      parts.push(`<${tag} class="chat-md-list">${items.map((it) => `<li>${inlineMd(it)}</li>`).join('')}</${tag}>`);
+      const li = (it) => {
+        const task = it.match(/^\[([ xX])\]\s+(.*)$/);
+        if (!task) return `<li>${inline(it)}</li>`;
+        const checked = task[1] === ' ' ? '' : ' checked';
+        return `<li class="chat-md-task"><input type="checkbox" disabled${checked}>${inline(task[2])}</li>`;
+      };
+      parts.push(`<${tag} class="chat-md-list">${items.map(li).join('')}</${tag}>`);
       continue;
     }
     if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
@@ -196,7 +334,7 @@ function renderMarkdown(raw) {
       while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
         rows.push(lines[i].split('|').slice(1, -1).map((c) => c.trim())); i += 1;
       }
-      parts.push(`<table class="chat-md-table"><thead><tr>${head.map((c) => `<th>${inlineMd(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inlineMd(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`);
+      parts.push(`<div class="chat-md-table-wrap"><table class="chat-md-table"><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
       continue;
     }
 
@@ -231,19 +369,6 @@ function makeBotAvatar() {
   img.referrerPolicy = 'no-referrer';
   img.addEventListener('error', () => { img.remove(); wrap.textContent = 'A'; });
   img.src = avatarUrl();
-  wrap.appendChild(img);
-  return wrap;
-}
-
-/* 用户头像：QQ 头像服务直链（见 USER_AVATAR_URL），加载失败回退文字「我」 */
-function makeUserAvatar() {
-  const wrap = el('div', 'chat-avatar user-avatar');
-  const img = document.createElement('img');
-  img.className = 'chat-avatar-img';
-  img.alt = '我';
-  img.referrerPolicy = 'no-referrer';
-  img.addEventListener('error', () => { img.remove(); wrap.textContent = '我'; });
-  img.src = USER_AVATAR_URL;
   wrap.appendChild(img);
   return wrap;
 }
@@ -287,7 +412,13 @@ function userAtBottom() {
 }
 
 function scrollToBottom(force = false) {
-  if (force || userAtBottom()) messagesEl.scrollTop = messagesEl.scrollHeight;
+  if (!messagesEl) return;
+  if (force || userAtBottom()) {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollBtn?.classList.remove('show', 'has-new');
+  } else if (generating) {
+    scrollBtn?.classList.add('has-new');
+  }
 }
 
 /* ---------- 消息渲染 ---------- */
@@ -295,12 +426,91 @@ function scrollToBottom(force = false) {
 function attachmentHtml(file) {
   const url = `${file.url}?token=${encodeURIComponent(getToken())}`;
   const name = escapeHtml(file.name || file.id);
+  /* 图片/文件点击后在小窗里预览（事件委托读 data-pv-*） */
+  const pv = `data-pv-url="${escapeHtml(url)}" data-pv-name="${name}" data-pv-kind="${escapeHtml(file.kind)}" data-pv-size="${Number(file.size) || 0}"`;
   if (file.kind === 'image') {
-    return `<a class="chat-attach-img-link" href="${url}" target="_blank" rel="noopener" title="查看/下载原图：${name}"><img class="chat-attach-img" src="${url}" alt="${name}" loading="lazy"></a>`;
+    return `<a class="chat-attach-img-link" href="${escapeHtml(url)}" ${pv} title="点击预览：${name}"><img class="chat-attach-img" src="${escapeHtml(url)}" alt="${name}" loading="lazy"></a>`;
   }
-  if (file.kind === 'audio') return `<audio class="chat-attach-audio" controls preload="none" src="${url}"></audio>`;
-  if (file.kind === 'video') return `<video class="chat-attach-video" controls preload="metadata" src="${url}"></video>`;
-  return `<a class="chat-attach-file" href="${url}" download="${name}" title="下载：${name}">${icon('file')} ${name} <span class="muted small">(${Math.ceil((file.size || 0) / 1024)} KB)</span></a>`;
+  if (file.kind === 'audio') return `<audio class="chat-attach-audio" controls preload="none" src="${escapeHtml(url)}"></audio>`;
+  if (file.kind === 'video') return `<video class="chat-attach-video" controls preload="metadata" src="${escapeHtml(url)}"></video>`;
+  return `<a class="chat-attach-file" href="${escapeHtml(url)}" ${pv} title="点击预览：${name}">${icon('file')} ${name} <span class="muted small">(${Math.ceil((file.size || 0) / 1024)} KB)</span></a>`;
+}
+
+/* ---------- 附件预览小窗 ---------- */
+
+const TEXT_EXTS = new Set('txt md markdown json jsonc csv tsv log ini cfg conf toml yaml yml xml html css js ts jsx tsx py java c cpp h hpp cs go rs sh bash ps1 sql env'.split(' '));
+const PREVIEW_MAX_BYTES = 2 * 1024 * 1024;
+
+function fmtSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  if (n < 1048576) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
+
+function triggerDownload(url, name) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function openFilePreview({ pvUrl: url, pvName: name, pvKind: kind, pvSize: size }) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  const isImage = kind === 'image';
+  const body = isImage
+    ? `<div class="file-preview-img-wrap"><img class="file-preview-img" src="${escapeHtml(url)}" alt="${escapeHtml(name)}"></div>`
+    : '<div class="file-preview-text"><div class="file-preview-loading"><span class="spinner-sm"></span> 加载中…</div></div>';
+  const modal = openModal({
+    title: `${name} · ${fmtSize(size)}`,
+    wide: true,
+    bodyHtml: body,
+    actions: [
+      { label: `${icon('download')} 下载`, class: 'primary', onClick: () => triggerDownload(url, name) },
+      { label: '关闭', class: 'ghost', onClick: ({ close }) => close() },
+    ],
+  });
+  if (isImage) return;
+
+  modal.el.addEventListener('click', handleCopyButton);
+  const box = modal.el.querySelector('.file-preview-text');
+  const notice = (title, sub) => {
+    box.innerHTML = `<div class="empty-state">${icon('file')}<div class="empty-state-title">${escapeHtml(title)}</div><div>${escapeHtml(sub)}</div></div>`;
+  };
+  if (!TEXT_EXTS.has(ext)) { notice('该类型暂不支持在线预览', '请点击下方「下载」保存到本地'); return; }
+  if (Number(size) > PREVIEW_MAX_BYTES) { notice('文件过大，不支持预览', `超过 ${fmtSize(PREVIEW_MAX_BYTES)}，请下载查看`); return; }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (!box.isConnected) return;
+    box.innerHTML = (ext === 'md' || ext === 'markdown')
+      ? `<div class="chat-content chat-md">${renderMarkdown(text)}</div>`
+      : `<pre class="chat-code file-preview-code"><code>${highlightCode(text, ext)}</code></pre>`;
+  } catch (e) {
+    if (box.isConnected) notice('加载失败', e.message);
+  }
+}
+
+/* 代码块/工具块的复制按钮；命中返回 true */
+async function handleCopyButton(e) {
+  const codeBtn = e.target.closest('.chat-codeblock-copy');
+  const toolBtn = e.target.closest('.chat-tool-copy');
+  const btn = codeBtn || toolBtn;
+  if (!btn) return false;
+  const source = codeBtn
+    ? btn.closest('.chat-codeblock').querySelector('code')
+    : btn.closest('.chat-tool-section').querySelector('pre');
+  const ok = await copyText(source?.textContent || '');
+  if (!ok) { toast('复制失败', 'error'); return true; }
+  const label = btn.querySelector('span') || btn;
+  const original = label.textContent;
+  btn.classList.add('copied');
+  label.textContent = '已复制';
+  setTimeout(() => { btn.classList.remove('copied'); label.textContent = original; }, 1500);
+  return true;
 }
 
 /* 工具投递的附件卡片：进当前助手回合，无活跃回合时兜底开一个并立即收尾 */
@@ -369,7 +579,6 @@ function appendUserMessage(text, files = [], nonce = '', ts = 0) {
   editBtn.addEventListener('click', () => startEditMessage(row));
   actions.appendChild(editBtn);
   bubble.appendChild(actions);
-  row.appendChild(makeUserAvatar());
   row.appendChild(bubble);
   messagesEl.appendChild(row);
   scrollToBottom();
@@ -438,10 +647,15 @@ function makeCollapsible(titleHtml, { collapsed = true, cls = '' } = {}) {
     </button>
     <div class="chat-block-body"></div>`;
   const head = block.querySelector('.chat-block-head');
+  head.setAttribute('aria-expanded', String(!collapsed));
   head.addEventListener('click', () => {
     block.classList.toggle('collapsed');
     if (block.classList.contains('collapsed')) scrollToBottom();
   });
+  /* 脚本里直接加/去 collapsed 的地方较多，aria 状态统一由观察器同步 */
+  new MutationObserver(() => {
+    head.setAttribute('aria-expanded', String(!block.classList.contains('collapsed')));
+  }).observe(block, { attributes: true, attributeFilter: ['class'] });
   if (collapsed) block.classList.add('collapsed');
   return block;
 }
@@ -555,16 +769,19 @@ function toolBlock(turn, step, toolCallId, toolName) {
   let tool = turn.tools.get(toolCallId);
   if (tool) return tool;
   const block = makeCollapsible(
-    `<span class="chat-block-name mono">${escapeHtml(toolName || toolCallId)}</span><span class="chat-tool-status running">运行中…</span>`,
+    `<span class="chat-block-name mono">${icon('wrench')}${escapeHtml(toolName || toolCallId)}</span><span class="chat-tool-status running">运行中…</span><span class="chat-tool-time"></span>`,
     { collapsed: true, cls: 'tool' },
   );
+  const copyBtn = `<button type="button" class="chat-tool-copy" aria-label="复制">${icon('copy')}复制</button>`;
   block.querySelector('.chat-block-body').innerHTML = `
-    <div class="chat-tool-section"><div class="chat-tool-label">参数</div><pre class="chat-tool-args mono">-</pre></div>
-    <div class="chat-tool-section"><div class="chat-tool-label">结果</div><pre class="chat-tool-result mono">…</pre></div>`;
+    <div class="chat-tool-section"><div class="chat-tool-label"><span>参数</span>${copyBtn}</div><pre class="chat-tool-args mono">-</pre></div>
+    <div class="chat-tool-section"><div class="chat-tool-label"><span>结果</span>${copyBtn}</div><pre class="chat-tool-result mono">…</pre></div>`;
   step.node.appendChild(block);
   tool = {
     block,
+    startedAt: performance.now(),
     status: block.querySelector('.chat-tool-status'),
+    time: block.querySelector('.chat-tool-time'),
     args: block.querySelector('.chat-tool-args'),
     result: block.querySelector('.chat-tool-result'),
   };
@@ -577,6 +794,10 @@ function setToolResult(tool, result, isError) {
   tool.status.textContent = isError ? '出错' : '完成';
   tool.status.classList.remove('running');
   tool.status.classList.add(isError ? 'error' : 'ok');
+  tool.block.classList.remove('is-ok', 'is-error');
+  tool.block.classList.add(isError ? 'is-error' : 'is-ok');
+  /* 历史重放的工具块没有真实耗时 */
+  if (tool.time && !activeTurn?.replay) tool.time.textContent = `${((performance.now() - tool.startedAt) / 1000).toFixed(1)}s`;
   const text = String(result ?? '');
   tool.result.textContent = text.length > 4000 ? `${text.slice(0, 4000)}…(已截断)` : text;
   tool.result.classList.toggle('chat-tool-error', Boolean(isError));
@@ -608,7 +829,7 @@ function handleAgentEvent(event) {
     step.reasoningText += event.delta || '';
     rs.body.textContent = step.reasoningText;
     rs.hint.textContent = ` · ${step.reasoningText.length} 字`;
-    rs.body.parentElement.scrollTop = rs.body.parentElement.scrollHeight;
+    rs.body.scrollTop = rs.body.scrollHeight;
     scrollToBottom();
   } else if (type === 'TEXT_DELTA') {
     /* 思考块在正文开始输出后折叠（与工具调用到达时一致） */
@@ -651,6 +872,12 @@ function handleAgentEvent(event) {
   } else if (type === 'RUN_SUMMARY') {
     finishTurn(event.finish_reason || 'completed', event.total_usage);
   } else if (type === 'ERROR') {
+    /* 用户点「停止」后端会先广播这条 ERROR，不应当作错误展示 */
+    if (event.exception_type === 'CancelledError') {
+      activeTurn.bubble.insertBefore(el('div', 'chat-stopped', `${icon('stop')} 已手动停止生成`), activeTurn.status);
+      finishTurn('stopped');
+      return;
+    }
     activeTurn.bubble.appendChild(el('div', 'chat-error', `${icon('alert')} ${escapeHtml(event.error_message || '未知错误')}`));
     finishTurn('error');
   }
@@ -768,13 +995,10 @@ function setGenerating(value) {
   generating = value;
   const sendBtn = sectionEl?.querySelector('#chat-send');
   if (!sendBtn) return;
-  if (value) {
-    sendBtn.classList.add('danger');
-    sendBtn.innerHTML = `${icon('x')} 停止`;
-  } else {
-    sendBtn.classList.remove('danger');
-    sendBtn.innerHTML = `${icon('send')} 发送`;
-  }
+  sendBtn.classList.toggle('danger', value);
+  sendBtn.innerHTML = icon(value ? 'stop' : 'send');
+  sendBtn.title = value ? '停止生成' : '发送（Enter）';
+  sendBtn.setAttribute('aria-label', value ? '停止生成' : '发送');
 }
 
 /* ---------- 历史恢复渲染 ---------- */
@@ -799,6 +1023,13 @@ function renderHistory(items) {
         ts: Number(item.ts) || 0,
       });
       const step = stepOf(activeTurn, 0);
+      if (item.reasoning) {
+        const rs = reasoningBlock(activeTurn, step);
+        step.reasoningText = item.reasoning;
+        rs.body.textContent = item.reasoning;
+        rs.hint.textContent = ` · ${item.reasoning.length} 字`;
+        rs.block.classList.add('collapsed');
+      }
       for (const tc of item.tools || []) {
         const tool = toolBlock(activeTurn, step, tc.name, tc.name);
         const pretty = prettyArgs(tc.arguments);
@@ -820,12 +1051,7 @@ function renderHistory(items) {
     lastUserMeta = { umIndex: userCount - 1, userText: prevUserText };
   }
   if (!messagesEl.children.length) {
-    messagesEl.innerHTML = `
-      <div class="chat-empty">
-        <div class="chat-empty-logo" id="chat-empty-logo">A</div>
-        <p>开始新对话吧</p>
-        <p class="muted small">支持图片 / 音频 / 视频附件</p>
-      </div>`;
+    messagesEl.innerHTML = emptyHtml();
     mountEmptyLogo();
   }
   scrollToBottom(true);
@@ -1225,6 +1451,11 @@ async function uploadFile(file) {
   sectionEl.querySelector('#chat-attachments').appendChild(chip);
   const entry = { chip, brief: null };
   pendingAttachments.push(entry);
+  let thumbUrl = '';
+  if (kind === 'image') {
+    thumbUrl = URL.createObjectURL(file);
+    chip.dataset.thumb = thumbUrl;
+  }
 
   chip.querySelector('.chat-chip-x').addEventListener('click', () => {
     entry.removed = true;
@@ -1247,9 +1478,16 @@ async function uploadFile(file) {
     entry.brief = data.file;
     if (!entry.removed) {
       chip.classList.remove('uploading');
-      const iconMap = { image: 'eye', audio: 'activity', video: 'layers', file: 'file' };
+      const iconMap = { image: 'image', audio: 'activity', video: 'layers', file: 'file' };
       chip.querySelector('.spinner-sm')?.remove();
-      chip.insertAdjacentHTML('afterbegin', icon(iconMap[kind] || 'file'));
+      if (thumbUrl) {
+        const thumb = el('img', 'chat-chip-thumb');
+        thumb.src = thumbUrl;
+        thumb.alt = '';
+        chip.prepend(thumb);
+      } else {
+        chip.insertAdjacentHTML('afterbegin', icon(iconMap[kind] || 'file'));
+      }
     }
   } catch (e) {
     entry.removed = true;
@@ -1396,16 +1634,17 @@ async function init(section) {
         <div class="chat-statusbar">
           <span class="chat-conn" title="聊天服务连接状态"><span class="dot red" id="chat-conn-dot"></span></span>
           <span class="chat-current" id="chat-current">正在连接…</span>
+          <span class="chat-meta">
+            <button type="button" class="chat-meta-chip" id="chat-meta-model" title="当前模型（点击打开设置）">${icon('bot')}<span></span></button>
+            <button type="button" class="chat-meta-chip" id="chat-meta-persona" title="当前人设（点击打开设置）">${icon('sparkles')}<span></span></button>
+          </span>
           <span class="spacer"></span>
-          <button class="icon-btn chat-settings-toggle" id="chat-settings-toggle" title="会话设置">${icon('sliders')}</button>
+          <button class="icon-btn chat-settings-toggle" id="chat-settings-toggle" title="会话设置" aria-label="会话设置">${icon('panelRight')}</button>
         </div>
 
-        <div class="chat-messages" id="chat-messages">
-          <div class="chat-empty">
-            <div class="chat-empty-logo" id="chat-empty-logo">A</div>
-            <p>连接聊天服务后即可开始对话</p>
-            <p class="muted small">支持图片 / 音频 / 视频附件</p>
-          </div>
+        <div class="chat-messages-wrap">
+          <div class="chat-messages" id="chat-messages" role="log" aria-live="polite">${emptyHtml()}</div>
+          <button type="button" class="chat-scroll-bottom" id="chat-scroll-bottom" title="回到底部" aria-label="回到底部">${icon('arrowDown')}</button>
         </div>
 
         <div class="chat-drop-overlay">${icon('plus')} 松开以添加附件</div>
@@ -1413,15 +1652,18 @@ async function init(section) {
         <div class="chat-input-area">
           <div class="chat-attachments" id="chat-attachments"></div>
           <div class="chat-input-row">
-            <button class="icon-btn" id="chat-attach-btn" title="添加附件（图片/音频/视频/文件）">${icon('file')}</button>
-            <textarea class="chat-textarea" id="chat-text" rows="1" placeholder="输入消息，Enter 发送，Shift+Enter 换行, 可直接拖入添加文件"></textarea>
-            <button class="btn primary" id="chat-send">${icon('send')} 发送</button>
+            <button class="icon-btn" id="chat-attach-btn" title="添加附件（图片/音频/视频/文件）" aria-label="添加附件">${icon('paperclip')}</button>
+            <textarea class="chat-textarea" id="chat-text" rows="1" placeholder="给 ATRI 发消息…" aria-label="消息输入"></textarea>
+            <button class="chat-send" id="chat-send" title="发送（Enter）" aria-label="发送">${icon('send')}</button>
           </div>
+          <div class="chat-input-hint">Enter 发送 · Shift+Enter 换行 · 支持拖拽或粘贴文件</div>
         </div>
       </div>
 
       <aside class="chat-settings" id="chat-settings">
-        <div class="chat-settings-title">${icon('sliders')} 对话设置</div>
+        <div class="chat-settings-title">${icon('sliders')} 对话设置
+          <button type="button" class="icon-btn chat-settings-close" id="chat-settings-close" title="收起设置" aria-label="收起设置">${icon('x')}</button>
+        </div>
 
         <div class="field">
           <div class="field-label">供应商</div>
@@ -1446,11 +1688,11 @@ async function init(section) {
         <div class="field">
           <div class="field-label">工具</div>
           <div class="field-desc">默认工具直接可用，待发现工具由 tool_search 按需启用</div>
-          <button class="btn sm ghost" id="chat-tools-btn" style="width:100%">${icon('settings')} <span id="chat-tools-count"></span></button>
+          <button class="btn sm ghost chat-wide-btn" id="chat-tools-btn">${icon('settings')} <span id="chat-tools-count"></span></button>
         </div>
 
         <div class="chat-settings-sep">请求参数</div>
-        <div class="field-desc" style="margin:0 0 6px">未调整时使用主配置 chat_parameter</div>
+        <div class="field-desc chat-settings-note">未调整时使用主配置 chat_parameter</div>
         <div class="field">
           <div class="field-label">温度 temperature <span class="chat-param-val" id="chat-val-temperature"></span></div>
           <div class="field-desc">值越高回答越发散</div>
@@ -1475,7 +1717,13 @@ async function init(section) {
             <option value="required">required · 强制调用</option>
           </select>
         </div>
-        <button class="btn sm ghost" id="chat-params-reset" style="width:100%">恢复默认参数</button>
+        <div class="field">
+          <div class="field-label">额外请求 JSON <span class="chat-param-val" id="chat-extra-count"></span></div>
+          <div class="field-desc">合并进模型请求体（如 top_k、enable_thinking）。与上方参数或主配置同名时以已有配置为准；model / messages / stream / tools 会被忽略</div>
+          <textarea class="input mono chat-extra-json" id="chat-extra-json" rows="4" spellcheck="false" placeholder='{"top_k": 40}'></textarea>
+          <div class="chat-extra-error" id="chat-extra-error"></div>
+        </div>
+        <button class="btn sm ghost chat-wide-btn" id="chat-params-reset">恢复默认参数</button>
       </aside>
 
       <div class="chat-settings-backdrop" id="chat-settings-backdrop"></div>
@@ -1484,8 +1732,37 @@ async function init(section) {
     </div>`;
 
   messagesEl = section.querySelector('#chat-messages');
+  scrollBtn = section.querySelector('#chat-scroll-bottom');
   const textEl = section.querySelector('#chat-text');
   mountEmptyLogo();
+
+  /* 回到底部按钮：离底超过阈值才显示 */
+  messagesEl.addEventListener('scroll', () => {
+    const away = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight > 160;
+    scrollBtn.classList.toggle('show', away);
+    if (!away) scrollBtn.classList.remove('has-new');
+  }, { passive: true });
+  scrollBtn.addEventListener('click', () => {
+    messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+  });
+
+  /* 代码块/工具块复制与空状态示例提问（事件委托，流式重绘不丢绑定） */
+  messagesEl.addEventListener('click', async (e) => {
+    const suggest = e.target.closest('.chat-suggest');
+    if (suggest) {
+      textEl.value = suggest.textContent.trim();
+      textEl.dispatchEvent(new Event('input'));
+      textEl.focus();
+      return;
+    }
+    const preview = e.target.closest('[data-pv-url]');
+    if (preview) {
+      e.preventDefault();
+      openFilePreview(preview.dataset);
+      return;
+    }
+    await handleCopyButton(e);
+  });
 
   /* 公式图片加载失败时降级为原始 LaTeX 文本 */
   messagesEl.addEventListener('error', (e) => {
@@ -1520,6 +1797,7 @@ async function init(section) {
     settings.supplier = e.target.value;
     saveSettings();
     populateModels();
+    updateMeta();
   });
   section.querySelector('#chat-model').addEventListener('change', (e) => {
     settings.model = e.target.value;
@@ -1533,11 +1811,48 @@ async function init(section) {
   customBox.addEventListener('change', saveSettings);
   section.querySelector('#chat-tools-btn').addEventListener('click', openToolsModal);
 
-  /* ---- 移动端设置抽屉 ---- */
-  const pageEl = section.querySelector('.chat-page');
-  section.querySelector('#chat-settings-toggle').addEventListener('click', () => {
-    pageEl.classList.toggle('chat-settings-open');
+  const extraEl = section.querySelector('#chat-extra-json');
+  const extraErr = section.querySelector('#chat-extra-error');
+  const extraCount = section.querySelector('#chat-extra-count');
+  const refreshExtra = () => {
+    const r = parseExtraJson(extraEl.value);
+    extraErr.textContent = r.ok ? '' : `JSON 无效：${r.error}`;
+    extraEl.classList.toggle('invalid', !r.ok);
+    extraCount.textContent = r.ok && r.count ? `${r.count} 项` : '';
+    extraCount.hidden = !(r.ok && r.count);
+  };
+  extraEl.value = settings.extra_json || '';
+  refreshExtra();
+  extraEl.addEventListener('input', () => {
+    settings.extra_json = extraEl.value;
+    refreshExtra();
+    saveSettings();
   });
+
+  /* ---- 设置栏：移动端抽屉 / 桌面端折叠（记忆在 localStorage） ---- */
+  const pageEl = section.querySelector('.chat-page');
+  const isMobile = () => matchMedia('(max-width: 900px)').matches;
+  pageEl.classList.toggle('settings-hidden', localStorage.getItem(HIDE_SETTINGS_KEY) === '1');
+  const toggleSettings = () => {
+    if (isMobile()) {
+      pageEl.classList.toggle('chat-settings-open');
+      return;
+    }
+    const hidden = pageEl.classList.toggle('settings-hidden');
+    localStorage.setItem(HIDE_SETTINGS_KEY, hidden ? '1' : '0');
+  };
+  section.querySelector('#chat-settings-toggle').addEventListener('click', toggleSettings);
+  section.querySelector('#chat-settings-close').addEventListener('click', () => {
+    if (isMobile()) pageEl.classList.remove('chat-settings-open');
+    else toggleSettings();
+  });
+  section.querySelector('#chat-meta-model').addEventListener('click', () => {
+    if (isMobile() || pageEl.classList.contains('settings-hidden')) toggleSettings();
+  });
+  section.querySelector('#chat-meta-persona').addEventListener('click', () => {
+    if (isMobile() || pageEl.classList.contains('settings-hidden')) toggleSettings();
+  });
+  updateMeta();
   section.querySelector('#chat-settings-backdrop').addEventListener('click', () => {
     pageEl.classList.remove('chat-settings-open');
   });
@@ -1555,6 +1870,20 @@ async function init(section) {
     textEl.style.height = `${Math.min(textEl.scrollHeight, 160)}px`;
   };
   textEl.addEventListener('input', autoGrow);
+
+  /* 粘贴图片/文件直接上传 */
+  textEl.addEventListener('paste', (e) => {
+    const files = [...(e.clipboardData?.files || [])];
+    if (!files.length) return;
+    e.preventDefault();
+    for (const file of files) {
+      /* 剪贴板截图文件名统一为 image.png，以时间戳区分 */
+      const named = file.name === 'image.png'
+        ? new File([file], `paste-${Date.now()}.png`, { type: file.type })
+        : file;
+      uploadFile(named);
+    }
+  });
 
   textEl.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
@@ -1583,6 +1912,13 @@ async function init(section) {
       return;
     }
     if (!wsOpen) { toast('聊天服务未连接', 'error'); return; }
+    const extra = parseExtraJson(settings.extra_json);
+    if (!extra.ok) {
+      toast(`额外请求 JSON 无效：${extra.error}`, 'error', 5000);
+      pageEl.classList.add('chat-settings-open');
+      pageEl.classList.remove('settings-hidden');
+      return;
+    }
 
     const files = ready.map((a) => a.brief);
     const nonce = Math.random().toString(36).slice(2);
@@ -1650,6 +1986,7 @@ function destroy() {
   ws = null;
   sectionEl = null;
   messagesEl = null;
+  scrollBtn = null;
   activeTurn = null;
   pendingAttachments = [];
 }
