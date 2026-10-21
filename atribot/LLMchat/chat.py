@@ -168,16 +168,29 @@ class ChatBasics(ABC):
 
         不得包含时间/群号/用户等随请求变化的内容,否则提示词缓存失效;
         每次请求现算,保证技能/工具热重载后下一轮即生效
+
+        表情包标签提示不在此处,通过 `_append_emoji_prompt` 随最新消息下发
         """
         parts = [
             self._static_rules(),
-            self.emoji_core.prompt,
             self.skills.prompt,
             self.tool_calls.get_deferred_tools_prompt(
                 self._tool_preset_name, chat_type=self._tool_chat_type
             ),
         ]
         return "\n\n".join(p for p in parts if p)
+
+    def _append_emoji_prompt(self, message_builder: MessageBuilder) -> None:
+        """把表情包标签提示追加到本轮最新消息中
+
+        表情标签列表可能随表情目录变化,不能放进 system 静态前缀(否则缓存前缀失效),
+        因此每轮都作为增量消息的一部分重新下发
+
+        Args:
+            message_builder: 本轮增量消息构建器
+        """
+        if prompt := self.emoji_core.prompt:
+            message_builder.add_text(prompt)
 
     def _log_cache_usage(self, uid: str, response: GenerationResponse) -> None:
         """输出本轮提示词缓存命中情况(兼容 OpenAI/DeepSeek/Anthropic 的 usage 字段)"""
@@ -730,6 +743,7 @@ class GroupChat(ChatBasics):
                 including_audios=self.audio_sense,
                 including_videos=self.video_sense,
             )
+            self._append_emoji_prompt(builder)
             builder.add_text(f"<prompt>{prompt}</prompt>")
             builder.add_text(self.build_prompt.group_environment_block(group_id))
             if user_id:
@@ -826,8 +840,6 @@ class GroupChat(ChatBasics):
     ) -> MessageBuilder:
         """构建提示结构
 
-        顺序:群历史 + 当前消息 + 触发提示 + 环境说明 + 用户画像 + 记忆片段;
-        固定规则/表情/技能已放入 system,这里只放随请求变化的内容
 
         Args:
             event: 当前传入的聊天消息事件
@@ -857,6 +869,7 @@ class GroupChat(ChatBasics):
             including_audios,
             including_videos,
         )
+        self._append_emoji_prompt(message_builder)
         message_builder.add_text(f"<prompt>{prompt}</prompt>")
         message_builder.add_text(self.build_prompt.group_environment_block(group_id))
         message_builder.add_text(
@@ -1224,6 +1237,7 @@ class PrivateChat(ChatBasics):
 
         async def build_message(including_pictures: bool) -> MessageBuilder:
             builder = MessageBuilder()
+            self._append_emoji_prompt(builder)
             builder.add_text(f"<prompt>{prompt}</prompt>")
             builder.add_text(self.build_prompt.private_environment_block(user_id))
             builder.add_text(
@@ -1310,8 +1324,6 @@ class PrivateChat(ChatBasics):
     ) -> MessageBuilder:
         """构建私聊提示结构(批次)
 
-        顺序:本批消息 + 触发提示 + 环境说明 + 用户画像 + 记忆片段;
-        固定规则/表情/技能已放入 system
         用户级信息只出现一次;每条消息带序号/自身时间/与上一条的
         间隔标记,内容走多模态降级处理;记忆检索用整批拼接文本
         """
@@ -1347,6 +1359,7 @@ class PrivateChat(ChatBasics):
             prev_receive = event.receive_time
 
         message_builder.add_text("</MESSAGE>")
+        self._append_emoji_prompt(message_builder)
         message_builder.add_text(f"<prompt>{prompt}</prompt>")
         message_builder.add_text(self.build_prompt.private_environment_block(user_id))
         message_builder.add_text(
