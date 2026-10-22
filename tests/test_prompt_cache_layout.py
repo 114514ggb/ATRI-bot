@@ -1,6 +1,6 @@
 ﻿from types import SimpleNamespace
 
-from atribot.core.type.context_types import Context, MessageBuilder
+from atribot.core.type.context_types import Context
 from atribot.LLMchat.chat import ChatBasics
 
 
@@ -25,22 +25,6 @@ def test_static_system_prompt_is_stable_and_has_no_dynamic_parts() -> None:
     second = ChatBasics._build_static_system_prompt(chat)
     assert first == second == "RULES\n\nSKILLS\n\nDEFERRED"
     assert "EMOJI" not in first
-
-
-def test_emoji_prompt_appended_to_latest_message() -> None:
-    chat = SimpleNamespace(emoji_core=SimpleNamespace(prompt="EMOJI"))
-    builder = MessageBuilder()
-    builder.add_text("最新消息")
-    ChatBasics._append_emoji_prompt(chat, builder)
-    assert builder.build() == {"role": "user", "content": "最新消息EMOJI"}
-
-
-def test_emoji_prompt_skipped_when_empty() -> None:
-    chat = SimpleNamespace(emoji_core=SimpleNamespace(prompt=""))
-    builder = MessageBuilder()
-    builder.add_text("最新消息")
-    ChatBasics._append_emoji_prompt(chat, builder)
-    assert builder.build() == {"role": "user", "content": "最新消息"}
 
 
 def test_stored_message_carries_group_and_user_state() -> None:

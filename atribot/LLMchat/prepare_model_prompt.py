@@ -269,6 +269,35 @@ class build_prompt:
         "</tag_guidance>"
         ) 
 
+    @staticmethod
+    def json_output_reminder() -> str:
+        """JSON 输出提醒段
+
+        静态规则位于 system 缓存前缀中,模型容易忽略;该段随最新消息每轮下发,
+        既不影响缓存前缀,又能再次强调以 actions JSON 结尾
+        """
+        return (
+            "\n输出内容要符合要求且合法的JSON\n"
+            "JSON里要求是包含\"actions\"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。\n"
+            "<example>\n\n"
+            "```json\n"
+            "{\n"
+            "    \"actions\":[\n"
+            "        {\n"
+            "            \"decision\":\"参数值:只能是update,silence,speak其中之一\",\n"
+            "            //要求参数\n"
+            "        },\n"
+            "        {\n"
+            "            \"decision\":\"speak\",\n"
+            "            //对应参数\n"
+            "        }\n"
+            "    ]\n"
+            "}\n"
+            "```\n\n"
+            "</example>"
+            "请根据情况灵活的进行工具调用完成任务最后给出你的actions的JSON"
+        )
+
     def group_environment_block(self, group_id: int) -> str:
         """群聊环境说明(含群号,动态内容,放在历史之后)"""
         return (
@@ -322,26 +351,6 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 
 输出内容要符合要求且合法的JSON
 JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。
-<example>
-
-```json
-{
-    "actions":[
-        {
-            "decision":"参数值:只能是update,silence,speak其中之一",
-            //要求参数
-        },
-        {
-            "decision":"speak",
-            //对应参数
-        }
-    ]
-}
-
-```
-
-</example>
-请根据情况灵活的进行工具调用完成任务最后给出你的actions的JSON
 """
             "</output_requirement>"
         )
@@ -398,27 +407,7 @@ update_field:dict[str,any],update时必填,其它决策禁止出现
 2.如果相同的内容已经被执行，请不要重复执行
 
 输出内容要符合要求且合法的JSON
-JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision。
-<example>
-
-```json
-{
-    "actions":[
-        {
-            "decision":"参数值:只能是update,silence,speak其中之一",
-            //要求参数
-        },
-        {
-            "decision":"speak",
-            //对应参数
-        }
-    ]
-}
-
-```
-
-</example>
-请根据情况灵活的进行工具调用完成任务最后给出你的actions的JSON
+JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对应值list里可以使用同一个decision或不同decision
 """
             "</output_requirement>"
         )

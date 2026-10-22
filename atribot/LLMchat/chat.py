@@ -169,7 +169,7 @@ class ChatBasics(ABC):
         不得包含时间/群号/用户等随请求变化的内容,否则提示词缓存失效;
         每次请求现算,保证技能/工具热重载后下一轮即生效
 
-        表情包标签提示不在此处,通过 `_append_emoji_prompt` 随最新消息下发
+        表情包标签提示不在此处,而是随本轮最新消息一起下发
         """
         parts = [
             self._static_rules(),
@@ -179,18 +179,6 @@ class ChatBasics(ABC):
             ),
         ]
         return "\n\n".join(p for p in parts if p)
-
-    def _append_emoji_prompt(self, message_builder: MessageBuilder) -> None:
-        """把表情包标签提示追加到本轮最新消息中
-
-        表情标签列表可能随表情目录变化,不能放进 system 静态前缀(否则缓存前缀失效),
-        因此每轮都作为增量消息的一部分重新下发
-
-        Args:
-            message_builder: 本轮增量消息构建器
-        """
-        if prompt := self.emoji_core.prompt:
-            message_builder.add_text(prompt)
 
     def _log_cache_usage(self, uid: str, response: GenerationResponse) -> None:
         """输出本轮提示词缓存命中情况(兼容 OpenAI/DeepSeek/Anthropic 的 usage 字段)"""
@@ -743,13 +731,16 @@ class GroupChat(ChatBasics):
                 including_audios=self.audio_sense,
                 including_videos=self.video_sense,
             )
-            self._append_emoji_prompt(builder)
+            
+            if emoji_prompt := self.emoji_core.prompt:
+                builder.add_text(emoji_prompt)
             builder.add_text(f"<prompt>{prompt}</prompt>")
             builder.add_text(self.build_prompt.group_environment_block(group_id))
             if user_id:
                 builder.add_text(
                     f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
                 )
+            builder.add_text(self.build_prompt.json_output_reminder())
             return builder
 
         message_builder = await build_message(self.visual_sense)
@@ -869,7 +860,8 @@ class GroupChat(ChatBasics):
             including_audios,
             including_videos,
         )
-        self._append_emoji_prompt(message_builder)
+        if emoji_prompt := self.emoji_core.prompt:
+            message_builder.add_text(emoji_prompt)
         message_builder.add_text(f"<prompt>{prompt}</prompt>")
         message_builder.add_text(self.build_prompt.group_environment_block(group_id))
         message_builder.add_text(
@@ -877,6 +869,7 @@ class GroupChat(ChatBasics):
         )
         if memory_text:
             message_builder.add_text(memory_text)
+        message_builder.add_text(self.build_prompt.json_output_reminder())
 
         return message_builder
 
@@ -1237,12 +1230,15 @@ class PrivateChat(ChatBasics):
 
         async def build_message(including_pictures: bool) -> MessageBuilder:
             builder = MessageBuilder()
-            self._append_emoji_prompt(builder)
+            
+            if emoji_prompt := self.emoji_core.prompt:
+                builder.add_text(emoji_prompt)
             builder.add_text(f"<prompt>{prompt}</prompt>")
             builder.add_text(self.build_prompt.private_environment_block(user_id))
             builder.add_text(
                 f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
             )
+            builder.add_text(self.build_prompt.json_output_reminder())
             return builder
 
         message_builder = await build_message(self.visual_sense)
@@ -1359,7 +1355,9 @@ class PrivateChat(ChatBasics):
             prev_receive = event.receive_time
 
         message_builder.add_text("</MESSAGE>")
-        self._append_emoji_prompt(message_builder)
+        
+        if emoji_prompt := self.emoji_core.prompt:
+            message_builder.add_text(emoji_prompt)
         message_builder.add_text(f"<prompt>{prompt}</prompt>")
         message_builder.add_text(self.build_prompt.private_environment_block(user_id))
         message_builder.add_text(
@@ -1388,6 +1386,7 @@ class PrivateChat(ChatBasics):
             message_builder.add_text(
                 f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>"
             )
+        message_builder.add_text(self.build_prompt.json_output_reminder())
 
         return message_builder
 
