@@ -648,13 +648,12 @@ class GroupChat(ChatBasics):
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
         original_context.add_user_message(
             self._format_stored_message(
-                user_id=user_id,
                 prompt=prompt,
                 body=f"用户消息:{event.llm_formatted_message}",
             )
         )
         original_context.extend(
-            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+            msg for msg in response.messages if msg["role"] in ["assistant", "tool"]
         )
         
         if response.reasoning_content:
@@ -772,7 +771,7 @@ class GroupChat(ChatBasics):
             self._format_stored_message(group_id=group_id, user_id=user_id, prompt=prompt)
         )
         original_context.extend(
-            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+            msg for msg in response.messages if msg["role"] in ["assistant", "tool"]
         )
         
         if response.reasoning_content:
@@ -1130,13 +1129,12 @@ class PrivateChat(ChatBasics):
 
         original_context.add_user_message(
             self._format_stored_message(
-                user_id=user_id,
                 prompt=prompt,
                 body=self._format_private_batch_body(events),
             )
         )
         original_context.extend(
-            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+            msg for msg in response.messages if msg["role"] in ["assistant", "tool"]
         )
 
         if response.reasoning_content:
@@ -1254,10 +1252,10 @@ class PrivateChat(ChatBasics):
         await self._dispatch_private_actions(response, event, uid)
 
         original_context.add_user_message(
-            self._format_stored_message(user_id=user_id, prompt=prompt)
+            self._format_stored_message(prompt=prompt)
         )
         original_context.extend(
-            [msg for msg in response.messages if msg["role"] in ["assistant", "tool"]]
+            msg for msg in response.messages if msg["role"] in ["assistant", "tool"]
         )
 
         if response.reasoning_content:

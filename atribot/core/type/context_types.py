@@ -372,7 +372,7 @@ class Context():
         """添加内容"""
         self.messages.append(dict)
 
-    def extend(self, Iterable: List) -> None:
+    def extend(self, Iterable: Iterable[Dict[str, Any]]) -> None:
         """用可迭代对象来扩展列表"""
         self.messages.extend(Iterable)
 
