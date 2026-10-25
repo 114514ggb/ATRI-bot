@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from logging import Logger
 from typing import TYPE_CHECKING, List, Optional
 
-from atribot.core.service_container import container
-from atribot.LLMchat.agent.message import AssistantMessage, BaseMessage, UserMessage
-from atribot.LLMchat.memory.memory_system import MemorySystem
+from atribot.LLMchat.agent.message import BaseMessage, ToolMessage
 
 if TYPE_CHECKING:
     from atribot.LLMchat.agent.context.context import AgentContext
@@ -38,7 +35,7 @@ class BaseCompressionStrategy(ABC):
         """对上下文执行压缩操作
 
         该方法会直接修改传入的 context。
-        子类实现应负责：压缩消息、对移除的消息进行总结、将总结插入上下文开头。
+        子类可自行决定被移除消息的处置方式（直接丢弃、或总结后插回上下文开头等）。
 
         Args:
             context: 待压缩的 Agent 对话上下文
@@ -50,20 +47,15 @@ class BaseCompressionStrategy(ABC):
 
 
 class DefaultCompressionStrategy(BaseCompressionStrategy):
-    """默认上下文压缩策略
+    """默认上下文压缩策略：纯截断，不依赖任何外部服务
 
     基于消息数量和 Token 数量的双重阈值判断：
-    - 消息数量超过 user_max_record 时触发
-    - Token 数量超过 compression_threshold * max_context_tokens 时触发
+    - 消息数量超过 user_max_record 时触发（-1 表示不限制）
+    - Token 数量超过 max_context_tokens * 0.8 时触发
 
-    压缩方式：丢弃前半部分消息，并确保剩余部分首条消息为 UserMessage
+    压缩方式：丢弃前半部分消息，并确保剩余部分的首条消息不是 ToolMessage
+    （孤立的工具响应会让后续请求非法）。被丢弃的消息不保留总结。
     """
-
-    def __init__(self):
-        super().__init__()
-        self.log: Logger = container.get_by_type(Logger).getChild("AgentCtx")
-        self.memory_system = container.get_by_type(MemorySystem)
-
 
     @property
     def name(self) -> str:
@@ -82,7 +74,7 @@ class DefaultCompressionStrategy(BaseCompressionStrategy):
         return trigger_by_count or trigger_by_tokens
 
     async def compress(self, context: AgentContext) -> Optional[List[BaseMessage]]:
-        """丢弃前半部分消息，确保首条为 UserMessage,并对被移除的消息进行总结后插入上下文开头"""
+        """丢弃前半部分消息，并保证截断后的首条消息不是 ToolMessage"""
         removed_messages: List[BaseMessage] = []
 
         discard_count = len(context._messages) // 2
@@ -91,29 +83,10 @@ class DefaultCompressionStrategy(BaseCompressionStrategy):
             if context._messages:
                 removed_messages.append(context._messages.popleft())
 
-        # 确保截断后的首条消息为 UserMessage，不满足则继续向后弹出
-        while context._messages and not isinstance(context._messages[0], UserMessage):
+        # 截断后首条若是工具响应，说明其对应的调用已被丢弃，需继续向后弹出
+        while context._messages and isinstance(context._messages[0], ToolMessage):
             removed_messages.append(context._messages.popleft())
-
-        # 对被移除的消息进行总结并插入到上下文开头
-        if removed_messages:
-            try:
-                removed_text = "\n".join(
-                    str(msg.to_openai_dict()) for msg in removed_messages
-                )
-                if summarize_text := await self.memory_system.summarize_context(removed_text):
-                    context._messages.appendleft(
-                        AssistantMessage(content=summarize_text[:3000])
-                    )
-                    self.log.info(
-                        f"Agent上下文总结完成, 压缩 {len(removed_messages)} 条消息"
-                        f" 为 {len(summarize_text)} 字符的摘要"
-                    )
-                else:
-                    self.log.info("Agent上下文总结返回为空, 跳过摘要插入")
-            except Exception as e:
-                self.log.exception(f"Agent上下文总结出现错误: {e}")
 
         context.total_tokens = context.count_estimate_tokens()
 
-        return removed_messages
+        return removed_messages or None

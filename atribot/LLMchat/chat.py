@@ -146,7 +146,6 @@ class ChatBasics(ABC):
 
     @staticmethod
     def _format_stored_message(
-        user_id: int | None,
         prompt: str,
         group_id: int | None = None,
         body: str = "",
@@ -155,11 +154,9 @@ class ChatBasics(ABC):
 
         发送给模型的是完整提示词,这里只保留触发原因与消息本体,不重复存储每轮都重新构造的内容
         """
-        attrs = f" time=\"{time.strftime('%Y-%m-%d %H:%M:%S')}\""
+        attrs = ""
         if group_id:
             attrs += f" group_id=\"{group_id}\""
-        if user_id:
-            attrs += f" user_id=\"{user_id}\""
         text = f"<context{attrs}><prompt>{prompt}</prompt></context>"
         return f"{text}\n{body}" if body else text
 
@@ -168,30 +165,27 @@ class ChatBasics(ABC):
 
         不得包含时间/群号/用户等随请求变化的内容,否则提示词缓存失效;
         每次请求现算,保证技能/工具热重载后下一轮即生效
-
-        表情包标签提示不在此处,而是随本轮最新消息一起下发
         """
         parts = [
-            self._static_rules(),
             self.skills.prompt,
             self.tool_calls.get_deferred_tools_prompt(
                 self._tool_preset_name, chat_type=self._tool_chat_type
             ),
+            self._static_rules(),
         ]
         return "\n\n".join(p for p in parts if p)
 
     def _log_cache_usage(self, uid: str, response: GenerationResponse) -> None:
-        """输出本轮提示词缓存命中情况(兼容 OpenAI/DeepSeek/Anthropic 的 usage 字段)"""
+        """输出本轮提示词缓存命中情况"""
         usage = response.metadata or {}
-        prompt_tokens = usage.get("prompt_tokens") or 0
-        details = usage.get("prompt_tokens_details") or {}
-        cached = (
-            details.get("cached_tokens")
-            or usage.get("prompt_cache_hit_tokens")
-            or usage.get("cache_read_input_tokens")
-            or 0
-        )
-        if prompt_tokens:
+        if prompt_tokens := usage.get("prompt_tokens"):
+            details = usage.get("prompt_tokens_details") or {}
+            cached = (
+                details.get("cached_tokens")
+                or usage.get("prompt_cache_hit_tokens")
+                or usage.get("cache_read_input_tokens")
+                or 0
+            )
             self.log.info(
                 f"[{uid}]提示词缓存命中 {cached}/{prompt_tokens} ({cached / prompt_tokens:.0%})"
             )
@@ -329,7 +323,7 @@ class ChatBasics(ABC):
         including_audios: bool = False,
         including_videos: bool = False,
     ) -> Callable[[List[MessageSegment]], Awaitable[None]]:
-        """构建消息片段追加器(多模态降级处理核心)
+        """构建消息片段追加器
 
         Returns:
             异步片段追加函数,按模型感知能力把图片/音频/视频
@@ -476,7 +470,7 @@ class ChatBasics(ABC):
         including_pictures: bool,
         including_audios: bool = False,
         including_videos: bool = False,
-    ) -> str:
+    ) -> None:
         """为当前用户输入附加结构化的消息片段
 
         Returns:
@@ -503,6 +497,8 @@ class ChatBasics(ABC):
 
         message_builder.add_text("</user_message></MESSAGE>")
 
+        message_builder.add_text(f"<current_user_info>{await self.user_system.get_user_info(event.user_id)}</current_user_info>")
+
         if (
             len(event.event.pure_text) >= 5
             and (memory := [
@@ -520,9 +516,7 @@ class ChatBasics(ABC):
                 )
             ])
         ):
-            return f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>"
-
-        return ""
+            message_builder.add_text(f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>")
 
 
 class GroupChat(ChatBasics):
@@ -613,7 +607,6 @@ class GroupChat(ChatBasics):
             event=event,
             prompt=prompt,
             group_id=group_id,
-            user_id=user_id,
             including_pictures=self.visual_sense,
             including_audios=self.audio_sense,
             including_videos=self.video_sense,
@@ -641,7 +634,6 @@ class GroupChat(ChatBasics):
                 event=event,
                 prompt=prompt,
                 group_id=group_id,
-                user_id=user_id,
                 including_pictures=including_pictures,
             ),
             uid = uid
@@ -656,7 +648,6 @@ class GroupChat(ChatBasics):
         #存储更新等,因为直接返回的是那个对象所以可以直接改变,虽然中途会有其他协程拿到这个对象改变数值但是不应堵塞其他携程的聊天
         original_context.add_user_message(
             self._format_stored_message(
-                group_id=group_id,
                 user_id=user_id,
                 prompt=prompt,
                 body=f"用户消息:{event.llm_formatted_message}",
@@ -824,7 +815,6 @@ class GroupChat(ChatBasics):
         event: MessageEventEnvelope,
         prompt: str,
         group_id: int,
-        user_id: int,
         including_pictures: bool = False,
         including_audios: bool = False,
         including_videos: bool = False,
@@ -853,7 +843,7 @@ class GroupChat(ChatBasics):
             including_audios=including_audios,
             including_videos=including_videos,
         )
-        memory_text = await self.append_message_segments_prompt(
+        await self.append_message_segments_prompt(
             event,
             message_builder,
             including_pictures,
@@ -864,11 +854,6 @@ class GroupChat(ChatBasics):
             message_builder.add_text(emoji_prompt)
         message_builder.add_text(f"<prompt>{prompt}</prompt>")
         message_builder.add_text(self.build_prompt.group_environment_block(group_id))
-        message_builder.add_text(
-            f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
-        )
-        if memory_text:
-            message_builder.add_text(memory_text)
         message_builder.add_text(self.build_prompt.json_output_reminder())
 
         return message_builder
@@ -1190,7 +1175,7 @@ class PrivateChat(ChatBasics):
 
     @staticmethod
     def _format_private_batch_body(events: list[MessageEventEnvelope]) -> str:
-        """把一批私聊消息格式化为落库文本(内容保留多模态CQ码)"""
+        """把一批私聊消息格式化为落库文本"""
         latest = events[-1]
         parts = [
             f"<MESSAGE count=\"{len(events)}\""
@@ -1331,39 +1316,29 @@ class PrivateChat(ChatBasics):
             including_audios,
             including_videos,
         )
-
-        count_note = f"(共{len(events)}条,按时间先后排列)" if len(events) > 1 else ""
+        
         message_builder.add_text(
-            f"最新用户消息{count_note}:\n<MESSAGE>"
+            f"最新一批用户消息:\n<MESSAGE>"
             f"<user_id>{user_id}</user_id>"
             f"<nick_name>{latest.event.sender['nickname']}</nick_name>"
             f"<time>{time.strftime('%Y-%m-%d %H:%M:%S')}</time>\n"
         )
 
-        prev_receive: float | None = None
-        for idx, event in enumerate(events):
+        for event in events:
             attrs = (
-                f" order=\"{idx + 1}\""
                 f" time=\"{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(event.event.time))}\""
                 f" message_id=\"{event.event.message_id}\""
             )
-            if prev_receive is not None:
-                attrs += f" interval=\"{event.receive_time - prev_receive:.1f}秒\""
             message_builder.add_text(f"<user_message{attrs}>")
             await self._append_event_segments(event, message_builder, append_segments)
             message_builder.add_text("</user_message>")
-            prev_receive = event.receive_time
 
         message_builder.add_text("</MESSAGE>")
-        
-        if emoji_prompt := self.emoji_core.prompt:
-            message_builder.add_text(emoji_prompt)
-        message_builder.add_text(f"<prompt>{prompt}</prompt>")
-        message_builder.add_text(self.build_prompt.private_environment_block(user_id))
+
         message_builder.add_text(
             f"<current_user_info>{await self.user_system.get_user_info(user_id)}</current_user_info>"
         )
-
+        
         #记忆检索
         combined_text = "".join(e.event.pure_text for e in events)
         if (
@@ -1386,6 +1361,12 @@ class PrivateChat(ChatBasics):
             message_builder.add_text(
                 f"以下是可能相关的最近记忆片段:<recent_memory_snippet>{memory}</recent_memory_snippet>"
             )
+
+        if emoji_prompt := self.emoji_core.prompt:
+            message_builder.add_text(emoji_prompt)
+        message_builder.add_text(self.build_prompt.private_environment_block(user_id))
+        message_builder.add_text(f"<prompt>{prompt}</prompt>")
+
         message_builder.add_text(self.build_prompt.json_output_reminder())
 
         return message_builder

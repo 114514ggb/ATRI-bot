@@ -561,10 +561,17 @@ def serialize_context(ctx) -> List[Dict[str, Any]]:
     return items
 
 
+def new_agent_context() -> AgentContext:
+    """新建带“总结式”压缩策略的 AgentContext（WebUI 会话沿用 LLM 摘要压缩）"""
+    from atribot.LLMchat.agent.context.summarize_compression import SummaryCompressionStrategy
+
+    return AgentContext(compression_strategies=[SummaryCompressionStrategy()])
+
+
 def deserialize_context(items: List[Dict[str, Any]]) -> "AgentContext":
     """chat_context.context_data -> AgentContext（推理内容不持久化，媒体为文字注记）"""
 
-    ctx = AgentContext()
+    ctx = new_agent_context()
     for item in items or []:
         role = item.get("role")
         if role == "user":
@@ -658,10 +665,8 @@ class ChatSession:
     """一个 WebUI 聊天会话：独立 AgentContext + 事件广播 + 展示用时间线"""
 
     def __init__(self, session_id: int):
-        from atribot.LLMchat.agent.context.context import AgentContext
-
         self.id: int = session_id
-        self.context = AgentContext()
+        self.context = new_agent_context()
         self.persona_key: Optional[str] = None
         self.custom_persona: str = ""
         self.last_settings: Dict[str, Any] = {}

@@ -505,7 +505,7 @@ class _MockToolCalls(ToolCalls):
 
 
 def make_memory_mock():
-    """MemorySystem 替身：AgentContext 压缩策略只做容器查找，跳过真实构造"""
+    """MemorySystem 替身：SummaryCompressionStrategy 只做容器查找，跳过真实构造"""
     from atribot.LLMchat.memory.memory_system import MemorySystem
 
     class _MockMemorySystem(MemorySystem):

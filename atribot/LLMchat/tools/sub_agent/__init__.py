@@ -5,6 +5,7 @@ from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
 from atribot.LLMchat.agent.agent_data import AgentData
 from atribot.LLMchat.agent.context.context import AgentContext
+from atribot.LLMchat.agent.context.summarize_compression import SummaryCompressionStrategy
 from atribot.LLMchat.agent.runners.response import RunSummary
 from atribot.LLMchat.agent.runners.subagent.sub_agent_runner import SubAgentRunner
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
@@ -100,7 +101,8 @@ async def sub_agent_task(
         source="子代理正在执行任务" 
     )
 
-    context = AgentContext()
+
+    context = AgentContext(compression_strategies=[SummaryCompressionStrategy()])
     if message_data.group_id is not None:
         environment_line = f"当前环境是群聊,群号是:{message_data.group_id}"
     else:
