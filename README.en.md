@@ -38,7 +38,7 @@ Logo illustrated by [吖密](https://space.bilibili.com/1196260828)
   - [🖥️ Web Admin Panel](#-web-admin-panel)
   - [🛠️ Other Practical Features](#-other-practical-features)
 - [🚀 Quick Start (How to Run)](#-quick-start-how-to-run)
-  - [1. Frontend Connection (NapCat)](#1-frontend-connection-napcat)
+  - [1. Frontend Connection (SnowLuma / NapCat)](#1-frontend-connection-snowluma--napcat)
   - [2. Database Configuration (PostgreSQL)](#2-database-configuration-postgresql)
   - [3. Model & Environment Configuration](#3-model--environment-configuration)
   - [4. Start the Project](#4-start-the-project)
@@ -76,7 +76,7 @@ The codebase is well-structured with detailed comments in core pipelines — sui
 
 ## ✨ Core Features
 
-A **NapCat**-connected QQ Bot deeply customized for group chat scenarios, with full private chat support as well.
+A QQ Bot connected through **SnowLuma / NapCat** (OneBot v11 backends), deeply customized for group chat scenarios, with full private chat support as well.
 
 ### 🧠 Deep LLM Chat Integration
 Fully self-implemented LLM chat pipeline with complete control from input processing to output response:
@@ -129,10 +129,21 @@ A web admin panel runs as an in-process background task when the bot starts (sam
 > To run the bot natively while keeping the database in a container:
 > `docker compose up -d db` → `uv sync` → `uv run main.py`.
 
-### 1. Frontend Connection (NapCat)
-First, you need a frontend that can communicate with the QQ server. NapCat is recommended:  
-[NapCat Installation Guide](https://napneko.github.io/guide/napcat)  
-[NapCat Repository](https://github.com/NapNeko/NapCatQQ)
+### 1. Frontend Connection (SnowLuma / NapCat)
+First, you need a frontend (an OneBot v11 backend) that can communicate with the QQ server. **SnowLuma is the primary recommendation**; NapCat works as well:
+
+**🌟 SnowLuma (recommended)**
+- [SnowLuma Deployment Guide](https://snowluma.github.io/zh/docs/guide/deploy)
+- [SnowLuma Releases](https://github.com/SnowLuma/SnowLuma/releases)
+- [SnowLuma Repository](https://github.com/SnowLuma/SnowLuma)
+
+**NapCat (alternative)**
+- [NapCat Installation Guide](https://napneko.github.io/guide/napcat)
+- [NapCat Repository](https://github.com/NapNeko/NapCatQQ)
+
+> Set `config.platforms.<name>.adapter` to `snowluma` for SnowLuma (forward WS defaults to port `3001`, path `/`)
+> or `onebot` for NapCat (forward WS default path `/websocket`).
+>
 > *Note: You can also implement your own frontend, as long as it can connect properly.*
 
 ### 2. Database Configuration (PostgreSQL)
@@ -190,7 +201,7 @@ Equips the AI model with a default **code sandbox environment** to safely execut
 #### ⚙️ Configuration Files
 Before starting, ensure to check the  `assets` folder:
 1.  Refer to `assets\如何配置配置文件.md` (Chinese guide) for configuration details.
-2.  **Platform connection**: `config.platforms.<name>` configures the connection to NapCat (`adapter` fixed as `onebot`, `connection_type` supports `WebSocket_client` / `WebSocket_server` / `http`, `access_token` must match NapCat, `url` is the address).
+2.  **Platform connection**: `config.platforms.<name>` configures the connection to the protocol backend (NapCat / SnowLuma) (`adapter` is `onebot` for NapCat-like OneBot v11 backends or `snowluma`, `connection_type` supports `WebSocket_client` / `WebSocket_server` / `http`, `access_token` must match the backend, `url` is the address; SnowLuma forward WS defaults to port `3001` with path `/`, overridable via `ws_path`).
 3.  Configure `supplier_config.json` (model supplier settings).
 4.  Configure `config.json` (project basic settings).
 5.  **MCP Configuration**：Default path is `atribot\LLMchat\MCP\mcp_server.json`. Specific MCP tools can be toggled via `"active": false`; remote servers use SSE by default, set `"transport": "streamable_http"` to use Streamable HTTP.
@@ -400,7 +411,7 @@ ATRI-main/
 NapCat (QQ Client)
       │  WebSocket / HTTP
       ▼
-Platform Adapter (OneBotAdapter, multi-platform)
+Platform Adapter (OneBotAdapter / SnowLumaAdapter, multi-platform)
       │
       ▼
 MessageQueue (message queue)

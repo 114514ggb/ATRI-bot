@@ -22,7 +22,19 @@ from atribot.core.type.onebot_event_types import OneBotEvent
 
 @register_adapter("onebot")
 class OneBotAdapter(PlatformAdapter):
-    """OneBot 协议平台适配器"""
+    """OneBot 协议平台适配器
+
+    子类可通过以下类属性替换实现细节，无需重写构造流程：
+        _log_name: 日志子名
+        _message_event_cls: 事件信封类型
+        _send_client_cls: 发送客户端类型
+        _default_ws_path: 正向 WS 默认路径（None 沿用 NapCat 的 /websocket 逻辑）
+    """
+
+    _log_name: str = "OneBotAdapter"
+    _message_event_cls: type[OneBotMessageEvent] = OneBotMessageEvent
+    _send_client_cls: type[OneBotSendClient] = OneBotSendClient
+    _default_ws_path: str | None = None
 
     def __init__(
         self,
@@ -32,7 +44,7 @@ class OneBotAdapter(PlatformAdapter):
         self._config = config
         self._queue = queue
         self._source_name = config.source_name
-        self._log = container.get_by_type(logging.Logger).getChild(f"OneBotAdapter.{config.source_name}")
+        self._log = container.get_by_type(logging.Logger).getChild(f"{self._log_name}.{config.source_name}")
         self._started = False
 
         if isinstance(config, WebSocketClientConfig):
@@ -40,8 +52,9 @@ class OneBotAdapter(PlatformAdapter):
                 url=config.url,
                 access_token=config.access_token,
                 log=self._log.getChild("WSClient"),
+                path=config.ws_path or self._default_ws_path,
             )
-            http_base_url = f"http://{config.url}"
+            http_base_url = f"http://{config.url}".rstrip("/")
         elif isinstance(config, WebSocketServerConfig):
             self._connection = OneBotWSServer(
                 host=config.host,
@@ -49,7 +62,7 @@ class OneBotAdapter(PlatformAdapter):
                 access_token=config.access_token,
                 log=self._log.getChild("WSServer"),
             )
-            http_base_url = f"http://{config.host}:{config.port}"
+            http_base_url = f"http://{config.host}:{config.port}".rstrip("/")
         elif isinstance(config, HttpAdapterConfig):
             self._connection = OneBotHttpServer(
                 host=config.host,
@@ -57,13 +70,13 @@ class OneBotAdapter(PlatformAdapter):
                 access_token=config.access_token,
                 log=self._log.getChild("HttpServer"),
             )
-            http_base_url = config.url
+            http_base_url = (config.url or "").rstrip("/")
         else:
             raise ValueError(
                 f"不支持的连接类型: {config.connection_type} "
                 f"(平台: {self._source_name})"
             )
-        self._send_client = OneBotSendClient(
+        self._send_client = self._send_client_cls(
             access_token=config.access_token or "",
             http_base_url=http_base_url,
             connection_type=config.connection_type,
@@ -78,6 +91,20 @@ class OneBotAdapter(PlatformAdapter):
     @property
     def is_started(self) -> bool:
         return self._started
+
+    @property
+    def is_connected(self) -> bool:
+        return bool(getattr(self._connection, "is_connected", False))
+
+    def get_connection_info(self) -> dict[str, Any]:
+        """返回连接运行状态快照（供状态查询命令 / 面板展示）"""
+        return {
+            "adapter": type(self).__name__,
+            "is_started": self._started,
+            "is_running": bool(getattr(self._connection, "is_running", False)),
+            "is_connected": self.is_connected,
+            "retry_count": getattr(self._connection, "retry_count", None),
+        }
 
 
     async def start(self) -> None:
@@ -166,7 +193,7 @@ class OneBotAdapter(PlatformAdapter):
             )
             return
 
-        msg = OneBotMessageEvent(
+        msg = self._message_event_cls(
             event=event,
             source=self._source_name,
             direction="incoming",

@@ -56,6 +56,21 @@ class PlatformAdapter(ABC):
         """
         ...
 
+    @property
+    def is_connected(self) -> bool:
+        """连接是否已建立（子类按需覆写）"""
+        return False
+
+    def get_connection_info(self) -> dict[str, Any]:
+        """返回连接运行状态快照，用于状态查询命令 / 面板展示
+
+        子类可覆写以补充连接细节（如重连次数）。
+
+        Returns:
+            状态字典，至少包含 is_connected 字段
+        """
+        return {"is_connected": self.is_connected}
+
     async def call_api(self, action: str, params: dict) -> Any:
         """通用 API 调用
 

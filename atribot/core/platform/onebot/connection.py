@@ -31,9 +31,11 @@ class OneBotWSClient:
         retry_delay: float = 1.0,
         echo_timeout: float = 15.0,
         log: logging.Logger | None = None,
+        path: Optional[str] = None,
     ):
         self.url = url
         self.access_token = access_token
+        self.path = path
         self.max_retries = max_retries
         self.retry_delay = retry_delay
         self.echo_timeout = echo_timeout
@@ -54,9 +56,19 @@ class OneBotWSClient:
         self._tasks: list[Task] = []
 
     def _build_uri(self) -> str:
-        """构建 WebSocket URI"""
+        """构建 WebSocket URI
+
+        `path` 为 None 时沿用 NapCat 的默认路径逻辑；指定后使用自定义路径
+        （SnowLuma 默认路径为 `/`）。
+        """
         protocol = "ws://"
-        if self.access_token:
+        if self.path is not None:
+            path = "/" + self.path.strip("/")
+            uri = f"{protocol}{self.url}{path}"
+            if self.access_token:
+                sep = "&" if "?" in uri else "?"
+                uri = f"{uri}{sep}access_token={self.access_token}"
+        elif self.access_token:
             uri = f"{protocol}{self.url}/websocket?access_token={self.access_token}"
         else:
             uri = f"{protocol}{self.url}/"
@@ -235,6 +247,11 @@ class OneBotWSClient:
         self.pending_requests.clear()
 
         self.log.info("WebSocket 客户端已关闭")
+
+    @property
+    def retry_count(self) -> int:
+        """累计重连尝试次数（连接成功后清零）"""
+        return self._retry_count
 
     @property
     def is_connected(self) -> bool:

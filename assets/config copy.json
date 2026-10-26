@@ -7,6 +7,15 @@
             "url": "127.0.0.1:8888",
             "enabled": true,
             "source_name": ""
+        },
+        "snowluma": {
+            "adapter": "snowluma",
+            "connection_type": "WebSocket_client",
+            "access_token": "ATRI114514",
+            "url": "127.0.0.1:3001",
+            "ws_path": "/",
+            "enabled": false,
+            "source_name": ""
         }
     },
     "root_user_id": 114514,

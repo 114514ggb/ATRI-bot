@@ -36,15 +36,13 @@ class SummaryCompressionStrategy(BaseCompressionStrategy):
 
     def should_compress(self, context: AgentContext) -> bool:
         """双重条件判断：消息数超限 或 Token 数超过阈值百分比"""
-        trigger_by_count = (
+        return (
             context.user_max_record != -1
             and len(context._messages) > context.user_max_record
-        )
-        trigger_by_tokens = (
+        ) or (
             context.total_tokens
             > (context.max_context_tokens * 0.8)
         )
-        return trigger_by_count or trigger_by_tokens
 
     async def compress(self, context: AgentContext) -> Optional[List[BaseMessage]]:
         """丢弃前半部分消息，确保首条为 UserMessage,并对被移除的消息进行总结后插入上下文开头"""

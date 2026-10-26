@@ -64,9 +64,9 @@
   - `cleanup()` — 若覆写，`resolve()` 自动提取为清理回调注册到容器，`shutdown` 时逆序调用
   - **不强制继承**：即使不继承 `ServiceBase`，只要在 `container.register(name, obj, cleanup=fn)` 时手动传入清理回调即可
 
-- **消息流**: `NapCat`（外部QQ） → 平台适配器（`OneBotAdapter`，支持 WebSocket client/server 与 HTTP） → `MessageQueue` → `Pipeline`（`WhitelistMiddleware` 群白名单过滤 + `ChatManager` 上下文中间件） → `EventBus`（按 `PostType` 分发） → 监听器（存储入库 priority=101 / `AtCommandRule` 命令路由 / `initiativeChat`·`privateChatTrigger` 聊天路由 / 插件 handlers）；群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理
+- **消息流**: `NapCat` / `SnowLuma`（外部QQ，OneBot v11） → 平台适配器（`OneBotAdapter` / `SnowLumaAdapter`，支持 WebSocket client/server 与 HTTP） → `MessageQueue` → `Pipeline`（`WhitelistMiddleware` 群白名单过滤 + `ChatManager` 上下文中间件） → `EventBus`（按 `PostType` 分发） → 监听器（存储入库 priority=101 / `AtCommandRule` 命令路由 / `initiativeChat`·`privateChatTrigger` 聊天路由 / 插件 handlers）；群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理
 - **数据库**: PostgreSQL + `pgvector`（HNSW 1024维，m=16/ef=64）+ `pgroonga` 扩展全异步，使用 `async with db as db:` 上下文管理器Schema 定义在 `docker/db/info.sql`，含自定义枚举 `permission_type`、`memory_category`
-- **配置访问**: `atriConfig` 将 JSON 包装为支持点操作的 `ConfigObject`（`assets/config.json`）路径统一通过 `config.file_path.*` 访问，均为 `Path` 对象；多平台连接配置在 `config.platforms.<name>`（`adapter`/`connection_type`/`access_token`/`url`，支持 `WebSocket_client`/`WebSocket_server`/`http`，旧别名 `"WebSocket"` 自动归一）
+- **配置访问**: `atriConfig` 将 JSON 包装为支持点操作的 `ConfigObject`（`assets/config.json`）路径统一通过 `config.file_path.*` 访问，均为 `Path` 对象；多平台连接配置在 `config.platforms.<name>`（`adapter` 支持 `onebot` / `snowluma`，`connection_type` 支持 `WebSocket_client`/`WebSocket_server`/`http`，`WebSocket_client` 可用 `ws_path` 覆盖连接路径：onebot 默认 `/websocket`、snowluma 默认 `/`，旧别名 `"WebSocket"` 自动归一）
 
 ## 完整服务名称表
 | 服务名 | 类型 | 推荐获取方式 | Shutdown | 备注 |

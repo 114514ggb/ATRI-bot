@@ -356,6 +356,7 @@ class WebSocketClientConfig:
         connection_type: 连接类型
         access_token: 访问令牌
         url: WS client 目标地址 (host:port)，必填
+        ws_path: WS 连接路径（None 时由适配器决定默认值）
         source_name: 来源标识，默认取平台条目 key
         enabled: 是否启用
     """
@@ -367,6 +368,8 @@ class WebSocketClientConfig:
     """访问令牌"""
     url: str = ""
     """WS client 目标地址 (host:port)"""
+    ws_path: str | None = None
+    """WS 连接路径（None 时由适配器决定默认值）"""
     source_name: str = ""
     """来源标识（为空时自动取平台条目 key"""
     enabled: bool = True
@@ -477,6 +480,7 @@ class PlatformsConfig:
                     adapter=raw.get("adapter", ""),
                     access_token=raw.get("access_token"),
                     url=raw.get("url") or "127.0.0.1:8080",
+                    ws_path=raw.get("ws_path"),
                     source_name=source_name,
                     enabled=raw.get("enabled", True),
                 )

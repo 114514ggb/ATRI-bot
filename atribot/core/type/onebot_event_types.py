@@ -129,6 +129,8 @@ class NoticeType(str, Enum):
     """表情回应"""
     BOT_OFFLINE = "bot_offline"
     """机器人离线"""
+    BOT_STATUS = "bot_status"
+    """机器人上下线状态(SnowLuma)"""
 
 
 class NotifySubType(str, Enum):
@@ -392,9 +394,11 @@ class OneBotEvent(ABC):
         elif notice_type == NoticeType.FRIEND_ADD:
             return FriendAddNoticeEvent.from_data(data)
 
-        #bot离线
+        #bot离线 / 上下线状态
         elif notice_type == NoticeType.BOT_OFFLINE:
             return BotOfflineEvent.from_data(data)
+        elif notice_type == NoticeType.BOT_STATUS:
+            return BotStatusEvent.from_data(data)
 
         else:
             return NoticeEvent.from_data(data)
@@ -1474,6 +1478,42 @@ class BotOfflineEvent(NoticeEvent):
 
 
 @dataclass(slots=True)
+class BotStatusEvent(NoticeEvent):
+    """机器人上下线状态通知(SnowLuma)"""
+    user_id: int = 0
+    """机器人 QQ 号"""
+    sub_type: str = ""
+    """状态子类型：online / offline"""
+
+    notice_type: str = field(default=NoticeType.BOT_STATUS, init=False)
+    """通知类型(固定为 bot_status)"""
+
+    @classmethod
+    def from_data(cls, data: Dict[str, Any]) -> BotStatusEvent:
+        return cls(
+            time=data.get("time", int(time.time())),
+            self_id=data.get("self_id", 0),
+            user_id=data.get("user_id", data.get("self_id", 0)),
+            sub_type=data.get("sub_type", ""),
+            primeval=data,
+        )
+
+    def _format_event_simple(self) -> str:
+        return f"[机器人状态] 账号{self.user_id} {self.sub_type}"
+
+    def _format_event_detailed(self) -> str:
+        return (
+            "<MESSAGE"
+            f" type=\"bot_status\""
+            f" time=\"{self._fmt_time()}\""
+            f" user_id=\"{self.user_id}\""
+            f" sub_type=\"{self.sub_type}\""
+            ">"
+            "</MESSAGE>"
+        )
+
+
+@dataclass(slots=True)
 class RequestEvent(OneBotEvent):
     """请求事件基类
 
@@ -1914,7 +1954,7 @@ AnyNoticeEvent = (
     GroupMsgEmojiLikeEvent | GroupGrayTipEvent |
     FriendAddNoticeEvent | FriendRecallNoticeEvent |
     FriendPokeEvent | GroupPokeEvent |
-    ProfileLikeEvent | InputStatusEvent | BotOfflineEvent
+    ProfileLikeEvent | InputStatusEvent | BotOfflineEvent | BotStatusEvent
 )
 
 # 所有请求类事件
