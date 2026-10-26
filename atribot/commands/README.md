@@ -133,7 +133,7 @@ async def handler(message_data: MessageEventEnvelope, <参数1>, <参数2>=默�
 回复消息两种方式：
 
 1. **信封自带方法**（自动区分群聊/私聊，推荐）：`await message_data.send(message_data.reply_text("文本"))`，以及 `deliver_image` / `deliver_file` / `deliver_merge_text`（长文本自动转合并转发防刷屏）/ `deliver_audio` / `deliver_music`。
-2. **`message_data.send_client`**（`SendClientBase`，见 `atribot/core/platform/send_client.py`）：`send_group_msg(group_id, message)`、`send_private_msg(user_id, message)`、`send_group_merge_text(...)`、`send_group_audio(...)`、`send_personal_audio(...)`、`send_group_pictures(...)`、`send_group_file(...)`、`send_group_poke(...)`，以及通用入口 `await send_client.async_send(action, params)` 调任意平台 API。
+2. **`message_data.send_client`**（`SendClientBase`，见 `atribot/core/platform/send_client.py`）：`send_group_msg(group_id, message)`、`send_private_msg(user_id, message)`、`send_group_merge_text(...)`、`send_group_audio(...)`、`send_personal_audio(...)`、`send_group_pictures(...)`、`send_group_file(...)`、`send_poke(user_id, group_id=None, target_id=None)`，以及通用入口 `await send_client.async_send(action, params)` 调任意平台 API。
 
 ## 权限等级
 

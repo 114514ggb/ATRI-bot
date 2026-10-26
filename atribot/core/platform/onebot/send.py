@@ -213,14 +213,25 @@ class OneBotSendClient(SendClientBase):
         """
         return await self.async_send("send_private_msg", message.to_dict())
 
-    async def send_group_poke(self, group_id: int, user_id: int) -> dict | None:
-        """发送群戳一戳
+    async def send_poke(
+        self,
+        user_id: int | str,
+        group_id: int | str | None = None,
+        target_id: int | str | None = None,
+    ) -> dict | None:
+        """发送戳一戳（群聊 / 私聊通用）
 
         Args:
-            group_id: 群号
-            user_id: 目标用户 QQ
+            user_id: 用户 QQ（群聊中为被戳成员，私聊中为好友 QQ）
+            group_id: 群号，省略则为私聊戳一戳
+            target_id: 被戳者 QQ，省略时与 user_id 相同
         """
-        return await self.async_send("group_poke", {"group_id": group_id, "user_id": user_id})
+        params: dict[str, Any] = {"user_id": user_id}
+        if group_id is not None:
+            params["group_id"] = group_id
+        if target_id is not None:
+            params["target_id"] = target_id
+        return await self.async_send("send_poke", params)
 
     async def send_group_json(self, group_id: int, json_dict: dict) -> dict | None:
         """发送群 JSON 卡片消息

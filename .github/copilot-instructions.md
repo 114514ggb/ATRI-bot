@@ -445,7 +445,7 @@ await send_message.send_private_merge_text(...) / send_private_merge_forward(...
 # 群管理 / 互动
 await send_message.set_group_ban(group_id, user_id, duration=1800)  # 禁言（秒）
 await send_message.set_group_add_request(flag, approve=True, reason="不行哦!")  # 处理加群申请
-await send_message.send_group_poke(group_id, user_id)               # 群戳一戳
+await send_message.send_poke(user_id, group_id=group_id)            # 戳一戳（群聊传 group_id，私聊省略）
 await send_message.delete_msg(message_id)                           # 撤回消息
 await send_message.set_msg_emoji_like(message_id, emoji_id, set)    # 消息贴表情
 

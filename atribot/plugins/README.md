@@ -50,9 +50,10 @@ class PokeReactionPlugin(Plugin):
         text = random.choice(reactivity_list)
         if isinstance(ev, GroupPokeEvent):
             await event.send_client.send_group_msg(ev.group_id, text)
-            await event.send_client.send_group_poke(ev.group_id, ev.user_id)
+            await event.send_client.send_poke(ev.user_id, group_id=ev.group_id)
         else:
             await event.send_client.send_private_msg(ev.user_id, text)
+            await event.send_client.send_poke(ev.user_id)
 ```
 
 ## 插件类结构
@@ -118,7 +119,7 @@ async def my_middleware(self, msg: MessageEventEnvelope) -> MessageEventEnvelope
 
 ## 发消息
 
-- 回调内（推荐）：`await event.send(event.reply_text("文本"))` 或 `await event.send(event.text(...))` 构建后发送；底层走 `event.send_client.send_group_msg(group_id, msg)` / `send_private_msg(user_id, msg)`，以及 `send_group_poke`、`set_msg_emoji_like` 等（完整清单见 `atribot/core/platform/send_client.py` 的 `SendClientBase`）。
+- 回调内（推荐）：`await event.send(event.reply_text("文本"))` 或 `await event.send(event.text(...))` 构建后发送；底层走 `event.send_client.send_group_msg(group_id, msg)` / `send_private_msg(user_id, msg)`，以及 `send_poke`、`set_msg_emoji_like` 等（完整清单见 `atribot/core/platform/send_client.py` 的 `SendClientBase`）。
 - 任意位置主动发：`container.get_by_type(PlatformManager)` 取平台适配器再拿 send_client。
 
 ## 其他

@@ -36,7 +36,7 @@ class SendClientBase(ABC):
 
     平台操作（默认抛出 NotImplementedError,子类按需覆写:
         - 群管理: set_group_ban, set_group_add_request, delete_msg
-        - 互动: send_group_poke, set_msg_emoji_like
+        - 互动: send_poke, set_msg_emoji_like
         - 富媒体: send_group_json, send_group_music, send_group_pictures,
                  send_group_image, send_group_video, send_group_audio, send_group_file
         - 私聊媒体: send_personal_pictures, send_personal_audio,
@@ -155,9 +155,20 @@ class SendClientBase(ABC):
         ]
         return await self.send_group_msg(group_id, params)
 
-    async def send_group_poke(self, group_id: int, user_id: int) -> dict | None:
-        """发送群戳一戳"""
-        raise NotImplementedError(f"{type(self).__name__} 未实现 send_group_poke")
+    async def send_poke(
+        self,
+        user_id: int | str,
+        group_id: int | str | None = None,
+        target_id: int | str | None = None,
+    ) -> dict | None:
+        """发送戳一戳（群聊 / 私聊通用）
+
+        Args:
+            user_id: 用户 QQ（群聊中为被戳成员，私聊中为好友 QQ）
+            group_id: 群号，省略则为私聊戳一戳
+            target_id: 被戳者 QQ，省略时与 user_id 相同
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 send_poke")
 
     async def send_group_json(self, group_id: int, json_dict: dict) -> dict | None:
         """发送群 JSON 卡片消息"""

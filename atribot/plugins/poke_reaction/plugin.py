@@ -33,6 +33,7 @@ class PokeReactionPlugin(Plugin):
 
         if isinstance(ev, GroupPokeEvent):
             await event.send_client.send_group_msg(ev.group_id, text)
-            await event.send_client.send_group_poke(ev.group_id, ev.user_id)
+            await event.send_client.send_poke(ev.user_id, group_id=ev.group_id)
         else:
             await event.send_client.send_private_msg(ev.user_id, text)
+            await event.send_client.send_poke(ev.user_id)
