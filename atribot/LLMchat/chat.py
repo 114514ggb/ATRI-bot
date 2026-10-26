@@ -864,15 +864,18 @@ class GroupChat(ChatBasics):
         
         self.log.info(f"LLM决定回复消息理由:{response_json.get("reason")}")
         group_id = event.group_id
+
+        chat_text_list = response_json.get("content") or []
+        if not chat_text_list:
+            self.log.warning("LLM决定回复但content为空,忽略本次发言")
+            return
         
         chat_condition =await self.chat_manager.get_group_LLM_decision_parameters(group_id)
         
-        #更新参数
-        since = chat_condition.get_seconds_since_llm_time()
-        await chat_condition.update_last_time()
-        
+        since = chat_condition.claim_speak_slot()
+
         await self.send_reply_message_separator(
-            chat_text_list = response_json.get("content",[]),
+            chat_text_list = chat_text_list,
             message_id = response_json.get("reply_message_id"),
             group_id = group_id,
             since_llm = since,
@@ -980,8 +983,8 @@ class GroupChat(ChatBasics):
         Args:
             chat_text_list (List[str]): 要解析发送的文本list
             group_id (int): 群号
-            message_id (int): 回复引用消息的id
             since_llm (float): 距离上一次llm发言时间
+            message_id (int): 回复引用消息的id
             send_client: SendClientBase 发送客户端，必须传入
         """
 

@@ -173,7 +173,7 @@ class TimeWindow:
 class LLMGroupChatCondition:
     """群用LLM发言的一些参数记录,用于决策的参考"""
 
-    __slots__ = ('last_msg_at', 'last_trigger_user_id', 'last_trigger_user_time', 'time_window', 'turns_since_last_llm', '_lock')
+    __slots__ = ('last_msg_at', 'last_trigger_user_id', 'last_trigger_user_time', 'time_window', 'turns_since_last_llm')
 
     last_msg_at: float
     """LLM最近一次发言的时间"""
@@ -199,18 +199,22 @@ class LLMGroupChatCondition:
         self.last_msg_at = self.last_trigger_user_time = time.time()
         self.last_trigger_user_id = 0
         self.turns_since_last_llm = 0
-        self._lock = asyncio.Lock()
 
-    async def update_last_time(self) -> None:
-        """更新LLM最近一次发言时间戳"""
-        async with self._lock:
-            self.last_msg_at = time.time()
+    def claim_speak_slot(self) -> float:
+        """占用一次发言时机,返回距上次发言的秒数并刷新时间戳
+
+        Returns:
+            float: 距离上一次LLM发言的秒数
+        """
+        now = time.time()
+        since = now - self.last_msg_at
+        self.last_msg_at = now
+        return since
 
     async def update_trigger_user(self, user_id: int) -> None:
         """更新最近一次触发聊天的用户信息"""
-        async with self._lock:
-            self.last_trigger_user_id = user_id
-            self.last_trigger_user_time = time.time()
+        self.last_trigger_user_id = user_id
+        self.last_trigger_user_time = time.time()
 
     def get_seconds_since_llm_time(self) -> float:
         """获取距离上一次LLM发言时间(秒级)"""
@@ -222,13 +226,11 @@ class LLMGroupChatCondition:
 
     async def add_turns_since_last_llm(self) -> None:
         """增加距离上次触发发言次数计数"""
-        async with self._lock:
-            self.turns_since_last_llm += 1
+        self.turns_since_last_llm += 1
 
     async def reset_turns_since_last_llm(self) -> None:
         """重置距离上次触发发言次数计数"""
-        async with self._lock:
-            self.turns_since_last_llm = 0
+        self.turns_since_last_llm = 0
 
 
 @dataclass(slots=True)

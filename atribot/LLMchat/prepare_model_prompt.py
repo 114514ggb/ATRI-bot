@@ -41,11 +41,7 @@ class build_prompt:
 
     @property
     def bot_id(self) -> int | None:
-        """bot 的 QQ 号
-
-        平台连接建立后由 PlatformManager 通过 get_login_info 自动填充，
-        尚未获取到（连接失败或超时）时为 None。
-        """
+        """bot 的 QQ 号"""
         account = self.config.account
         return account.id if account else None
 
