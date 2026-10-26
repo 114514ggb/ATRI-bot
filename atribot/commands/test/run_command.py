@@ -1,5 +1,6 @@
 import textwrap
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.command.command_parsing import CommandSystem
 from atribot.core.db.async_postgresql import AsyncPostgreSQL
 from atribot.core.service_container import container
@@ -14,7 +15,7 @@ db: AsyncPostgreSQL = container.get("database")
     name='run',
     description='执行异步Python代码',
     examples=[
-        "/run await message_data.send_client.send_group_message(984466158, 'test')",
+        "/run await message_data.send_client.send_group_msg(984466158, 'test')",
     ],
     authority_level=3
 )
@@ -26,7 +27,12 @@ async def run_async_code(message_data: MessageEventEnvelope):
     PrivateMessage
     GroupMessage
     File 
+    atriConfig.account
     
+    # config = container.get("config")
+    
+    # info = await message_data.send_client.get_login_info()
+    # await message_data.send_client.send_group_msg(message_data.group_id, str(info))
     #执行mcp工具
     # from atribot.LLMchat.MCP.tool_calls import ToolCalls
     # send_message = message_data.send_client

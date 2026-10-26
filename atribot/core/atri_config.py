@@ -64,6 +64,16 @@ class ConfigObject(dict):
             raise AttributeError(f"配置项 '{name}' 不存在") from exception
 
 
+@dataclass(frozen=True, slots=True)
+class AccountInfo:
+    """bot 登录账号信息"""
+
+    id: int
+    """登录 QQ 号"""
+    name: str
+    """登录昵称"""
+
+
 @dataclass(slots=True)
 class FilePathConfig:
     """路径配置:统一管理项目根目录、document 根目录和派生路径
@@ -517,6 +527,8 @@ class atriConfig:
     """路径配置"""
     platforms:PlatformsConfig
     """平台配置"""
+    account: AccountInfo | None = None
+    """bot 登录账号信息"""
 
     @staticmethod
     def _find_project_root(start_path: Path) -> Path:
@@ -554,6 +566,7 @@ class atriConfig:
         self._raw_config: Dict[str, Any] = config_data
         self._config = ConfigObject(config_data)
         self._config_file: Path = config_file
+        self.account = None
 
         file_path_data = config_data.get("file_path", {})
         self.file_path = FilePathConfig.from_dict(file_path_data, project_root)
@@ -588,6 +601,19 @@ class atriConfig:
         self._raw_config[key] = value
         self._config[key] = ConfigObject(value) if isinstance(value, dict) else value
         return value
+
+    def set_account(self, user_id: int, nickname: str) -> AccountInfo:
+        """保存 bot 登录账号信息
+
+        Args:
+            user_id (int): 登录 QQ 号
+            nickname (str): 登录昵称
+
+        Returns:
+            AccountInfo: 保存后的账号信息
+        """
+        self.account = AccountInfo(id=user_id, name=nickname)
+        return self.account
 
     def __getattr__(self, name: str) -> Any:
         """代理获取配置项

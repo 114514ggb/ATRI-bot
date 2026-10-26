@@ -19,10 +19,6 @@
         }
     },
     "root_user_id": 114514,
-    "account": {
-        "id": 168238719,
-        "name": "ATRI-bot"
-    },
     "file_path": {
         "resolve_paths": false,
         "create_dirs": false,

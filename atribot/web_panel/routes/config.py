@@ -258,9 +258,6 @@ def _validate_main_config(data: dict) -> None:
             if not platform.get("access_token"):
                 errors.append(f"platforms.{key}.access_token 不能为空")
 
-    account = data.get("account")
-    if not isinstance(account, dict) or "id" not in account:
-        errors.append("account.id（bot 的 QQ 号）不能为空")
     if not isinstance(data.get("root_user_id"), int):
         errors.append("root_user_id 必须是整数（root 用户 QQ 号）")
 

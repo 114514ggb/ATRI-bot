@@ -268,6 +268,24 @@ class OneBotWSClient:
         """检查是否正在运行"""
         return self._running
 
+    async def wait_for_connection(self, timeout: Optional[float] = None) -> bool:
+        """等待 WebSocket 连接建立
+
+        Args:
+            timeout: 超时时间(秒)，None 表示无限等待
+
+        Returns:
+            是否在超时前成功连接
+        """
+        try:
+            if timeout:
+                await asyncio.wait_for(self._connected.wait(), timeout=timeout)
+            else:
+                await self._connected.wait()
+            return True
+        except asyncio.TimeoutError:
+            return False
+
 
 class OneBotWSServer:
     """OneBot WebSocket 反向连接服务端"""

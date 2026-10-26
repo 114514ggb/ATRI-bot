@@ -39,6 +39,31 @@ class build_prompt:
         self.prompt = prompt
         self.model_environment = model_environment
 
+    @property
+    def bot_id(self) -> int | None:
+        """bot 的 QQ 号
+
+        平台连接建立后由 PlatformManager 通过 get_login_info 自动填充，
+        尚未获取到（连接失败或超时）时为 None。
+        """
+        account = self.config.account
+        return account.id if account else None
+
+    @property
+    def bot_name(self) -> str:
+        """bot 的账号昵称"""
+        return self.config.name
+
+    @property
+    def bot_identity_hint(self) -> str:
+        """bot 身份描述片段
+
+        QQ 号未知时省略该字段，避免 prompt 中出现 None。
+        """
+        if self.bot_id is None:
+            return f"你的账号名是:{self.bot_name}"
+        return f"你的QQ号是:{self.bot_id},你的账号名是:{self.bot_name}"
+
     def get_prompt(self):
         return self.prompt
 
@@ -76,7 +101,7 @@ class build_prompt:
         return (
             "<context>\n"
             "<environment>"
-            f"你在一个qq群聊中,群号是{group_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name},你输出的内容将作直接为群聊中的消息发送。一些特殊消息被格式化成文本了,不要发送未经允许的[CQ:~]等你在聊天记录中看到的特殊内容"
+            f"你在一个qq群聊中,群号是{group_id},{self.bot_identity_hint},你输出的内容将作直接为群聊中的消息发送。一些特殊消息被格式化成文本了,不要发送未经允许的[CQ:~]等你在聊天记录中看到的特殊内容"
             "你将回复被XML标签MESSAGE包裹的内容,其余标签内容作为约束或信息补充,用户唯一标识:\"qq_id\"用户自己定义的名称:\"nick_name\"格式化后的用户输入:\"user_message\""
             "</environment>\n"
             "<prompt>"
@@ -109,7 +134,7 @@ class build_prompt:
             "2.聊天可能并不连续要记得区分聊天的话题"
             "3.如果记忆包含矛盾信息,优先采用最新的记忆"
             f"4.参考时间{time.strftime('%Y-%m-%d %H:%M:%S')}"
-            "5.如果问题涉及时间参照（如“去年”、“两个月前”等）,请根据参考时间算实际日期。例如,若2022年5月4日的记忆提到“去年去了印度”,则旅程发生在2021年"
+            "5.如果问题涉及时间参照(如“去年”、“两个月前”等),请根据参考时间算实际日期。例如,若2022年5月4日的记忆提到“去年去了印度”,则旅程发生在2021年"
             "6.始终将相对时间参照转换为具体日期、月份或年份。例如,根据参考时间戳将“去年”转为“2022年”,将“两个月前”转为“2023年3月”。不使用相对参照表述"
             "7.勿将记忆中提及的角色名与的实际创建者混淆"
             "8.每条事件都要简洁的一句话描述"
@@ -145,7 +170,7 @@ class build_prompt:
             "2.聊天可能并不连续要记得区分聊天的话题"
             "3.如果记忆包含矛盾信息,优先采用最新的记忆"
             f"4.参考时间{time.strftime('%Y-%m-%d %H:%M:%S')}"
-            "5.如果问题涉及时间参照(如“去年”、“两个月前”等）,请根据参考时间算实际日期。例如,若2022年5月4日的记忆提到“去年去了印度”,则旅程发生在2021年"
+            "5.如果问题涉及时间参照(如“去年”、“两个月前”等),请根据参考时间算实际日期。例如,若2022年5月4日的记忆提到“去年去了印度”,则旅程发生在2021年"
             "6.始终将相对时间参照转换为具体日期、月份或年份。例如,根据参考时间戳将“去年”转为“2022年”,将“两个月前”转为“2023年3月”。不使用相对参照表述"
             "7.勿将记忆中提及的角色名与的实际创建者混淆"
             "8.每条事件都要简洁的一句话描述,可以带自己的一些看法"
@@ -161,7 +186,7 @@ class build_prompt:
 
     @staticmethod
     def build_group_user_Information(data: dict) -> str:
-        """构造群用户信息（XML格式）"""
+        """构造群用户信息(XML格式)"""
         return (
         "<MESSAGE>"
         f"<qq_id>{data['user_id']}</qq_id>"
@@ -175,7 +200,7 @@ class build_prompt:
 
     @staticmethod    
     def build_user_Information(data: dict, message: str, memory: str = None) -> str:
-        """构造用户消息（XML格式）"""
+        """构造用户消息(XML格式)"""
         return (
             f"<MESSAGE>"
             f"<user_id>{data['user_id']}</user_id>"
@@ -302,7 +327,7 @@ class build_prompt:
         """群聊环境说明(含群号,动态内容,放在历史之后)"""
         return (
             "<environment>"
-            f"你在一个qq群聊中,群号是{group_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name}请注意哪些是你自己的发言,一些特殊消息被格式化成[cq]文本了"
+            f"你在一个qq群聊中,群号是{group_id},{self.bot_identity_hint}请注意哪些是你自己的发言,一些特殊消息被格式化成[cq]文本了"
             "群内的消息已经被格式化成文本,用户唯一标识:\"qq_id\"用户自己定义账号名称:\"nick_name\"当前user在当前群的qq的权限情况:\"group_role\"格式化后的用户输入:\"user_message\",注意区分你自己的和别人的消息"
             "</environment>"
         )
@@ -356,10 +381,10 @@ JSON里要求是包含"actions"键及其对应的JSON列表,JSON列表actions对
         )
 
     def private_environment_block(self, user_id: int) -> str:
-        """私聊环境说明(含对方QQ号,动态内容,放在历史之后)"""
+        """私聊环境说明"""
         return (
             "<environment>"
-            f"你正在与用户进行一对一的私聊对话,对方的QQ号是:{user_id},你的QQ号是:{self.config.account.id},你的账号名是:{self.config.account.name}。"
+            f"你正在与用户进行一对一的私聊对话,对方的QQ号是:{user_id},{self.bot_identity_hint}。"
             "你输出的内容将直接作为私聊消息发送给对方。"
             "用户的消息已被格式化,用户唯一标识:\"user_id\"用户自己定义账号名称:\"nick_name\"格式化后的用户输入:\"user_message\""
             "</environment>"

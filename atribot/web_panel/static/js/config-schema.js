@@ -24,12 +24,11 @@ export const SCHEMA = [
   },
   {
     id: 'account',
-    label: '账号信息',
+    label: '账号权限',
     icon: 'bot',
+    desc: 'Bot 账号信息会在平台连接建立后通过 get_login_info 自动获取，无需配置。',
     fields: [
       { path: 'root_user_id', label: 'Root QQ 号', type: 'number', desc: '最高权限用户，无视名单配置强制接收消息' },
-      { path: 'account.id', label: 'Bot QQ 号', type: 'number', desc: '机器人自己的账号' },
-      { path: 'account.name', label: 'Bot 名称', type: 'text', desc: '机器人账号名称' },
     ],
   },
   {

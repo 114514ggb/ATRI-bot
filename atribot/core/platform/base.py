@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any
 
+from atribot.core.platform.send_client import LoginInfo
 from atribot.core.type.chat_message_types import SendMessage
 
 
@@ -89,3 +90,10 @@ class PlatformAdapter(ABC):
         raise NotImplementedError(
             f"{type(self).__name__} 未实现 call_api()"
         )
+
+    async def get_login_info(self) -> LoginInfo | None:
+        """获取当前登录帐号的信息
+
+        子类按需覆写；未实现时返回 None
+        """
+        return None

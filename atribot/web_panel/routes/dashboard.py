@@ -46,14 +46,14 @@ async def api_status(_: None = Depends(_auth)) -> Dict[str, Any]:
         if isinstance(platform, dict) and platform.get("connection_type"):
             conn_types.add(platform["connection_type"])
 
-    account = raw.get("account") or {}
+    account = _cfg().account
     connect = (raw.get("model") or {}).get("connect") or {}
     uptime = int(time.time() - _start_time)
     h, r = divmod(uptime, 3600)
     m, s = divmod(r, 60)
     return {
-        "account_id": account.get("id"),
-        "account_name": account.get("name"),
+        "account_id": account.id if account else None,
+        "account_name": account.name if account else None,
         "model": connect.get("model_name"),
         "supplier": connect.get("supplier"),
         "connection_type": sorted(conn_types),

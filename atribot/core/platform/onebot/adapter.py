@@ -15,6 +15,7 @@ from atribot.core.platform.message_queue import MessageQueue
 from atribot.core.platform.onebot.connection import OneBotHttpServer, OneBotWSClient, OneBotWSServer
 from atribot.core.platform.onebot.message_event import OneBotMessageEvent
 from atribot.core.platform.onebot.send import OneBotSendClient
+from atribot.core.platform.send_client import LoginInfo
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import SendMessage
 from atribot.core.type.onebot_event_types import OneBotEvent
@@ -124,11 +125,10 @@ class OneBotAdapter(PlatformAdapter):
         self._started = True
 
         if hasattr(self._connection, "wait_for_connection"):
-            ok = await self._connection.wait_for_connection(timeout=5.0)
-            if ok:
+            if await self._connection.wait_for_connection(timeout=5.0):
                 self._log.info("连接已建立")
             else:
-                self._log.warning("连接尚未建立（后台重试中）")
+                self._log.warning("连接尚未建立（等待重连 / 客户端接入）")
         else:
             self._log.info("已启动（监听中）")
 
@@ -176,6 +176,10 @@ class OneBotAdapter(PlatformAdapter):
             API 响应，或 None
         """
         return await self._send_client.async_send(action, params)
+
+    async def get_login_info(self) -> LoginInfo | None:
+        """获取当前登录帐号的信息"""
+        return await self._send_client.get_login_info()
 
     async def _on_raw_message(self, data: dict) -> None:
         """收到原始 OneBot 事件后的回调(WS / HTTP)

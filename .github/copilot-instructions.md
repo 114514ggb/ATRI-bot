@@ -67,6 +67,7 @@
 - **消息流**: `NapCat` / `SnowLuma`（外部QQ，OneBot v11） → 平台适配器（`OneBotAdapter` / `SnowLumaAdapter`，支持 WebSocket client/server 与 HTTP） → `MessageQueue` → `Pipeline`（`WhitelistMiddleware` 群白名单过滤 + `ChatManager` 上下文中间件） → `EventBus`（按 `PostType` 分发） → 监听器（存储入库 priority=101 / `AtCommandRule` 命令路由 / `initiativeChat`·`privateChatTrigger` 聊天路由 / 插件 handlers）；群聊由 `GroupChat` 处理，私聊由 `PrivateChat` 处理
 - **数据库**: PostgreSQL + `pgvector`（HNSW 1024维，m=16/ef=64）+ `pgroonga` 扩展全异步，使用 `async with db as db:` 上下文管理器Schema 定义在 `docker/db/info.sql`，含自定义枚举 `permission_type`、`memory_category`
 - **配置访问**: `atriConfig` 将 JSON 包装为支持点操作的 `ConfigObject`（`assets/config.json`）路径统一通过 `config.file_path.*` 访问，均为 `Path` 对象；多平台连接配置在 `config.platforms.<name>`（`adapter` 支持 `onebot` / `snowluma`，`connection_type` 支持 `WebSocket_client`/`WebSocket_server`/`http`，`WebSocket_client` 可用 `ws_path` 覆盖连接路径：onebot 默认 `/websocket`、snowluma 默认 `/`，旧别名 `"WebSocket"` 自动归一）
+- **bot 账号信息**: 配置文件的 `account` 段已废弃（读取时仅告警并忽略）；`config.account` 是运行时值（`AccountInfo`，`id` 为 QQ 号、`name` 为昵称），由 `PlatformManager.start_all()` 在适配器启动后调用 `get_login_info` 自动填充**一次**（换号/改昵称需重启）：先以 0.2s 步进等待 `is_connected`，再以 1s 间隔重试，所有适配器共享统一上限 `LOGIN_INFO_TIMEOUT=10s`（`platform/manager.py`，刻意不配置化）；**超时只告警不阻断启动**（Web 管理面板与命令仍可用），此时 `config.account` 保持 `None`，`build_prompt.bot_id` 返回 `None` 且提示词中省略 bot QQ 号片段
 
 ## 完整服务名称表
 | 服务名 | 类型 | 推荐获取方式 | Shutdown | 备注 |
@@ -453,6 +454,7 @@ await send_message.set_msg_emoji_like(message_id, emoji_id, set)    # 消息贴�
 await send_message.get_group_info(group_id) / get_stranger_info(qq_id)
 await send_message.get_msg_details(message_id)
 await send_message.get_img_details(file_id) / get_recordg_details(file, file_id)
+await send_message.get_login_info()                          # 当前登录账号（user_id / nickname）
 
 # 其它
 await send_message.send_group_json(group_id, json_dict)

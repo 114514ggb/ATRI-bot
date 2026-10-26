@@ -46,7 +46,6 @@ def _prepare_files() -> Path:
             }
         },
         "web_panel": {"enable": True, "access_token": DEV_TOKEN, "port": 5125},
-        "account": {"id": 10000, "name": "ATRI-dev"},
         "root_user_id": 10001,
         "file_path": {
             "relative_to_root": {

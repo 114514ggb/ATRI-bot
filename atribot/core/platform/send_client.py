@@ -20,6 +20,15 @@ class ImageDetails(TypedDict):
     """图片 Base64 编码（不含 data:image 前缀）"""
 
 
+class LoginInfo(TypedDict):
+    """get_login_info API 返回的登录账号信息"""
+
+    user_id: int
+    """登录账号 QQ 号"""
+    nickname: str
+    """登录账号昵称"""
+
+
 class SendClientBase(ABC):
     """发送客户端基类 —— 所有平台发消息的底座
 
@@ -47,7 +56,7 @@ class SendClientBase(ABC):
                  upload_image_to_qun_album, set_essence_msg, delete_essence_msg,
                  get_group_info_ex, get_group_list, get_group_member_list,
                  get_group_member_info, get_essence_msg_list
-        - 账号/用户: set_qq_avatar, set_self_longnick, send_like,
+        - 账号/用户: get_login_info, set_qq_avatar, set_self_longnick, send_like,
                     set_input_status, set_friend_add_request
         - QQ空间: send_qzone_msg, delete_qzone_msg
     """
@@ -368,6 +377,15 @@ class SendClientBase(ABC):
             qq_id: 用户 ID
         """
         raise NotImplementedError(f"{type(self).__name__} 未实现 get_stranger_info")
+
+    async def get_login_info(self) -> LoginInfo | None:
+        """获取当前登录帐号的信息
+
+        Returns:
+            LoginInfo 字典，包含 user_id / nickname 两个字段；
+            若请求失败则返回 None。
+        """
+        raise NotImplementedError(f"{type(self).__name__} 未实现 get_login_info")
 
     async def get_msg_details(self, message_id: int | str) -> MessageEventEnvelope | None:
         """获取消息详情

@@ -4,7 +4,7 @@ from typing import Any, Literal, Optional
 import aiohttp
 
 from atribot.core.atri_config import FilePathConfig, atriConfig
-from atribot.core.platform.send_client import ImageDetails, SendClientBase
+from atribot.core.platform.send_client import ImageDetails, LoginInfo, SendClientBase
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import GroupMessage, PrivateMessage, SendMessage
 from atribot.core.type.onebot_event_types import OneBotEvent
@@ -370,6 +370,37 @@ class OneBotSendClient(SendClientBase):
             账号信息字典
         """
         return await self.async_send("get_stranger_info", {"user_id": qq_id})
+
+    async def get_login_info(self) -> LoginInfo | None:
+        """获取当前登录帐号的信息
+
+        Returns:
+            LoginInfo 字典，包含 user_id / nickname 两个字段；
+            响应状态非 ok 或缺少 user_id 时返回 None。
+        """
+        try:
+            resp = await self.async_send("get_login_info", {})
+        except Exception as e:
+            self.log.warning("获取登录账号信息失败: %s", e)
+            return None
+
+        if not isinstance(resp, dict) or resp.get("status") not in (None, "ok"):
+            self.log.warning("获取登录账号信息失败: %s", resp)
+            return None
+
+        data = resp.get("data")
+        if not isinstance(data, dict) or data.get("user_id") is None:
+            self.log.warning("获取登录账号信息失败: 响应缺少 data.user_id (%s)", resp)
+            return None
+
+        try:
+            return LoginInfo(
+                user_id=int(data["user_id"]),
+                nickname=str(data.get("nickname") or ""),
+            )
+        except (TypeError, ValueError) as e:
+            self.log.warning("解析登录账号信息失败: %s (%s)", e, data)
+            return None
 
     async def get_msg_details(self, message_id: int | str) -> OneBotMessageEvent | None:
         """获取消息详情"""

@@ -15,6 +15,15 @@ from atribot.core.platform.message_queue import MessageQueue
 from atribot.core.service_container import container
 from atribot.core.type.chat_message_types import SendMessage
 
+LOGIN_INFO_TIMEOUT: float = 10.0
+"""启动时等待平台连接并获取 bot 账号信息的统一上限（秒）"""
+
+_CONNECT_POLL_INTERVAL: float = 0.2
+"""等待适配器连接建立的轮询间隔（秒）"""
+
+_LOGIN_INFO_POLL_INTERVAL: float = 1.0
+"""重试 get_login_info 的间隔（秒）"""
+
 
 class PlatformManager:
     """统一管理所有平台适配器"""
@@ -103,8 +112,69 @@ class PlatformManager:
             name="EventBus.main_loop",
         )
 
+        # 等待连接并获取账号信息
+        await self._resolve_login_info()
+
         self._running = True
         self._log.info("所有平台已启动 (%d 个),EventBus 已就绪", len(self._adapters))
+
+    async def _resolve_login_info(self, timeout: float = LOGIN_INFO_TIMEOUT) -> None:
+        """在有上限的等待窗口内获取 bot 账号信息
+
+        Args:
+            timeout: 等待上限（秒），所有适配器共享同一个截止时间
+        """
+        if not self._adapters:
+            return
+
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout
+
+        for name, adapter in self._adapters.items():
+            while not adapter.is_connected and loop.time() < deadline:
+                await asyncio.sleep(_CONNECT_POLL_INTERVAL)
+
+            if not adapter.is_connected:
+                self._log.warning(
+                    "平台 '%s' 在 %.1fs 内未建立连接，跳过账号信息获取",
+                    name,
+                    timeout,
+                )
+                continue
+
+            while True:
+                info: Any = None
+                try:
+                    info = await adapter.get_login_info()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    self._log.warning("平台 '%s' 获取登录账号信息失败: %s", name, e)
+
+                if isinstance(info, dict) and info.get("user_id"):
+                    account = self._config.set_account(
+                        info["user_id"], info.get("nickname") or ""
+                    )
+                    self._log.info(
+                        "已获取 bot 账号信息: %s (%s)，来源平台 '%s'",
+                        account.name,
+                        account.id,
+                        name,
+                    )
+                    return
+
+                if loop.time() >= deadline:
+                    self._log.warning(
+                        "平台 '%s' 未返回有效的登录账号信息（已到达等待上限 %.1fs）",
+                        name,
+                        timeout,
+                    )
+                    break
+                await asyncio.sleep(_LOGIN_INFO_POLL_INTERVAL)
+
+        self._log.warning(
+            "未能获取 bot 账号信息"
+        )
 
     async def stop_all(self) -> None:
         """停止所有适配器及 EventBus"""
