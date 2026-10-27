@@ -566,7 +566,7 @@ class atriConfig:
         self._raw_config: Dict[str, Any] = config_data
         self._config = ConfigObject(config_data)
         self._config_file: Path = config_file
-        self.account = None
+        self.account = AccountInfo(id=None, name="ATRI-bot")
 
         file_path_data = config_data.get("file_path", {})
         self.file_path = FilePathConfig.from_dict(file_path_data, project_root)

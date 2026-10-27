@@ -48,7 +48,7 @@ class build_prompt:
     @property
     def bot_name(self) -> str:
         """bot 的账号昵称"""
-        return self.config.name
+        return self.config.account.name
 
     @property
     def bot_identity_hint(self) -> str:

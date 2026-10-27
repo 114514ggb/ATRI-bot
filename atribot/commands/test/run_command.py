@@ -27,12 +27,10 @@ async def run_async_code(message_data: MessageEventEnvelope):
     PrivateMessage
     GroupMessage
     File 
-    atriConfig.account
+    atriConfig
     
     # config = container.get("config")
-    
-    # info = await message_data.send_client.get_login_info()
-    # await message_data.send_client.send_group_msg(message_data.group_id, str(info))
+
     #执行mcp工具
     # from atribot.LLMchat.MCP.tool_calls import ToolCalls
     # send_message = message_data.send_client
