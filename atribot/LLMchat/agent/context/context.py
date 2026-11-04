@@ -9,6 +9,9 @@ from atribot.LLMchat.agent.context.compression import (
     BaseCompressionStrategy,
     DefaultCompressionStrategy,
 )
+from atribot.LLMchat.agent.context.tool_truncate_compression import (
+    ToolTruncateCompressionStrategy,
+)
 from atribot.LLMchat.agent.message import (
     AssistantMessage,
     BaseMessage,
@@ -101,9 +104,16 @@ class AgentContext(BaseContext):
     """异步锁"""
 
     compression_strategies: List[BaseCompressionStrategy] = field(
-        default_factory=lambda: [DefaultCompressionStrategy()]
+        default_factory=lambda: [
+            ToolTruncateCompressionStrategy(),
+            DefaultCompressionStrategy(),
+        ]
     )
-    """压缩策略链（责任链模式），按顺序遍历，首个命中即停止"""
+    """压缩策略链（责任链模式），按顺序遍历
+
+    预处理策略（``continues_chain=True``）命中后继续遍历，
+    其余策略首个命中即停止。
+    """
 
     def __post_init__(self):
         if self._messages is None:
@@ -111,7 +121,10 @@ class AgentContext(BaseContext):
         elif isinstance(self._messages, list):
             self._messages = deque(self._messages)
         if self.compression_strategies is None:
-            self.compression_strategies = [DefaultCompressionStrategy()]
+            self.compression_strategies = [
+                ToolTruncateCompressionStrategy(),
+                DefaultCompressionStrategy(),
+            ]
 
     @property
     def messages(self) -> Deque[BaseMessage]:
@@ -237,6 +250,9 @@ class AgentContext(BaseContext):
         """
         遍历压缩策略链，对上下文进行验证与压缩
 
+        预处理策略（``continues_chain=True``）命中后只改写上下文而不删除消息，
+        因此会继续遍历后续策略；其余策略首个命中即返回。
+
         Args:
             current_tokens (Optional[int]): 当前上下文 Token 长度，若未指定则通过估算自动获取
 
@@ -249,8 +265,14 @@ class AgentContext(BaseContext):
             self.total_tokens = self.count_estimate_tokens()
 
         for strategy in self.compression_strategies:
-            if strategy.should_compress(self):
-                return await strategy.compress(self)
+            if not strategy.should_compress(self):
+                continue
+
+            removed = await strategy.compress(self)
+            if strategy.continues_chain:
+                continue
+
+            return removed
 
         return None
 

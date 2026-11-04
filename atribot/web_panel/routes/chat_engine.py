@@ -562,10 +562,16 @@ def serialize_context(ctx) -> List[Dict[str, Any]]:
 
 
 def new_agent_context() -> AgentContext:
-    """新建带“总结式”压缩策略的 AgentContext（WebUI 会话沿用 LLM 摘要压缩）"""
+    """新建带“工具结果截断 + 总结式”压缩策略的 AgentContext"""
     from atribot.LLMchat.agent.context.summarize_compression import SummaryCompressionStrategy
+    from atribot.LLMchat.agent.context.tool_truncate_compression import ToolTruncateCompressionStrategy
 
-    return AgentContext(compression_strategies=[SummaryCompressionStrategy()])
+    return AgentContext(
+        compression_strategies=[
+            ToolTruncateCompressionStrategy(),
+            SummaryCompressionStrategy(),
+        ]
+    )
 
 
 def deserialize_context(items: List[Dict[str, Any]]) -> "AgentContext":

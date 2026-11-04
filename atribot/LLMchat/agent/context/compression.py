@@ -12,6 +12,13 @@ if TYPE_CHECKING:
 class BaseCompressionStrategy(ABC):
     """上下文压缩策略抽象基类"""
 
+    continues_chain: bool = False
+    """命中后是否继续遍历后续策略
+
+    仅对「只改写、不删除消息」的预处理策略置为 True（如工具结果截断），
+    使后续的总结/丢弃策略仍能基于压缩后的 Token 数继续判断。
+    """
+
     @property
     @abstractmethod
     def name(self) -> str:
