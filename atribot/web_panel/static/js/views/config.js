@@ -88,6 +88,9 @@ function renderControl(field, value) {
     case 'chips-int':
       return renderChips(field.path, 'int', Array.isArray(value) ? value : []);
 
+    case 'chips-text':
+      return renderChips(field.path, 'str', Array.isArray(value) ? value : []);
+
     default:
       return `<input class="input" type="text" data-path="${field.path}" data-ftype="text" value="${escapeHtml(String(v))}" placeholder="${field.optional ? '（可选）' : ''}">`;
   }
@@ -456,6 +459,17 @@ function findField(path) {
     for (const f of section.fields || []) if (f.path === path) return f;
   }
   return null;
+}
+
+/* schema 声明了 default 的字段：配置文件中缺失时补齐「当前生效值」，
+   避免表单缺键时显示为空、保存时又把默认值静默写成空值（如关键词列表清空 = 关闭触发） */
+function applySchemaDefaults(data) {
+  for (const section of SCHEMA) {
+    for (const f of section.fields || []) {
+      if (f.default === undefined || kit.getPath(data, f.path) !== undefined) continue;
+      kit.setPath(data, f.path, Array.isArray(f.default) ? [...f.default] : f.default);
+    }
+  }
 }
 
 /* 工具预设保存校验：tool_search 与 deferred 必须成对出现，缺一个就没有意义
@@ -925,12 +939,15 @@ async function save() {
   if (!ok) return;
 
   try {
-    await api.post('/config', { content: JSON.stringify(payload, null, 2) });
+    const res = await api.post('/config', { content: JSON.stringify(payload, null, 2) });
     original = kit.deepClone(payload);
     formBase = kit.deepClone(payload);
     refreshPresetKeys(); /* 清单随保存后的配置同步（源码模式增删的预设切回表单时即可见） */
     saveBar.setDirty(false);
-    toast('配置已保存，已生成 .bak 备份', 'success');
+    toast(
+      res?.keywords_reloaded ? '配置已保存，已生成 .bak 备份（主动聊天关键词已立即生效）' : '配置已保存，已生成 .bak 备份',
+      'success',
+    );
     await kit.needsRestartFlow('主配置');
   } catch (e) {
     toast(`保存失败：${e.message}`, 'error', 5000);
@@ -963,6 +980,7 @@ async function load() {
     api.get('/personas').catch(() => ({ items: [] })),
   ]);
   original = JSON.parse(configRes.content);
+  applySchemaDefaults(original); /* 缺键但运行时有内置默认的字段，按默认值展示与写回 */
   formBase = kit.deepClone(original);
   refreshPresetKeys(); /* 预设清单随配置一起（重新）读取 */
   pathLabel = configRes.path;
@@ -1025,6 +1043,7 @@ function switchMode(next) {
     if (editor && !editor.isValid()) { toast('源码存在语法错误，无法切回表单模式', 'error'); saveBar.setMode('source'); return; }
     if (editor) {
       try { formBase = JSON.parse(editor.getContent()); } catch { /* keep */ }
+      applySchemaDefaults(formBase); /* 与首次加载一致：缺键字段按生效默认值展示 */
     }
     refreshPresetKeys(); /* 源码模式可能新增/删除预设，切回表单时重读清单 */
     sourceWrap.classList.add('hidden');

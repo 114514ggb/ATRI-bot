@@ -239,6 +239,21 @@ def _reload_tool_presets() -> bool:
     return True
 
 
+def _reload_initiative_chat_keywords() -> bool:
+    """把刚写盘的关键词触发列表同步到运行中的 atriConfig
+
+    `initiativeChat` 每次决策实时读 `config.initiative_chat_keyword_trigger`，
+    因此重载该段后 WebUI 保存即可立即生效，无需重启 bot。
+    独立面板/开发模式下可能没有 config 服务，静默跳过。
+    """
+    try:
+        _cfg().reload_section("initiative_chat_keyword_trigger")
+    except Exception as exc:  # 热重载失败不应影响保存结果
+        log.warning("主动聊天关键词热重载失败（配置已写入磁盘，重启后生效）: %s", exc)
+        return False
+    return True
+
+
 def _validate_main_config(data: dict) -> None:
     errors: List[str] = []
 
@@ -271,6 +286,14 @@ def _validate_main_config(data: dict) -> None:
 
     errors.extend(_validate_tool_presets(data))
     errors.extend(_validate_tts(data))
+
+    keywords = data.get("initiative_chat_keyword_trigger")
+    if keywords is not None and (
+        not isinstance(keywords, list)
+        or not all(isinstance(k, str) and k.strip() for k in keywords)
+    ):
+        # 空数组合法：表示关闭关键词触发；缺键则回退内置默认词
+        errors.append("initiative_chat_keyword_trigger 必须是字符串数组，元素不能为空字符串（空数组表示关闭关键词触发）")
 
     if errors:
         raise HTTPException(status_code=400, detail="；".join(errors))
@@ -313,7 +336,14 @@ async def api_save_config(body: ConfigBody, _: None = Depends(_auth)) -> Dict[st
     backup = _backup_file(path)
     _write_json(path, parsed)
     presets_reloaded = _reload_tool_presets()  # 工具预设立即生效，其余配置段仍需重启
-    return {"status": "ok", "needs_restart": True, "backup": str(backup), "presets_reloaded": presets_reloaded}
+    keywords_reloaded = _reload_initiative_chat_keywords()  # 主动聊天关键词同样即时生效
+    return {
+        "status": "ok",
+        "needs_restart": True,
+        "backup": str(backup),
+        "presets_reloaded": presets_reloaded,
+        "keywords_reloaded": keywords_reloaded,
+    }
 
 
 @router.get("/api/supplier_config")

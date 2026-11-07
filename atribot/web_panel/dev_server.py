@@ -85,6 +85,7 @@ def _prepare_files() -> Path:
         },
         "group_white_list": [123456, 789012],
         "group_initiative_chat_white_list": [123456],
+        "initiative_chat_keyword_trigger": ["哈基莉", "atri-bot", "ATRI-bot"],
         "group_information_extraction": [],
         "private_chat_white_list": [10086],
         "database": {"host": "127.0.0.1", "port": 5432, "user": "postgres", "password": "dev", "database": "atri"},

@@ -93,7 +93,7 @@
 - **公式图片化输出**：回复中的 LaTeX 公式（`$...$`、`$$...$$`、`\(...\)`、`\[...\]`）会自动渲染成图片发送，在群里讨论数学公式不再是一串源码。
 - **拟人化交互**：
   - 自然发送表情包，支持分段回复模拟真实打字节奏。
-  - 达到条件时主动融入群聊话题，而不只是被动等待 @。
+  - 达到条件时主动融入群聊话题，而不只是被动等待 @（关键词触发词表可在 `initiative_chat_keyword_trigger` 配置，WebUI 配置页可直接编辑）。
   - 支持人设切换等基础功能。
 
 ### 💻 类 Unix 命令系统
@@ -176,10 +176,11 @@ Bot 启动时会以内置后台任务的形式拉起一个 Web 管理面板
 
 #### 🤖 嵌入模型 (Embedding)
 推荐优先使用本地的 `dengcao/Qwen3-Embedding-0.6B:F16`。当然你也可以接入其他 Embedding API（OpenAI 格式兼容），只是仓库里目前主要按 Ollama 的使用方式测试过。
-推荐使用 [Ollama](https://ollama.com/) 进行本地部署：
+想省事推荐使用 [Ollama](https://ollama.com/) 进行本地部署：
 ```bash
 ollama run dengcao/Qwen3-Embedding-0.6B:F16
 ```
+不然还是推荐其他家的
 
 > **注意**：如果更换 Embedding 模型，之前构建的向量数据需要重新构建。
 
@@ -221,7 +222,7 @@ docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
-1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.md 或 如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表；`tool_presets` 配置各会话工具预设（支持 list 或 `{"default": [...], "deferred": [...]}`，deferred 工具由 `tool_search` 动态发现）。
+1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.md 或 如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表；`tool_presets` 配置各会话工具预设（支持 list 或 `{"default": [...], "deferred": [...]}`，deferred 工具由 `tool_search` 动态发现）；`initiative_chat_keyword_trigger` 是主动聊天的关键词触发词表（不写则用内置默认，写 `[]` 关闭）。
 2.  **平台连接**：`config.platforms.<name>` 配置与协议端（NapCat / SnowLuma）的对接方式（`adapter` 为 `onebot`（NapCat 等 OneBot v11 实现）或 `snowluma`，`connection_type` 支持 `WebSocket_client` / `WebSocket_server` / `http`，`access_token` 需与协议端一致，`url` 为地址；SnowLuma 正向 WS 默认端口 `3001`、路径 `/`，可用 `ws_path` 覆盖）。
 3.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
     ```bash

@@ -224,6 +224,9 @@
     ],
     "private_chat_white_list":[#启动私聊的列表
     ],
+    "initiative_chat_keyword_trigger":[#主动聊天的关键词触发列表，群里出现这些词（子串匹配、大小写不敏感）时更倾向主动接话
+        "哈基莉","atri-bot"#不写这一项时使用内置默认(哈基莉/atri-bot/ATRI-bot)；写成空数组[]则关闭关键词触发
+    ],
     "database":
     {
         "host":"127.0.0.1",#数据库连接ip地址

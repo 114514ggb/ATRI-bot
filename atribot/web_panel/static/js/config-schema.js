@@ -137,12 +137,20 @@ export const SCHEMA = [
     id: 'whitelist',
     label: '白名单',
     icon: 'check',
-    desc: '消息处理的核心开关。输入 QQ 号/群号后回车添加。',
+    desc: '消息处理与主动聊天的核心开关。名单输入 QQ 号/群号后回车添加，关键词输入后回车添加。',
     fields: [
       { path: 'group_white_list', label: '群白名单', type: 'chips-int', span: true, desc: '只有名单内的群会接收并处理消息' },
       { path: 'group_initiative_chat_white_list', label: '主动聊天名单', type: 'chips-int', span: true, desc: '启用主动聊天的群，必须同时也在群白名单内' },
       { path: 'group_information_extraction', label: '群消息提取', type: 'chips-int', span: true, desc: '启用群消息提取入库（由群聊摘要模型处理）' },
       { path: 'private_chat_white_list', label: '私聊白名单', type: 'chips-int', span: true, desc: '允许触发 LLM 私聊的用户 QQ 号；root 可绕过' },
+      {
+        path: 'initiative_chat_keyword_trigger',
+        label: '主动聊天关键词',
+        type: 'chips-text',
+        span: true,
+        default: ['哈基莉', 'atri-bot', 'ATRI-bot'],
+        desc: '群消息出现这些词时更倾向主动接话（大小写不敏感）；清空并保存即关闭关键词触发，缺省使用内置默认词',
+      },
     ],
   },
   {

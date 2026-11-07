@@ -544,6 +544,7 @@ async with db as db:
   ```
 - **SandBox**: 使用前调用 `container.exists("SandBox")` 检查；后端由 `sand_box.type` 决定：`docker`（默认，镜像默认 `python:3.12-slim`，`atribot/LLMchat/sandbox/Dockerfile` 预装 numpy/pandas/matplotlib/seaborn/pillow/opencv-python-headless/scipy/sympy + ffmpeg/中文字体）/ `none|no_sandbox|local`（本机直执行，工作区在 `document/work`）/ `e2b`；初始化失败不阻断启动；沙盒工具描述按 后端×平台×shell 动态生成，可用 `sand_box.tool_prompts.<工具名>` 覆盖描述、`sand_box.tools.<工具名>: false` 禁用
 - **群组白名单**: `config.group_white_list` 控制哪些群接收消息处理（由 `WhitelistMiddleware` 在 Pipeline 层过滤，`root_user_id` 可绕过），`group_initiative_chat_white_list` 控制主动发起对话的群，`group_information_extraction` 指定自动提取话题的群，`private_chat_white_list` 控制哪些用户可触发 LLM 私聊（由 `privateChatTrigger` 在 EventBus 路由层判定，非白名单用户的私聊消息仍会入库和执行命令，只是不进 LLM；`root_user_id` 可绕过）
+- **主动聊天关键词**: `config.initiative_chat_keyword_trigger`（字符串数组，顶层，与名单位置并列）控制 `initiativeChat` 的关键词触发词表：未配置（缺键/`null`）回退模块常量 `DEFAULT_KEYWORD_TRIGGER`（`哈基莉`/`atri-bot`/`ATRI-bot`），显式 `[]` 表示关闭关键词触发，非数组时 warning 并回退默认；匹配为 `casefold()` 子串匹配（大小写不敏感），每次决策由 `initiativeChat.get_keyword_trigger_list()` 实时读配置，WebUI 保存后由 `web_panel/routes/config.py::_reload_initiative_chat_keywords()` 调 `atriConfig.reload_section` 热同步，无需重启
 - **运行测试**: 项目根目录 `uv run python -m pytest tests/ -q`
 
 ````

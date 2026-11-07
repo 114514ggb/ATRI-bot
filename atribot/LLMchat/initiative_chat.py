@@ -1,6 +1,7 @@
 from logging import Logger
 from typing import List, Literal, Optional
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.cache.management_chat_example import ChatManager
 from atribot.core.command.async_permissions_management import PermissionsManagement
 from atribot.core.service_container import container
@@ -8,16 +9,47 @@ from atribot.core.type.bot_types import MessageEventEnvelope
 from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition
 from atribot.LLMchat.chat import GroupChat
 
+DEFAULT_KEYWORD_TRIGGER: tuple[str, ...] = ("哈基莉", "atri-bot", "ATRI-bot")
+"""`initiative_chat_keyword_trigger` 未配置时使用的内置主动聊天关键词"""
+
+
+def resolve_keyword_trigger(raw: object, log: Logger) -> List[str]:
+    """把配置中的关键词列表规整成可用于匹配的字符串列表
+
+    - 未配置（缺键 / None）：回退内置默认词
+    - 显式空数组：返回空列表，即关闭关键词触发
+    - 类型不合法：告警并回退内置默认词，避免写错配置导致整段主动聊天逻辑失效
+
+    Args:
+        raw (object): 配置值（期望为字符串数组）
+        log (Logger): 用于记录配置异常的日志器
+
+    Returns:
+        List[str]: 去除首尾空白后的关键词列表
+    """
+    if raw is None:
+        return list(DEFAULT_KEYWORD_TRIGGER)
+    if not isinstance(raw, list):
+        log.warning(f"initiative_chat_keyword_trigger 应为字符串数组，已回退内置关键词：{raw!r}")
+        return list(DEFAULT_KEYWORD_TRIGGER)
+    return [item.strip() for item in raw if isinstance(item, str) and item.strip()]
+
 
 class initiativeChat:
     """决定bot如何在合适的时机加入群聊天"""
     
     def __init__(self):
         self.log: Logger = container.get_by_type(Logger).getChild("InitChat")
+        self.config = container.get_by_type(atriConfig)
         self.blacklist = container.get_by_type(PermissionsManagement).blacklist
         self.chat_manager = container.get_by_type(ChatManager)
         self.group_chat = container.get_by_type(GroupChat)
-        self.keyword_trigger_list = ["哈基莉","atri-bot","ATRI-bot"]
+
+    def get_keyword_trigger_list(self) -> List[str]:
+        """读取主动聊天关键词"""
+        return resolve_keyword_trigger(
+            getattr(self.config, "initiative_chat_keyword_trigger", None), self.log
+        )
     
     async def decision(self, event: MessageEventEnvelope, group_context:GroupContext) -> bool:
         """决策是否应该发言"""
@@ -66,7 +98,7 @@ class initiativeChat:
             if group_context.initiative_chat and self.get_bot_active_reference(group_context, 3) < 0.5:
                 
                 #关键词触发检测
-                if value := self.find_first_match(event.event.pure_text, self.keyword_trigger_list):
+                if value := self.find_first_match(event.event.pure_text, self.get_keyword_trigger_list()):
                     decision = await self._execute_reply(
                         event, group_id, params,
                         log_msg=f"Keyword '{value}' triggered by user {user_id}, preparing to respond.",
@@ -112,8 +144,8 @@ class initiativeChat:
     @staticmethod
     def find_first_match(text: str, patterns: List[str]) -> Optional[str]:
         """
-        在 text 中查找是否包含 patterns 中的任意一个子串。
-        找到第一个匹配的子串后立即返回该子串，否则返回 None。
+        在 text 中查找是否包含 patterns 中的任意一个子串（大小写不敏感）。
+        找到第一个匹配的子串后立即返回该子串（配置中的原样写法），否则返回 None。
         
         参数:
             text (str): 要搜索的字符串
@@ -122,8 +154,9 @@ class initiativeChat:
         返回:
             Optional[str]: 第一个匹配的子串，或 None
         """
+        folded = text.casefold()
         for pattern in patterns:
-            if pattern in text:
+            if pattern.casefold() in folded:
                 return pattern
         return None
     

@@ -173,6 +173,11 @@
     "group_initiative_chat_white_list": [],
     "group_information_extraction": [],
     "private_chat_white_list": [],
+    "initiative_chat_keyword_trigger": [
+        "哈基莉",
+        "atri-bot",
+        "ATRI-bot"
+    ],
     "database": {
         "host": "127.0.0.1",
         "port": 5432,

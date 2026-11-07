@@ -117,14 +117,14 @@
 
 ## 配置管理（config.py）
 
-三个配置文件的读写接口形态一致：GET 返回 `{content, path, valid, masked}`，POST 保存前先备份为 `*.bak` 并返回 `{status, needs_restart: true, backup}`（`needs_restart` 为真表示需**手动**重启 bot 进程才能生效，面板不提供自动重启）。
+三个配置文件的读写接口形态一致：GET 返回 `{content, path, valid, masked}`，POST 保存前先备份为 `*.bak` 并返回 `{status, needs_restart: true, backup}`（`needs_restart` 为真表示需**手动**重启 bot 进程才能生效，面板不提供自动重启；例外是主配置里的 `tool_presets` 与 `initiative_chat_keyword_trigger`，见下表 `presets_reloaded` / `keywords_reloaded`）。
 
 > **密钥打码（默认开启）**：`web_panel.mask_secrets` 不为 `false` 时，GET 会把敏感值替换为哨兵 `"__KEEP__"`——主配置的 `web_panel.access_token`、`database.password`、`platforms.*.access_token`；供应商配置的 `api_key`（单值或号池数组）；MCP 配置的 `mcpServers.*.env.*` 值。POST 保存时哨兵自动还原为磁盘旧值（按供应商 name / MCP 服务名匹配），因此"只改其他字段"不会弄丢密钥；若填了哨兵却无旧值可还原，返回 400 而非写入半套密钥。想直接看/改真实密钥可把该开关设为 `false`（不建议）。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/config` | 读取主配置 config.json |
-| POST | `/api/config` | 保存主配置。Body：`{ "content": "<json 文本>" }`。保存前做结构校验（platforms / root_user_id / database / tool_presets / tts） |
+| POST | `/api/config` | 保存主配置。Body：`{ "content": "<json 文本>" }`。保存前做结构校验（platforms / root_user_id / database / tool_presets / tts / initiative_chat_keyword_trigger）。返回额外 `presets_reloaded` / `keywords_reloaded`：工具预设与主动聊天关键词是热重载例外，已写回运行中的 `atriConfig`（面板与 bot 同进程时立即生效；独立面板/开发模式下为 `false`，重启后生效） |
 | GET | `/api/supplier_config` | 读取供应商配置，额外返回解析好的 `suppliers: [{name, base_url, models: {模型名: {visual_sense, audio_sense, video_sense, document_sense}}}]` |
 | POST | `/api/supplier_config` | 保存供应商配置（校验 api 数组与 name/base_url/api_key） |
 | GET | `/api/mcp_config` | 读取 MCP 配置（文件不存在时返回默认 `{ "mcpServers": {} }` 模板，`exists: false`） |
