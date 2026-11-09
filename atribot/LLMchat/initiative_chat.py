@@ -10,7 +10,9 @@ from atribot.core.type.chat_types import GroupContext, LLMGroupChatCondition
 from atribot.LLMchat.chat import GroupChat
 
 DEFAULT_KEYWORD_TRIGGER: tuple[str, ...] = ("哈基莉", "atri-bot", "ATRI-bot")
-"""`initiative_chat_keyword_trigger` 未配置时使用的内置主动聊天关键词"""
+"""`initiative_chat_keyword_trigger` 未配置时使用的内置主动聊天关键词
+感觉可以后面加个命中统计什么的动态排序？
+"""
 
 
 def resolve_keyword_trigger(raw: object, log: Logger) -> List[str]:
