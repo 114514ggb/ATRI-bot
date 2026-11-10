@@ -1,0 +1,5 @@
+# 统一换行符：脚本在 Linux 容器/CI 中执行，CRLF 会导致
+# "cannot execute: required file not found"（shebang 后面多了 \r）
+*.sh text eol=lf
+docker/db/init/*.sh text eol=lf
+docker/python/*.sh text eol=lf

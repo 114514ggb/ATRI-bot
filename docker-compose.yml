@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: docker/db/Dockerfile
+      args:
+        APT_MIRROR: ${ATRI_APT_MIRROR:-deb.debian.org}
     container_name: atri-db
     restart: unless-stopped
     environment:
@@ -13,9 +15,10 @@ services:
       ATRI_DB_NAME: ${ATRI_DB_NAME:-atri}
       ATRI_DB_APP_USER: ${ATRI_DB_APP_USER:-atri}
       ATRI_DB_APP_PASSWORD: ${ATRI_DB_APP_PASSWORD:-180710}
-      PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
-      - atri-postgres-data:/var/lib/postgresql/data
+      # PostgreSQL 18 官方镜像把 VOLUME 改成了 /var/lib/postgresql（PGDATA 默认
+      # /var/lib/postgresql/18/docker）。挂父目录才不会每次重建多出一个匿名卷。
+      - atri-postgres-data:/var/lib/postgresql
       - ./docker/db/init/01-init.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
@@ -39,6 +42,9 @@ services:
     build:
       context: .
       dockerfile: docker/python/Dockerfile
+      args:
+        APT_MIRROR: ${ATRI_APT_MIRROR:-deb.debian.org}
+        PIP_INDEX_URL: ${ATRI_PIP_INDEX_URL:-https://pypi.org/simple}
     container_name: atri-bot
     restart: unless-stopped
     init: true
@@ -49,6 +55,9 @@ services:
     # Docker 默认发 SIGTERM 会直接杀进程，graceful_shutdown 不执行，故改用 SIGINT
     stop_signal: SIGINT
     stop_grace_period: 30s
+    # .env 里的变量全部注入容器，便于用 ATRI_PLATFORM_<NAME>_<FIELD> 覆盖平台配置
+    env_file:
+      - .env
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       ATRI_SUPPLIER_CONFIG_PATH: /app/assets/supplier_config.json

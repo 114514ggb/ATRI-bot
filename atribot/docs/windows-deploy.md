@@ -54,13 +54,10 @@ docker compose up -d --build
 ### docker.sock 说明
 
 `docker-compose.yml` 挂载了 `/var/run/docker.sock`，用于容器内的 AI 沙盒拉起兄弟容器。
-在 **Docker Desktop for Windows** 下这条挂载不成立（Windows 用的是 named pipe
-`npipe:////./pipe/docker_engine`）。影响范围仅限 **Docker 沙盒后端**，不影响 bot 主功能。
-
-处理方式二选一：
-
-1. 保持沙盒镜像已构建、接受沙盒不可用；或
-2. 让沙盒改用本机直执行：把 `assets/config.json` 的 `sand_box.type` 改成 `"none"`。
+在 **Docker Desktop for Windows** 下，Linux 容器可以使用这个 socket（Desktop 会自动转发，
+无需改用 named pipe）；只要 Docker Desktop 正在运行，沙盒就能正常工作。
+若宿主机 Docker 守护进程不可用或使用远程守护进程，才需要把 `assets/config.json` 的
+`sand_box.type` 改成 `"none"`（本机直执行）或配置 `DOCKER_HOST`。
 
 ---
 

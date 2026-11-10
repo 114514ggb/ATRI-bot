@@ -1,45 +1,22 @@
 # db/Dockerfile
+#
+# PostgreSQL 18 + pgroonga + pgvector。
+# - pgroonga 用 Groonga 官方镜像（底层就是 postgres:18 官方镜像，扩展已装好），
+#   不再从 packages.groonga.org 拉包，避免该源在国内极慢/超时。
+#   `latest-debian-18` 跟随 PG18 的 PGroonga 最新版（当前 4.1.0）。
+# - pgvector 用 PGDG 仓库的预编译包（基础镜像已配置 apt.postgresql.org 源），不再源码编译。
 
-FROM postgres:18-bookworm AS pgvector-builder
+FROM groonga/pgroonga:latest-debian-18
 
-ARG PGVECTOR_VERSION=v0.8.6
+# Debian 源默认走官方地址；国内网络可传 --build-arg APT_MIRROR=mirrors.ustc.edu.cn 换成镜像站
+ARG APT_MIRROR=deb.debian.org
+RUN grep -rl 'deb.debian.org' /etc/apt > /tmp/apt-mirror-targets 2>/dev/null || true; \
+    if [ -s /tmp/apt-mirror-targets ]; then \
+        xargs -r sed -i "s|deb.debian.org|${APT_MIRROR}|g" < /tmp/apt-mirror-targets; \
+    fi; \
+    rm -f /tmp/apt-mirror-targets
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git \
-    make \
-    gcc \
-    postgresql-server-dev-18 \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-18-pgvector \
     && rm -rf /var/lib/apt/lists/*
 
-RUN git clone --depth 1 --branch ${PGVECTOR_VERSION} https://github.com/pgvector/pgvector.git /tmp/pgvector \
-    && cd /tmp/pgvector \
-    && make \
-    && make install DESTDIR=/pgvector-artifacts
-
-FROM postgres:18-bookworm
-
-RUN apt-get update && apt-get install -y --fix-missing \
-    curl \
-    ca-certificates \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN install -d /usr/share/postgresql-common/pgdg && \
-    curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail https://www.postgresql.org/media/keys/ACCC4CF8.asc
-
-RUN . /etc/os-release && \
-    sh -c "echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt ${VERSION_CODENAME}-pgdg main' > /etc/apt/sources.list.d/pgdg.list"
-
-RUN . /etc/os-release && \
-    curl -fsSL https://packages.groonga.org/debian/groonga-archive-keyring.gpg \
-    | gpg --dearmor -o /usr/share/keyrings/groonga-archive-keyring.gpg && \
-    sh -c "echo 'deb [signed-by=/usr/share/keyrings/groonga-archive-keyring.gpg] https://packages.groonga.org/debian/ ${VERSION_CODENAME} main' > /etc/apt/sources.list.d/groonga.list"
-
-RUN apt-get update && apt-get install -y --fix-missing \
-    postgresql-18-pgdg-pgroonga \
-    && apt-get purge -y curl ca-certificates gnupg \
-    && apt-get autoremove -y \
-    && rm -rf /var/lib/apt/lists/*
-
-# 拷贝编译好的 pgvector（vector.so + control + SQL 脚本），自动落到 PG18 的 lib/extension 目录
-COPY --from=pgvector-builder /pgvector-artifacts/ /

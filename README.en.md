@@ -241,7 +241,7 @@ python -m pytest tests/
 
 ### 6. Docker Deployment
 The repository includes a ready-to-run `Docker Compose` configuration that starts:
-- `atri-db`: PostgreSQL with `pgvector + pgroonga`
+- `atri-db`: PostgreSQL 18 based on the official Groonga image (`pgvector` + `pgroonga` ready)
 - `atri-bot`: ATRI main application container
 
 Before first use, ensure:
@@ -269,6 +269,8 @@ cp .env.docker.example .env
 | `ATRI_PANEL_PORT` | Web admin panel port (inside the container equals the host mapping) | `5308` |
 | `ATRI_PANEL_TOKEN` | Web admin panel login credential (required for Docker; ⚠️ overridden by `web_panel.access_token`, see below) | empty |
 | `ATRI_SANDBOX_IMAGE` | AI sandbox image (build it manually first, see section 4) | `atri-sandbox:latest` |
+| `ATRI_APT_MIRROR` | Debian mirror used while building images (e.g. `mirrors.ustc.edu.cn` in China) | `deb.debian.org` |
+| `ATRI_PIP_INDEX_URL` | PyPI index used while building images | `https://pypi.org/simple` |
 | `ATRI_FILE_LOG` | `1` = also write file logs, `0` = stdout only | `1` |
 | `TZ` | Container timezone | `Asia/Shanghai` |
 
@@ -289,6 +291,24 @@ docker compose logs -f app
 docker compose logs -f db
 ```
 
+**Running NapCat in a container too** (tested): join the network created by Compose and mount the login state plus the `document` directory:
+```bash
+# The network name defaults to "<project-dir>_atri-net"; check with `docker network ls`
+docker run -d --name atri-napcat \
+  --network atri-main_atri-net \
+  -p 6099:6099 \
+  -v <host>/napcat/config:/app/napcat/config \
+  -v <host>/napcat/qq:/app/.config/QQ \
+  -v <host>/document:/app/document:ro \
+  mlikiowa/napcat-docker:latest
+```
+- Add a **WebSocket client** in NapCat's OneBot config pointing to `ws://atri-bot:8888/websocket`
+  with the same token as `ATRI_ACCESS_TOKEN` (the bot runs in `WebSocket_server` mode).
+- First login: `docker logs -f atri-napcat` prints the QR code, or open
+  `http://localhost:6099/webui?token=<WebUI token from the log>` and scan it.
+- Mounting `/app/.config/QQ` keeps the login state across restarts; mount `document` at the
+  **same path** so the bot's `file:///app/document/...` paths are readable by NapCat.
+
 Stop and remove containers:
 ```bash
 docker compose down
@@ -305,7 +325,7 @@ http://localhost:5308/admin/
 ```
 The login credential is `web_panel.access_token` in `assets/config.json` (this repo ships a random strong default — **replace it with your own before deploying**). To make `ATRI_PANEL_TOKEN` from `.env` effective, remove `access_token` from the config file first (it has higher priority). The panel no longer falls back to a platform `access_token`; when unconfigured every API returns 503. Login exchanges the credential for a session token with a fixed lifetime (default 4 hours, adjustable via `web_panel.session_ttl_hours`, 1-24 h); the WebUI logs out automatically on expiry, and logout or changing the credential invalidates all sessions immediately. Three consecutive wrong attempts trigger a global lockout (starting at 10 minutes, doubling, capped at 24 hours; the correct credential is rejected while locked). The host port mapping binds `127.0.0.1` only by default.
 
-**⚠️ Path mapping (required for Docker)**: when sending local media, the bot hands NapCat a `file://` path **inside the container** (e.g. `/app/document/...`), which the host NapCat cannot read. Configure `assets/config.json` on the host:
+**⚠️ Path mapping (required when NapCat runs on the host)**: when sending local media, the bot hands NapCat a `file://` path **inside the container** (e.g. `/app/document/...`), which the host NapCat cannot read. Configure `assets/config.json` on the host:
 ```json
 "file_path": {
     "path_mapping": {
@@ -325,6 +345,7 @@ docker compose down -v         # also remove the data volume (recreate the datab
 
 Notes:
 - The container generates a runtime config based on `assets/config.json` without overwriting your local setup.
+- The database volume is mounted at `/var/lib/postgresql` (PostgreSQL 18 image `VOLUME`/`PGDATA` layout). Upgrading from the older compose file (which mounted `/var/lib/postgresql/data`) does not migrate data automatically — run `docker compose down -v` to recreate.
 - Host directories `assets/`, `document/`, `atribot/log/` and `temp/` are mounted into the container; file logs are written to `atribot/log/` (`ATRI_FILE_LOG=0` switches to stdout-only so Docker log rotation handles them).
 - The sandbox only overrides the image name, so build the sandbox image **manually first** (`docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .`). Without it the bot still starts, but AI code execution is unavailable. Compose mounts the Docker socket (`/var/run/docker.sock`), so the sandbox can talk to the host Docker daemon out of the box.
 - The image ships `uv` (for `uvx`) and Node.js (for `npx`), so stdio MCP servers work out of the box; use `docker build --build-arg WITH_NODE=0` to drop Node and shrink the image.

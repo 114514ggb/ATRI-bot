@@ -1,6 +1,8 @@
 .git
 .github
 .venv
+.wslvenv
+.uv-cache
 __pycache__
 **/__pycache__
 *.pyc
@@ -9,10 +11,19 @@ __pycache__
 .pytest_cache
 .ruff_cache
 .mypy_cache
+# 本地环境变量不进镜像
+.env
+.env.*
+!.env.docker.example
+assets/*.bak
+assets/* copy.json
+*.log
+atribot/log
 document
 log
 privacy
 temp
+tests
 document/img/tmp
 document/audio/TTS_output
 docker/postgres-data

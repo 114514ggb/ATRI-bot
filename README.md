@@ -263,7 +263,7 @@ python main.py
 
 ### 5. 使用 Docker 启动
 仓库已经补齐了可直接运行的 `Docker Compose` 配置，默认会启动：
-- `atri-db`：带 `pgvector + pgroonga` 的 PostgreSQL
+- `atri-db`：基于 Groonga 官方镜像的 PostgreSQL 18（`pgvector` + `pgroonga` 已就绪）
 - `atri-bot`：ATRI 主程序容器
 
 首次使用前，至少确认两件事：
@@ -291,8 +291,16 @@ cp .env.docker.example .env
 | `ATRI_PANEL_PORT` | Web 管理面板端口（容器内与宿主映射一致） | `5308` |
 | `ATRI_PANEL_TOKEN` | Web 管理面板登录口令（Docker 下必填；⚠️ 会被 `web_panel.access_token` 覆盖，见下） | 空 |
 | `ATRI_SANDBOX_IMAGE` | AI 沙盒镜像（需先手动构建，见第 4 节） | `atri-sandbox:latest` |
+| `ATRI_APT_MIRROR` | 构建镜像时的 Debian 源（国内可设 `mirrors.ustc.edu.cn`） | `deb.debian.org` |
+| `ATRI_PIP_INDEX_URL` | 构建镜像时的 PyPI 源（国内可设 `https://mirrors.aliyun.com/pypi/simple`） | `https://pypi.org/simple` |
 | `ATRI_FILE_LOG` | `1`=同时写文件日志，`0`=只输出 stdout | `1` |
 | `TZ` | 容器时区 | `Asia/Shanghai` |
+
+> `.env` 会整体注入 `app` 容器，除上表变量外，还可用 `ATRI_PLATFORM_<平台名>_<字段>` 覆盖
+> `assets/config.json` 里的平台配置（字段：`adapter` / `connection_type` / `access_token` /
+> `url` / `host` / `port` / `source_name` / `enabled`）。例如本机配置里还开着 `snowluma` 时，
+> 容器内会对着 `127.0.0.1:3001` 反复重连，用 NapCat 部署时可在 `.env` 写
+> `ATRI_PLATFORM_SNOWLUMA_ENABLED=false` 关掉它。
 
 然后直接启动：
 ```bash
@@ -310,6 +318,24 @@ docker compose up -d --build
 docker compose logs -f app
 docker compose logs -f db
 ```
+
+**NapCat 也用容器跑时**（实测可用）：让它加入 compose 创建的网络，并挂载登录态与 `document` 目录：
+```bash
+# 网络名默认为 "<项目目录名>_atri-net"，可先用 docker network ls 确认
+docker run -d --name atri-napcat \
+  --network atri-main_atri-net \
+  -p 6099:6099 \
+  -v <宿主机>/napcat/config:/app/napcat/config \
+  -v <宿主机>/napcat/qq:/app/.config/QQ \
+  -v <宿主机>/document:/app/document:ro \
+  mlikiowa/napcat-docker:latest
+```
+- 在 NapCat 的 OneBot 配置里添加 **WebSocket 客户端**：`ws://atri-bot:8888/websocket`，
+  token 与 `.env` 的 `ATRI_ACCESS_TOKEN` 一致（bot 是 `WebSocket_server` 模式）
+- 首次登录：`docker logs -f atri-napcat` 会打印二维码，或打开 WebUI
+  `http://localhost:6099/webui?token=<日志里的 WebUI Token>` 扫码
+- 挂载 `/app/.config/QQ` 才能复用登录态；把 `document` 以**相同路径**挂进 NapCat，
+  bot 发出的 `file:///app/document/...` 才能被 NapCat 读到（否则图片/语音/文件发送失败）
 
 停止并删除容器：
 ```bash
@@ -329,7 +355,7 @@ http://localhost:5308/admin/
 
 登录口令取 `assets/config.json` 的 `web_panel.access_token`；若想让 `.env` 里的 `ATRI_PANEL_TOKEN` 生效，需要先把配置文件里的 `access_token` 删掉（它优先级更高）。面板不会回退使用平台 `access_token`；未配置口令时所有接口返回 503。登录页用口令换取会话令牌（**固定有效期**，默认 4 小时，可在 `web_panel.session_ttl_hours` 调整 1-24 小时），到期后 WebUI 自动退出登录；登出、修改口令都会立即让全部会话失效。连续输错口令 3 次会触发**全局锁定**（10 分钟起步、指数递增、封顶 24 小时；锁定期间口令正确也拒绝）。
 
-**⚠️ 路径映射（Docker 部署必配）**：Bot 给 NapCat 发本地媒体时用的是 `file://` **容器内**路径（如 `/app/document/...`），宿主机上的 NapCat 读不到。请在宿主机的 `assets/config.json` 中配置：
+**⚠️ 路径映射（NapCat 跑在宿主机时必配）**：Bot 给 NapCat 发本地媒体时用的是 `file://` **容器内**路径（如 `/app/document/...`），宿主机上的 NapCat 读不到。请在宿主机的 `assets/config.json` 中配置：
 ```json
 "file_path": {
     "path_mapping": {
@@ -349,10 +375,11 @@ docker compose down -v         # 连数据卷一起删除（清库重建）
 
 说明：
 - 容器启动时会基于 `assets/config.json` 生成一份运行时配置，不会覆盖你原本的本地配置。
+- 数据库数据卷挂载在 `/var/lib/postgresql`（PostgreSQL 18 官方镜像的 `VOLUME`/`PGDATA` 布局）；从旧版 compose（挂载 `/var/lib/postgresql/data`）升级时旧数据不会自动迁移，需要 `docker compose down -v` 后重建。
 - 默认把宿主机的 `assets/`、`document/`、`atribot/log/`、`temp/` 挂进容器；Bot 的文件日志写在 `atribot/log/`（设 `ATRI_FILE_LOG=0` 可改为只输出 stdout，交给 Docker 日志轮转）。
 - 内置 AI 沙盒只覆盖镜像名，沙盒镜像需要**先手动构建**（`docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .`）；不构建不会阻断启动，但 AI 的代码执行能力会缺失。Compose 已挂载 Docker Socket（`/var/run/docker.sock`），容器内可直接调用宿主 Docker 拉起沙盒。
 - 镜像内已装 `uv`（供 `uvx`）与 Node.js（供 `npx`），stdio 型 MCP 服务可直接启动；不需要 Node 时可用 `docker build --build-arg WITH_NODE=0` 减小体积。
-- ⚠️ **Windows 下的 docker.sock**：Compose 挂载的 `/var/run/docker.sock` 在 Docker Desktop for Windows 上不成立（Windows 用 named pipe）。影响范围仅限容器内拉起 AI 沙盒（Docker 后端）；可改用 `sand_box.type: "none"` 本机后端，详见 [Windows 部署指南](atribot/docs/windows-deploy.md)。
+- **Windows 下的 docker.sock**：Docker Desktop for Windows 的 Linux 容器可以直接使用挂载的 `/var/run/docker.sock`（由 Docker Desktop 自动转发），容器内的 AI 沙盒可以正常拉起；前提是 Docker Desktop 正在运行。若改用外部远程 Docker 守护进程，则需自行配置 `DOCKER_HOST`。
 - ⚠️ 安全提醒：默认口令（数据库 `180710`、平台 Token `ATRI114514`、面板口令 `ATRI`）都是公开弱口令，请务必修改；挂载 `/var/run/docker.sock` 等价于把宿主机 root 权限给了容器，请勿把面板/端口暴露到公网。
 
 ---
