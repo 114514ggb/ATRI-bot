@@ -20,7 +20,6 @@
 [![Python](https://img.shields.io/badge/Python-3.14-blue.svg)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/Database-PostgreSQL-336791.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Container-Docker-2496ED.svg)](https://www.docker.com/)
-[![SnowLuma](https://img.shields.io/badge/Backend-SnowLuma-blueviolet.svg)](https://github.com/SnowLuma/SnowLuma)
 [![NapCat](https://img.shields.io/badge/Backend-NapCat-green.svg)](https://github.com/NapNeko/NapCatQQ)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-1.2.4-orange.svg)](./pyproject.toml)
@@ -39,7 +38,7 @@
   - [🖥️ Web 管理面板](#-web-管理面板)
   - [🛠️ 其他实用功能](#-其他实用功能)
 - [🚀 快速开始 (How to Run)](#-快速开始-how-to-run)
-  - [1. 前端连接 (SnowLuma / NapCat)](#1-前端连接-snowluma--napcat)
+  - [1. 前端连接 (NapCat)](#1-前端连接-napcat)
   - [2. 数据库配置 (PostgreSQL)](#2-数据库配置-postgresql)
   - [3. 模型与环境配置](#3-模型与环境配置)
   - [4. 启动项目](#4-启动项目)
@@ -75,7 +74,7 @@
 
 ## ✨ 项目核心功能
 
-一个基于 **SnowLuma / NapCat**（OneBot v11 协议端）对接的 QQ Bot，以群聊场景为核心深度定制
+一个基于 **NapCat**（OneBot v11 协议端）对接的 QQ Bot，以群聊场景为核心深度定制
 
 ### 🧠 深度 LLM 聊天集成
 
@@ -134,21 +133,15 @@ Bot 启动时会以内置后台任务的形式拉起一个 Web 管理面板
 > 若只想在原生 Windows 上跑 bot、数据库用容器，最短路径是：
 > `docker compose up -d db` → `uv sync` → `uv run main.py`。
 
-### 1. 前端连接 (SnowLuma / NapCat)
-首先需要一个能够与 QQ 通信的前端（OneBot v11 协议端）。**主推荐 SnowLuma**，NapCat 同样可用：
+### 1. 前端连接 (NapCat)
+首先需要一个能够与 QQ 通信的前端（OneBot v11 协议端）。本项目使用 **NapCat**：
 
-**🌟 SnowLuma（主推荐）**
-- [SnowLuma 部署指南](https://snowluma.github.io/zh/docs/guide/deploy)
-- [SnowLuma 下载（Releases）](https://github.com/SnowLuma/SnowLuma/releases)
-- [SnowLuma 项目地址](https://github.com/SnowLuma/SnowLuma)
-
-**NapCat（备选）**
+**NapCat**
 - [NapCat 安装指南](https://napneko.github.io/guide/napcat)
 - [NapCat 项目地址](https://github.com/NapNeko/NapCatQQ)
 
-> 对接本项目时，`config.platforms.<name>.adapter`：SnowLuma 填 `snowluma`（正向 WS 默认端口 `3001`、路径 `/`），
-> NapCat 填 `onebot`（正向 WS 默认路径 `/websocket`）；详细字段见
-> [如何配置配置文件](assets/如何配置配置文件.md)。
+> 对接本项目时，`config.platforms.<name>.adapter` 填 `onebot`（正向 WS 默认路径 `/websocket`）；
+> 详细字段见 [如何配置配置文件](assets/如何配置配置文件.md)。
 >
 > *注：你也可以自己实现前端，只要能对接上即可。*
 
@@ -223,7 +216,7 @@ docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 #### ⚙️ 配置文件
 在启动前，请务必检查 `assets` 目录中的配置：
 1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.md 或 如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表；`tool_presets` 配置各会话工具预设（支持 list 或 `{"default": [...], "deferred": [...]}`，deferred 工具由 `tool_search` 动态发现）；`initiative_chat_keyword_trigger` 是主动聊天的关键词触发词表（不写则用内置默认，写 `[]` 关闭）。
-2.  **平台连接**：`config.platforms.<name>` 配置与协议端（NapCat / SnowLuma）的对接方式（`adapter` 为 `onebot`（NapCat 等 OneBot v11 实现）或 `snowluma`，`connection_type` 支持 `WebSocket_client` / `WebSocket_server` / `http`，`access_token` 需与协议端一致，`url` 为地址；SnowLuma 正向 WS 默认端口 `3001`、路径 `/`，可用 `ws_path` 覆盖）。
+2.  **平台连接**：`config.platforms.<name>` 配置与协议端（NapCat）的对接方式（`adapter` 为 `onebot`（NapCat 等 OneBot v11 实现），`connection_type` 支持 `WebSocket_client` / `WebSocket_server` / `http`，`access_token` 需与协议端一致，`url` 为地址；正向 WS 路径默认 `/websocket`，可用 `ws_path` 覆盖）。
 3.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
     ```bash
     cp "assets/config copy.json" assets/config.json
@@ -298,9 +291,8 @@ cp .env.docker.example .env
 
 > `.env` 会整体注入 `app` 容器，除上表变量外，还可用 `ATRI_PLATFORM_<平台名>_<字段>` 覆盖
 > `assets/config.json` 里的平台配置（字段：`adapter` / `connection_type` / `access_token` /
-> `url` / `host` / `port` / `source_name` / `enabled`）。例如本机配置里还开着 `snowluma` 时，
-> 容器内会对着 `127.0.0.1:3001` 反复重连，用 NapCat 部署时可在 `.env` 写
-> `ATRI_PLATFORM_SNOWLUMA_ENABLED=false` 关掉它。
+> `url` / `host` / `port` / `source_name` / `enabled`）。例如配置里还有容器内不可达的平台条目、
+> 会对着该地址反复重连时，可在 `.env` 写 `ATRI_PLATFORM_<平台名>_ENABLED=false` 关掉它。
 
 然后直接启动：
 ```bash
@@ -518,7 +510,7 @@ ATRI-main/
 NapCat (QQ客户端)
       │  WebSocket / HTTP
       ▼
-平台适配器 (OneBotAdapter / SnowLumaAdapter，支持多平台)
+平台适配器 (OneBotAdapter，支持多平台)
       │
       ▼
 MessageQueue (消息队列)
