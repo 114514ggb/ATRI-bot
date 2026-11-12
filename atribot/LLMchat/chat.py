@@ -4,7 +4,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import replace
 from logging import Logger
-from typing import Awaitable, Callable, Coroutine, Dict, List
+from typing import Any, Awaitable, Callable, ClassVar, Coroutine, Dict, List
 
 from atribot.common_utils import (
     download_text,
@@ -73,6 +73,9 @@ STRING_LENGTH_LIMIT = 500 #字符串长度限制
 class ChatBasics(ABC):
     """聊天基类"""
 
+    _model_scope: ClassVar[str] = "group_chat"
+    """会话场景对应的 model.<scope> 覆盖段（子类覆盖）"""
+
     def __init__(
         self,
         llm_supervisor: LLMCoordinator,
@@ -109,9 +112,24 @@ class ChatBasics(ABC):
         self._tool_chat_type: str
         """会话场景"""
 
-        self.template_request_simplify :GenerationRequestSimplify
+        self.model_api = None
+        """当前生效的模型 API 实例"""
+        self.model_name: str = ""
+        """当前生效的模型名"""
+        self.model_supplier_name: str = ""
+        """当前生效的供应商名"""
+        self.visual_sense: bool = False
+        self.audio_sense: bool = False
+        self.video_sense: bool = False
+        self.emoji_file_dict: Dict = self.emoji_core.emoji_file_dict
+        self.api_order: list[dict[str, str]] = []
+        """备用api调用list"""
+        self.template_request_simplify: GenerationRequestSimplify
         """构建请求缓存"""
-        
+
+        self._apply_model_config()
+        self.config.on_change("model", self._on_model_config_changed)
+
         self.decision_function:Dict[str,Coroutine[Dict]] = {
             "speak" : self.reply_conduct,
             "update" : self.update_conduct,
@@ -131,6 +149,55 @@ class ChatBasics(ABC):
         return self.tool_calls.resolve_toolset(
             preset=self._tool_preset_name, chat_type=self._tool_chat_type
         )
+
+    def _apply_model_config(self) -> bool:
+        """按 `_model_scope` 读取供应商/模型并刷新请求模板
+
+        热更新时若新配置指向未加载的供应商/模型（supplier_config.json 的改动需重启），
+        只告警并保留当前生效的模型，避免聊天直接失败。
+
+        Returns:
+            bool: 是否成功切换到配置中的模型
+        """
+        supplier_name, model_name = self.config.get_chat_model(self._model_scope)
+        connection = self.supplier.connections.get(supplier_name) if supplier_name else None
+        model_info = connection.model_dict.get(model_name) if connection is not None else None
+        if connection is None or model_info is None:
+            message = (
+                f"模型配置不可用（{self._model_scope}: supplier={supplier_name!r}, "
+                f"model={model_name!r}），请检查 config.model 与 supplier_config.json"
+            )
+            if not self.model_name:
+                raise ValueError(message)
+            self.log.warning(f"{message}，继续使用当前模型 {self.model_name}")
+            return False
+
+        self.model_supplier_name = supplier_name
+        self.model_name = model_name
+        self.model_api = connection.connection_object
+        self.visual_sense = bool(model_info.get("visual_sense", False))
+        self.audio_sense = bool(model_info.get("audio_sense", False))
+        self.video_sense = bool(model_info.get("video_sense", False))
+        self.api_order = list(getattr(self.config.model, "standby_model", None) or [])
+        self.template_request_simplify = GenerationRequestSimplify(
+            model_api=self.model_api,
+            model=model_name,
+            supplier_name=supplier_name,
+            parameter=self.config.model.chat_parameter,
+            messages=None,
+            visual_sense=self.visual_sense,
+            audio_sense=self.audio_sense,
+        )
+        self._on_model_config_applied()
+        self.log.info(f"聊天模型已就绪（{self._model_scope}: {supplier_name} / {model_name}）")
+        return True
+
+    def _on_model_config_changed(self, _value: Any) -> None:
+        """`model` 配置段变更回调：热切换模型与请求模板"""
+        self._apply_model_config()
+
+    def _on_model_config_applied(self) -> None:
+        """模型配置生效后的子类扩展钩子"""
 
     @abstractmethod
     async def step(self) -> None:
@@ -522,6 +589,8 @@ class ChatBasics(ABC):
 class GroupChat(ChatBasics):
     """处理群聊天"""
 
+    _model_scope = "group_chat"
+
     def __init__(
         self,
         llm_supervisor: LLMCoordinator,
@@ -553,37 +622,17 @@ class GroupChat(ChatBasics):
             config=config,
             log=log,
         )
-        model_supplier = self.supplier.connections[
-            self.config.model.connect.supplier
-        ]
-        model_name = self.config.model.connect.model_name
-        self.model_api = model_supplier.connection_object
-        model_information_dict = model_supplier.model_dict[model_name]
-        self.visual_sense = model_information_dict.get("visual_sense", False)
-        self.audio_sense = model_information_dict.get("audio_sense", False)
-        self.video_sense = model_information_dict.get("video_sense", False)
-        self.emoji_file_dict = self.emoji_core.emoji_file_dict
-        
-        self.api_order: list[dict[str, str]] = self.config.model.standby_model
-        """备用api调用list"""
-
         self._tool_preset_name = "group_chat"
         self._tool_chat_type = "group"
 
-        self.template_request_simplify = GenerationRequestSimplify(
-            model_api=self.model_api,
-            model=model_name,
-            parameter=self.config.model.chat_parameter,
-            messages=None,
-            visual_sense=self.visual_sense,
-            audio_sense=self.audio_sense,
-        )
-        
-        if self.config.model.connect.user_global_context:
+    def _on_model_config_applied(self) -> None:
+        """按 model.connect.user_global_context 决定群聊取用的上下文"""
+        connect = getattr(self.config.model, "connect", None)
+        if connect is not None and getattr(connect, "user_global_context", False):
             self.get_context = lambda group_id,user_id : self.chat_manager.get_private_context(user_id)
         else:
             self.get_context = lambda group_id,user_id : self.chat_manager.get_group_context(group_id)
-        
+
     async def step(
         self,
         event: MessageEventEnvelope,
@@ -1019,6 +1068,8 @@ class GroupChat(ChatBasics):
 class PrivateChat(ChatBasics):
     """处理私聊天"""
 
+    _model_scope = "private_chat"
+
     def __init__(
         self,
         llm_supervisor: LLMCoordinator,
@@ -1051,30 +1102,8 @@ class PrivateChat(ChatBasics):
             log=log,
         )
 
-        model_supplier = self.supplier.connections[
-            self.config.model.connect.supplier
-        ]
-        model_name = self.config.model.connect.model_name
-        self.model_api = model_supplier.connection_object
-        model_information_dict = model_supplier.model_dict[model_name]
-        self.visual_sense = model_information_dict.get("visual_sense", False)
-        self.audio_sense = model_information_dict.get("audio_sense", False)
-        self.video_sense = model_information_dict.get("video_sense", False)
-        self.emoji_file_dict = self.emoji_core.emoji_file_dict
-
-        self.api_order: list[dict[str, str]] = self.config.model.standby_model
-
         self._tool_preset_name = "private_chat"
         self._tool_chat_type = "private"
-
-        self.template_request_simplify = GenerationRequestSimplify(
-            model_api=self.model_api,
-            model=model_name,
-            parameter=self.config.model.chat_parameter,
-            messages=None,
-            visual_sense=self.visual_sense,
-            audio_sense=self.audio_sense,
-        )
 
     async def step(self, events: list[MessageEventEnvelope], prompt: str) -> None:
         """私聊 LLM 处理全流程

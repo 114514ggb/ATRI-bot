@@ -49,6 +49,14 @@
             "model_name": "deepseek-chat",
             "user_global_context": true
         },
+        "group_chat": {
+            "supplier": "",
+            "model_name": ""
+        },
+        "private_chat": {
+            "supplier": "",
+            "model_name": ""
+        },
         "chat_parameter": {
             "temperature": 0.6,
             "top_p": 0.9,

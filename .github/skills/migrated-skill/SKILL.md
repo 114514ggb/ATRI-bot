@@ -1,8 +1,8 @@
 ---
-name: 精简代码
+name: migrated-skill
 description: 当代码存在过度拆分、冗余抽象、重复防御、可读性差时，用于在不改变行为的前提下进行精简。
+disable-model-invocation: true
 ---
-
 # 任务
 你的任务不是重写代码，而是精简代码。
 

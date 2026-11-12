@@ -56,6 +56,8 @@ def _prepare_files() -> Path:
         },
         "model": {
             "connect": {"supplier": "dev-supplier", "model_name": "dev-model", "user_global_context": True},
+            "group_chat": {"supplier": "", "model_name": ""},
+            "private_chat": {"supplier": "", "model_name": ""},
             "chat_parameter": {"temperature": 0.6, "top_p": 0.9, "max_tokens": 65536, "stream": False, "tool_choice": "auto"},
             "RAG": {"enable": True, "dimensions": 1024},
             "standby_model": [{"supplier": "dev-supplier", "model_name": "dev-model2"}],

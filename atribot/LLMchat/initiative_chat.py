@@ -18,7 +18,7 @@ DEFAULT_KEYWORD_TRIGGER: tuple[str, ...] = ("哈基莉", "atri-bot", "ATRI-bot")
 def resolve_keyword_trigger(raw: object, log: Logger) -> List[str]:
     """把配置中的关键词列表规整成可用于匹配的字符串列表
 
-    - 未配置（缺键 / None）：回退内置默认词
+    - 未配置(缺键 / None)回退内置默认词
     - 显式空数组：返回空列表，即关闭关键词触发
     - 类型不合法：告警并回退内置默认词，避免写错配置导致整段主动聊天逻辑失效
 
@@ -46,12 +46,15 @@ class initiativeChat:
         self.blacklist = container.get_by_type(PermissionsManagement).blacklist
         self.chat_manager = container.get_by_type(ChatManager)
         self.group_chat = container.get_by_type(GroupChat)
-
-    def get_keyword_trigger_list(self) -> List[str]:
-        """读取主动聊天关键词"""
-        return resolve_keyword_trigger(
+        self._keyword_trigger_list: List[str] = resolve_keyword_trigger(
             getattr(self.config, "initiative_chat_keyword_trigger", None), self.log
         )
+        """主动聊天关键词缓存，配置变更时由回调刷新（不在每次决策时重读配置）"""
+        self.config.on_change("initiative_chat_keyword_trigger", self._on_keyword_config_changed)
+
+    def _on_keyword_config_changed(self, raw: object) -> None:
+        """`initiative_chat_keyword_trigger` 配置段变更回调：重建关键词缓存"""
+        self._keyword_trigger_list = resolve_keyword_trigger(raw, self.log)
     
     async def decision(self, event: MessageEventEnvelope, group_context:GroupContext) -> bool:
         """决策是否应该发言"""
@@ -100,7 +103,7 @@ class initiativeChat:
             if group_context.initiative_chat and self.get_bot_active_reference(group_context, 3) < 0.5:
                 
                 #关键词触发检测
-                if value := self.find_first_match(event.event.pure_text, self.get_keyword_trigger_list()):
+                if value := self.find_first_match(event.event.pure_text, self._keyword_trigger_list):
                     decision = await self._execute_reply(
                         event, group_id, params,
                         log_msg=f"Keyword '{value}' triggered by user {user_id}, preparing to respond.",

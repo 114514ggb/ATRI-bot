@@ -1,8 +1,20 @@
+import asyncio
+import inspect
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Literal, Mapping, Union
+from typing import Any, Callable, Dict, Literal, Mapping, Union
+
+log = logging.getLogger("atri-bot.ConfigChange")
+"""配置变更通知日志器"""
+
+ChangeCallback = Callable[[Any], Any]
+"""配置段变更回调：入参为该段最新值，可返回 awaitable"""
+
+_UNSET = object()
+"""notify_change 未显式传值时的哨兵"""
 
 
 class ConfigObject(dict):
@@ -566,6 +578,8 @@ class atriConfig:
         self._raw_config: Dict[str, Any] = config_data
         self._config = ConfigObject(config_data)
         self._config_file: Path = config_file
+        self._change_listeners: Dict[str, list[ChangeCallback]] = {}
+        """顶层配置段 -> 变更回调列表"""
         self.account = AccountInfo(id=None, name="ATRI-bot")
 
         file_path_data = config_data.get("file_path", {})
@@ -581,17 +595,117 @@ class atriConfig:
         """返回当前加载的配置文件绝对路径"""
         return self._config_file
 
-    def reload_section(self, key: str) -> Any:
-        """从配置文件重读某个顶层配置段并同步到内存（文件须已写盘）
+    def on_change(self, section: str, callback: ChangeCallback) -> Callable[[], None]:
+        """订阅某个顶层配置段的变更
 
-        self._raw_config 与 self._config（ConfigObject）是两份数据（嵌套字典会被递归拷贝），
-        因此必须同时更新，否则 getattr(config, key) 仍会读到启动时的旧值。
+        服务在初始化时取一次配置并缓存，配置变化（如 WebUI 保存）时通过这里的回调刷新，
+        避免每次使用都实时读取配置文件。
+
+        Args:
+            section (str): 顶层配置项名称，如 "model" / "tool_presets"
+            callback (ChangeCallback): 变更回调，入参为该段最新值；返回值是 awaitable 时
+                在有事件循环的情况下调度为任务
+
+        Returns:
+            Callable[[], None]: 取消订阅函数
+        """
+        listeners = self._change_listeners.setdefault(section, [])
+        if callback not in listeners:
+            listeners.append(callback)
+        return lambda: self.off_change(section, callback)
+
+    def off_change(self, section: str, callback: ChangeCallback) -> bool:
+        """取消某个配置段变更回调
+
+        Args:
+            section (str): 顶层配置项名称
+            callback (ChangeCallback): 注册时的回调对象
+
+        Returns:
+            bool: 是否确实移除了回调
+        """
+        listeners = self._change_listeners.get(section)
+        if not listeners or callback not in listeners:
+            return False
+        listeners.remove(callback)
+        if not listeners:
+            self._change_listeners.pop(section, None)
+        return True
+
+    def notify_change(self, section: str, value: Any = _UNSET) -> int:
+        """通知某个配置段的订阅者
+
+        单个回调抛异常只记日志，不影响其它订阅者，也不影响调用方
+
+        Args:
+            section (str): 顶层配置项名称
+            value (Any): 该段最新值；缺省时取内存中的当前值
+
+        Returns:
+            int: 本次通知到的回调数量
+        """
+        listeners = self._change_listeners.get(section) or []
+        if value is _UNSET:
+            value = self._config.get(section)
+        for callback in listeners:
+            try:
+                result = callback(value)
+                if inspect.isawaitable(result):
+                    self._schedule_callback(result, section, callback)
+            except Exception:
+                log.exception("配置段 %s 的变更回调 %r 执行失败", section, callback)
+        return len(listeners)
+
+    @staticmethod
+    def _schedule_callback(awaitable: Any, section: str, callback: ChangeCallback) -> None:
+        """把异步回调调度成任务；没有运行中的事件循环时告警并丢弃"""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            log.warning("配置段 %s 的异步回调 %r 没有运行中的事件循环，已跳过", section, callback)
+            if inspect.iscoroutine(awaitable):
+                awaitable.close()
+            return
+        loop.create_task(awaitable)
+
+    def get_chat_model(self, scope: str) -> tuple[str, str]:
+        """取指定会话场景生效的聊天模型
+
+        `model.<scope>`（group_chat / private_chat）优先，缺省或填写空值时回退 `model.connect`。
+
+        Args:
+            scope (str): 会话场景，"group_chat" 或 "private_chat"
+
+        Returns:
+            tuple[str, str]: (供应商名, 模型名)；配置缺失时对应位置为空字符串
+        """
+        model_config = self._config.get("model") or {}
+        connect = model_config.get("connect") if isinstance(model_config, dict) else None
+        connect = connect if isinstance(connect, dict) else {}
+        scope_config = model_config.get(scope) if isinstance(model_config, dict) else None
+        scope_config = scope_config if isinstance(scope_config, dict) else {}
+
+        supplier = scope_config.get("supplier")
+        if not isinstance(supplier, str) or not supplier.strip():
+            supplier = connect.get("supplier")
+        model_name = scope_config.get("model_name")
+        if not isinstance(model_name, str) or not model_name.strip():
+            model_name = connect.get("model_name")
+
+        return (
+            supplier if isinstance(supplier, str) else "",
+            model_name if isinstance(model_name, str) else "",
+        )
+
+    def reload_section(self, key: str, notify: bool = True) -> Any:
+        """从配置文件重读某个顶层配置段并同步到内存
 
         Args:
             key (str): 顶层配置项名称，如 "tool_presets"
+            notify (bool): 是否通知订阅者，默认 True
 
         Returns:
-            Any: 同步后的值（配置中无此项时为 None）
+            Any: 同步后的值（配置中无此项时为 None
 
         Raises:
             FileNotFoundError, json.JSONDecodeError: 文件不可读或非法
@@ -599,7 +713,12 @@ class atriConfig:
         with open(self._config_file, "r", encoding="utf-8") as file_handler:
             value = json.load(file_handler).get(key)
         self._raw_config[key] = value
-        self._config[key] = ConfigObject(value) if isinstance(value, dict) else value
+        if key == "platforms":
+            self._config[key] = PlatformsConfig.from_dict(value if isinstance(value, dict) else {})
+        else:
+            self._config[key] = ConfigObject(value) if isinstance(value, dict) else value
+        if notify:
+            self.notify_change(key, value)
         return value
 
     def set_account(self, user_id: int, nickname: str) -> AccountInfo:

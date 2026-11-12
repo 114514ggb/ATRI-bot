@@ -161,7 +161,8 @@ class SystemMonitor:
 
     def get_model_info(self) -> str:
         """返回模型信息 (通用动态版本)"""
-        chief_model = config.model.connect.model_name
+        group_supplier, group_model = config.get_chat_model("group_chat")
+        private_supplier, private_model = config.get_chat_model("private_chat")
         spare_model_list = config.model.standby_model
         model_parameter = config.model.chat_parameter
 
@@ -178,7 +179,8 @@ class SystemMonitor:
 
         return (
             f"✨ 模型配置信息 ✨\n\n"
-            f"🎯 主模型: 🚀 {chief_model}\n\n"
+            f"🎯 群聊模型: 🚀 {group_model}（{group_supplier}）\n"
+            f"💬 私聊模型: {private_model}（{private_supplier}）\n\n"
             f"🔄 备用模型:\n"
             f"{spare_text if spare_text else '   (无备用模型)'}\n\n"  
             f"⚙️  参数设置:\n"

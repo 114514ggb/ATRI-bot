@@ -25,10 +25,18 @@ class WhitelistMiddleware(PipelineMiddleware):
         self._root_user_id: int = 0
 
     async def initialize(self) -> None:
-        """初始化时从容器获取配置"""
+        """初始化时取一次配置，并订阅白名单/root 的变更"""
         config: atriConfig = container.get_by_type(atriConfig)
         self._group_white_list = config.group_white_list
         self._root_user_id = config.root_user_id
+        config.on_change("group_white_list", self._apply_group_white_list)
+        config.on_change("root_user_id", self._apply_root_user_id)
+
+    def _apply_group_white_list(self, group_ids: list[int]) -> None:
+        self._group_white_list = group_ids
+
+    def _apply_root_user_id(self, root_user_id: int) -> None:
+        self._root_user_id = root_user_id
 
     async def process(self, msg: atriMessageEvent) -> atriMessageEvent | None:
         """处理消息：白名单检查

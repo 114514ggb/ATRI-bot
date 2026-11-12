@@ -22,12 +22,21 @@ class privateChatTrigger:
         self.log: Logger = container.get_by_type(Logger).getChild("PrivateChatTrigger")
         self.config: atriConfig = container.get_by_type(atriConfig)
         self.private_chat_white_list: list = self.config.all_config.get("private_chat_white_list", [])
+        self._root_user_id: int = self.config.root_user_id
+        self.config.on_change("private_chat_white_list", self._on_private_white_list_changed)
+        self.config.on_change("root_user_id", self._on_root_user_id_changed)
         self.private_chat = container.get_by_type(PrivateChat)
         self.message_window: MessageAggregationWindow[MessageEventEnvelope] = MessageAggregationWindow(
             on_flush=self._flush_private_messages,
             window_seconds=PRIVATE_CHAT_WINDOW_SECONDS,
             max_buffer_size=PRIVATE_CHAT_WINDOW_MAX_MESSAGES,
         )
+
+    def _on_private_white_list_changed(self, white_list: list) -> None:
+        self.private_chat_white_list = white_list
+
+    def _on_root_user_id_changed(self, root_user_id: int) -> None:
+        self._root_user_id = root_user_id
 
     async def decision(self, event: MessageEventEnvelope) -> bool:
         """私聊消息决策:是否交由LLM接管回复
@@ -41,7 +50,7 @@ class privateChatTrigger:
         user_id: int = event.user_id
 
         #白名单外的用户不触发LLM私聊
-        if not (user_id in self.private_chat_white_list or user_id == self.config.root_user_id):
+        if not (user_id in self.private_chat_white_list or user_id == self._root_user_id):
             self.log.debug(f"用户{user_id}不在LLM私聊白名单内,跳过")
             return False
 

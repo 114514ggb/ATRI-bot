@@ -219,39 +219,85 @@ def _validate_tts(data: dict) -> List[str]:
     return errors
 
 
-def _reload_tool_presets() -> bool:
-    """把刚写盘的工具预设同步到运行中的 ToolCalls 与 atriConfig（面板与 bot 同进程）
-
-    不热重载的话会出现「配置页改了预设 → 聊天页仍旧值 → 聊天页保存又把改动覆盖」，
-    或「聊天页保存 → 点刷新工具 → 预设回退」（reload_local_tools 从 atriConfig 重读）。
-    独立面板/开发模式下没有 ToolCalls 服务，静默跳过。
-    """
+def _has_tool_calls_service() -> bool:
+    """运行中的 bot 是否注册了 ToolCalls（独立面板/开发模式下没有）"""
     from atribot.core.service_container import container
 
-    if not container.exists("ToolCalls"):
+    return container.exists("ToolCalls")
+
+
+def _reload_tool_presets() -> bool:
+    """重载工具预设段，由订阅了 `tool_presets` 的 ToolCalls 完成实际刷新
+
+    面板与 bot 同进程才有运行时消费者；独立面板/开发模式下返回 False，
+    表示「仅写盘，重启后生效」。
+    """
+    if not _has_tool_calls_service():
         return False
     try:
-        presets = _cfg().reload_section("tool_presets") or {}
-        container.get("ToolCalls").load_presets_from_config(presets)
+        _cfg().reload_section("tool_presets")
     except Exception as exc:  # 热重载失败不应影响保存结果
         log.warning("工具预设热重载失败（配置已写入磁盘，重启后生效）: %s", exc)
         return False
     return True
 
 
-def _reload_initiative_chat_keywords() -> bool:
-    """把刚写盘的关键词触发列表同步到运行中的 atriConfig
+def _hot_reload_main_config(before: Dict[str, Any]) -> List[str]:
+    """重载保存/回滚后发生变化的顶层配置段，并触发 atriConfig 的订阅者回调
 
-    `initiativeChat` 每次决策实时读 `config.initiative_chat_keyword_trigger`，
-    因此重载该段后 WebUI 保存即可立即生效，无需重启 bot。
-    独立面板/开发模式下可能没有 config 服务，静默跳过。
+    Args:
+        before (Dict[str, Any]): 变更前的顶层配置快照
+
+    Returns:
+        List[str]: 成功热重载的段名
     """
+    cfg = _cfg()
     try:
-        _cfg().reload_section("initiative_chat_keyword_trigger")
-    except Exception as exc:  # 热重载失败不应影响保存结果
-        log.warning("主动聊天关键词热重载失败（配置已写入磁盘，重启后生效）: %s", exc)
-        return False
-    return True
+        with open(cfg.config_file_path, "r", encoding="utf-8") as file_handler:
+            after = json.load(file_handler)
+    except Exception as exc:
+        log.warning("配置热重载失败（磁盘内容不可读，重启后生效）: %s", exc)
+        return []
+    if not isinstance(after, dict):
+        return []
+
+    changed = sorted(key for key in set(before) | set(after) if before.get(key) != after.get(key))
+    reloaded: List[str] = []
+    for key in changed:
+        try:
+            cfg.reload_section(key)  # 内部通知订阅者
+        except Exception as exc:
+            log.warning("配置段 %s 热重载失败（重启后生效）: %s", key, exc)
+            continue
+        reloaded.append(key)
+    return reloaded
+
+
+def _validate_chat_model_overrides(data: dict) -> List[str]:
+    """校验 model.group_chat / model.private_chat 覆盖块
+
+    两块均可选；填了就必须是对象，supplier / model_name 若出现必须是非空字符串
+    （留空或省略即回退 model.connect）。
+    """
+    model = data.get("model")
+    if model is None:
+        return []
+    if not isinstance(model, dict):
+        return ["model 必须是对象"]
+
+    errors: List[str] = []
+    for scope in ("group_chat", "private_chat"):
+        override = model.get(scope)
+        if override is None:
+            continue
+        if not isinstance(override, dict):
+            errors.append(f"model.{scope} 必须是对象（{{supplier, model_name}}）")
+            continue
+        for field_name in ("supplier", "model_name"):
+            value = override.get(field_name)
+            if value is not None and not isinstance(value, str):
+                errors.append(f"model.{scope}.{field_name} 必须是字符串（留空回退主聊天模型）")
+    return errors
 
 
 def _validate_main_config(data: dict) -> None:
@@ -286,6 +332,7 @@ def _validate_main_config(data: dict) -> None:
 
     errors.extend(_validate_tool_presets(data))
     errors.extend(_validate_tts(data))
+    errors.extend(_validate_chat_model_overrides(data))
 
     keywords = data.get("initiative_chat_keyword_trigger")
     if keywords is not None and (
@@ -328,21 +375,24 @@ class ConfigBody(BaseModel):
 
 @router.post("/api/config")
 async def api_save_config(body: ConfigBody, _: None = Depends(_auth)) -> Dict[str, Any]:
-    path = _cfg().config_file_path
+    cfg = _cfg()
+    path = cfg.config_file_path
+    before = dict(cfg._raw_config)
     parsed = _parse_json_or_400(body.content)
     if _mask_secrets_enabled():
         restore_secrets("main", parsed, _current_json(path))
     _validate_main_config(parsed)
     backup = _backup_file(path)
     _write_json(path, parsed)
-    presets_reloaded = _reload_tool_presets()  # 工具预设立即生效，其余配置段仍需重启
-    keywords_reloaded = _reload_initiative_chat_keywords()  # 主动聊天关键词同样即时生效
+    # 变化的配置段统一热重载：订阅者（工具预设/关键词/模型/白名单…）在回调里刷新
+    hot_reloaded = _hot_reload_main_config(before)
     return {
         "status": "ok",
         "needs_restart": True,
         "backup": str(backup),
-        "presets_reloaded": presets_reloaded,
-        "keywords_reloaded": keywords_reloaded,
+        "presets_reloaded": "tool_presets" in hot_reloaded and _has_tool_calls_service(),
+        "keywords_reloaded": "initiative_chat_keyword_trigger" in hot_reloaded,
+        "hot_reloaded": hot_reloaded,
     }
 
 
@@ -430,14 +480,16 @@ async def api_config_rollback(body: RollbackBody, _: None = Depends(_auth)) -> D
 
     # 先取出当前内容，恢复备份后再把它写回 .bak，
     # 使 rollback 成为"当前 ↔ 备份"的切换，可以再次回滚撤销
+    before = dict(cfg._raw_config)
     previous = path.read_text(encoding="utf-8") if path.exists() else None
     shutil.copy2(backup, path)
     if previous is not None:
         backup.write_text(previous, encoding="utf-8")
-    presets_reloaded = _reload_tool_presets() if body.target == "config" else False
+    hot_reloaded = _hot_reload_main_config(before) if body.target == "config" else []
     return {
         "status": "ok",
         "restored_from": str(backup),
         "needs_restart": True,
-        "presets_reloaded": presets_reloaded,
+        "presets_reloaded": "tool_presets" in hot_reloaded and _has_tool_calls_service(),
+        "hot_reloaded": hot_reloaded,
     }

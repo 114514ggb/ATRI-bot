@@ -698,7 +698,11 @@ class ToolCalls(ServiceBase):
     @classmethod
     def factory(cls, config: atriConfig) -> ToolCalls:
         instance = cls(config.file_path.tool_calls)
-        instance._preset_manager.load_presets_from_config(config.tool_presets, instance._registry)
+        instance._preset_manager.load_presets_from_config(
+            getattr(config, "tool_presets", {}) or {}, instance._registry
+        )
+        # 配置段变更时由回调重建预设，WebUI 保存后无需手动刷新
+        config.on_change("tool_presets", instance._on_presets_config_changed)
         return instance
 
     def __init__(self, tool_path: Path) -> None:
@@ -1079,9 +1083,14 @@ class ToolCalls(ServiceBase):
         self._preset_manager.remove_preset(preset_name)
 
     def load_presets_from_config(self, presets_config: Dict[str, Any]) -> None:
-        """从配置字典批量加载预设组"""
+        """从配置字典批量加载预设组（先清空，保证被删掉的预设不残留）"""
+        self._preset_manager.presets.clear()
         self._preset_manager.load_presets_from_config(presets_config, self._registry)
         self._deferred_prompt_cache.clear()
+
+    def _on_presets_config_changed(self, presets_config: Any) -> None:
+        """`tool_presets` 配置段变更回调（WebUI 保存后立即生效）"""
+        self.load_presets_from_config(presets_config or {})
 
     async def modify_preset_tools(
         self, preset_name: str, op: str, tools: List[str], group: str = "default"

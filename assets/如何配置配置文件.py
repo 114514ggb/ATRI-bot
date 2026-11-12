@@ -72,6 +72,14 @@
             "model_name":"Nvidia/deepseek-ai/deepseek-v4-flash",#配置的聊天模型名称(对应 supplier_config.json 中 models 的 key)
             "user_global_context":True #上下文模式: True=群聊每个人独立上下文（使用自己的私聊上下文）, False=每个群的人共享一个群聊上下文
         },
+        "group_chat":{#群聊专用模型(可选)。supplier/model_name 留空、写成 {} 或整段删掉,都回退上面的 connect 主模型;WebUI 保存后立即生效
+            "supplier":"",#对应 supplier_config.json 中 api[].name
+            "model_name":""#对应 supplier_config.json 中 models 的 key
+        },
+        "private_chat":{#私聊专用模型(可选),回退规则同上
+            "supplier":"",
+            "model_name":""
+        },
         "chat_parameter":{#聊天模型会使用的参数配置
             "thinking_level":"high",#minimal,low,medium,high
             "temperature":0.3,
