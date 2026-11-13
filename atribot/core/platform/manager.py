@@ -69,7 +69,11 @@ class PlatformManager:
                 )
                 continue
 
-            adapter = adapter_cls(config=plat_cfg, queue=self._queue)
+            try:
+                adapter = adapter_cls(config=plat_cfg, queue=self._queue)
+            except Exception:
+                self._log.exception("创建平台 '%s' 的适配器失败，已跳过", name)
+                continue
             self._adapters[name] = adapter
             self._log.info(
                 "平台 '%s' 已创建: adapter=%s, connection=%s, source=%s",

@@ -48,9 +48,16 @@ class privateChatTrigger:
             bool: True 表示消息已被聚合窗口接管,中断 EventBus 后续监听器
         """
         user_id: int = event.user_id
+        # QQ 官方机器人的用户 ID 是 user_openid（字符串），允许白名单直接写 openid
+        user_openid = event.get_platform_openid("user")
 
         #白名单外的用户不触发LLM私聊
-        if not (user_id in self.private_chat_white_list or user_id == self._root_user_id):
+        if not (
+            user_id in self.private_chat_white_list
+            or (user_openid is not None and user_openid in self.private_chat_white_list)
+            or user_id == self._root_user_id
+            or (user_openid is not None and user_openid == self._root_user_id)
+        ):
             self.log.debug(f"用户{user_id}不在LLM私聊白名单内,跳过")
             return False
 

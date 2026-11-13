@@ -15,7 +15,10 @@ router = APIRouter()
 
 log = logging.getLogger("atri-bot.WebPanelConfig")
 
-_VALID_CONN_TYPES = {"WebSocket_client", "WebSocket_server", "http"}
+_VALID_CONN_TYPES = {"WebSocket_client", "WebSocket_server", "http", "qqbot"}
+
+_PLATFORM_SECRET_KEYS = ("access_token", "app_secret")
+"""平台条目中需要打码的密钥字段（OneBot 的 access_token / QQ 官方机器人的 app_secret）"""
 
 _TOOL_SEARCH_NAME = "tool_search"
 
@@ -50,8 +53,11 @@ def mask_secrets(kind: str, data: dict) -> dict:
         if isinstance(db, dict) and db.get("password"):
             db["password"] = _KEEP_SENTINEL
         for platform in (data.get("platforms") or {}).values():
-            if isinstance(platform, dict) and platform.get("access_token"):
-                platform["access_token"] = _KEEP_SENTINEL
+            if not isinstance(platform, dict):
+                continue
+            for secret_key in _PLATFORM_SECRET_KEYS:
+                if platform.get(secret_key):
+                    platform[secret_key] = _KEEP_SENTINEL
     elif kind == "supplier":
         for item in data.get("api") or []:
             if isinstance(item, dict) and item.get("api_key"):
@@ -82,13 +88,19 @@ def restore_secrets(kind: str, new: dict, old: dict) -> None:
             db_new["password"] = previous
         platforms_old = old.get("platforms") or {}
         for name, platform in (new.get("platforms") or {}).items():
-            if not isinstance(platform, dict) or platform.get("access_token") != _KEEP_SENTINEL:
+            if not isinstance(platform, dict):
                 continue
             old_platform = platforms_old.get(name)
-            previous = old_platform.get("access_token") if isinstance(old_platform, dict) else None
-            if not previous:
-                raise HTTPException(400, f"platforms.{name}.access_token 是占位符但没有可还原的旧值，请填写真实 token")
-            platform["access_token"] = previous
+            for secret_key in _PLATFORM_SECRET_KEYS:
+                if platform.get(secret_key) != _KEEP_SENTINEL:
+                    continue
+                previous = old_platform.get(secret_key) if isinstance(old_platform, dict) else None
+                if not previous:
+                    raise HTTPException(
+                        400,
+                        f"platforms.{name}.{secret_key} 是占位符但没有可还原的旧值，请填写真实值",
+                    )
+                platform[secret_key] = previous
     elif kind == "supplier":
         old_keys = {
             item.get("name"): item.get("api_key")
@@ -316,7 +328,12 @@ def _validate_main_config(data: dict) -> None:
                 errors.append(
                     f"platforms.{key}.connection_type 必须是 {'/'.join(sorted(_VALID_CONN_TYPES))} 之一"
                 )
-            if not platform.get("access_token"):
+            elif conn == "qqbot":
+                if not platform.get("app_id"):
+                    errors.append(f"platforms.{key}.app_id 不能为空")
+                if not platform.get("app_secret"):
+                    errors.append(f"platforms.{key}.app_secret 不能为空")
+            elif not platform.get("access_token"):
                 errors.append(f"platforms.{key}.access_token 不能为空")
 
     if not isinstance(data.get("root_user_id"), int):

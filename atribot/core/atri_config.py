@@ -459,7 +459,56 @@ class HttpAdapterConfig:
     """是否启用"""
 
 
-PlatformInstanceConfig = Union[WebSocketClientConfig, WebSocketServerConfig, HttpAdapterConfig]
+@dataclass(slots=True)
+class QQBotPlatformConfig:
+    """QQ 官方机器人（QQ 开放平台 API v2）平台实例配置
+
+    Attributes:
+        adapter: 适配器类型名称，固定为 "qqbot"
+        connection_type: 连接类型
+        app_id: 机器人 AppID（QQ 开放平台后台获取）
+        app_secret: 机器人 AppSecret
+        sandbox: 是否使用沙箱环境（sandbox.api.sgroup.qq.com）
+        intents: 事件订阅位掩码，None 时使用默认的群/C2C 事件
+        id_map: openid → 整数 ID 的手工映射，形如 {"group": {"<openid>": 123}, "user": {...}}
+        text_chunk_size: 单条文本消息的最大字符数，超出自动分片
+        max_passive_replies: 同一条入站消息最多被动回复次数
+        allow_proactive: 无被动回复目标时是否允许发送主动消息（受官方配额限制）
+        source_name: 来源标识，默认取平台条目 key
+        enabled: 是否启用
+    """
+    adapter: str
+    """适配器类型名称"""
+    connection_type: Literal["qqbot"] = "qqbot"
+    """连接类型"""
+    app_id: str = ""
+    """机器人 AppID"""
+    app_secret: str = ""
+    """机器人 AppSecret"""
+    sandbox: bool = False
+    """是否使用沙箱环境"""
+    intents: int | None = None
+    """事件订阅位掩码（None 使用默认群/C2C 事件）"""
+    id_map: dict[str, dict[str, int]] = field(default_factory=dict)
+    """openid → 整数 ID 的手工映射"""
+    text_chunk_size: int = 1500
+    """单条文本消息最大字符数"""
+    max_passive_replies: int = 5
+    """同一条入站消息最多被动回复次数"""
+    allow_proactive: bool = False
+    """是否允许发送主动消息（受官方配额限制）"""
+    source_name: str = ""
+    """来源标识（为空时自动取平台条目 key"""
+    enabled: bool = True
+    """是否启用"""
+
+
+PlatformInstanceConfig = Union[
+    WebSocketClientConfig,
+    WebSocketServerConfig,
+    HttpAdapterConfig,
+    QQBotPlatformConfig,
+]
 """平台实例配置联合类型，由 connection_type 区分具体变体"""
 
 
@@ -503,6 +552,26 @@ class PlatformsConfig:
                     access_token=raw.get("access_token"),
                     url=raw.get("url") or "127.0.0.1:8080",
                     ws_path=raw.get("ws_path"),
+                    source_name=source_name,
+                    enabled=raw.get("enabled", True),
+                )
+            elif conn_type == "qqbot":
+                id_map: dict[str, dict[str, int]] = {}
+                raw_id_map = raw.get("id_map")
+                if isinstance(raw_id_map, dict):
+                    for kind, mapping in raw_id_map.items():
+                        if isinstance(mapping, dict):
+                            id_map[str(kind)] = mapping
+                cfg = QQBotPlatformConfig(
+                    adapter=raw.get("adapter", "qqbot"),
+                    app_id=str(raw.get("app_id") or ""),
+                    app_secret=str(raw.get("app_secret") or ""),
+                    sandbox=bool(raw.get("sandbox", False)),
+                    intents=raw.get("intents"),
+                    id_map=id_map,
+                    text_chunk_size=int(raw.get("text_chunk_size", 1500) or 1500),
+                    max_passive_replies=int(raw.get("max_passive_replies", 5) or 5),
+                    allow_proactive=bool(raw.get("allow_proactive", False)),
                     source_name=source_name,
                     enabled=raw.get("enabled", True),
                 )

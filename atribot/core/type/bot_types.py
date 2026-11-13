@@ -153,6 +153,23 @@ class atriMessageEvent(ABC, Generic[E]):
         """读取消息信封上的自定义上下文数据"""
         return self._extra.get(key, default)
 
+    def get_platform_openid(self, kind: str) -> str | None:
+        """获取平台侧的原始 ID（如 QQ 官方机器人的 group_openid / user_openid）
+
+        Args:
+            kind: ``"group"`` 或 ``"user"``
+
+        Returns:
+            原始 openid 字符串；平台未提供时返回 None
+        """
+        primeval = self.primeval if isinstance(self.primeval, dict) else {}
+        meta = primeval.get("_qqbot")
+        if not isinstance(meta, dict):
+            return None
+        key = {"group": "group_openid", "user": "user_openid"}.get(kind)
+        value = meta.get(key) if key else None
+        return str(value) if value else None
+
     async def send(self, message: SendMessage) -> Any:
         """发送消息到平台
 

@@ -5,7 +5,23 @@
             "connection_type": "WebSocket_client",
             "access_token": "ATRI114514",
             "url": "127.0.0.1:8888",
-            "enabled": true,
+            "enabled": false,
+            "source_name": ""
+        },
+        "qqbot": {
+            "adapter": "qqbot",
+            "connection_type": "qqbot",
+            "app_id": "",
+            "app_secret": "",
+            "sandbox": false,
+            "text_chunk_size": 1500,
+            "max_passive_replies": 5,
+            "allow_proactive": true,
+            "id_map": {
+                "group": {},
+                "user": {}
+            },
+            "enabled": false,
             "source_name": ""
         }
     },

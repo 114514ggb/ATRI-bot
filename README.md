@@ -217,6 +217,7 @@ docker build -t atri-sandbox:latest -f atribot/LLMchat/sandbox/Dockerfile .
 在启动前，请务必检查 `assets` 目录中的配置：
 1.  将 `config copy.json` 重命名为 `config.json` 并配置（记得查看 `如何配置配置文件.md 或 如何配置配置文件.py`）。其中 `model.connect` 指定主模型供应商与模型名，`model.chat_parameter` 控制采样参数（`temperature`/`top_p`/`max_tokens`/`stream`/`tool_choice`），`model.standby_model` 维护备用模型列表；`tool_presets` 配置各会话工具预设（支持 list 或 `{"default": [...], "deferred": [...]}`，deferred 工具由 `tool_search` 动态发现）；`initiative_chat_keyword_trigger` 是主动聊天的关键词触发词表（不写则用内置默认，写 `[]` 关闭）。
 2.  **平台连接**：`config.platforms.<name>` 配置与协议端（NapCat）的对接方式（`adapter` 为 `onebot`（NapCat 等 OneBot v11 实现），`connection_type` 支持 `WebSocket_client` / `WebSocket_server` / `http`，`access_token` 需与协议端一致，`url` 为地址；正向 WS 路径默认 `/websocket`，可用 `ws_path` 覆盖）。
+    > 也支持直接接入 **QQ 官方机器人**：`adapter` / `connection_type` 填 `qqbot`，并配置 `app_id` / `app_secret`（可选 `sandbox`），详见 [atribot/docs/qqbot-adapter.md](atribot/docs/qqbot-adapter.md)。
 3.  将 `supplier_config copy.json` 重命名为 `supplier_config.json` 并配置（模型供应商配置，支持任意 OpenAI 兼容的）。
     ```bash
     cp "assets/config copy.json" assets/config.json
@@ -291,7 +292,7 @@ cp .env.docker.example .env
 
 > `.env` 会整体注入 `app` 容器，除上表变量外，还可用 `ATRI_PLATFORM_<平台名>_<字段>` 覆盖
 > `assets/config.json` 里的平台配置（字段：`adapter` / `connection_type` / `access_token` /
-> `url` / `host` / `port` / `source_name` / `enabled`）。例如配置里还有容器内不可达的平台条目、
+> `app_id` / `app_secret` / `sandbox` / `url` / `host` / `port` / `source_name` / `enabled`）。例如配置里还有容器内不可达的平台条目、
 > 会对着该地址反复重连时，可在 `.env` 写 `ATRI_PLATFORM_<平台名>_ENABLED=false` 关掉它。
 
 然后直接启动：

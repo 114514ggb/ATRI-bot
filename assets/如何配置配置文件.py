@@ -2,9 +2,9 @@
 #先把文件config copy.json,supplier_config copy.json重命名成config.json,supplier_config.json再根据注释填写
 {
     "platforms": {
-        # connection_type 决定用哪个配置, 三种模式:
+        # connection_type 决定用哪个配置, 四种模式: WebSocket_client / WebSocket_server / http / qqbot
         #WebSocket_client
-        "napcat": {#这个目前只有napcat
+        "napcat": {
             "adapter": "onebot",
             "connection_type": "WebSocket_client",
             "access_token": "ATRI114514",
@@ -13,7 +13,7 @@
             "source_name": ""              # 可选,空=取平台名
         },
         #WebSocket_server
-        "napcat_server": {#如果要用这个连接方式记得把napcat_server改成napcat
+        "napcat_server": {
             "adapter": "onebot",
             "connection_type": "WebSocket_server",
             "access_token": "ATRI114514",
@@ -23,7 +23,7 @@
             "source_name": ""
         },
         #http
-        "napcat_http": {#如果要用这个连接方式记得把napcat_http改成napcat
+        "napcat_http": {
             "adapter": "onebot",
             "connection_type": "http",
             "access_token": "ATRI114514",
@@ -32,13 +32,23 @@
             "port": 8888,
             "enabled": False,
             "source_name": ""
+        },
+        #qqbot (QQ 官方机器人,不经过 NapCat;群聊只能收到 @ 机器人的消息)
+        "qqbot": {
+            "adapter": "qqbot",
+            "connection_type": "qqbot",
+            "app_id": "",                  # QQ 开放平台机器人 AppID
+            "app_secret": "",              # QQ 开放平台机器人 AppSecret(敏感,不要提交到仓库)
+            "sandbox": False,              # 可选,true=沙箱环境 sandbox.api.sgroup.qq.com
+            "text_chunk_size": 1500,       # 可选,单条文本最大字符数,超出自动分片
+            "max_passive_replies": 5,      # 可选,同一条入站消息最多被动回复次数(官方上限 5)
+            "allow_proactive": False,      # 可选,无被动回复目标时是否发送主动消息(受官方配额限制)
+            # "id_map": {"group": {"<group_openid>": 123456789}, "user": {"<user_openid>": 10001}},  # 可选,openid→整数ID手工映射
+            "enabled": False,
+            "source_name": ""
         }
     },
     "root_user_id": 2631018780,#root用户的qq号，有执行命令的最高权限，不管在哪个群都会无视其他配置名单强制接受这个qq号的消息
-    "account":{
-        "id":2430843831, #bot的qq号
-        "name":"atri~" #bot的账号名称
-    },
     "file_path":{#没事的话可以不配置目录,使用默认的即可,注意如果没有对应目录的话会自动创建
         "resolve_paths": False,#是否强制将相对路径转为绝对路径
         "create_dirs": False,#是否目录创建,确保目录存在

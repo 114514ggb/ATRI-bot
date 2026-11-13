@@ -21,11 +21,15 @@ def _adapter_status() -> Dict[str, Any]:
     pm = container.get_by_type(PlatformManager)
     status = {}
     for name, adapter in pm.adapters.items():
-        connection = getattr(adapter, "_connection", None)
+        # 优先使用适配器自身的 is_connected（不同适配器底层连接对象不同）
+        connected = bool(getattr(adapter, "is_connected", False))
+        if not connected:
+            connection = getattr(adapter, "_connection", None)
+            connected = bool(getattr(connection, "is_connected", False)) if connection else False
         status[name] = {
             "type": getattr(adapter, "source_name", name),
             "is_started": bool(getattr(adapter, "is_started", False)),
-            "is_connected": bool(getattr(connection, "is_connected", False)) if connection else False,
+            "is_connected": connected,
         }
     return status
 

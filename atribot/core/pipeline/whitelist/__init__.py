@@ -21,8 +21,8 @@ class WhitelistMiddleware(PipelineMiddleware):
 
     def __init__(self) -> None:
         self._log: Logger = container.get_by_type(Logger).getChild("Whitelist")
-        self._group_white_list: list[int] = []
-        self._root_user_id: int = 0
+        self._group_white_list: list = []
+        self._root_user_id: int | str = 0
 
     async def initialize(self) -> None:
         """初始化时取一次配置，并订阅白名单/root 的变更"""
@@ -32,10 +32,10 @@ class WhitelistMiddleware(PipelineMiddleware):
         config.on_change("group_white_list", self._apply_group_white_list)
         config.on_change("root_user_id", self._apply_root_user_id)
 
-    def _apply_group_white_list(self, group_ids: list[int]) -> None:
+    def _apply_group_white_list(self, group_ids: list) -> None:
         self._group_white_list = group_ids
 
-    def _apply_root_user_id(self, root_user_id: int) -> None:
+    def _apply_root_user_id(self, root_user_id: int | str) -> None:
         self._root_user_id = root_user_id
 
     async def process(self, msg: atriMessageEvent) -> atriMessageEvent | None:
@@ -51,7 +51,15 @@ class WhitelistMiddleware(PipelineMiddleware):
         if msg.group_id is None:
             return msg
 
-        if msg.group_id in self._group_white_list or msg.user_id == self._root_user_id:
+        group_openid = msg.get_platform_openid("group")
+        user_openid = msg.get_platform_openid("user")
+
+        if (
+            msg.group_id in self._group_white_list
+            or (group_openid is not None and group_openid in self._group_white_list)
+            or msg.user_id == self._root_user_id
+            or (user_openid is not None and user_openid == self._root_user_id)
+        ):
             self._log.debug("群相关事件:%s",msg.event.primeval)
             return msg
 

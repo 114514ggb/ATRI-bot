@@ -119,8 +119,9 @@ function renderPlatformCard(key, conf, idx) {
   const fields = SCHEMA[0].itemFields.filter((f) => !f.conn || f.conn.includes(conn));
   const controls = fields
     .map((f) => {
-      const val = conf[f.key] !== undefined ? conf[f.key] : f.type === 'toggle' ? true : '';
-      return `<div class="field ${['url', 'access_token'].includes(f.key) ? 'span-2' : ''}">
+      const fallback = f.default !== undefined ? f.default : f.type === 'toggle' ? true : '';
+      const val = conf[f.key] !== undefined ? conf[f.key] : fallback;
+      return `<div class="field ${['url', 'access_token', 'app_id', 'app_secret'].includes(f.key) ? 'span-2' : ''}">
         <div class="field-label">${escapeHtml(f.label)}</div>
         ${f.type === 'toggle'
           ? `<label class="toggle"><input type="checkbox" data-pkey="${escapeHtml(key)}" data-fkey="${f.key}" ${val ? 'checked' : ''}><span class="track"></span><span class="thumb"></span></label>`
