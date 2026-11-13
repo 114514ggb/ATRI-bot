@@ -13,9 +13,6 @@
 断线后优先 ``op 6 Resume``（携带 session_id + seq），``op 9`` 表示会话失效需要重新
 Identify；``op 7`` 表示服务端要求重连。
 """
-
-from __future__ import annotations
-
 import asyncio
 import inspect
 import json
@@ -24,6 +21,7 @@ from typing import Any, Callable, Optional
 
 import aiohttp
 
+from atribot.common_utils.net_utils import create_session, resolve_proxy
 from atribot.core.logger import get_named_logger
 from atribot.core.platform.qqbot.api import QQBotApiClient
 from atribot.core.platform.qqbot.auth import QQBotTokenManager
@@ -130,7 +128,6 @@ class QQBotGatewayClient:
         if callback in self._listeners:
             self._listeners.remove(callback)
 
-    # ------------------------------------------------------------------ 生命周期
     async def start(self) -> None:
         """启动网关连接（阻塞直到 close() 被调用）"""
         if self._running:
@@ -154,7 +151,7 @@ class QQBotGatewayClient:
         if self._ws is not None:
             try:
                 await self._ws.close()
-            except Exception:  # noqa: BLE001 - 关闭阶段的异常只记日志
+            except Exception:
                 self.log.debug("关闭 WebSocket 时出现异常", exc_info=True)
             self._ws = None
 
@@ -172,7 +169,7 @@ class QQBotGatewayClient:
                 await self._connect_once()
             except asyncio.CancelledError:
                 raise
-            except Exception as exc:  # noqa: BLE001 - 任何异常都要重连
+            except Exception as exc:
                 self._ready.clear()
                 if not self._running:
                     break
@@ -200,10 +197,17 @@ class QQBotGatewayClient:
 
         gateway_url = await self._api.get_gateway_url()
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
+            self._session = create_session(
+                timeout=aiohttp.ClientTimeout(total=None)
+            )
 
         self.log.info("正在连接 QQ 官方机器人网关: %s", gateway_url)
-        async with self._session.ws_connect(gateway_url, heartbeat=None, max_msg_size=0) as ws:
+        async with self._session.ws_connect(
+            gateway_url,
+            heartbeat=None,
+            max_msg_size=0,
+            proxy=resolve_proxy(gateway_url),
+        ) as ws:
             self._ws = ws
             try:
                 async for message in ws:
@@ -224,7 +228,6 @@ class QQBotGatewayClient:
 
         self.log.warning("QQ 官方机器人网关连接已断开")
 
-    # ------------------------------------------------------------------ 收包
     async def _on_payload(self, raw: str) -> None:
         try:
             payload = json.loads(raw)
@@ -330,12 +333,11 @@ class QQBotGatewayClient:
         if self._ws is not None:
             try:
                 await self._ws.close()
-            except Exception:  # noqa: BLE001
+            except Exception:
                 self.log.debug("关闭 WebSocket 失败", exc_info=True)
             self._ws = None
         self._ready.clear()
 
-    # ------------------------------------------------------------------ 心跳
     async def _start_heartbeat(self, interval: float) -> None:
         await self._stop_heartbeat()
         self._heartbeat_task = asyncio.create_task(
@@ -352,7 +354,7 @@ class QQBotGatewayClient:
                 await task
             except asyncio.CancelledError:
                 pass
-            except Exception:  # noqa: BLE001
+            except Exception:
                 self.log.debug("停止心跳任务时出现异常", exc_info=True)
 
     async def _heartbeat_loop(self, interval: float) -> None:
@@ -360,7 +362,7 @@ class QQBotGatewayClient:
         while self._running and self._ws is not None and not self._ws.closed:
             try:
                 await self._send_payload({"op": OP_HEARTBEAT, "d": self._last_seq})
-            except Exception:  # noqa: BLE001 - 发送失败交给外层重连
+            except Exception:
                 self.log.debug("发送心跳失败", exc_info=True)
                 return
             await asyncio.sleep(interval)
@@ -374,5 +376,5 @@ class QQBotGatewayClient:
                 result = callback(payload)
                 if inspect.isawaitable(result):
                     await result
-        except Exception:  # noqa: BLE001 - 单个监听器异常不影响连接
+        except Exception:
             self.log.exception("网关事件回调执行失败")

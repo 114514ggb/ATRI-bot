@@ -32,6 +32,9 @@ from atribot.core.type.onebot_event_types import PostType
 DEFAULT_INTENTS = 1 << 25
 """默认订阅：公域群聊 @ 消息 + C2C 消息 + 机器人入群/退群等事件"""
 
+SEEN_MESSAGE_LIMIT = 512
+"""重复消息去重缓存容量（@ 事件与全量群消息事件可能重复推送同一条消息）"""
+
 
 @register_adapter("qqbot")
 class QQBotAdapter(PlatformAdapter):
@@ -55,6 +58,8 @@ class QQBotAdapter(PlatformAdapter):
         self._started = False
         self._conn_task: asyncio.Task[None] | None = None
         self._self_id: int = 0
+        self._self_openids: set[str] = set()
+        self._seen_message_ids: dict[str, bool] = {}
 
         self._id_mapper = QQBotIdMapper(config.id_map, log=self._log)
         self._tokens = QQBotTokenManager(
@@ -82,7 +87,7 @@ class QQBotAdapter(PlatformAdapter):
             allow_proactive=config.allow_proactive,
         )
 
-    # ------------------------------------------------------------------ 属性
+
     @property
     def source_name(self) -> str:
         return self._source_name
@@ -107,7 +112,6 @@ class QQBotAdapter(PlatformAdapter):
             "bot_id": self._self_id,
         }
 
-    # ------------------------------------------------------------------ 生命周期
     async def start(self) -> None:
         """启动网关连接"""
         if self._started:
@@ -140,7 +144,7 @@ class QQBotAdapter(PlatformAdapter):
         self._log.info("正在停止 QQ 官方机器人适配器...")
         try:
             self._gateway.remove_listener(self._on_dispatch)
-        except Exception:  # noqa: BLE001
+        except Exception:
             self._log.warning("移除网关监听器时出现异常", exc_info=True)
 
         await self._gateway.close()
@@ -151,7 +155,7 @@ class QQBotAdapter(PlatformAdapter):
                 await self._conn_task
             except asyncio.CancelledError:
                 pass
-            except Exception:  # noqa: BLE001
+            except Exception:
                 self._log.debug("网关任务退出时出现异常", exc_info=True)
         self._conn_task = None
 
@@ -162,7 +166,6 @@ class QQBotAdapter(PlatformAdapter):
         self._started = False
         self._log.info("QQ 官方机器人适配器已停止")
 
-    # ------------------------------------------------------------------ 发送
     async def send(self, message: SendMessage) -> Any:
         return await self._send_client.send(message)
 
@@ -186,7 +189,6 @@ class QQBotAdapter(PlatformAdapter):
             self._update_self_id({"id": info["user_id"], "username": info["nickname"]})
         return info
 
-    # ------------------------------------------------------------------ 事件
     async def _on_dispatch(self, payload: dict) -> None:
         """网关 dispatch 回调：翻译为 OneBot 事件并入队"""
         event_type = payload.get("t")
@@ -199,8 +201,9 @@ class QQBotAdapter(PlatformAdapter):
                 payload,
                 id_mapper=self._id_mapper,
                 self_id=self._self_id,
+                self_openids=self._self_openids,
             )
-        except Exception:  # noqa: BLE001 - 单条事件翻译失败不应断开连接
+        except Exception:
             self._log.exception(
                 "QQ 官方事件翻译失败: %s",
                 json.dumps(payload, ensure_ascii=False)[:300],
@@ -213,6 +216,13 @@ class QQBotAdapter(PlatformAdapter):
 
         meta = event.primeval.get("_qqbot") if isinstance(event.primeval, dict) else None
         if isinstance(meta, dict) and event.post_type == PostType.MESSAGE:
+            if self._is_duplicate_message(meta, is_at=bool(getattr(event, "is_at", False))):
+                self._log.debug(
+                    "忽略重复的 QQ 官方消息: %s (%s)",
+                    event_type,
+                    meta.get("raw_message_id"),
+                )
+                return
             self._remember_inbound(event, meta)
 
         msg = self._message_event_cls(
@@ -228,6 +238,28 @@ class QQBotAdapter(PlatformAdapter):
                 type(event).__name__,
                 event_type,
             )
+
+    def _is_duplicate_message(self, meta: dict, *, is_at: bool) -> bool:
+        """按官方消息 ID 去重
+
+        ``GROUP_AT_MESSAGE_CREATE`` 与 ``GROUP_MESSAGE_CREATE`` 可能推送同一条消息。
+        若先到的全量群消息未被识别为 @，后到的 @ 事件仍会放行，避免漏掉对机器人的 @。
+        """
+        raw_id = str(meta.get("raw_message_id") or "")
+        if not raw_id:
+            return False
+
+        seen_at = self._seen_message_ids.get(raw_id)
+        if seen_at is not None:
+            if is_at and not seen_at:
+                self._seen_message_ids[raw_id] = True
+                return False
+            return True
+
+        self._seen_message_ids[raw_id] = is_at
+        while len(self._seen_message_ids) > SEEN_MESSAGE_LIMIT:
+            self._seen_message_ids.pop(next(iter(self._seen_message_ids)))
+        return False
 
     def _remember_inbound(self, event: Any, meta: dict) -> None:
         """登记入站消息，供被动回复使用"""
@@ -250,6 +282,10 @@ class QQBotAdapter(PlatformAdapter):
         )
 
     def _update_self_id(self, user: dict) -> None:
+        for key in ("id", "openid", "union_openid"):
+            raw = user.get(key)
+            if isinstance(raw, str) and raw.strip():
+                self._self_openids.add(raw.strip())
         raw_id = user.get("id")
         if raw_id is None:
             return

@@ -10,9 +10,6 @@
 - ``POST /v2/users/{openid}/files``                       上传 C2C 富媒体
 - ``DELETE /v2/groups/{group_openid}/messages/{id}``      撤回群消息
 """
-
-from __future__ import annotations
-
 import asyncio
 import json
 from logging import Logger
@@ -20,6 +17,7 @@ from typing import Any
 
 import aiohttp
 
+from atribot.common_utils.net_utils import create_session, resolve_proxy
 from atribot.core.logger import get_named_logger
 from atribot.core.platform.qqbot.auth import QQBotTokenManager
 
@@ -58,7 +56,7 @@ class QQBotApiClient:
 
     def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
+            self._session = create_session(
                 timeout=aiohttp.ClientTimeout(total=self._timeout)
             )
         return self._session
@@ -92,7 +90,7 @@ class QQBotApiClient:
 
         try:
             async with session.request(
-                method, url, json=json_body, headers=headers
+                method, url, json=json_body, headers=headers, proxy=resolve_proxy(url)
             ) as response:
                 status = response.status
                 text = await response.text()

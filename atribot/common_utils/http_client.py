@@ -1,6 +1,7 @@
 """统一异步 HTTP 客户端。
 
 单例 aiohttp.ClientSession + TCPConnector 复用连接池，避免各模块重复创建 Session。
+解析器 / 代理 / 超时由顶层 ``config.network`` 统一控制（见 ``net_utils.create_session``）。
 
 使用方式：
     from atribot.core.service_container import container
@@ -10,10 +11,22 @@
 """
 
 import asyncio
+import logging
 from typing import Any
 
 import aiohttp
-from aiohttp.resolver import AsyncResolver
+
+from atribot.common_utils.net_utils import (
+    create_session,
+    create_tcp_connector,
+    effective_dns_mode,
+    get_network_config,
+    resolve_proxy,
+    set_resolver_mode_override,
+)
+from atribot.core.atri_config import atriConfig
+
+log = logging.getLogger("atri-bot.HTTPClient")
 
 _DEFAULT_HEADERS: dict[str, str] = {
     "User-Agent": "QQ/9.9.27-45758 CFNetwork/1220.1 Darwin/20.3.0",
@@ -24,24 +37,36 @@ _DEFAULT_HEADERS: dict[str, str] = {
     "Pragma": "no-cache",
 }
 
-_DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=10)
-
 
 class HTTPClient:
     """统一 HTTP 客户端，复用单一 TCP 连接池，默认 QQ UA headers。"""
 
-    def __init__(self) -> None:
-        connector = aiohttp.TCPConnector(
-            limit=100, 
-            keepalive_timeout=30,
-            resolver=AsyncResolver(
-                nameservers=['8.8.8.8', '8.8.4.4', '114.114.114.114'] #DNS相关
-            )
+    def __init__(self, config: atriConfig) -> None:
+        self._session = self._build_session()
+        self._unsubscribe = config.on_change("network", self.reload_network)
+
+    def _build_session(self) -> aiohttp.ClientSession:
+        """按当前 network 配置创建会话（新连接池）"""
+        return create_session(
+            connector=create_tcp_connector(), headers=_DEFAULT_HEADERS
         )
-        self._session = aiohttp.ClientSession(
-            connector=connector,
-            headers=_DEFAULT_HEADERS,
-            timeout=_DEFAULT_TIMEOUT,
+
+    async def reload_network(self, _value: Any = None) -> None:
+        """network 段变更后重建连接池（仅 HTTPClient 支持热生效）
+
+        先创建新会话再关闭旧会话，尽量不打断在途请求。
+        """
+        set_resolver_mode_override(None)
+        old_session = self._session
+        self._session = self._build_session()
+        try:
+            await old_session.close()
+        except Exception:
+            log.debug("关闭旧 HTTP 会话时出现异常", exc_info=True)
+        log.info(
+            "HTTPClient 已按 network 配置重建连接池 (dns_mode=%s, proxy=%s)",
+            effective_dns_mode(),
+            get_network_config().proxy or "未启用",
         )
 
     @property
@@ -68,7 +93,9 @@ class HTTPClient:
             ValueError: 状态码非 2xx、下载不完整或超过 max_bytes 时抛出。
         """
         try:
-            async with self._session.get(url, headers=headers, timeout=timeout) as resp:
+            async with self._session.get(
+                url, headers=headers, timeout=timeout, proxy=resolve_proxy(url)
+            ) as resp:
                 if not (200 <= resp.status < 300):
                     raise ValueError(f"下载失败，状态码: {resp.status}")
                 data = await resp.read()
@@ -105,7 +132,9 @@ class HTTPClient:
         Returns:
             解析后的 JSON 响应（dict/list）。
         """
-        async with self._session.post(url, data=data, headers=headers) as resp:
+        async with self._session.post(
+            url, data=data, headers=headers, proxy=resolve_proxy(url)
+        ) as resp:
             return await resp.json()
 
     async def post_json(
@@ -128,11 +157,16 @@ class HTTPClient:
             解析后的 JSON 响应（dict/list）。
         """
         async with self._session.post(
-            url, json=payload, headers=headers, timeout=timeout
+            url,
+            json=payload,
+            headers=headers,
+            timeout=timeout,
+            proxy=resolve_proxy(url),
         ) as resp:
             return await resp.json()
 
     async def close(self) -> None:
         """释放连接池资源。"""
+        self._unsubscribe()
         if not self._session.closed:
             await self._session.close()

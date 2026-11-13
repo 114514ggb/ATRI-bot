@@ -3,6 +3,7 @@ from typing import Any, Literal, Optional
 
 import aiohttp
 
+from atribot.common_utils.net_utils import create_session, resolve_proxy
 from atribot.core.atri_config import FilePathConfig, atriConfig
 from atribot.core.platform.send_client import ImageDetails, LoginInfo, SendClientBase
 from atribot.core.service_container import container
@@ -46,7 +47,7 @@ class OneBotSendClient(SendClientBase):
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {access_token}",
             }
-            self._http_session = aiohttp.ClientSession(headers=headers)
+            self._http_session = create_session(headers=headers)
             self._send_impl = self._send_http
         else:
             self._send_impl = self._send_ws
@@ -57,7 +58,9 @@ class OneBotSendClient(SendClientBase):
         """通过 HTTP POST 发送"""
         try:
             async with self._http_session.post(
-                f"{self.http_base_url}/{action}", json=params
+                f"{self.http_base_url}/{action}",
+                json=params,
+                proxy=resolve_proxy(f"{self.http_base_url}/{action}"),
             ) as response:
                 if response.status == 200:
                     return await response.json()

@@ -7,9 +7,6 @@ QQ 官方 API 的 ``group_openid`` / ``user_openid`` / 消息 ``id`` 都是字�
 （结果落在 2^62 ~ 2^63 区间），避免与真实 QQ 号（远小于 2^32）混淆。
 映射结果只由 openid 决定，进程重启后不变，因此无需持久化。
 """
-
-from __future__ import annotations
-
 import hashlib
 from logging import Logger
 from typing import Literal

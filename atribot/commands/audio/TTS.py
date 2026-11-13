@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 import aiohttp
 
+from atribot.common_utils.net_utils import create_session, resolve_proxy
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
 
@@ -173,8 +174,10 @@ class TTSService:
     async def _send_tts_request(self, payload: Dict[str, Any]) -> str:
         """发送TTS请求并处理响应"""
         try:
-            async with aiohttp.ClientSession() as session:  
-                async with session.post(self.api_url, json=payload) as response:
+            async with create_session() as session:
+                async with session.post(
+                    self.api_url, json=payload, proxy=resolve_proxy(self.api_url)
+                ) as response:
                     if response.status == 200:
                         audio_bytes = await response.read()
                         return await self._save_audio_file(audio_bytes)

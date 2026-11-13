@@ -19,6 +19,12 @@ from typing import Any
 
 import aiohttp
 
+from atribot.common_utils.net_utils import (
+    DNS_HINT,
+    create_session,
+    is_dns_error,
+    resolve_proxy,
+)
 from atribot.core.logger import get_named_logger
 
 
@@ -40,6 +46,7 @@ class QQBotTokenManager:
         session: aiohttp.ClientSession | None = None,
         timeout: float = 20.0,
         refresh_margin: float = 60.0,
+        token_url: str | None = None,
     ) -> None:
         if not app_id or not app_secret:
             raise QQBotAuthError("QQ 官方机器人缺少 app_id / app_secret 配置")
@@ -49,6 +56,7 @@ class QQBotTokenManager:
         self.log = log or get_named_logger("QQBotToken")
         self._timeout = timeout
         self._refresh_margin = refresh_margin
+        self._token_url = token_url or self.TOKEN_URL
 
         self._session = session
         self._owns_session = session is None
@@ -58,7 +66,7 @@ class QQBotTokenManager:
 
     def _ensure_session(self) -> aiohttp.ClientSession:
         if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession(
+            self._session = create_session(
                 timeout=aiohttp.ClientTimeout(total=self._timeout)
             )
             self._owns_session = True
@@ -98,11 +106,16 @@ class QQBotTokenManager:
         }
         self.log.debug("正在获取 QQ 官方机器人 Access Token (app_id=%s)", self.app_id)
         try:
-            async with session.post(self.TOKEN_URL, json=payload) as response:
+            async with session.post(
+                self._token_url, json=payload, proxy=resolve_proxy(self._token_url)
+            ) as response:
                 text = await response.text()
                 status = response.status
-        except aiohttp.ClientError as exc:
-            raise QQBotAuthError(f"获取 Access Token 网络异常: {exc}") from exc
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as exc:
+            message = f"获取 Access Token 网络异常: {exc}"
+            if is_dns_error(exc):
+                message = f"{message}｜{DNS_HINT}"
+            raise QQBotAuthError(message) from exc
 
         try:
             data: Any = json.loads(text) if text else {}

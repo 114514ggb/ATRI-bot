@@ -33,7 +33,7 @@
             "enabled": False,
             "source_name": ""
         },
-        #qqbot (QQ 官方机器人,不经过 NapCat;群聊只能收到 @ 机器人的消息)
+        #qqbot (QQ 官方机器人,不要使用,还在开发中，绝大多数功能什么的不太能正常使用
         "qqbot": {
             "adapter": "qqbot",
             "connection_type": "qqbot",
@@ -47,6 +47,26 @@
             "enabled": False,
             "source_name": ""
         }
+    },
+    "network": { #全局 HTTP 出口的 DNS 与代理，整段可以不写（默认系统 DNS）
+        "dns_mode": "system", #system=系统 DNS(getaddrinfo,兼容性最好) / custom=用 dns_nameservers 指定的 DNS / cares=沿用 aiohttp 默认(装了 aiodns 时即 c-ares)
+        "dns_nameservers": [], #dns_mode=custom 时必填,如 ["223.5.5.5", "119.29.29.29"]
+        "proxy": "", #HTTP(S) 代理地址,如 http://127.0.0.1:7890；留空表示直连
+        "proxy_bypass": [ #不走代理的主机(完全相等或域名后缀匹配)
+            "bots.qq.com",
+            "api.sgroup.qq.com",
+            "sandbox.api.sgroup.qq.com",
+            "localhost",
+            "127.0.0.1",
+            "::1"
+        ],
+        "trust_env": False, #是否读取环境变量里的代理配置(HTTP_PROXY 等)
+        "connect_timeout": 10, #建连超时(秒)
+        "total_timeout": 30, #单次请求整体超时(秒)
+        "probe_hosts": [ #启动时 DNS 自检探测的主机
+            "bots.qq.com",
+            "api.sgroup.qq.com"
+        ]
     },
     "root_user_id": 2631018780,#root用户的qq号，有执行命令的最高权限，不管在哪个群都会无视其他配置名单强制接受这个qq号的消息
     "file_path":{#没事的话可以不配置目录,使用默认的即可,注意如果没有对应目录的话会自动创建

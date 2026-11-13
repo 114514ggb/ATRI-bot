@@ -25,6 +25,11 @@ def _parse_bool(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _parse_list(value: str) -> list[str]:
+    """解析逗号分隔的列表环境变量值"""
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
 def ensure_platform(config_data: dict[str, Any], name: str) -> None:
     """确保 platforms.<name> 存在，新建平台时给出可用的默认结构"""
     platforms = config_data.setdefault("platforms", {})
@@ -93,6 +98,10 @@ def main() -> None:
         ("ATRI_DB_PASSWORD", ("database", "password"), None),
         ("ATRI_DB_NAME", ("database", "database"), None),
         ("ATRI_SANDBOX_IMAGE", ("sand_box", "image"), None),
+        ("ATRI_NETWORK_DNS_MODE", ("network", "dns_mode"), None),
+        ("ATRI_NETWORK_DNS_NAMESERVERS", ("network", "dns_nameservers"), _parse_list),
+        ("ATRI_NETWORK_PROXY", ("network", "proxy"), None),
+        ("ATRI_NETWORK_TRUST_ENV", ("network", "trust_env"), _parse_bool),
     ]
 
     for env_name, path, cast in overrides:

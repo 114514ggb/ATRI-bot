@@ -90,7 +90,7 @@ class QQBotSendClient(SendClientBase):
         if file_paths is None:
             try:
                 file_paths = container.get_by_type(atriConfig).file_path
-            except Exception:  # noqa: BLE001 - 测试环境可能没有容器
+            except Exception:
                 file_paths = None
         self.file_paths = file_paths
 
@@ -100,7 +100,7 @@ class QQBotSendClient(SendClientBase):
         self._locks: dict[str, asyncio.Lock] = {}
         self._login_info: LoginInfo | None = None
 
-    # ================================================================ 入站登记
+
     def remember_inbound(
         self,
         *,

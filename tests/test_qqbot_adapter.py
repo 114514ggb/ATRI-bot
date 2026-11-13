@@ -181,6 +181,58 @@ class TestTranslate:
         assert event.primeval["_qqbot"]["group_openid"] == GROUP_OPENID
         assert event.primeval["_qqbot"]["raw_message_id"] == "raw-msg-1"
 
+    def test_group_plain_message_is_not_at(self) -> None:
+        mapper = QQBotIdMapper()
+        payload = group_payload(content="普通聊天")
+        payload["t"] = "GROUP_MESSAGE_CREATE"
+        event = build_event(payload, id_mapper=mapper, self_id=SELF_ID)
+
+        assert isinstance(event, GroupMessageEvent)
+        assert event.group_id == mapper.to_id("group", GROUP_OPENID)
+        assert event.is_at is False
+        assert event.pure_text == "普通聊天"
+
+    def test_group_message_mention_tag_marks_at(self) -> None:
+        bot_openid = "bot-openid-ZZZ"
+        self_id = make_synthetic_id("user", bot_openid)
+        payload = group_payload(content=f"<@!{bot_openid}> 在吗")
+        payload["t"] = "GROUP_MESSAGE_CREATE"
+        event = build_event(payload, id_mapper=QQBotIdMapper(), self_id=self_id)
+
+        assert isinstance(event, GroupMessageEvent)
+        assert event.is_at is True
+        assert event.pure_text == "在吗"
+        assert [s.type for s in event.segments] == ["at", "text"]
+
+    def test_group_message_mentions_is_you_marks_at(self) -> None:
+        payload = group_payload(content="在吗")
+        payload["t"] = "GROUP_MESSAGE_CREATE"
+        payload["d"]["mentions"] = [
+            {"member_openid": "other-openid", "is_you": True}
+        ]
+        event = build_event(payload, id_mapper=QQBotIdMapper(), self_id=SELF_ID)
+
+        assert isinstance(event, GroupMessageEvent)
+        assert event.is_at is True
+
+    def test_group_message_other_mention_is_not_at(self) -> None:
+        mapper = QQBotIdMapper()
+        payload = group_payload(content="<@other-openid> 你好")
+        payload["t"] = "GROUP_MESSAGE_CREATE"
+        event = build_event(payload, id_mapper=mapper, self_id=SELF_ID)
+
+        assert isinstance(event, GroupMessageEvent)
+        assert event.is_at is False
+        assert event.pure_text == "你好"
+        assert event.segments[0].type == "at"  # type: ignore[attr-defined]
+
+    def test_bot_authored_group_message_is_ignored(self) -> None:
+        payload = group_payload(content="别的机器人说的话")
+        payload["t"] = "GROUP_MESSAGE_CREATE"
+        payload["d"]["author"]["bot"] = True
+
+        assert build_event(payload, id_mapper=QQBotIdMapper(), self_id=SELF_ID) is None
+
     def test_group_image_attachment_becomes_image_segment(self) -> None:
         mapper = QQBotIdMapper()
         payload = group_payload(
@@ -364,6 +416,84 @@ class TestAdapter:
         info = adapter.get_connection_info()
         assert info["adapter"] == "QQBotAdapter"
         assert info["is_connected"] is False
+
+    @pytest.mark.asyncio
+    async def test_dispatch_group_all_message_enqueues_without_at(self) -> None:
+        from atribot.core.platform.qqbot.adapter import QQBotAdapter
+
+        queue = FakeQueue()
+        adapter = QQBotAdapter(
+            QQBotPlatformConfig(
+                adapter="qqbot",
+                app_id="1024",
+                app_secret="secret",
+                source_name="official",
+            ),
+            queue,  # type: ignore[arg-type]
+        )
+        adapter._self_id = SELF_ID
+
+        payload = group_payload(content="群里随便聊聊")
+        payload["t"] = "GROUP_MESSAGE_CREATE"
+        await adapter._on_dispatch(payload)
+
+        assert len(queue.items) == 1
+        envelope = queue.items[0]
+        assert envelope.group_id == adapter._id_mapper.to_id("group", GROUP_OPENID)
+        assert envelope.is_at is False
+
+    @pytest.mark.asyncio
+    async def test_dispatch_deduplicates_same_raw_message_id(self) -> None:
+        from atribot.core.platform.qqbot.adapter import QQBotAdapter
+
+        queue = FakeQueue()
+        adapter = QQBotAdapter(
+            QQBotPlatformConfig(
+                adapter="qqbot",
+                app_id="1024",
+                app_secret="secret",
+                source_name="official",
+            ),
+            queue,  # type: ignore[arg-type]
+        )
+        adapter._self_id = SELF_ID
+
+        at_payload = group_payload()
+        all_payload = group_payload()
+        all_payload["t"] = "GROUP_MESSAGE_CREATE"
+
+        await adapter._on_dispatch(at_payload)
+        await adapter._on_dispatch(all_payload)
+
+        assert len(queue.items) == 1
+        assert queue.items[0].is_at is True
+
+    @pytest.mark.asyncio
+    async def test_dispatch_keeps_at_event_after_plain_duplicate(self) -> None:
+        from atribot.core.platform.qqbot.adapter import QQBotAdapter
+
+        queue = FakeQueue()
+        adapter = QQBotAdapter(
+            QQBotPlatformConfig(
+                adapter="qqbot",
+                app_id="1024",
+                app_secret="secret",
+                source_name="official",
+            ),
+            queue,  # type: ignore[arg-type]
+        )
+        adapter._self_id = SELF_ID
+
+        all_payload = group_payload(content="在吗")
+        all_payload["t"] = "GROUP_MESSAGE_CREATE"
+        at_payload = group_payload(content=" 在吗")
+
+        await adapter._on_dispatch(all_payload)
+        await adapter._on_dispatch(at_payload)
+        await adapter._on_dispatch(all_payload)
+
+        assert len(queue.items) == 2
+        assert [item.is_at for item in queue.items] == [False, True]
 
 
 class TestGateway:

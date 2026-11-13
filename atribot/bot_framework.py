@@ -121,6 +121,8 @@ class BotFramework:
         self.config = atriConfig()
         container.register("config", self.config)
 
+        await self._diagnose_network()
+
         self._register_services()
 
         self._platform_manager = PlatformManager(self.config)
@@ -143,6 +145,15 @@ class BotFramework:
         await self._platform_manager.start_all()
 
         await self._start_runtime_services()
+
+    async def _diagnose_network(self) -> None:
+        """启动期 DNS 自检"""
+        from atribot.common_utils.net_utils import diagnose_network
+
+        try:
+            await diagnose_network()
+        except Exception:
+            self.log.warning("DNS 自检异常（不影响启动）", exc_info=True)
 
     async def _register_message_storage(self) -> None:
         """注册内部处理中间件什么的"""
@@ -361,9 +372,6 @@ class BotFramework:
             return
 
         try:
-            # uvicorn 的 timeout_graceful_shutdown=3，这里等待时间必须比它长：
-            # 面板页还挂着 WebSocket 连接时，uvicorn 优雅关闭恰好需要约 3s，
-            # 等待时间相等必然超时，导致 uvicorn 关闭被取消、内部任务残留到收尾
             await asyncio.wait_for(asyncio.shield(panel_task), timeout=8.0)
         except (TimeoutError, asyncio.CancelledError):
             # 强制退出标记：确保 panel_task 随后被取消时 uvicorn 能立即停下

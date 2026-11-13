@@ -598,6 +598,137 @@ class PlatformsConfig:
         return cls(instances=instances)
 
 
+NETWORK_DNS_MODES = ("system", "custom", "cares")
+"""network.dns_mode 允许的取值"""
+
+DEFAULT_PROXY_BYPASS = (
+    "bots.qq.com",
+    "api.sgroup.qq.com",
+    "sandbox.api.sgroup.qq.com",
+    "localhost",
+    "127.0.0.1",
+    "::1",
+)
+"""默认不走代理的主机（国内直连域名 + 本机）"""
+
+DEFAULT_PROBE_HOSTS = ("bots.qq.com", "api.sgroup.qq.com")
+"""启动期 DNS 自检默认探测的主机"""
+
+
+@dataclass(slots=True)
+class NetworkConfig:
+    """全局网络出口配置（DNS 解析器 / 代理）
+
+    aiohttp 在检测到已安装 aiodns 时会默认使用 c-ares（``AsyncResolver``）。
+    c-ares 在 Windows、VPN、多网卡、WSL 等环境下可能读不到可用的 nameserver，
+    直接抛出 ``Could not contact DNS servers``。因此这里默认使用系统 DNS
+    （``ThreadedResolver``，底层走 getaddrinfo）。
+
+    Attributes:
+        dns_mode: 解析器模式：``system``（系统 getaddrinfo，默认）/ ``custom``
+            （aiodns + 指定 ``dns_nameservers``）/ ``cares``（沿用 aiohttp 默认）
+        dns_nameservers: ``dns_mode="custom"`` 时使用的 DNS 服务器地址列表
+        proxy: HTTP(S) 代理地址，如 ``http://127.0.0.1:7890``；空表示不使用代理
+        proxy_bypass: 不走代理的主机（按主机名或后缀匹配）
+        trust_env: 是否让 aiohttp 读取环境变量中的代理等配置
+        connect_timeout: 建连超时（秒）
+        total_timeout: 单次请求整体超时（秒）
+        probe_hosts: 启动期 DNS 自检探测的主机列表
+    """
+
+    dns_mode: str = "system"
+    """解析器模式（system / custom / cares）"""
+    dns_nameservers: list[str] = field(default_factory=list)
+    """custom 模式使用的 DNS 服务器地址"""
+    proxy: str | None = None
+    """HTTP(S) 代理地址（默认不使用）"""
+    proxy_bypass: list[str] = field(default_factory=lambda: list(DEFAULT_PROXY_BYPASS))
+    """不走代理的主机列表"""
+    trust_env: bool = False
+    """是否读取环境变量中的代理配置"""
+    connect_timeout: float = 10.0
+    """建连超时（秒）"""
+    total_timeout: float = 30.0
+    """单次请求整体超时（秒）"""
+    probe_hosts: list[str] = field(default_factory=lambda: list(DEFAULT_PROBE_HOSTS))
+    """启动期 DNS 自检探测的主机"""
+
+    @staticmethod
+    def _string_list(value: Any) -> list[str]:
+        """把配置值归一化为非空字符串列表（非法值返回空列表）"""
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, (list, tuple)):
+            return []
+        return [item.strip() for item in value if isinstance(item, str) and item.strip()]
+
+    @staticmethod
+    def _positive_float(value: Any, default: float, field_name: str) -> float:
+        """解析正数超时配置，非法值告警并回退默认值"""
+        if value is None:
+            return default
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError):
+            log.warning("network.%s=%r 不是数字，已回退 %.1f", field_name, value, default)
+            return default
+        if parsed <= 0:
+            log.warning("network.%s=%r 必须大于 0，已回退 %.1f", field_name, value, default)
+            return default
+        return parsed
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "NetworkConfig":
+        """从原始 JSON 字典构建 NetworkConfig
+
+        Args:
+            data: ``network`` 段字典，缺失时返回全默认配置
+
+        Returns:
+            NetworkConfig: 归一化后的配置
+        """
+        if data is None:
+            return cls()
+        if not isinstance(data, dict):
+            log.warning("network 配置段必须是对象，已忽略并使用默认值")
+            return cls()
+
+        mode_raw = data.get("dns_mode", "system")
+        mode = mode_raw.strip().lower() if isinstance(mode_raw, str) else "system"
+        if mode not in NETWORK_DNS_MODES:
+            log.warning(
+                "network.dns_mode=%r 不受支持（可选 %s），已回退 system",
+                mode_raw,
+                "/".join(NETWORK_DNS_MODES),
+            )
+            mode = "system"
+
+        nameservers = cls._string_list(data.get("dns_nameservers"))
+        if mode == "custom" and not nameservers:
+            log.warning("network.dns_mode=custom 但 dns_nameservers 为空，将回退系统 DNS")
+
+        proxy_raw = data.get("proxy")
+        proxy = proxy_raw.strip() if isinstance(proxy_raw, str) and proxy_raw.strip() else None
+
+        bypass = cls._string_list(data.get("proxy_bypass")) or list(DEFAULT_PROXY_BYPASS)
+        probe_hosts = cls._string_list(data.get("probe_hosts")) or list(DEFAULT_PROBE_HOSTS)
+
+        return cls(
+            dns_mode=mode,
+            dns_nameservers=nameservers,
+            proxy=proxy,
+            proxy_bypass=bypass,
+            trust_env=bool(data.get("trust_env", False)),
+            connect_timeout=cls._positive_float(
+                data.get("connect_timeout"), 10.0, "connect_timeout"
+            ),
+            total_timeout=cls._positive_float(
+                data.get("total_timeout"), 30.0, "total_timeout"
+            ),
+            probe_hosts=probe_hosts,
+        )
+
+
 class atriConfig:
     """提供项目配置参数
 
@@ -608,6 +739,8 @@ class atriConfig:
     """路径配置"""
     platforms:PlatformsConfig
     """平台配置"""
+    network: NetworkConfig
+    """全局网络出口配置（DNS / 代理）"""
     account: AccountInfo | None = None
     """bot 登录账号信息"""
 
@@ -658,6 +791,10 @@ class atriConfig:
         platforms_raw: dict[str, Any] = config_data.get("platforms", {})
         platforms_config: PlatformsConfig = PlatformsConfig.from_dict(platforms_raw)
         self._config["platforms"] = platforms_config
+
+        #网络出口配置（DNS / 代理）
+        self.network = NetworkConfig.from_dict(config_data.get("network"))
+        self._config["network"] = self.network
 
     @property
     def config_file_path(self) -> Path:
@@ -784,6 +921,9 @@ class atriConfig:
         self._raw_config[key] = value
         if key == "platforms":
             self._config[key] = PlatformsConfig.from_dict(value if isinstance(value, dict) else {})
+        elif key == "network":
+            self.network = NetworkConfig.from_dict(value if isinstance(value, dict) else None)
+            self._config[key] = self.network
         else:
             self._config[key] = ConfigObject(value) if isinstance(value, dict) else value
         if notify:

@@ -25,6 +25,26 @@
             "source_name": ""
         }
     },
+    "network": {
+        "dns_mode": "system",
+        "dns_nameservers": [],
+        "proxy": "",
+        "proxy_bypass": [
+            "bots.qq.com",
+            "api.sgroup.qq.com",
+            "sandbox.api.sgroup.qq.com",
+            "localhost",
+            "127.0.0.1",
+            "::1"
+        ],
+        "trust_env": false,
+        "connect_timeout": 10,
+        "total_timeout": 30,
+        "probe_hosts": [
+            "bots.qq.com",
+            "api.sgroup.qq.com"
+        ]
+    },
     "root_user_id": 114514,
     "file_path": {
         "resolve_paths": false,

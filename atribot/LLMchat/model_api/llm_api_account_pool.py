@@ -4,8 +4,12 @@ from itertools import cycle
 from typing import AsyncGenerator, Dict, List
 
 import aiohttp
-from aiohttp.resolver import AsyncResolver
 
+from atribot.common_utils.net_utils import (
+    create_session,
+    create_tcp_connector,
+    resolve_proxy,
+)
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 
 
@@ -34,7 +38,7 @@ class ai_api_account_pool(universal_ai_api):
                     self.base_url,
                     headers={'Authorization': f'Bearer {next(self._headers_cycle)}'},
                     json=data,
-                    # proxy='http://127.0.0.1:7890' # 代理
+                    proxy=resolve_proxy(self.base_url),
                 ) as response:
                     try:
                         # self.log.debug(await response.text()) # 调试用
@@ -67,16 +71,13 @@ class ai_api_account_pool(universal_ai_api):
         异步初始化方法
         """
         if self.client is None:
-            self.client = aiohttp.ClientSession(
-                connector=aiohttp.TCPConnector(
+            self.client = create_session(
+                connector=create_tcp_connector(
                     limit=100,                  # 最大连接数
                     limit_per_host=5,           # 单主机保持连接数
                     force_close=False,          # 允许keepalive
                     enable_cleanup_closed=True, # 自动清理关闭连接
-                    keepalive_timeout=20,        # keepalive超时
-                    resolver=AsyncResolver(
-                        nameservers=['8.8.8.8', '8.8.4.4', '114.114.114.114'] #DNS相关
-                    )
+                    keepalive_timeout=20,       # keepalive超时
                 ),
                 timeout=aiohttp.ClientTimeout(total=180, connect=20), # 细分连接超时和总超时
                 headers={
@@ -105,8 +106,8 @@ class ai_api_account_pool(universal_ai_api):
                 async with self.client.post(
                     self.base_url,
                     headers={'Authorization': f'Bearer {next(self._headers_cycle)}'},
-                    # proxy='http://127.0.0.1:7890', # 代理
-                    json=data
+                    json=data,
+                    proxy=resolve_proxy(self.base_url),
                 ) as response:
                     
                     if response.status != 200:
