@@ -470,6 +470,9 @@ class SystemMonitor:
         output.append(f"群消息上限:      {self._safe_attr(chat_manager, 'group_max_record', 'unknown')}")
         output.append(f"user消息上限:    {self._safe_attr(chat_manager, 'private_max_record', 'unknown')}")
         output.append(f"LLM轮次上限:     {self._safe_attr(chat_manager, 'LLM_max_record', 'unknown')}")
+        output.append(f"历史图片上限:    {self._safe_attr(chat_manager, 'history_image_limit', 'unknown')}")
+        output.append(f"历史音频上限:    {self._safe_attr(chat_manager, 'history_audio_limit', 'unknown')}")
+        output.append(f"历史视频上限:    {self._safe_attr(chat_manager, 'history_video_limit', 'unknown')}")
 
         return "\n".join(output)
 

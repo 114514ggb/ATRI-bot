@@ -357,6 +357,31 @@ def _validate_network(data: dict) -> List[str]:
     return errors
 
 
+def _validate_ai_chat(data: dict) -> List[str]:
+    """校验 ai_chat 历史多模态保留数量
+
+    三项均可缺省（缺省回退默认值 2/1/1）；出现时必须是 >= -1 的整数，
+    -1 表示不限制，0 表示全部转文字描述。
+    """
+    ai_chat = data.get("ai_chat")
+    if not isinstance(ai_chat, dict):
+        return []
+    errors: List[str] = []
+    for field_name in (
+        "history_image_limit",
+        "history_audio_limit",
+        "history_video_limit",
+    ):
+        value = ai_chat.get(field_name)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < -1:
+            errors.append(
+                f"ai_chat.{field_name} 必须是 >= -1 的整数（-1 表示不限制)"
+            )
+    return errors
+
+
 def _validate_main_config(data: dict) -> None:
     errors: List[str] = []
 
@@ -396,6 +421,7 @@ def _validate_main_config(data: dict) -> None:
     errors.extend(_validate_tts(data))
     errors.extend(_validate_chat_model_overrides(data))
     errors.extend(_validate_network(data))
+    errors.extend(_validate_ai_chat(data))
 
     keywords = data.get("initiative_chat_keyword_trigger")
     if keywords is not None and (

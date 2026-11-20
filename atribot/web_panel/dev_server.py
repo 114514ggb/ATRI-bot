@@ -62,7 +62,7 @@ def _prepare_files() -> Path:
             "RAG": {"enable": True, "dimensions": 1024},
             "standby_model": [{"supplier": "dev-supplier", "model_name": "dev-model2"}],
         },
-        "ai_chat": {"playRole": "ATRI_dev", "ai_max_record": 10, "group_max_record": 20, "private_max_record": 20},
+        "ai_chat": {"playRole": "ATRI_dev", "ai_max_record": 10, "group_max_record": 20, "private_max_record": 20, "history_image_limit": 2, "history_audio_limit": 1, "history_video_limit": 1},
         "sand_box": {"image": "atri-sandbox:latest"},
         "tts": {
             "api_url": "http://127.0.0.1:9880",

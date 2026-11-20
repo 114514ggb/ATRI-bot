@@ -1,6 +1,6 @@
 import datetime
 from logging import Logger
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Any, Callable, Dict, List
 
 from atribot.common_utils import url_to_audio_mp3, url_to_image_jpeg, url_to_video_mp4
 from atribot.core.atri_config import atriConfig
@@ -32,13 +32,23 @@ DEFAULT_INCLUDING_PICTURES = 2
 DEFAULT_INCLUDING_AUDIOS = 1
 DEFAULT_INCLUDING_VIDEOS = 1
 
+UNLIMITED_MEDIA = -1
+"""历史多模态保留数量为 -1 时表示不限制"""
+
 if TYPE_CHECKING:
     from atribot.core.type.bot_types import atriMessageEvent
 
 
 class ChatManager(ServiceBase):
     """管理聊天实例类（异步安全）"""
-    
+
+    history_image_limit: int = DEFAULT_INCLUDING_PICTURES
+    """历史上下文最多保留的真实图片数量(-1 不限制, 0 全部转文字)"""
+    history_audio_limit: int = DEFAULT_INCLUDING_AUDIOS
+    """历史上下文最多保留的真实音频数量(-1 不限制, 0 全部转文字)"""
+    history_video_limit: int = DEFAULT_INCLUDING_VIDEOS
+    """历史上下文最多保留的真实视频数量(-1 不限制, 0 全部转文字)"""
+
     @classmethod
     def factory(
         cls,
@@ -47,18 +57,21 @@ class ChatManager(ServiceBase):
         media_processor: MediaProcessor,
         log: Logger,
     ) -> ChatManager:
-        return cls(
+        ai_chat = config.ai_chat
+        manager = cls(
             log=log,
             time_trigger=time_trigger,
             media_processor=media_processor,
-            default_play_role=config.ai_chat.playRole,
-            group_messages_max_limit=config.ai_chat.group_max_record,
-            private_messages_max_limit=config.ai_chat.private_max_record,
-            group_LLM_max_limit=config.ai_chat.ai_max_record,
+            default_play_role=ai_chat.playRole,
+            group_messages_max_limit=ai_chat.group_max_record,
+            private_messages_max_limit=ai_chat.private_max_record,
+            group_LLM_max_limit=ai_chat.ai_max_record,
             character_folder=config.file_path.chat_manager,
             initiative_white_list=config.group_initiative_chat_white_list,
             information_extraction=config.group_information_extraction,
         )
+        manager._apply_ai_chat_config(ai_chat)
+        return manager
 
     def __init__(
         self,
@@ -119,11 +132,44 @@ class ChatManager(ServiceBase):
         self._mw_instance: PipelineMiddleware | None = None
         self._listener_fn = None
         self._pm: PlatformManager | None = None
+        self._unsubscribe_ai_chat: Callable[[], None] | None = None
+
+    @staticmethod
+    def _media_limit(value: Any, default: int) -> int:
+        """历史多模态数量：缺省或非法时回退默认值（-1 表示不限制）"""
+        if isinstance(value, bool) or not isinstance(value, int) or value < UNLIMITED_MEDIA:
+            return default
+        return value
+
+    def _apply_ai_chat_config(self, ai_chat: Any) -> None:
+        """按 ai_chat 段刷新历史多模态保留数量
+
+        启动时调用一次，之后由 config.on_change("ai_chat", ...) 在 WebUI 保存后刷新。
+        """
+        section = ai_chat if isinstance(ai_chat, dict) else {}
+        self.history_image_limit = self._media_limit(
+            section.get("history_image_limit"), DEFAULT_INCLUDING_PICTURES
+        )
+        self.history_audio_limit = self._media_limit(
+            section.get("history_audio_limit"), DEFAULT_INCLUDING_AUDIOS
+        )
+        self.history_video_limit = self._media_limit(
+            section.get("history_video_limit"), DEFAULT_INCLUDING_VIDEOS
+        )
+        self.log.info(
+            "历史多模态上限已应用: 图片=%d 音频=%d 视频=%d (-1 表示不限制)",
+            self.history_image_limit,
+            self.history_audio_limit,
+            self.history_video_limit,
+        )
 
     async def initialize(self) -> None:
         """初始化：注册上下文加载中间件和消息存储监听器"""
         pm = container.get_by_type(PlatformManager)
         self._pm = pm
+        self._unsubscribe_ai_chat = container.get_by_type(atriConfig).on_change(
+            "ai_chat", self._apply_ai_chat_config
+        )
 
         class _ContextLoader(PipelineMiddleware):
             name = "context_loader"
@@ -149,6 +195,10 @@ class ChatManager(ServiceBase):
 
     async def cleanup(self) -> None:
         """清理：注销上下文处理器,并对剩余上下文做最终落盘"""
+        if self._unsubscribe_ai_chat is not None:
+            self._unsubscribe_ai_chat()
+            self._unsubscribe_ai_chat = None
+
         if self._pm is not None:
             if self._mw_instance is not None:
                 await self._pm.pipeline.remove_middleware("context_loader")
@@ -362,11 +412,11 @@ class ChatManager(ServiceBase):
         Args:
             group_id: 群组ID
             builder: 消息构建器
-            including_pictures: True = 保留 DEFAULT_INCLUDING_PICTURES 条实际图片；
+            including_pictures: True = 按 ai_chat.history_image_limit 保留实际图片；
                                 False = 使用 MediaProcessor 转为文本描述
-            including_audios: True = 保留 DEFAULT_INCLUDING_AUDIOS 条实际音频；
+            including_audios: True = 按 ai_chat.history_audio_limit 保留实际音频；
                               False = 使用 MediaProcessor 转为文本描述
-            including_videos: True = 保留 DEFAULT_INCLUDING_VIDEOS 条实际视频；
+            including_videos: True = 按 ai_chat.history_video_limit 保留实际视频；
                               False = 使用 MediaProcessor 转为文本描述
 
         Returns:
@@ -375,9 +425,9 @@ class ChatManager(ServiceBase):
 
         messages = list((await self.get_group_context(group_id)).messages)
 
-        remaining_pictures = DEFAULT_INCLUDING_PICTURES if including_pictures else 0
-        remaining_audios = DEFAULT_INCLUDING_AUDIOS if including_audios else 0
-        remaining_videos = DEFAULT_INCLUDING_VIDEOS if including_videos else 0
+        remaining_pictures = self.history_image_limit if including_pictures else 0
+        remaining_audios = self.history_audio_limit if including_audios else 0
+        remaining_videos = self.history_video_limit if including_videos else 0
 
         builder.add_text_left('</group_history>')
 
@@ -399,7 +449,7 @@ class ChatManager(ServiceBase):
                     builder.add_text_left(segment.text)
 
                 elif isinstance(segment, ImageSegment):
-                    if remaining_pictures > 0:
+                    if remaining_pictures != 0:
                         if url := segment.url or segment.file.file:
                             try:
                                 result = await url_to_image_jpeg(
@@ -409,7 +459,8 @@ class ChatManager(ServiceBase):
                                 builder.add_image_base64_left(result.data, result.mime)
                             except Exception as e:
                                 self.log.warning(f"图片转码失败 url={url}: {e}")
-                            remaining_pictures -= 1
+                            if remaining_pictures > 0:
+                                remaining_pictures -= 1
                         cq_text = (
                             f"[CQ:image,file={segment.file_name or 'unknown'}]"
                         )
@@ -421,7 +472,7 @@ class ChatManager(ServiceBase):
                             builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'}]" )
 
                 elif isinstance(segment, RecordSegment):
-                    if remaining_audios > 0:
+                    if remaining_audios != 0:
                         audio_url = segment.url or segment.file.file
                         try:
                             result = await url_to_audio_mp3(
@@ -429,7 +480,8 @@ class ChatManager(ServiceBase):
                                 file_name=segment.file_name,
                             )
                             builder.add_audio_left(result.data, result.fmt)
-                            remaining_audios -= 1
+                            if remaining_audios > 0:
+                                remaining_audios -= 1
                             cq_text = (
                                 f"[CQ:record,file={segment.file_name or 'unknown'}]"
                             )
@@ -452,14 +504,15 @@ class ChatManager(ServiceBase):
                             builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'}]" )
 
                 elif isinstance(segment, VideoSegment):
-                    if remaining_videos > 0:
+                    if remaining_videos != 0:
                         video_url = segment.url or segment.file.file
                         try:
                             result = await url_to_video_mp4(video_url, segment.file_name)
                             builder.add_video_base64_left(result.data, result.mime)
                         except Exception as e:
                             self.log.warning(f"视频转码失败 url={video_url}: {e}")
-                        remaining_videos -= 1
+                        if remaining_videos > 0:
+                            remaining_videos -= 1
                         cq_text = (
                             f"[CQ:video,file={segment.file_name or 'unknown'}]"
                         )

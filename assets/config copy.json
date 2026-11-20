@@ -137,7 +137,10 @@
         "playRole": "ATRI_simplify",
         "ai_max_record": 20,
         "group_max_record": 20,
-        "private_max_record": 20
+        "private_max_record": 20,
+        "history_image_limit": 2,
+        "history_audio_limit": 1,
+        "history_video_limit": 1
     },
     "sand_box": {
         "type": "docker",
