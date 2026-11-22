@@ -1,7 +1,7 @@
 import re
 from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, Dict, List
+from typing import Any
 
 from mcp.types import BlobResourceContents, CallToolResult, TextResourceContents
 
@@ -12,10 +12,17 @@ from atribot.core.type.context_types import (
     MessageBuilder,
     ToolSearchRequested,
 )
+from atribot.core.type.llm_message_types import (
+    AssistantMessage,
+    ChatContent,
+    ChatMessages,
+    ToolCallDict,
+)
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import ToolSet
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
+from atribot.LLMchat.model_api.llm_types import ChatCompletion
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 
 
@@ -25,13 +32,13 @@ class GenerationResponse():
 
     model: str
     """响应模型名称"""
-    messages: List[Dict[str, Any]] = field(default_factory=list)
+    messages: ChatMessages = field(default_factory=list)
     """新增上下文"""
-    reply_text: List[str] = field(default_factory=list)
+    reply_text: list[str] = field(default_factory=list)
     """未合并模型回复的文本"""
-    reasoning_content: List[str] = field(default_factory=list)
+    reasoning_content: list[str] = field(default_factory=list)
     """未合并的推理模型的思考过程"""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
     """可选的额外数据,如果有值可能包含:
         {
             'prompt_tokens': 358,
@@ -52,34 +59,36 @@ class GenerationRequest():
     """模型名称"""
     new_message: str
     """最新一条需要回答的聊天内容"""
-    messages: List[Dict[str, Any]]
+    messages: ChatMessages
     """聊天历史"""
-    supplier_name:str = ""
+    supplier_name: str = ""
     """供应商"""
-    model_api:model_api_basics|None = None
+    model_api: model_api_basics | None = None
     """模型的api实例"""
     prompt: str = ""
     """嵌入上下文的模型输出内容提示"""
-    image_url_list: List[str] = None
+    image_url_list: list[str] | None = None
     """如果有有的话会加入响应"""
-    system_review:bool = False
+    system_review: bool = False
     """prompt嵌入时是否单独使用system而不是采用直接拼接"""
     tool_json: ToolSet | None = None
     """可供模型调用工具集合"""
-    parameter: Dict = None
+    parameter: dict[str, Any] | None = None
     """模型参数"""
-    generation_response: GenerationResponse|None = None
+    generation_response: GenerationResponse | None = None
     """
     从上次错误继承来未完成返回值\n
     如果是调用工具时出现api响应错误时重试的时候这个会有值\n
     如果是初始请求则为None
     """
-    message_data: MessageEventEnvelope = None
+    message_data: MessageEventEnvelope | None = None
     """触发此次请求的事件对象,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
     visual_sense: bool = False
     """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
     audio_sense: bool = False
     """当前模型是否支持音频输入，工具返回音频时决定直接传递还是降级转文字"""
+    video_sense: bool = False
+    """当前模型是否支持视频输入，回退到备用模型时据此重建请求负载"""
     user_id: str | None = None
     """请求体中的 user_id，用于供应商侧的内容安全 / KVCache / 调度隔离"""
 
@@ -89,30 +98,32 @@ class GenerationRequestSimplify():
     
     model: str
     """模型名称"""
-    messages: List[Dict[str, Any]]
+    messages: ChatMessages
     """模型聊天的历史上下文"""
-    supplier_name:str = ""
+    supplier_name: str = ""
     """供应商"""
-    increment_messages:List[Dict[str, Any]]|None = None
+    increment_messages: ChatMessages | None = None
     """增量上下文""" 
-    model_api:model_api_basics|None = None
+    model_api: model_api_basics | None = None
     """模型的api实例"""
     tool_json: ToolSet | None = None
     """可供模型调用工具集合"""
-    parameter: Dict = None
+    parameter: dict[str, Any] | None = None
     """模型参数"""
-    generation_response: GenerationResponse|None = None
+    generation_response: GenerationResponse | None = None
     """
     从上次错误继承来未完成返回值\n
     如果是调用工具时出现api响应错误时重试的时候这个会有值\n
     如果是初始请求则为None
     """
-    message_data: MessageEventEnvelope = None
+    message_data: MessageEventEnvelope | None = None
     """触发此次请求的事件对象,工具调用时自动注入到声明了 message_data 参数的本地工具函数"""
     visual_sense: bool = False
     """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
     audio_sense: bool = False
     """当前模型是否支持音频输入，工具返回音频时决定直接传递还是降级转文字"""
+    video_sense: bool = False
+    """当前模型是否支持视频输入，回退到备用模型时据此重建请求负载"""
     user_id: str | None = None
     """请求体中的 user_id，用于供应商侧的内容安全 / KVCache / 调度隔离"""
 
@@ -125,9 +136,9 @@ class LLMSRequestFailed(Exception):
     def __init__(
         self, 
         exception: Exception, 
-        response: GenerationResponse = None,
+        response: GenerationResponse | None = None,
         custom_message: str = ""
-    ):
+    ) -> None:
         """
         Args:
             exception: 原始异常对象
@@ -145,7 +156,7 @@ class LLMSRequestFailed(Exception):
             
         super().__init__(display_message)
     
-    def __str__(self):
+    def __str__(self) -> str:
         """字符串表示，包含详细上下文信息"""
         base_message = super().__str__()
         return base_message
@@ -163,13 +174,13 @@ class LLMSRequestFailed(Exception):
 class LLMCoordinator():
     """获取LLM响应的主类,面向openAI的格式"""
     
-    def __init__(self):
-        self.supplier = container.get_by_type(LLMConnectionManager)
-        self.tool_management = container.get_by_type(ToolCalls)
+    def __init__(self) -> None:
+        self.supplier: LLMConnectionManager = container.get_by_type(LLMConnectionManager)
+        self.tool_management: ToolCalls = container.get_by_type(ToolCalls)
         self.log: Logger = container.get_by_type(Logger).getChild("LLMCoord")
-        self._media_processor = container.get_by_type(MediaProcessor)
+        self._media_processor: MediaProcessor = container.get_by_type(MediaProcessor)
         
-    async def step(self, request:GenerationRequest)->GenerationResponse:
+    async def step(self, request: GenerationRequest) -> GenerationResponse:
         """对于GenerationRequest的主处理函数
 
         Args:
@@ -204,7 +215,7 @@ class LLMCoordinator():
         )
         
 
-    async def run(self, request:GenerationRequestSimplify)->GenerationResponse:
+    async def run(self, request: GenerationRequestSimplify) -> GenerationResponse:
         """对于GenerationRequest的主处理函数,运行后产生结果,中间会处理工具掉用
 
         Args:
@@ -241,10 +252,10 @@ class LLMCoordinator():
     
     async def resume_step(
         self, 
-        request :GenerationRequest|GenerationRequestSimplify, 
-        model_api :model_api_basics, 
+        request: GenerationRequest | GenerationRequestSimplify, 
+        model_api: model_api_basics, 
         increase_context: Context
-    )->GenerationResponse:
+    ) -> GenerationResponse:
         """从中断继续请求
 
         Args:
@@ -278,10 +289,10 @@ class LLMCoordinator():
 
     async def _handle_assistant_message(
         self,
-        request: GenerationRequest|GenerationRequestSimplify,
-        api_reply: Dict[str, Any],
-        assistant_message: Dict[str, Any],
-        content: str|None,
+        request: GenerationRequest | GenerationRequestSimplify,
+        api_reply: ChatCompletion,
+        assistant_message: AssistantMessage,
+        content: str | None,
         increase_context: Context,
         model_api: model_api_basics
     ) -> GenerationResponse:
@@ -320,12 +331,12 @@ class LLMCoordinator():
        
     async def tool_calls_while(
         self, 
-        request:GenerationRequest|GenerationRequestSimplify, 
-        tool_calls: list,
-        assistant_message:dict, 
-        increase_context:Context, 
-        model_api:model_api_basics
-    )->GenerationResponse:
+        request: GenerationRequest | GenerationRequestSimplify, 
+        tool_calls: list[ToolCallDict],
+        assistant_message: AssistantMessage, 
+        increase_context: Context, 
+        model_api: model_api_basics
+    ) -> GenerationResponse:
         """处理模型有工具调用的情况
 
         Args:
@@ -461,7 +472,7 @@ class LLMCoordinator():
         return "\n".join(lines)
 
     @staticmethod
-    def get_init_context(request:GenerationRequest)->Context:
+    def get_init_context(request: GenerationRequest) -> Context:
         """获取初始上下文"""
         increase_context = Context()
             
@@ -478,7 +489,7 @@ class LLMCoordinator():
         
         return increase_context
 
-    def _update_response(self, response: GenerationResponse, assistant_message: Dict) -> GenerationResponse:
+    def _update_response(self, response: GenerationResponse, assistant_message: AssistantMessage) -> GenerationResponse:
         """更新response"""
         
         if explicit_reasoning := assistant_message.get("reasoning_content"):
@@ -495,7 +506,7 @@ class LLMCoordinator():
         result: CallToolResult,
         visual_sense: bool,
         audio_sense: bool = False,
-    ) -> str | list:
+    ) -> ChatContent:
         """将 MCP 工具执行结果格式化，支持全类型 ContentBlock 多模态处理
 
         Args:
@@ -636,7 +647,7 @@ class LLMCoordinator():
         increase_context: Context,
         model_api: model_api_basics,
         max_retries: int = 5
-    ) -> tuple[Dict,Dict,str|None]:
+    ) -> tuple[ChatCompletion, AssistantMessage, str | None]:
         """获取模型回复，包含重试机制
         
         Args:
@@ -646,13 +657,13 @@ class LLMCoordinator():
             max_retries (int): 最大重试次数
         
         Returns:
-            tuple[Dict,Dict,str|None]: 响应原始消息体还有整个助手消息体和助手文本(如果有的话)组成的Tuple
+            tuple[ChatCompletion, AssistantMessage, str | None]: 响应原始消息体、整个助手消息体和助手文本(如果有的话)组成的Tuple
         
         Raises:
             ValueError: 当空回复次数超过阈值时抛出
         """
         for _ in range(max_retries):       
-            api_reply:Dict = await self.get_chat_json(
+            api_reply: ChatCompletion = await self.get_chat_json(
                 request = request,
                 messages = increase_context.get_messages(),
                 model_api = model_api
@@ -660,7 +671,7 @@ class LLMCoordinator():
             
             self.log.debug(f"模型返回:{api_reply}")
             
-            assistant_message:Dict = api_reply['choices'][0]['message']
+            assistant_message: AssistantMessage = api_reply['choices'][0]['message']
             content = assistant_message.get('content')
             
             if content:
@@ -672,7 +683,7 @@ class LLMCoordinator():
     
     
     @staticmethod
-    def extract_thought(text):
+    def extract_thought(text: str) -> tuple[str, str]:
         """
         提取字符串中被<thought></thought>标签包裹的内容，并返回去掉标签后的文本
         
@@ -693,19 +704,19 @@ class LLMCoordinator():
     
     async def get_chat_json(
         self,
-        request:GenerationRequest|GenerationRequestSimplify, 
-        messages:List[Dict[str, Any]], 
-        model_api:model_api_basics
-    )->Dict:
+        request: GenerationRequest | GenerationRequestSimplify, 
+        messages: ChatMessages, 
+        model_api: model_api_basics
+    ) -> ChatCompletion:
         """发起向api的请求
 
         Args:
             request (GenerationRequest | GenerationRequestSimplify): _description_
-            messages (List[Dict[str, Any]]): 消息的新增部分
+            messages (ChatMessages): 消息的新增部分
             model_api (model_api_basics): _description_
 
         Returns:
-            Dict: 请求回的json
+            ChatCompletion: 请求回的json
         """
         tools = (
             self.tool_management.get_openai(toolset=request.tool_json)

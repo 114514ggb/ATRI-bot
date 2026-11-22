@@ -481,7 +481,7 @@ chat.py → GroupChat.step()          ← Chat entry point
             └─ Trigger summarize_context() when context exceeds token limit
 ```
 
-**High-Availability Fallback**: When the primary model API returns an error, the request wrappers of `GroupChat`/`PrivateChat` in `chat.py` (`_request_model_with_fallback_` / `_request_model_with_fallback_private_`) iterate through the `config.model.standby_model` list to try backup providers and models (including vision-capability differences), ensuring responses even when the primary key fails.
+**High-Availability Fallback**: When the primary model API returns an error, `ChatBasics._request_model_with_fallback_` in `chat.py` (shared by `GroupChat` / `PrivateChat`) iterates through the `config.model.standby_model` list. For each standby model it reads `visual_sense` / `audio_sense` / `video_sense` and rebuilds the incremental prompt for that model's capabilities (live group messages + current message; rebuilt only when the increment contains media, cached per capability triple). Persisted history is not rebuilt: `chat.py` strips multimodal parts the target model does not support (replacing them with placeholder text) when building the request. Unknown standby suppliers/models are skipped instead of aborting the fallback loop.
 
 **Structured Output**: The model is instructed to return a JSON object (with an `actions` array), each item containing a `decision` field (`speak` / `update` / `silence`), making response behavior fully controllable and extensible.
 

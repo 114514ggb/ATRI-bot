@@ -1,9 +1,14 @@
 from abc import ABC, abstractmethod
 from logging import Logger
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from atribot.core.service_container import container
-from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk
+from atribot.core.type.llm_message_types import ChatMessages
+from atribot.LLMchat.model_api.llm_types import (
+    ChatCompletion,
+    ChatCompletionChunk,
+    ChatCompletionMessage,
+)
 
 
 class model_api_basics(ABC):
@@ -75,7 +80,7 @@ class model_api_basics(ABC):
         self.api_key = api_key
     
     @abstractmethod
-    async def close(self):
+    async def close(self) -> None:
         """异步关闭客户端"""
         ...
 
@@ -95,39 +100,39 @@ class model_api_basics(ABC):
     @abstractmethod
     async def generate_text_tools(
         self,
-        model:str,
-        messages:list,
-        tools:list,
+        model: str,
+        messages: ChatMessages,
+        tools: list[dict[str, Any]],
         user_id: str | None = None,
-    )->ChatCompletion:
+    ) -> ChatCompletion:
         """请求生成文本,全量默认参数
 
         Args:
             model (str): 模型
-            messages (list): 上下文
-            tools (list): 可使用工具
+            messages (ChatMessages): 上下文
+            tools (list[dict[str, Any]]): 可使用工具
             user_id (str | None): 请求体的 user_id,供应商侧隔离用
 
         Returns:
-            dict: 原消息json
+            ChatCompletion: 原消息json
         """
         ...
     
     @abstractmethod
-    async def generate_json_ample(self, model:str,remainder:dict)->ChatCompletion:
+    async def generate_json_ample(self, model: str, remainder: dict[str, Any]) -> ChatCompletion:
         """向发起请求,获取json,参数自定
 
         Args:
             model (str): 模型名称
-            remainder (dict): 其他参数
+            remainder (dict[str, Any]): 其他参数
 
         Returns:
-            dict: 原消息json
+            ChatCompletion: 原消息json
         """
         ...
     
     @abstractmethod
-    async def generate_json_ample_stream(self, model: str, remainder: dict) -> ChatCompletion:
+    async def generate_json_ample_stream(self, model: str, remainder: dict[str, Any]) -> ChatCompletion:
         """向发起请求,获取json,参数自定,但是是以流式的方法处理数据,流式接受完成后返回总数据
 
         Args:
@@ -139,25 +144,31 @@ class model_api_basics(ABC):
         """
         ...
     
-    def alter_parameters(self, parameters:str, value:float|bool|dict):
+    def alter_parameters(self, parameters: str, value: float | bool | dict[str, Any]) -> None:
         """修改模型单个默认参数"""
         self.model_parameters[parameters] = value
         
-    def update_parameters(self, new_parameters: dict):
+    def update_parameters(self, new_parameters: dict[str, Any]) -> None:
         """用新字典更新久参数字典"""
         self.model_parameters |= new_parameters
     
-    async def request_fetch_primary(self, model:str, messages:list[dict] ,tools:list, temperature:int = 0.3)->dict:
+    async def request_fetch_primary(
+        self,
+        model: str,
+        messages: ChatMessages,
+        tools: list[dict[str, Any]],
+        temperature: int = 0.3,
+    ) -> ChatCompletionMessage:
         """向发起请求,返回主要内容
 
         Args:
             model (str): 模型
-            messages (list[dict]): 上下文
-            tools (list): 可使用工具
+            messages (ChatMessages): 上下文
+            tools (list[dict[str, Any]]): 可使用工具
             temperature (int, optional): 模型温度. Defaults to 0.3.
 
         Returns:
-            dict: 处理过的字典
+            ChatCompletionMessage: 处理过的字典
         """
         data = await self.generate_json_ample(
             model, 
@@ -252,5 +263,5 @@ class model_api_basics(ABC):
         except (KeyError, TypeError):
             raise ValueError(data)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"<model_api,url:{self.base_url}>"

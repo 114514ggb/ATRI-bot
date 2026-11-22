@@ -1,22 +1,25 @@
 from typing import Literal, NotRequired, TypedDict, Union
 
+from atribot.core.type.llm_message_types import ExtraContent, GoogleThought, ToolCallDict
 
-class GoogleThought(TypedDict):
-    """Google 模型的思考签名信息
-
-    Attributes:
-        thought_signature: 思考签名，用于验证模型输出
-    """
-    thought_signature: str
-
-
-class ExtraContent(TypedDict):
-    """额外内容，目前仅包含 Google 特定元数据
-
-    Attributes:
-        google: Google 模型的额外信息，如思考签名
-    """
-    google: GoogleThought
+__all__ = [
+    "ChatCompletion",
+    "ChatCompletionChunk",
+    "ChatCompletionMessage",
+    "Choice",
+    "CompletionChoice",
+    "ContentFilterResult",
+    "ContentFilterResults",
+    "Delta",
+    "ExtraContent",
+    "GoogleThought",
+    "PromptTokensDetails",
+    "ToolCall",
+    "ToolCallDict",
+    "ToolCallFunction",
+    "Usage",
+    "choices"
+]
 
 
 class ToolCallFunction(TypedDict):
@@ -157,25 +160,25 @@ class ChatCompletionChunk(TypedDict):
     choices: list[Choice]
     usage: NotRequired[Usage]              # DeepSeek 最后一个 chunk 才有
 
-class message(TypedDict):
+class ChatCompletionMessage(TypedDict):
     """非流式返回的模型具体消息
 
     Attributes:
         role: 角色，通常为 "assistant"
         content: 模型输出的纯文本内容
         reasoning_content: 思维链
-        tool_calls: 工具调用列表
+        tool_calls: 工具调用列表(完整调用，非流式增量片段)
         refusal: 拒绝生成内容时的原因（OpenAI 等提供）
         extra_content: Google 模型的额外元数据(如思考签名)
     """
     role: Literal["assistant"]
-    content: str
+    content: NotRequired[str | None]
     reasoning_content: NotRequired[str]
-    tool_calls: NotRequired[list[ToolCall]]
+    tool_calls: NotRequired[list[ToolCallDict]]
     refusal: NotRequired[str | None]
     extra_content: NotRequired[ExtraContent]
 
-class choices(TypedDict):
+class CompletionChoice(TypedDict):
     """非流式响应中的候选结果
 
     Attributes:
@@ -186,9 +189,13 @@ class choices(TypedDict):
     """
 
     index: int
-    message: message
+    message: ChatCompletionMessage
     finish_reason: str
     content_filter_results: NotRequired[ContentFilterResults]
+
+
+choices = CompletionChoice
+"""兼容旧命名"""
 
 
 class ChatCompletion(TypedDict):
@@ -208,7 +215,7 @@ class ChatCompletion(TypedDict):
     object: Literal["chat.completion"]
     created: int
     model: str
-    choices: list[choices]
+    choices: list[CompletionChoice]
     usage: Usage
     system_fingerprint: NotRequired[str]  # DeepSeek 提供
     nonce: NotRequired[str]               # Gemini 偶尔携带

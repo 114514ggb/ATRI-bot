@@ -174,6 +174,14 @@ class ChatMessage:
 
 > **注意**：`sender_nickname` 不是独立字段，通过 `sender_info["nickname"]` 访问
 
+### LLM 消息字典类型（TypedDict）
+`atribot/core/type/llm_message_types.py` 按 OpenAI Chat Completions 的 message 格式定义上下文消息类型，供 `Context` / `MessageBuilder` / `LLMCoordinator` / `model_api` / `chat.py` 共用（**仅类型标注，运行期仍是 `dict`**）：
+- `ChatRole`、`ChatContent`（`str` 或内容段列表）、`ChatContentPart`（`text` / `image_url` / `input_audio` / `video_url` / `file`）
+- `ToolCallDict`（完整工具调用，区别于流式 delta 片段）、`SystemMessage` / `UserMessage` / `AssistantMessage` / `ToolMessage`
+- `ChatMessageDict`（宽松版，用于动态拼装）、`ChatMessages`（`list[ChatMessageDict]`，上下文与 `messages` 参数的统一标注）
+
+> 响应侧类型（流式 `Delta`/`ToolCall`、`ChatCompletion`、`ChatCompletionMessage`）仍在 `atribot/LLMchat/model_api/llm_types.py`，其中 `ExtraContent` / `GoogleThought` 由 core 模块定义并由它 re-export。
+
 ### MessageSegment 消息段类型
 | 类名 | 用途 | 构造 |
 |---|---|---|

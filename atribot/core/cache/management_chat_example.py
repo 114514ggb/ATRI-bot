@@ -395,6 +395,42 @@ class ChatManager(ServiceBase):
         """返回群消息上下文(纯文本)"""
         return (await self.get_group_context(group_id)).build_context()
 
+    async def _segment_text_description(
+        self,
+        segment: ImageSegment | RecordSegment | VideoSegment,
+        kind: str,
+    ) -> str:
+        """获取历史消息段的多模态文本描述（优先复用消息段缓存）
+
+        Args:
+            segment: 图片/音频/视频消息段
+            kind: 媒体类型，``image`` / ``audio`` / ``video``
+
+        Returns:
+            str: 文本描述；未配置识别模型或识别失败时返回占位文本
+        """
+        if segment.text_description:
+            return segment.text_description
+        if self.media_processor is None:
+            return "<未配置识别模型>"
+
+        url = segment.url or segment.file.file
+        try:
+            if kind == "image":
+                desc = await self.media_processor.image_to_text(
+                    url, file_name=segment.file_name
+                )
+            elif kind == "audio":
+                desc = await self.media_processor.audio_to_text(url)
+            else:
+                desc = await self.media_processor.video_to_text(url)
+        except Exception as e:
+            self.log.warning(f"{kind}历史媒体识别失败 url={url}: {e}")
+            desc = "<描述获取失败>"
+
+        segment.text_description = desc
+        return desc
+
     async def add_group_messages_builder(
         self, 
         group_id: int, 
@@ -466,10 +502,8 @@ class ChatManager(ServiceBase):
                         )
                         builder.add_text_left(cq_text)
                     else:
-                        if segment.text_description:
-                            builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
-                        else:
-                            builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'}]" )
+                        desc = await self._segment_text_description(segment, "image")
+                        builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'},summary:{desc}]")
 
                 elif isinstance(segment, RecordSegment):
                     if remaining_audios != 0:
@@ -488,20 +522,13 @@ class ChatManager(ServiceBase):
                             builder.add_text_left(cq_text)
                         except Exception as e:
                             self.log.warning(f"音频下载失败，降级文本识别 url={audio_url}: {e}")
-                            if not segment.text_description:
-                                try:
-                                    desc = await self.media_processor.audio_to_text(audio_url)
-                                    segment.text_description = desc
-                                except Exception:
-                                    segment.text_description = "<描述获取失败>"
+                            desc = await self._segment_text_description(segment, "audio")
                             builder.add_text_left(
-                                f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]"
+                                f"[CQ:record,file={segment.file_name or 'unknown'},summary:{desc}]"
                             )
                     else:
-                        if segment.text_description:
-                            builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
-                        else:
-                            builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'}]" )
+                        desc = await self._segment_text_description(segment, "audio")
+                        builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{desc}]")
 
                 elif isinstance(segment, VideoSegment):
                     if remaining_videos != 0:
@@ -518,10 +545,8 @@ class ChatManager(ServiceBase):
                         )
                         builder.add_text_left(cq_text)
                     else:
-                        if segment.text_description:
-                            builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{segment.text_description}]")
-                        else:
-                            builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'}]" )
+                        desc = await self._segment_text_description(segment, "video")
+                        builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{desc}]")
 
                 else:
                     builder.add_text_left(segment.__str__())

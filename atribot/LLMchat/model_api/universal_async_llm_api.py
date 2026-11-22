@@ -1,6 +1,6 @@
 import asyncio
 import json
-from typing import AsyncGenerator, Dict, List, overload
+from typing import Any, AsyncGenerator, Dict, List, overload
 
 import aiohttp
 
@@ -9,7 +9,8 @@ from atribot.common_utils.net_utils import (
     create_tcp_connector,
     resolve_proxy,
 )
-from atribot.LLMchat.model_api.llm_types import ChatCompletionChunk
+from atribot.core.type.llm_message_types import ChatMessages
+from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 from atribot.LLMchat.model_api.stream_processor import StreamProcessor
 
@@ -171,11 +172,11 @@ class universal_ai_api(model_api_basics,StreamProcessor):
     
     async def generate_text_tools(
         self,
-        model:str,
-        messages:list,
-        tools:list,
+        model: str,
+        messages: ChatMessages,
+        tools: list[dict[str, Any]],
         user_id: str | None = None,
-    ):
+    ) -> ChatCompletion:
         payload = {
             "model": model,
             "messages": messages,
@@ -202,7 +203,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                 else:
                     raise ValueError(f"LLM API请求为空，已重试 {max_retries} 次")
 
-    async def generate_text_lightweight(self, model:str, messages:list):
+    async def generate_text_lightweight(self, model: str, messages: ChatMessages) -> ChatCompletion:
         """请求生成文本,轻量参数,无工具调用,返回全部内容"""
         payload = {
             "model": model,
@@ -210,7 +211,7 @@ class universal_ai_api(model_api_basics,StreamProcessor):
         }
         return await self._client_post(payload)
     
-    async def generate_json_ample(self, model,remainder)->Dict:
+    async def generate_json_ample(self, model: str, remainder: dict[str, Any]) -> ChatCompletion:
         payload = {"model": model, **remainder}
         
         max_retries = 3
@@ -322,6 +323,6 @@ class universal_ai_api(model_api_basics,StreamProcessor):
 
         raise ValueError("无法识别的嵌入返回格式")
 
-    async def generate_json_ample_stream(self, model: str, remainder: dict) -> dict:
+    async def generate_json_ample_stream(self, model: str, remainder: dict[str, Any]) -> ChatCompletion:
         return await self.process_stream_simple(self.client_post_stream({"model": model, **remainder}))
 

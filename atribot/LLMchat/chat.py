@@ -2,7 +2,7 @@ import datetime
 import time
 import uuid
 from abc import ABC, abstractmethod
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from logging import Logger
 from typing import Any, Awaitable, Callable, ClassVar, Coroutine, Dict, List
 
@@ -29,6 +29,7 @@ from atribot.core.type.chat_message_types import (
     VideoSegment,
 )
 from atribot.core.type.context_types import Context, MessageBuilder
+from atribot.core.type.llm_message_types import ChatContentPart, ChatMessages
 from atribot.core.type.onebot_event_types import TEXT_LENGTH_LIMIT
 from atribot.LLMchat.emoji_system import EmojiCore
 from atribot.LLMchat.LLM_supervisor import (
@@ -64,11 +65,89 @@ IMAGE_EXTENSIONS = {
     'jpg', 'jpeg', 'png', 'gif', 'psd',
 }
 
-
 MESSAGE_DELAY = 1.5  # 多条消息间隔时间
 MAX_SINGLE_MESSAGE_LENGTH = 4  # 分条发送长度阈值
 LLM_COOLDOWN_THRESHOLD = 5 #间隔时间,防止多条消息同时发送
 STRING_LENGTH_LIMIT = 500 #字符串长度限制
+
+_MEDIA_PARTS = {
+    "image_url": ("visual_sense", "[图片已省略:未识别成功]"),
+    "input_audio": ("audio_sense", "[音频已省略:未识别成功]"),
+    "video_url": ("video_sense", "[视频已省略:未识别成功]"),
+}
+"""多模态片段的类型标识、对应能力字段与占位文本"""
+
+
+@dataclass(frozen=True, slots=True)
+class MediaCapability:
+    """模型的多模态输入能力（字段与供应商配置一致）"""
+
+    visual_sense: bool = False
+    audio_sense: bool = False
+    video_sense: bool = False
+
+    @classmethod
+    def from_model_info(cls, model_info: Dict[str, Any] | None) -> MediaCapability:
+        """从供应商模型配置中读取能力标记"""
+        info = model_info or {}
+        return cls(**{
+            field: bool(info.get(field, False))
+            for field, _ in _MEDIA_PARTS.values()
+        })
+
+
+def strip_unsupported_media(
+    messages: ChatMessages,
+    capability: MediaCapability,
+) -> ChatMessages:
+    """剔除目标模型不支持的多模态片段
+
+    Args:
+        messages: 消息列表
+        capability: 目标模型的多模态能力
+
+    Returns:
+        ChatMessages: 处理后的消息列表；无需剔除时返回原列表
+    """
+    stripped: ChatMessages = []
+    changed = False
+
+    for message in messages:
+        content = message.get("content")
+        if not isinstance(content, list):
+            stripped.append(message)
+            continue
+
+        message_changed = False
+        new_content: list[ChatContentPart] = []
+        for part in content:
+            part_type = part.get("type") if isinstance(part, dict) else None
+            media = _MEDIA_PARTS.get(part_type)
+            if media is not None and not getattr(capability, media[0]):
+                new_content.append({"type": "text", "text": media[1]})
+                message_changed = True
+            else:
+                new_content.append(part)
+
+        if message_changed:
+            stripped.append({**message, "content": new_content})
+            changed = True
+        else:
+            stripped.append(message)
+
+    return stripped if changed else messages
+
+
+def has_media_parts(messages: ChatMessages | None) -> bool:
+    """消息里是否含有受模型能力控制的多模态片段"""
+    for message in messages or []:
+        content = message.get("content")
+        if not isinstance(content, list):
+            continue
+        for part in content:
+            if isinstance(part, dict) and part.get("type") in _MEDIA_PARTS:
+                return True
+    return False
 
 
 class ChatBasics(ABC):
@@ -188,6 +267,7 @@ class ChatBasics(ABC):
             messages=None,
             visual_sense=self.visual_sense,
             audio_sense=self.audio_sense,
+            video_sense=self.video_sense,
         )
         self._on_model_config_applied()
         self.log.info(f"聊天模型已就绪（{self._model_scope}: {supplier_name} / {model_name}）")
@@ -383,6 +463,123 @@ class ChatBasics(ABC):
                 )
         except Exception as e:
             self.log.error(f"发送'模型返回无法解析的格式'兜底消息失败: {e}")
+
+    async def _request_model_with_fallback_(
+        self,
+        request: GenerationRequestSimplify,
+        rebuild: Callable[[MediaCapability], Awaitable[MessageBuilder]] | None,
+        uid: str,
+        scene: str = "群聊天",
+    ) -> GenerationResponse:
+        """尝试模型请求,失败时按备用模型的多模态能力重建负载后降级重试
+
+        增量提示只在包含多模态片段时才需要按目标模型能力重建;
+        历史消息中目标模型不支持的片段在构建请求时替换为占位文本。
+
+        Args:
+            request (GenerationRequestSimplify): 请求体
+            rebuild: 按目标模型能力重建增量提示负载; 增量不含媒体时可为 None
+            uid (str): 唯一响应的标识
+            scene (str): 日志中的场景名
+
+        Returns:
+            GenerationResponse: 回复
+        """
+        primary = MediaCapability(
+            visual_sense=request.visual_sense,
+            audio_sense=request.audio_sense,
+            video_sense=request.video_sense,
+        )
+        request.messages = strip_unsupported_media(request.messages, primary)
+
+        try:
+            return await self.model_api_supervisor.run(request)
+
+        except LLMSRequestFailed as e:
+            self.log.exception(f"[{uid}]{scene}调用工具中途出现了错误:{e}\n尝试备用api!")
+            request.generation_response = e.get_response()
+
+        except Exception as e:
+            self.log.exception(f"[{uid}]{scene}出现了错误:{e}\n尝试备用api!")
+
+        increment_cache: dict[MediaCapability, ChatMessages] = {}
+
+        request.model_api = None
+        request.parameter = { #一个绝大多数模型可用的通用配置
+            "temperature":0.1,
+            "top_p":0.9,
+            "max_tokens": 8192,
+            "tool_choice": "auto"
+        }
+
+        for parameter in self.api_order:
+
+            supplier = parameter["supplier"]
+            model_name = parameter["model_name"]
+            self.log.info(f"[{uid}]{scene}正在使用备用api,来自{parameter}")
+
+            try:
+                model_info = self.supplier.get_model_information(supplier, model_name)
+            except (KeyError, AttributeError) as e:
+                self.log.warning(f"[{uid}]备用api{parameter}不可用,跳过: {e}")
+                continue
+
+            capability = MediaCapability.from_model_info(model_info)
+            self.log.info(
+                f"[{uid}]备用api能力 visual_sense={capability.visual_sense} "
+                f"audio_sense={capability.audio_sense} video_sense={capability.video_sense}"
+            )
+
+            generation_response = request.generation_response
+            if capability == primary:
+                increment_messages = request.increment_messages
+                history_messages = request.messages
+            else:
+                if not has_media_parts(request.increment_messages):
+                    increment_messages = request.increment_messages
+                elif rebuild is None:
+                    increment_messages = strip_unsupported_media(
+                        request.increment_messages, capability
+                    )
+                else:
+                    increment_messages = increment_cache.get(capability)
+                    if increment_messages is None:
+                        try:
+                            increment_messages = [(await rebuild(capability)).build()]
+                        except Exception as e:
+                            self.log.exception(f"[{uid}]按备用能力重建提示失败,跳过该候选:{e}")
+                            continue
+                        increment_cache[capability] = increment_messages
+
+                history_messages = strip_unsupported_media(request.messages, capability)
+                if generation_response is not None:
+                    generation_response = replace(
+                        generation_response,
+                        messages=strip_unsupported_media(
+                            generation_response.messages, capability
+                        ),
+                    )
+
+            new_request = replace(
+                request,
+                model=model_name,
+                supplier_name=supplier,
+                model_api=None,
+                increment_messages=increment_messages,
+                messages=history_messages,
+                generation_response=generation_response,
+                visual_sense=capability.visual_sense,
+                audio_sense=capability.audio_sense,
+                video_sense=capability.video_sense,
+            )
+
+            try:
+                return await self.model_api_supervisor.run(new_request)
+            except Exception as e:
+                self.log.error(f"[{uid}]备用api{parameter}出现了错误!:{e}")
+
+        self.log.error(f"[{uid}]{scene}所有备用api出现错误!")
+        raise ValueError(f"[{uid}]{scene}所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
 
     def _make_segment_appender(
         self,
@@ -681,11 +878,13 @@ class GroupChat(ChatBasics):
         
         response = await self._request_model_with_fallback_(
             request = request, 
-            rebuild = lambda including_pictures: self.prompt_structure(
+            rebuild = lambda capability: self.prompt_structure(
                 event=event,
                 prompt=prompt,
                 group_id=group_id,
-                including_pictures=including_pictures,
+                including_pictures=capability.visual_sense,
+                including_audios=capability.audio_sense,
+                including_videos=capability.video_sense,
             ),
             uid = uid
         )
@@ -763,14 +962,14 @@ class GroupChat(ChatBasics):
         if user_id:
             prompt += f"\n触发定时消息用户:<user_id>{user_id}</user_id>"
 
-        async def build_message(including_pictures: bool) -> MessageBuilder:
+        async def build_message(capability: MediaCapability) -> MessageBuilder:
             builder = MessageBuilder()
             await self.chat_manager.add_group_messages_builder(
                 group_id=group_id,
                 builder=builder,
-                including_pictures=including_pictures,
-                including_audios=self.audio_sense,
-                including_videos=self.video_sense,
+                including_pictures=capability.visual_sense,
+                including_audios=capability.audio_sense,
+                including_videos=capability.video_sense,
             )
             
             if emoji_prompt := self.emoji_core.prompt:
@@ -784,7 +983,12 @@ class GroupChat(ChatBasics):
             builder.add_text(self.build_prompt.json_output_reminder())
             return builder
 
-        message_builder = await build_message(self.visual_sense)
+        primary_capability = MediaCapability(
+            visual_sense=self.visual_sense,
+            audio_sense=self.audio_sense,
+            video_sense=self.video_sense,
+        )
+        message_builder = await build_message(primary_capability)
 
         if user_id:
             #如果一个user触发了定时，那么应该在他的上下文消息里
@@ -934,82 +1138,6 @@ class GroupChat(ChatBasics):
             send_client=event.send_client,
         )
 
-    async def _request_model_with_fallback_(
-        self,
-        request: GenerationRequestSimplify,
-        rebuild: Callable[[bool], Awaitable[MessageBuilder]],
-        uid: str
-    ) -> GenerationResponse:
-        """尝试模型请求,失败时自动降级到配置的备用API
-
-        Args:
-            request (GenerationRequestSimplify): 请求体
-            rebuild: 按目标模型是否支持图像重新构建提示负载
-            uid (str): 唯一响应的标识
-
-        Returns:
-            GenerationResponse: 回复
-        """
-        try:
-            return await self.model_api_supervisor.run(request)
-
-        except LLMSRequestFailed as e:
-            self.log.exception(f"[{uid}]群聊天调用工具中途出现了错误:{e}\n尝试备用api!")
-            request.generation_response = e.get_response()
-            
-        except Exception as e:
-            self.log.exception(f"[{uid}]群聊天出现了错误:{e}\n尝试备用api!")
-            
-        opposite_structure_increment_messages = None
-        request.model_api = None
-        request.parameter = { #一个绝大多数模型可用的通用配置
-            "temperature":0.1,
-            "top_p":0.9,
-            "max_tokens": 8192,
-            "tool_choice": "auto"
-        }
-        
-        for parameter in self.api_order:
-            
-            supplier = parameter["supplier"]
-            model_name = parameter["model_name"]
-            self.log.info(f"正在使用备用api,来自{parameter}")
-
-            model_info = self.supplier.get_model_information(supplier, model_name)
-            visual_sense: bool = model_info.get("visual_sense", False)
-            audio_sense: bool = model_info.get("audio_sense", False)
-
-            if visual_sense == self.visual_sense:#只考虑图像的情况
-                new_request = replace(
-                    request,
-                    model=model_name,
-                    supplier_name=supplier,
-                    visual_sense=visual_sense,
-                    audio_sense=audio_sense,
-                )
-            else:
-                if not opposite_structure_increment_messages:
-                    #没有缓存重新构建消息
-                    opposite_structure_increment_messages = [(await rebuild(visual_sense)).build()]
-
-                new_request = replace(
-                    request,
-                    model=model_name,
-                    supplier_name=supplier,
-                    increment_messages=opposite_structure_increment_messages,
-                    visual_sense=visual_sense,
-                    audio_sense=audio_sense,
-                )
-
-            try:
-                return await self.model_api_supervisor.run(new_request)
-            except Exception as e:
-                self.log.error(f"[{uid}]备用api{parameter}出现了错误!:{e}")
-
-        self.log.error(f"[{uid}]所有备用api出现错误!")
-        raise ValueError(f"[{uid}]所有备用api出现错误!出现这个错误请联系管理员！不要再尝试使用了")
-
-
     async def get_chat_context(self, group_id:int, user_id:int)->Context:
         """获取需要的聊天
 
@@ -1146,15 +1274,18 @@ class PrivateChat(ChatBasics):
             tool_json=round_toolset,
         )
 
-        response = await self._request_model_with_fallback_private_(
+        response = await self._request_model_with_fallback_(
             request=request,
-            rebuild=lambda including_pictures: self.prompt_structure(
+            rebuild=lambda capability: self.prompt_structure(
                 events=events,
                 prompt=prompt,
                 user_id=user_id,
-                including_pictures=including_pictures,
+                including_pictures=capability.visual_sense,
+                including_audios=capability.audio_sense,
+                including_videos=capability.video_sense,
             ),
             uid=uid,
+            scene="私聊",
         )
 
         self.log.info(f"[{uid}]私聊模型返回json_list:\n{''.join(response.reply_text)}")
@@ -1246,7 +1377,7 @@ class PrivateChat(ChatBasics):
 
         prompt = custom_prompt
 
-        async def build_message(including_pictures: bool) -> MessageBuilder:
+        async def build_message() -> MessageBuilder:
             builder = MessageBuilder()
             
             if emoji_prompt := self.emoji_core.prompt:
@@ -1259,7 +1390,7 @@ class PrivateChat(ChatBasics):
             builder.add_text(self.build_prompt.json_output_reminder())
             return builder
 
-        message_builder = await build_message(self.visual_sense)
+        message_builder = await build_message()
 
         private_context_obj = await self.chat_manager.get_private_context(user_id)
         original_context: Context = private_context_obj.chat_context
@@ -1275,10 +1406,11 @@ class PrivateChat(ChatBasics):
             tool_json=round_toolset,
         )
 
-        response = await self._request_model_with_fallback_private_(
+        response = await self._request_model_with_fallback_(
             request=request,
-            rebuild=build_message,
+            rebuild=None,
             uid=uid,
+            scene="私聊",
         )
 
         self.log.info(f"[{uid}]私聊内部触发模型返回json_list:\n{''.join(response.reply_text)}")
@@ -1447,65 +1579,3 @@ class PrivateChat(ChatBasics):
                 text="\n".join(chat_text_list),
                 reply_id=message_id,
             )
-
-    async def _request_model_with_fallback_private_(
-        self,
-        request: GenerationRequestSimplify,
-        rebuild: Callable[[bool], Awaitable[MessageBuilder]],
-        uid: str,
-    ) -> GenerationResponse:
-        """尝试模型请求,失败时自动降级到配置的备用API"""
-        try:
-            return await self.model_api_supervisor.run(request)
-        except LLMSRequestFailed as e:
-            self.log.exception(f"[{uid}]私聊调用出现错误:{e}\n尝试备用api!")
-            request.generation_response = e.get_response()
-        except Exception as e:
-            self.log.exception(f"[{uid}]私聊出现了错误:{e}\n尝试备用api!")
-
-        opposite_structure_increment_messages = None
-        request.model_api = None
-        request.parameter = {
-            "temperature": 0.1,
-            "top_p": 0.9,
-            "max_tokens": 8192,
-            "tool_choice": "auto",
-        }
-
-        for parameter in self.api_order:
-            supplier = parameter["supplier"]
-            model_name = parameter["model_name"]
-            self.log.info(f"[{uid}]私聊正在使用备用api: {parameter}")
-
-            model_info = self.supplier.get_model_information(supplier, model_name)
-            visual_sense: bool = model_info.get("visual_sense", False)
-            audio_sense: bool = model_info.get("audio_sense", False)
-
-            if visual_sense == self.visual_sense:
-                new_request = replace(
-                    request,
-                    model=model_name,
-                    supplier_name=supplier,
-                    visual_sense=visual_sense,
-                    audio_sense=audio_sense,
-                )
-            else:
-                if not opposite_structure_increment_messages:
-                    opposite_structure_increment_messages = [(await rebuild(visual_sense)).build()]
-
-                new_request = replace(
-                    request,
-                    model=model_name,
-                    supplier_name=supplier,
-                    increment_messages=opposite_structure_increment_messages,
-                    visual_sense=visual_sense,
-                    audio_sense=audio_sense,
-                )
-
-            try:
-                return await self.model_api_supervisor.run(new_request)
-            except Exception as e:
-                self.log.error(f"[{uid}]私聊备用api{parameter}出现了错误!:{e}")
-
-        self.log.error(f"[{uid}]私聊所有备用api出现错误!")
-        raise ValueError(f"[{uid}]私聊所有备用api出现错误!")

@@ -578,7 +578,7 @@ chat.py → GroupChat.step()          ← 聊天主入口
             └─ 上下文超长时触发 summarize_context() 压缩
 ```
 
-**高可用降级机制**：当主模型 API 响应异常时，`chat.py` 中 `GroupChat`/`PrivateChat` 的请求封装（`_request_model_with_fallback_` / `_request_model_with_fallback_private_`）会按 `config.model.standby_model` 列表依次尝试备用供应商和模型（含视觉能力差异处理），保证即使主力 Key 失效也能正常回复。
+**高可用降级机制**：当主模型 API 响应异常时，`chat.py` 中 `ChatBasics._request_model_with_fallback_`（`GroupChat` / `PrivateChat` 共用）会按 `config.model.standby_model` 列表依次尝试备用供应商和模型：读取每个备用模型的 `visual_sense` / `audio_sense` / `video_sense`，按目标模型能力重建增量提示（实时群消息 + 当前消息；仅当增量包含媒体时才重建，重建结果按能力三元组缓存）；已持久化的历史消息不做重建，由 `chat.py` 在构建请求时剔除目标模型不支持的多模态片段（替换为占位文本）。配置中不存在的备用供应商/模型会被跳过而不会中断回退。
 
 **结构化输出**：模型被要求返回 JSON 对象（`actions` 数组），每一项包含 `decision` 字段（`speak` / `update` / `silence`），使回复行为完全可控和可扩展。
 

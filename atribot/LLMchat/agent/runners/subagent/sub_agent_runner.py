@@ -33,7 +33,7 @@ from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import ToolSet
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
-from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, message
+from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
 from atribot.LLMchat.model_api.model_api_basics import model_api_basics
 
 _MAX_EMPTY_RETRIES = 5  # 空响应重试次数
@@ -89,7 +89,7 @@ class SubAgentRunner(BaseAgentRunner):
 
         #最后一次 LLM 响应结果
         self._last_api_reply: Optional[ChatCompletion] = None
-        self._last_assistant_message: Optional[message] = None
+        self._last_assistant_message: Optional[ChatCompletionMessage] = None
         self._last_content: Optional[str] = None
 
         #当前步的 StepSummary

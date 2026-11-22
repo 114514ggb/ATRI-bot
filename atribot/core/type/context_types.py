@@ -1,9 +1,19 @@
 import asyncio
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Deque, Dict, Iterable, List
+from typing import Deque, Iterable
 
 from atribot.common_utils.message_utils import count_estimate_tokens
+from atribot.core.type.llm_message_types import (
+    AssistantMessage,
+    ChatContent,
+    ChatContentPart,
+    ChatMessageDict,
+    ChatMessages,
+    ChatRole,
+    ExtraContent,
+    ToolCallDict,
+)
 
 
 class ToolCallsStopIteration(Exception):
@@ -38,14 +48,14 @@ class MessageBuilder:
 
     __slots__ = ["_role", "_parts"]
 
-    def __init__(self, role: str = "user"):
+    def __init__(self, role: ChatRole = "user"):
         """初始化消息构建器
 
         Args:
             role: 消息角色，例如 user、assistant、system
         """
-        self._role: str = role
-        self._parts: Deque[dict[str, Any]] = deque()
+        self._role: ChatRole = role
+        self._parts: Deque[ChatContentPart] = deque()
 
     def _last_is_text(self) -> bool:
         """判断最后一个内容是否为文本"""
@@ -275,7 +285,7 @@ class MessageBuilder:
 
         return self
 
-    def build_content(self) -> str | list[dict[str, Any]]:
+    def build_content(self) -> ChatContent:
         """构建消息 content
 
         Returns:
@@ -290,7 +300,7 @@ class MessageBuilder:
 
         return list(self._parts)
 
-    def build(self) -> dict[str, Any]:
+    def build(self) -> ChatMessageDict:
         """构建完整消息
 
         Returns:
@@ -301,7 +311,7 @@ class MessageBuilder:
             "content": self.build_content(),
         }
 
-    def build_and_add(self, ctx: list[dict[str, Any]]) -> None:
+    def build_and_add(self, ctx: ChatMessages) -> None:
         """构建消息并追加到上下文
 
         Args:
@@ -328,7 +338,7 @@ class MessageBuilder:
 @dataclass(slots=True)
 class Context():
     """对话上下文"""
-    messages: List[Dict[str, Any]] = None
+    messages: ChatMessages = field(default_factory=list)
     """原始的上下文"""
     user_max_record: int = 20
     """user最多消息条数限制"""
@@ -342,10 +352,6 @@ class Context():
     """上一轮api响应中给出的上下文token"""
     async_lock:asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
     """异步锁"""
-
-    def __post_init__(self):
-        if self.messages is None:
-            self.messages = []
 
     def __getitem__(self, index):
         return self.get_messages()[index]
@@ -368,15 +374,15 @@ class Context():
     def __repr__(self):
         return repr(self.get_messages())
 
-    def append(self, dict: Dict[str, Any]) -> None:
+    def append(self, message: ChatMessageDict) -> None:
         """添加内容"""
-        self.messages.append(dict)
+        self.messages.append(message)
 
-    def extend(self, Iterable: Iterable[Dict[str, Any]]) -> None:
+    def extend(self, messages: Iterable[ChatMessageDict]) -> None:
         """用可迭代对象来扩展列表"""
-        self.messages.extend(Iterable)
+        self.messages.extend(messages)
 
-    def get_messages(self, inject_text: str = "") -> List[Dict[str, str]]:
+    def get_messages(self, inject_text: str = "") -> ChatMessages:
         """获取当前的上下文List
 
         Args:
@@ -390,13 +396,13 @@ class Context():
 
         return self.messages
 
-    def add_message(self, role: str, content: str | list, tool_call_id: int = None) -> None:
+    def add_message(self, role: ChatRole, content: ChatContent, tool_call_id: str | None = None) -> None:
         """添加消息
 
         Args:
-            role (str): 消息枚举值"user", "assistant", "system", "tool"
-            content (str): 内容
-            tool_call_id (int): 工具id,当类型为tool时可能需要
+            role (ChatRole): 消息枚举值"user", "assistant", "system", "tool"
+            content (ChatContent): 纯文本或多模态内容列表
+            tool_call_id (str | None): 工具id,当类型为tool时可能需要
         """
         if tool_call_id:
             self.messages.append({
@@ -408,13 +414,13 @@ class Context():
 
         self.messages.append({"role": role, "content": content})
 
-    def add_img_message(self, role: str, text: str, image_urls: list) -> None:
+    def add_img_message(self, role: ChatRole, text: str, image_urls: list[str]) -> None:
         """添加带图片消息
 
         Args:
-            role (str): 消息枚举值"user", "assistant", "system", "tool"
+            role (ChatRole): 消息枚举值"user", "assistant", "system", "tool"
             text (str): 文本内容
-            image_urls (list): 图片的 URL 列表，每个 URL 都会被作为独立的图片项添加到 content
+            image_urls (list[str]): 图片的 URL 列表，每个 URL 都会被作为独立的图片项添加到 content
         """
         self.messages.append({
             "role": role,
@@ -429,10 +435,10 @@ class Context():
         self, 
         content: str | None, 
         reasoning_content: str | None = None,
-        extra_content: dict | None = None #对谷歌的兼容字段
+        extra_content: ExtraContent | None = None #对谷歌的兼容字段
     ) -> None:
         """添加助手消息"""
-        assistant_message = {
+        assistant_message: AssistantMessage = {
             "role": "assistant",
             "content": content
         }
@@ -445,17 +451,17 @@ class Context():
 
         self.messages.append(assistant_message)
 
-    def add_assistant_message_flexible(self, assistant_message: Dict) -> None:
+    def add_assistant_message_flexible(self, assistant_message: AssistantMessage) -> None:
         """灵活的添加user消息
 
         Args:
-            assistant_message (Dict): 模型返回原始消息字段
+            assistant_message (AssistantMessage): 模型返回原始消息字段
         """
         self.messages.append(assistant_message)
 
-    def add_assistant_tool_message(self, content: str | None, tool_calls: List[Dict], reasoning_content: str | None = None) -> None:
+    def add_assistant_tool_message(self, content: str | None, tool_calls: list[ToolCallDict], reasoning_content: str | None = None) -> None:
         """添加助手调用工具消息"""
-        tool_message = {
+        tool_message: AssistantMessage = {
             "role": "assistant",
             "tool_calls": tool_calls
         }
@@ -471,11 +477,11 @@ class Context():
         """添加系统消息"""
         self.messages.append({"role": "system", "content": content})
 
-    def add_tool_message(self, naem: str, tool_call_id: str, content: str | list) -> None:
+    def add_tool_message(self, name: str, tool_call_id: str, content: ChatContent) -> None:
         """添加工具消息"""
         self.messages.append({
             "role": "tool",
-            "name": naem,
+            "name": name,
             "tool_call_id": tool_call_id,
             "content": content#纯文本(str)或多模态内容列表(list)
         })
@@ -484,7 +490,7 @@ class Context():
         """清除上下文"""
         self.messages.clear()
 
-    def record_validity_check(self) -> list:
+    def record_validity_check(self) -> ChatMessages | None:
         """
         针对消息条数的验证，需要显式调用
         如果 user 消息数超过限制，会截取到总长度为 user_max_record
@@ -534,7 +540,7 @@ class Context():
 class ContextDeque:
     """对话上下文 (优化版),不是很确定实战效果使用了双端队列来实现"""
 
-    messages: Deque[Dict[str, Any]] = field(default_factory=deque)
+    messages: Deque[ChatMessageDict] = field(default_factory=deque)
     """原始的上下文"""
 
     user_max_record: int = 20
@@ -573,18 +579,18 @@ class ContextDeque:
     def __repr__(self):
         return repr(list(self.messages))
 
-    def append(self, data: Dict[str, Any]) -> None:
+    def append(self, message: ChatMessageDict) -> None:
         """添加内容"""
-        self.messages.append(data)
+        self.messages.append(message)
 
-    def extend(self, iterable: Iterable) -> None:
+    def extend(self, messages: Iterable[ChatMessageDict]) -> None:
         """扩展列表"""
-        self.messages.extend(iterable)
+        self.messages.extend(messages)
 
-    def get_messages(self, inject_text: str = "") -> List[Dict[str, str]]:
+    def get_messages(self, inject_text: str = "") -> ChatMessages:
         """获取当前的上下文 List"""
         system_content = "\n\n".join(filter(None, [self.play_role, inject_text]))
-        system_msg = [{"role": "system", "content": system_content}] if system_content else []
+        system_msg: ChatMessages = [{"role": "system", "content": system_content}] if system_content else []
 
         return system_msg + list(self.messages)
 
@@ -592,12 +598,12 @@ class ContextDeque:
         """清除上下文"""
         self.messages.clear()
 
-    def record_validity_check(self) -> List[Dict[str, Any]]:
+    def record_validity_check(self) -> ChatMessages | None:
         """
         针对消息条数的验证
         优化后：使用 popleft() 移除头部元素，避免了列表切片的内存拷贝和移动
         """
-        removed_messages = []
+        removed_messages: ChatMessages = []
 
         user_count = sum(1 for msg in self.messages if msg["role"] == "user")
 
@@ -616,7 +622,7 @@ class ContextDeque:
 
         return removed_messages
 
-    def add_message(self, role: str, content: str | list, tool_call_id: int = None) -> None:
+    def add_message(self, role: ChatRole, content: ChatContent, tool_call_id: str | None = None) -> None:
         if tool_call_id:
             self.messages.append({
                 "role": role,
@@ -626,7 +632,7 @@ class ContextDeque:
             return
         self.messages.append({"role": role, "content": content})
 
-    def add_img_message(self, role: str, text: str, image_urls: list) -> None:
+    def add_img_message(self, role: ChatRole, text: str, image_urls: list[str]) -> None:
         self.messages.append({
             "role": role,
             "content": [{"type": "image_url", "image_url": {"url": url}} for url in image_urls] + [{"type": "text", "text": text}]
@@ -638,11 +644,13 @@ class ContextDeque:
     def add_assistant_message(self, content: str | None) -> None:
         self.messages.append({"role": "assistant", "content": content})
 
-    def add_assistant_message_flexible(self, assistant_message: Dict) -> None:
+    def add_assistant_message_flexible(self, assistant_message: AssistantMessage) -> None:
         self.messages.append(assistant_message)
 
-    def add_assistant_tool_message(self, content: str | None, tool_calls: List[Dict] = None) -> None:
-        msg = {"role": "assistant", "tool_calls": tool_calls}
+    def add_assistant_tool_message(self, content: str | None, tool_calls: list[ToolCallDict] | None = None) -> None:
+        msg: ChatMessageDict = {"role": "assistant"}
+        if tool_calls is not None:
+            msg["tool_calls"] = tool_calls
         if content:
             msg["content"] = content
         self.messages.append(msg)
@@ -650,7 +658,7 @@ class ContextDeque:
     def add_system_message(self, content: str) -> None:
         self.messages.append({"role": "system", "content": content})
 
-    def add_tool_message(self, name: str, tool_call_id: str, content: str) -> None:
+    def add_tool_message(self, name: str, tool_call_id: str, content: ChatContent) -> None:
         self.messages.append({
             "role": "tool",
             "name": name,

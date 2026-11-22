@@ -2,6 +2,7 @@ import time
 from enum import Enum
 
 from atribot.core.service_container import container
+from atribot.core.type.llm_message_types import ChatContent, ChatMessages, ChatRole
 
 
 class TriggerChatStateType(Enum):
@@ -34,7 +35,7 @@ class build_prompt:
     model_environment:str
     """model输出的环境"""
     
-    def __init__(self, prompt = "", model_environment = ""):
+    def __init__(self, prompt: str = "", model_environment: str = "") -> None:
         self.config = container.get("config")
         self.prompt = prompt
         self.model_environment = model_environment
@@ -210,27 +211,27 @@ class build_prompt:
         )
     
     @staticmethod
-    def append_playRole(content,messages:list):
+    def append_playRole(content: str, messages: ChatMessages) -> ChatMessages:
         """添加扮演的角色,固定为列表的第一个元素"""
         if content != "":
              messages.insert(0, {"role": "system","content": content})
         return messages
     
     @staticmethod
-    def append_message_text(messages:list,role:str,content:str):
+    def append_message_text(messages: ChatMessages, role: ChatRole, content: str) -> ChatMessages:
         """
         添加文本消息.
         
         Args:
-            messages (list):消息list 
-            role (str): 消息角色。
+            messages (ChatMessages):消息list 
+            role (ChatRole): 消息角色。
             content (str):content为内容
         """
         messages.append({"role": role,"content": content})
         return messages
     
     @staticmethod
-    def append_message_image(messages: list, image_urls: list, text="请详细描述这个图片,如果上面有文字也要详细说清楚", role: str = "user"):
+    def append_message_image(messages: ChatMessages, image_urls: list[str], text: str = "请详细描述这个图片,如果上面有文字也要详细说清楚", role: ChatRole = "user") -> ChatMessages:
         """
         添加带图片的消息到 messages 列表中。
         
@@ -255,7 +256,7 @@ class build_prompt:
         return messages
     
     @staticmethod
-    def append_message_tool(messages:list ,tool_content:str ,tool_call_id:str):
+    def append_message_tool(messages: ChatMessages, tool_content: ChatContent, tool_call_id: str) -> ChatMessages:
         """ 添加工具消息 """
         messages.append({
             "role": "tool",
