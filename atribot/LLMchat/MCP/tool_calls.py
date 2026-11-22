@@ -699,7 +699,7 @@ class ToolCalls(ServiceBase):
     def factory(cls, config: atriConfig) -> ToolCalls:
         instance = cls(config.file_path.tool_calls)
         instance._preset_manager.load_presets_from_config(
-            getattr(config, "tool_presets", {}) or {}, instance._registry
+            config.tool_presets, instance._registry
         )
         # 配置段变更时由回调重建预设，WebUI 保存后无需手动刷新
         config.on_change("tool_presets", instance._on_presets_config_changed)
@@ -1065,7 +1065,7 @@ class ToolCalls(ServiceBase):
         # 预设重解析（ToolSet 持有 LocalTool 引用，需重绑到新对象）
         config = container.get("config")
         self._preset_manager.presets.clear()
-        self.load_presets_from_config(getattr(config, "tool_presets", {}) or {})
+        self.load_presets_from_config(config.tool_presets)
 
         # 重建 schema 缓存
         self._schema_cache.build_tool_description_cache(self._registry.func_list)

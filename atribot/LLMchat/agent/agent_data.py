@@ -22,6 +22,7 @@ class AgentData:
             同时作为待发现(deferred)工具名单的查找锚点
         kwargs (Dict[str, Any]): 额外运行时控制参数
         hooks (List[BaseAgentHooks]): 挂载到此 Agent 的生命周期钩子列表
+        user_id (str | None): 请求体中的 user_id（供应商侧隔离），为 None 时不携带
     """
 
     context: AgentContext
@@ -39,3 +40,4 @@ class AgentData:
         }
     )
     hooks: List[BaseAgentHooks] = field(default_factory=list)
+    user_id: str | None = None

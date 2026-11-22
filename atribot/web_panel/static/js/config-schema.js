@@ -189,6 +189,9 @@ export const SCHEMA = [
       { path: 'web_panel.port', label: '面板端口', type: 'number', optional: true, desc: '默认 5125，修改后需重启 bot' },
       { path: 'web_panel.access_token', label: '面板访问令牌', type: 'password', span: true, optional: true, desc: '主令牌/登录口令：登录页用它换取会话令牌；未配置时接口全部返回 503，修改后全部会话失效' },
       { path: 'web_panel.session_ttl_hours', label: '会话有效期（小时）', type: 'number', optional: true, desc: '登录会话的固定有效期，默认 4（范围 1-24）；到期后 WebUI 自动退出登录' },
+      { path: 'web_panel.mask_secrets', label: '密钥打码', type: 'toggle', optional: true, desc: '默认开启：配置接口把面板口令 / 数据库密码 / 平台 token / 供应商 api_key / MCP env 显示为 __KEEP__，保存时自动还原；关闭会回吐真实密钥（不建议）' },
+      { path: 'web_panel.block_weak_token', label: '拒绝弱主令牌', type: 'toggle', optional: true, desc: '开启后主令牌短于 16 字符或与平台 token 相同时，登录接口直接返回 403' },
+      { path: 'web_panel.db_console_readonly', label: 'SQL 控制台只读', type: 'toggle', optional: true, desc: '开启后数据库控制台仅允许查询语句，写语句返回 403' },
     ],
   },
 ];

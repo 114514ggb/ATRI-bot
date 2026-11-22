@@ -214,8 +214,8 @@ class BotFramework:
         本地直执行(none)后端的工作区默认落在 ``document/work``；docker / e2b
         等隔离后端不受影响（容器内固定路径）。
         """
-        raw_config: dict = getattr(self.config, "sand_box", None) or {}
-        document_root = getattr(getattr(self.config, "file_path", None), "document_root", None)
+        raw_config: dict = dict(self.config.sand_box)
+        document_root = self.config.file_path.document_root
         sandbox_config = resolve_sandbox_config(raw_config, document_root)
         try:
             sand_box = create_sandbox(sandbox_config)

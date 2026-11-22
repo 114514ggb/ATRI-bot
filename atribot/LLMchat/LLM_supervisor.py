@@ -80,6 +80,8 @@ class GenerationRequest():
     """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
     audio_sense: bool = False
     """当前模型是否支持音频输入，工具返回音频时决定直接传递还是降级转文字"""
+    user_id: str | None = None
+    """请求体中的 user_id，用于供应商侧的内容安全 / KVCache / 调度隔离"""
 
 @dataclass(slots=True)
 class GenerationRequestSimplify():
@@ -111,6 +113,8 @@ class GenerationRequestSimplify():
     """当前模型是否支持图像输入，工具返回图片时决定直接传图还是降级为文字描述"""
     audio_sense: bool = False
     """当前模型是否支持音频输入，工具返回音频时决定直接传递还是降级转文字"""
+    user_id: str | None = None
+    """请求体中的 user_id，用于供应商侧的内容安全 / KVCache / 调度隔离"""
 
 class LLMSRequestFailed(Exception):
     """LLM请求失败异常
@@ -714,6 +718,8 @@ class LLMCoordinator():
                 "tools":  tools,
                 **request.parameter
             }
+            if request.user_id:
+                parameter["user_id"] = request.user_id
             if request.parameter.get('stream'):
                 return await model_api.generate_json_ample_stream(
                     model = request.model,
@@ -728,5 +734,6 @@ class LLMCoordinator():
             return await model_api.generate_text_tools(
                 model = request.model,
                 messages = request.messages + messages, 
-                tools = tools
+                tools = tools,
+                user_id = request.user_id
             )

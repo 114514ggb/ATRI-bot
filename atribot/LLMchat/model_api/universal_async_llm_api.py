@@ -169,7 +169,13 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                 self.log.exception(f"流式请求发生未知错误: {e}")
                 raise e
     
-    async def generate_text_tools(self, model:str, messages:list,tools:list):
+    async def generate_text_tools(
+        self,
+        model:str,
+        messages:list,
+        tools:list,
+        user_id: str | None = None,
+    ):
         payload = {
             "model": model,
             "messages": messages,
@@ -177,6 +183,8 @@ class universal_ai_api(model_api_basics,StreamProcessor):
             # 'response_format':response_format,
             **self.model_parameters
         }
+        if user_id:
+            payload["user_id"] = user_id
     
         max_retries = 3
         base_delay = 0.5

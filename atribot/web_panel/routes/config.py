@@ -9,6 +9,8 @@ from typing import Any, Dict, List
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from atribot.core.atri_config import normalize_section
+
 from ..deps import _auth, _backup_file, _cfg, _parse_json_or_400, _read_config_text, _write_json
 
 router = APIRouter()
@@ -276,7 +278,12 @@ def _hot_reload_main_config(before: Dict[str, Any]) -> List[str]:
     if not isinstance(after, dict):
         return []
 
-    changed = sorted(key for key in set(before) | set(after) if before.get(key) != after.get(key))
+    changed = sorted(
+        key
+        for key in set(before) | set(after)
+        # 两侧都按 CONFIG_DEFAULTS 规范化后再比较：用户省略缺省键不算"改动"
+        if normalize_section(key, before.get(key)) != normalize_section(key, after.get(key))
+    )
     reloaded: List[str] = []
     for key in changed:
         try:

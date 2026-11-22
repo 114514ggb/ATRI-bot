@@ -47,7 +47,7 @@ class initiativeChat:
         self.chat_manager = container.get_by_type(ChatManager)
         self.group_chat = container.get_by_type(GroupChat)
         self._keyword_trigger_list: List[str] = resolve_keyword_trigger(
-            getattr(self.config, "initiative_chat_keyword_trigger", None), self.log
+            self.config.initiative_chat_keyword_trigger, self.log
         )
         """主动聊天关键词缓存，配置变更时由回调刷新（不在每次决策时重读配置）"""
         self.config.on_change("initiative_chat_keyword_trigger", self._on_keyword_config_changed)

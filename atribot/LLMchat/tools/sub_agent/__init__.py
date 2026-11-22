@@ -1,5 +1,6 @@
 from logging import Logger
 
+from atribot.common_utils import derive_chat_api_user_id, sub_agent_api_user_id
 from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
 from atribot.core.type.bot_types import atriMessageEvent
@@ -69,14 +70,14 @@ async def sub_agent_task(
     log: Logger = container.get_by_type(Logger).getChild("SubAgentTool")
     config: atriConfig = container.get("config")
 
-    agency_cfg = getattr(config.model, "agency_Agent", None)
-    if agency_cfg and agency_cfg.get("model_name"):
-        model_name = agency_cfg["model_name"]
-        supplier_name = agency_cfg.get("supplier", "")
+    agency_cfg = config.model.agency_Agent
+    if agency_cfg.model_name:
+        model_name = agency_cfg.model_name
+        supplier_name = agency_cfg.supplier
     else:
         summarize_cfg = config.model.memory.summarize_model
-        model_name = summarize_cfg["model_name"]
-        supplier_name = summarize_cfg.get("supplier", "")
+        model_name = summarize_cfg.model_name
+        supplier_name = summarize_cfg.supplier
         log.info(f"未配置 model.agency_Agent,回退到 summarize_model 模型: {model_name}")
 
     if not model_name:
@@ -124,6 +125,12 @@ async def sub_agent_task(
     context.play_role = system_prompt
     context.add_user_message(content=task)
 
+    parent_api_user_id = derive_chat_api_user_id(
+        message_data.group_id,
+        message_data.user_id,
+        bool(config.model.connect.user_global_context),
+    )
+
     agent_data = AgentData(
         context=context,
         model_name=model_name,
@@ -135,6 +142,7 @@ async def sub_agent_task(
             "max_tokens": 32768,
             "tool_choice": "auto",
         },
+        user_id=sub_agent_api_user_id(parent_api_user_id),
     )
 
     runner = SubAgentRunner(agent_data=agent_data, message_data=message_data)

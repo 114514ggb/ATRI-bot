@@ -965,7 +965,7 @@ def _chat_parameter_kwargs(
     额外 JSON 与已有配置项同名时，以已有配置项为准。
     """
     try:
-        raw = container.get("config")._raw_config.get("model", {}).get("chat_parameter") or {}
+        raw = container.get("config").model.chat_parameter
         kwargs = dict(raw) if isinstance(raw, dict) else {}
     except Exception:
         kwargs = {}
@@ -1133,6 +1133,7 @@ async def _run_agent_turn(session: ChatSession, settings: Dict[str, Any]) -> Non
 
 async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
     """跑一轮 Agent 循环（上下文末尾应为用户消息）：校验→提示词→参数→流式事件→落库"""
+    from atribot.common_utils import private_api_user_id
     from atribot.LLMchat.agent.agent_data import AgentData
     from atribot.LLMchat.agent.runners.subagent.sub_agent_runner import SubAgentRunner
 
@@ -1170,6 +1171,7 @@ async def _run_agent(session: ChatSession, settings: Dict[str, Any]) -> None:
             tools=[],
             tool_preset=WEBUI_PRESET,
             kwargs=kwargs,
+            user_id=private_api_user_id(session.id),
         )
         try:
             runner = SubAgentRunner(

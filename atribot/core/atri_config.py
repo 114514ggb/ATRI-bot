@@ -1,11 +1,24 @@
 import asyncio
+import copy
 import inspect
 import json
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field, fields, is_dataclass
 from pathlib import Path
-from typing import Any, Callable, Dict, Literal, Mapping, Union
+from typing import Any, Callable, Dict, List, Literal, Mapping, Union
+
+from atribot.core.config_schema import (
+    AIChatConfig,
+    ConfigSchema,
+    DatabaseConfig,
+    FreeForm,
+    ModelConfig,
+    SandboxConfig,
+    TTSConfig,
+    WebPanelConfig,
+    WhitelistIds,
+)
 
 log = logging.getLogger("atri-bot.ConfigChange")
 """配置变更通知日志器"""
@@ -15,6 +28,148 @@ ChangeCallback = Callable[[Any], Any]
 
 _UNSET = object()
 """notify_change 未显式传值时的哨兵"""
+
+
+def _default_of(item: Any) -> Any:
+    """取 dataclass 字段的默认值"""
+    return item.default if item.default is not MISSING else item.default_factory()
+
+
+def _schema_of(schema: Any) -> Any:
+    """把 dataclass 字段默认值展开成 ``CONFIG_DEFAULTS`` 的嵌套 dict
+
+    ``FreeForm`` 原样返回
+    """
+    if is_dataclass(schema) and not isinstance(schema, type):
+        return {item.name: _schema_of(_default_of(item)) for item in fields(schema)}
+    return schema
+
+
+CONFIG_DEFAULTS: Dict[str, Any] = _schema_of(ConfigSchema())
+"""已知配置段与键的默认值（由 ``config_schema.ConfigSchema`` 的字段生成）
+
+`atriConfig` 初始化时按此表补齐缺失的段/键，因此代码里可以直接做属性访问——配置项缺失即视为拼写错误。
+改默认值请改对应 dataclass 的字段，不要在这里加字面量
+"""
+
+_UNMANAGED_SECTIONS = frozenset({"file_path", "platforms", "network"})
+"""由类型化配置类自行管理、不参与默认值补全与未知键检查的顶层段"""
+
+_MAX_REPORTED_KEYS = 10
+"""日志中最多列出的键数量"""
+
+
+def _materialize(value: Any) -> Any:
+    """深拷贝默认值，并把 ``FreeForm`` 还原成普通 dict
+
+    Args:
+        value (Any): schema 中的默认值
+
+    Returns:
+        Any: 可直接写入配置数据的普通对象
+    """
+    if isinstance(value, Mapping):
+        return {key: _materialize(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_materialize(item) for item in value]
+    return copy.deepcopy(value)
+
+
+def _fill_defaults(defaults: Mapping[str, Any], data: Any) -> tuple[Dict[str, Any], list[str]]:
+    """按 schema 补齐缺失的键
+
+    补全规则：
+        - 键缺失：填入默认值的深拷贝
+        - 键为 None 且默认值是对象：视为缺失（如 ``"detection_audio": null``）
+        - 两侧都是对象：递归补全
+        - 其余情况（标量/数组/类型不匹配）：保留用户填写的值，绝不覆盖
+
+    Args:
+        defaults (Mapping[str, Any]): 该层的默认值 schema
+        data (Any): 用户配置的该层数据（非对象时按空对象处理）
+
+    Returns:
+        tuple[Dict[str, Any], list[str]]: (补全后的对象, 被补入的键路径列表)
+    """
+    merged: Dict[str, Any] = dict(data) if isinstance(data, Mapping) else {}
+    filled: list[str] = []
+    for key, default in defaults.items():
+        if key not in merged:
+            merged[key] = _materialize(default)
+            filled.append(key)
+            continue
+        value = merged[key]
+        if not isinstance(default, Mapping):
+            continue
+        if value is None:
+            merged[key] = _materialize(default)
+            filled.append(key)
+        elif isinstance(value, Mapping):
+            nested, nested_filled = _fill_defaults(default, value)
+            merged[key] = nested
+            filled.extend(f"{key}.{path}" for path in nested_filled)
+    return merged, filled
+
+
+def _collect_unknown_keys(defaults: Mapping[str, Any], data: Any, prefix: str = "") -> list[str]:
+    """收集 schema 未声明的键路径（大概率是拼写错误）
+
+    Args:
+        defaults (Mapping[str, Any]): 当前层的默认值 schema
+        data (Any): 用户配置的当前层数据
+        prefix (str): 键路径前缀
+
+    Returns:
+        list[str]: 未声明的键路径列表
+    """
+    if not isinstance(data, Mapping):
+        return []
+    free_form = isinstance(defaults, FreeForm)
+    unknown: list[str] = []
+    for key, value in data.items():
+        path = f"{prefix}{key}"
+        if key not in defaults:
+            if not free_form:
+                unknown.append(path)
+            continue
+        declared = defaults[key]
+        if isinstance(declared, Mapping) and isinstance(value, Mapping):
+            unknown.extend(_collect_unknown_keys(declared, value, f"{path}."))
+    return unknown
+
+
+def normalize_section(key: str, value: Any) -> Any:
+    """按 ``CONFIG_DEFAULTS`` 补全某个顶层配置段
+
+    供比较/展示场景使用：同一个段无论用户是否写了缺省键，规范化后的结果都一致。
+
+    Args:
+        key (str): 顶层配置项名称
+        value (Any): 该段的原始值
+
+    Returns:
+        Any: 补全后的值；不在 schema 中的段原样返回
+    """
+    defaults = CONFIG_DEFAULTS.get(key)
+    if not isinstance(defaults, Mapping):
+        return value
+    filled, _ = _fill_defaults(defaults, value)
+    return filled
+
+
+def _format_key_list(keys: list[str]) -> str:
+    """把键路径列表格式化成单行日志文本
+
+    Args:
+        keys (list[str]): 键路径列表
+
+    Returns:
+        str: 逗号分隔的键路径，超出上限时追加总数
+    """
+    shown = ", ".join(keys[:_MAX_REPORTED_KEYS])
+    if len(keys) > _MAX_REPORTED_KEYS:
+        shown += f" ...（共 {len(keys)} 项）"
+    return shown
 
 
 class ConfigObject(dict):
@@ -50,7 +205,9 @@ class ConfigObject(dict):
         try:
             return self[name]
         except KeyError as exception:
-            raise AttributeError(f"配置项 '{name}' 不存在") from exception
+            raise AttributeError(
+                f"配置项 '{name}' 不存在（请检查拼写；已知默认值见 atribot/core/atri_config.py 的 CONFIG_DEFAULTS）"
+            ) from exception
 
     def __setattr__(self, name: str, value: Any) -> None:
         """设置属性
@@ -744,6 +901,35 @@ class atriConfig:
     account: AccountInfo | None = None
     """bot 登录账号信息"""
 
+    # 以下注解只为 IDE 补全与类型检查：运行期由 __getattr__ 代理到 ConfigObject，
+    # 缺省值由 CONFIG_DEFAULTS 补齐。类型镜像见 atribot/core/config_schema.py。
+    root_user_id: int | None
+    """Root 用户 QQ 号（无视名单限制）"""
+    model: ModelConfig
+    """模型配置"""
+    ai_chat: AIChatConfig
+    """人设与上下文窗口"""
+    sand_box: SandboxConfig
+    """LLM 代码执行沙盒"""
+    tool_presets: Dict[str, Any]
+    """LLM 工具预设"""
+    group_white_list: WhitelistIds
+    """接收消息处理的群白名单"""
+    group_initiative_chat_white_list: WhitelistIds
+    """允许主动发起对话的群"""
+    group_information_extraction: WhitelistIds
+    """自动提取话题的群"""
+    private_chat_white_list: WhitelistIds
+    """可触发 LLM 私聊的用户"""
+    initiative_chat_keyword_trigger: List[str] | None
+    """主动聊天关键词触发词表（None = 未配置，回退内置关键词）"""
+    database: DatabaseConfig
+    """PostgreSQL 连接参数"""
+    web_panel: WebPanelConfig
+    """Web 管理面板"""
+    tts: TTSConfig
+    """语音合成"""
+
     @staticmethod
     def _find_project_root(start_path: Path) -> Path:
         """自动定位项目根目录：以 `main.py` 所在目录作为根目录
@@ -775,7 +961,11 @@ class atriConfig:
             config_file = (project_root / config_file).resolve()
 
         with open(config_file, "r", encoding="utf-8") as file_handler:
-            config_data: Dict[str, Any] = json.load(file_handler)
+            loaded_config: Dict[str, Any] = json.load(file_handler)
+
+        config_data, filled_keys = _fill_defaults(CONFIG_DEFAULTS, loaded_config)
+        self._filled_keys: tuple[str, ...] = tuple(filled_keys)
+        """本次启动自动补入的配置键路径（只补内存，不写回文件）"""
 
         self._raw_config: Dict[str, Any] = config_data
         self._config = ConfigObject(config_data)
@@ -783,6 +973,8 @@ class atriConfig:
         self._change_listeners: Dict[str, list[ChangeCallback]] = {}
         """顶层配置段 -> 变更回调列表"""
         self.account = AccountInfo(id=None, name="ATRI-bot")
+
+        self._report_config_schema(filled_keys, config_data)
 
         file_path_data = config_data.get("file_path", {})
         self.file_path = FilePathConfig.from_dict(file_path_data, project_root)
@@ -800,6 +992,48 @@ class atriConfig:
     def config_file_path(self) -> Path:
         """返回当前加载的配置文件绝对路径"""
         return self._config_file
+
+    @property
+    def filled_keys(self) -> tuple[str, ...]:
+        """返回本次启动自动补入的配置键路径
+
+        补全只作用于内存中的配置对象，磁盘文件保持原样，直到 Web 面板下一次保存。
+        """
+        return self._filled_keys
+
+    def _report_config_schema(
+        self, filled_keys: list[str], config_data: Mapping[str, Any]
+    ) -> None:
+        """启动时输出配置补全与未知键汇总
+
+        两类信息都只是提示，不影响启动：缺省值已按 ``CONFIG_DEFAULTS`` 补齐，
+        未知键大概率是拼写错误（代码读到时会抛 AttributeError）。
+
+        Args:
+            filled_keys (list[str]): 被补入的键路径
+            config_data (Mapping[str, Any]): 补全后的配置数据
+        """
+        if filled_keys:
+            log.info(
+                "配置补全 %d 项（仅内存生效，保存面板后写入文件）：%s",
+                len(filled_keys),
+                _format_key_list(filled_keys),
+            )
+
+        unknown: list[str] = []
+        for section, value in config_data.items():
+            if section in _UNMANAGED_SECTIONS:
+                continue
+            declared = CONFIG_DEFAULTS.get(section)
+            if declared is None:
+                continue
+            unknown.extend(_collect_unknown_keys(declared, value, f"{section}."))
+        if unknown:
+            log.warning(
+                "配置中存在 %d 个未知键（可能是拼写错误，代码不会读取它们）：%s",
+                len(unknown),
+                _format_key_list(unknown),
+            )
 
     def on_change(self, section: str, callback: ChangeCallback) -> Callable[[], None]:
         """订阅某个顶层配置段的变更
@@ -885,23 +1119,16 @@ class atriConfig:
         Returns:
             tuple[str, str]: (供应商名, 模型名)；配置缺失时对应位置为空字符串
         """
-        model_config = self._config.get("model") or {}
-        connect = model_config.get("connect") if isinstance(model_config, dict) else None
-        connect = connect if isinstance(connect, dict) else {}
-        scope_config = model_config.get(scope) if isinstance(model_config, dict) else None
-        scope_config = scope_config if isinstance(scope_config, dict) else {}
+        model_config = self._config.model
+        scope_config = model_config.get(scope) or {}
+        connect_config = model_config.connect
 
-        supplier = scope_config.get("supplier")
-        if not isinstance(supplier, str) or not supplier.strip():
-            supplier = connect.get("supplier")
-        model_name = scope_config.get("model_name")
-        if not isinstance(model_name, str) or not model_name.strip():
-            model_name = connect.get("model_name")
+        def _text(value: Any) -> str:
+            return value.strip() if isinstance(value, str) else ""
 
-        return (
-            supplier if isinstance(supplier, str) else "",
-            model_name if isinstance(model_name, str) else "",
-        )
+        supplier = _text(scope_config.get("supplier")) or _text(connect_config.supplier)
+        model_name = _text(scope_config.get("model_name")) or _text(connect_config.model_name)
+        return supplier, model_name
 
     def reload_section(self, key: str, notify: bool = True) -> Any:
         """从配置文件重读某个顶层配置段并同步到内存
@@ -911,13 +1138,18 @@ class atriConfig:
             notify (bool): 是否通知订阅者，默认 True
 
         Returns:
-            Any: 同步后的值（配置中无此项时为 None
+            Any: 同步后的值（`CONFIG_DEFAULTS` 中的段会先补齐缺失键；其余情况配置中无此项时为 None）
 
         Raises:
             FileNotFoundError, json.JSONDecodeError: 文件不可读或非法
         """
         with open(self._config_file, "r", encoding="utf-8") as file_handler:
             value = json.load(file_handler).get(key)
+        defaults = CONFIG_DEFAULTS.get(key)
+        if isinstance(defaults, Mapping):
+            value, filled = _fill_defaults(defaults, value)
+            if filled:
+                log.info("配置段 %s 补全 %d 项：%s", key, len(filled), _format_key_list(filled))
         self._raw_config[key] = value
         if key == "platforms":
             self._config[key] = PlatformsConfig.from_dict(value if isinstance(value, dict) else {})

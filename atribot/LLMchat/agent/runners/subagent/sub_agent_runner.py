@@ -222,12 +222,17 @@ class SubAgentRunner(BaseAgentRunner):
                 }
                 if tools is not None:
                     payload["tools"] = tools
+                if self.agent_data.user_id:
+                    payload["user_id"] = self.agent_data.user_id
                 api_reply = await model_api.generate_json_ample(
                     model=model, remainder=payload
                 )
             else:
                 api_reply = await model_api.generate_text_tools(
-                    model=model, messages=messages, tools=tools or []
+                    model=model,
+                    messages=messages,
+                    tools=tools or [],
+                    user_id=self.agent_data.user_id,
                 )
 
             self.log.debug(f"LLM response: {api_reply}")
@@ -272,6 +277,8 @@ class SubAgentRunner(BaseAgentRunner):
         }
         if tools is not None:
             payload["tools"] = tools
+        if self.agent_data.user_id:
+            payload["user_id"] = self.agent_data.user_id
 
         #流式状态
         reasoning_content = ""

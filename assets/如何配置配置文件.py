@@ -282,7 +282,10 @@
         "host":"127.0.0.1",#面板监听的地址，默认只绑本机；容器部署要写 0.0.0.0 才能从宿主机访问(可用环境变量 ATRI_WEB_PANEL_HOST 覆盖)
         "port":5125,#面板监听的端口，默认 5125(可用环境变量 ATRI_WEB_PANEL_PORT 覆盖)
         "access_token":"ATRI",#面板主令牌(登录口令)，建议32字符以上随机值；留空读环境变量 ATRI_PANEL_TOKEN，两者都没有时面板接口全部返回503，登录页用口令换取会话令牌（默认 4 小时有效）
-        "session_ttl_hours":4#登录会话的固定有效期（小时，1-24），默认 4；到期后 WebUI 自动退出登录
+        "session_ttl_hours":4,#登录会话的固定有效期（小时，1-24），默认 4；到期后 WebUI 自动退出登录
+        "mask_secrets":True,#配置接口是否对密钥打码(默认 True)：开启后 access_token/database.password/平台 token/供应商 api_key/MCP env 在面板里只显示 __KEEP__，保存时自动还原为旧值；设为 False 会回吐真实密钥(不建议)
+        "block_weak_token":False,#是否硬性拒绝弱主令牌登录(默认 False)：开启后主令牌短于 16 字符或与平台 access_token 相同，登录接口直接 403
+        "db_console_readonly":False#SQL 控制台是否只读(默认 False)：开启后只允许 select/show/explain 等查询语句，写语句返回 403
     },
     "tts":{#语音合成(TTS,可选，需自备 GPT-SoVITS 服务)，不配则使用内置默认情感与 document/audio/tts_reference 下的参考音频
         "api_url":"http://127.0.0.1:9880",#GPT-SoVITS 接口地址

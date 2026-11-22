@@ -1,3 +1,9 @@
+from .api_identity import (
+    derive_chat_api_user_id,
+    group_api_user_id,
+    private_api_user_id,
+    sub_agent_api_user_id,
+)
 from .cluster_utils import ClusterUtils
 from .cq_utils import escape_cq_param
 from .db_format import format_memory_records
@@ -40,6 +46,7 @@ __all__ = [
     "compress_image",
     "convert_to_jpeg",
     "construction_message_dict",
+    "derive_chat_api_user_id",
     "download_binary",
     "download_text",
     "estimate_tokens",
@@ -47,9 +54,12 @@ __all__ = [
     "extract_json_from_text",
     "format_duration",
     "format_memory_records",
+    "group_api_user_id",
     "HTTPClient",
     "is_qq",
     "poll_until_done",
+    "private_api_user_id",
+    "sub_agent_api_user_id",
     "jaro_winkler_similarity",
     "levenshtein_distance",
     "parse_time_to_timestamp",

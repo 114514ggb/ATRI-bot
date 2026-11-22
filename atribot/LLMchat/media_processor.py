@@ -2,7 +2,9 @@ from logging import Logger
 from typing import Optional
 
 from atribot.common_utils.file.image_utils import url_to_image_jpeg
+from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
+from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
 
 
@@ -14,8 +16,8 @@ class MediaProcessor:
     """
 
     def __init__(self) -> None:
-        config = container.get("config")
-        supplier = container.get("LLMSupplier")
+        config:atriConfig = container.get("config")
+        supplier:LLMConnectionManager = container.get("LLMSupplier")
         self.log: Logger = container.get_by_type(Logger).getChild("Media")
 
         # 图像识别
@@ -31,7 +33,8 @@ class MediaProcessor:
 
         # 音频识别
         try:
-            if detection_audio := config.model.detection_audio:
+            detection_audio = config.model.detection_audio
+            if detection_audio.model_name:
                 self._audio_api: Optional[universal_ai_api] = supplier.connections[
                     detection_audio.supplier
                 ].connection_object
@@ -46,7 +49,8 @@ class MediaProcessor:
 
         # 视频识别
         try:
-            if detection_video := config.model.detection_video:
+            detection_video = config.model.detection_video
+            if detection_video.model_name:
                 self._video_api: Optional[universal_ai_api] = supplier.connections[
                     detection_video.supplier
                 ].connection_object

@@ -99,6 +99,14 @@
             "supplier": "bigModel",
             "model_name": "GLM-4.1V-Thinking-Flash"
         },
+        "detection_audio": {
+            "supplier": "",
+            "model_name": ""
+        },
+        "detection_video": {
+            "supplier": "",
+            "model_name": ""
+        },
         "memory": {
             "summarize_model": {
                 "supplier": "",
@@ -144,7 +152,9 @@
     },
     "sand_box": {
         "type": "docker",
-        "image": "atri-sandbox:latest"
+        "image": "atri-sandbox:latest",
+        "tool_prompts": {},
+        "tools": {}
     },
     "tool_presets": {
         "group_chat": {
@@ -228,7 +238,10 @@
         "host": "127.0.0.1",
         "port": 5125,
         "access_token": "ATRI",
-        "session_ttl_hours": 4
+        "session_ttl_hours": 4,
+        "mask_secrets": true,
+        "block_weak_token": false,
+        "db_console_readonly": false
     },
     "tts": {
         "api_url": "http://127.0.0.1:9880",

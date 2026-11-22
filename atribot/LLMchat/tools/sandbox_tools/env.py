@@ -25,7 +25,7 @@ def _sandbox_config() -> dict:
     """读取 config.json 的 ``sand_box`` 配置块(失败时返回空字典)"""
     try:
         config = container.get("config")
-        value = getattr(config, "sand_box", None)
+        value = config.sand_box
         return dict(value) if value else {}
     except Exception:
         return {}

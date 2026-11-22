@@ -29,8 +29,8 @@ def _sandbox() -> Optional[SandBoxBase]:
 def _sandbox_config() -> dict:
     try:
         config = _cfg()
-        raw = (config._raw_config or {}).get("sand_box") or {}
-        document_root = getattr(getattr(config, "file_path", None), "document_root", None)
+        raw = dict(config.sand_box)
+        document_root = config.file_path.document_root
         return resolve_sandbox_config(raw, document_root)
     except Exception:
         return {}

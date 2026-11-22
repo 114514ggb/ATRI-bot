@@ -21,7 +21,7 @@ class privateChatTrigger:
     def __init__(self) -> None:
         self.log: Logger = container.get_by_type(Logger).getChild("PrivateChatTrigger")
         self.config: atriConfig = container.get_by_type(atriConfig)
-        self.private_chat_white_list: list = self.config.all_config.get("private_chat_white_list", [])
+        self.private_chat_white_list: list = self.config.private_chat_white_list
         self._root_user_id: int = self.config.root_user_id
         self.config.on_change("private_chat_white_list", self._on_private_white_list_changed)
         self.config.on_change("root_user_id", self._on_root_user_id_changed)

@@ -10,23 +10,23 @@ class model_api_basics(ABC):
     """LLM api 基类"""
     
     model_parameters = {
-        'stream': False,#是否流式输出如果设置为 True，将会以 SSE(server-sent events)的形式以流式发送消息增量消息流以 data: [DONE] 结尾
+        'stream': False,#是否流式输出如果设置为 True,将会以 SSE(server-sent events)的形式以流式发送消息增量消息流以 data: [DONE] 结尾
 
-        # 'frequency_penalty': 1.5,#介于 -2.0 和 2.0 之间的数字如果该值为正，那么新 token 会根据其在已有文本中的出现频率受到相应的惩罚，降低模型重复相同内容的可能性
+        # 'frequency_penalty': 1.5,#介于 -2.0 和 2.0 之间的数字如果该值为正,那么新 token 会根据其在已有文本中的出现频率受到相应的惩罚,降低模型重复相同内容的可能性
 
-        # 'presence_penalty':0.5, #介于 -2.0 和 2.0 之间的数字如果该值为正，那么新 token 会根据其是否已在已有文本中出现受到相应的惩罚，从而增加模型谈论新主题的可能性
+        # 'presence_penalty':0.5, #介于 -2.0 和 2.0 之间的数字如果该值为正,那么新 token 会根据其是否已在已有文本中出现受到相应的惩罚,从而增加模型谈论新主题的可能性
 
-        #'top_p':0.4,#作为调节采样温度的替代方案，模型会考虑前 top_p 概率的 token 的结果所以 0.1 就意味着只有包括在最高 10% 概率中的 token 会被考虑
+        #'top_p':0.4,#作为调节采样温度的替代方案,模型会考虑前 top_p 概率的 token 的结果所以 0.1 就意味着只有包括在最高 10% 概率中的 token 会被考虑
         
-        'temperature': 0.5,#采样温度，介于 0 和 2 之间更高的值，如 0.8，会使输出更随机，而更低的值，如 0.2，会使其更加集中和确定
+        'temperature': 0.5,#采样温度,介于 0 和 2 之间更高的值,如 0.8,会使输出更随机,而更低的值,如 0.2,会使其更加集中和确定
         # #不建议同时对'top_p','temperature'进行修改 
 
-        'max_tokens': 8192,#介于 1 到 8192 间的整数，限制一次请求中模型生成 completion 的最大 token 数输入 token 和输出 token 的总长度受模型的上下文长度的限制
+        'max_tokens': 8192,#介于 1 到 8192 间的整数,限制一次请求中模型生成 completion 的最大 token 数输入 token 和输出 token 的总长度受模型的上下文长度的限制
 
         'reasoning_effort':'high',
-        #推理努力程度，值可以是 "low", "medium", "high", "extreme"
-        #停用思考功能，可以将 reasoning_effort 设置为 "none"
-        #默认值为 "medium"更高的推理努力程度通常会导致更准确和详细的回答，但也可能需要更多的计算资源和时间
+        #推理努力程度,值可以是 "low", "medium", "high", "extreme"
+        #停用思考功能,可以将 reasoning_effort 设置为 "none"
+        #默认值为 "medium"更高的推理努力程度通常会导致更准确和详细的回答,但也可能需要更多的计算资源和时间
         # "extra_body": {
         #     "google": {
         #         "thinking_config": {
@@ -35,26 +35,26 @@ class model_api_basics(ABC):
         #         }
         #     }
         # }
-        #谷歌模型的openai兼容.思考总结是模型原始思考的合成版本，可帮助您深入了解模型的内部推理过程
-        #请注意，思考预算适用于模型的原始想法，而不适用于想法摘要
+        #谷歌模型的openai兼容.思考总结是模型原始思考的合成版本,可帮助您深入了解模型的内部推理过程
+        #请注意,思考预算适用于模型的原始想法,而不适用于想法摘要
         
         'tool_choice': "auto",#控制模型调用 tool 的行为
-        # # none 意味着模型不会调用任何 tool，而是生成一条消息
+        # # none 意味着模型不会调用任何 tool,而是生成一条消息
         # # auto 意味着模型可以选择生成一条消息或调用一个或多个 tool
         # # required 意味着模型必须调用一个或多个 tool
         # # 好像只有DS有
-        # # 通过 {"type": "function", "function": {"name": "my_function"}} 指定特定 tool，会强制模型调用该 tool
+        # # 通过 {"type": "function", "function": {"name": "my_function"}} 指定特定 tool,会强制模型调用该 tool
         
         # 'stop': None
-        #一个 string 或最多包含 16 个 string 的 list，在遇到这些词时，API 将停止生成更多的 token
+        #一个 string 或最多包含 16 个 string 的 list,在遇到这些词时,API 将停止生成更多的 token
 
         # 'response_format': { 
         #     "type": "text"
         # },
         #响应格式
         #设置为 { "type": "json_object" } 以启用 JSON 模式
-        # 注意: 使用 JSON 模式时，你还必须通过系统或用户消息指示模型生成 JSON
-        # 否则，模型可能会生成不断的空白字符，直到生成达到令牌限制，从而导致请求长时间运行并显得“卡住”
+        # 注意: 使用 JSON 模式时,你还必须通过系统或用户消息指示模型生成 JSON
+        # 否则,模型可能会生成不断的空白字符,直到生成达到令牌限制,从而导致请求长时间运行并显得“卡住”
     }
     """模型参数"""
     
@@ -93,13 +93,20 @@ class model_api_basics(ABC):
         ...
 
     @abstractmethod
-    async def generate_text_tools(self, model:str, messages:list, tools:list)->ChatCompletion:
-        """请求生成文本，全量默认参数
+    async def generate_text_tools(
+        self,
+        model:str,
+        messages:list,
+        tools:list,
+        user_id: str | None = None,
+    )->ChatCompletion:
+        """请求生成文本,全量默认参数
 
         Args:
             model (str): 模型
             messages (list): 上下文
             tools (list): 可使用工具
+            user_id (str | None): 请求体的 user_id,供应商侧隔离用
 
         Returns:
             dict: 原消息json
@@ -121,7 +128,7 @@ class model_api_basics(ABC):
     
     @abstractmethod
     async def generate_json_ample_stream(self, model: str, remainder: dict) -> ChatCompletion:
-        """向发起请求,获取json,参数自定,但是是以流式的方法处理数据，流式接受完成后返回总数据
+        """向发起请求,获取json,参数自定,但是是以流式的方法处理数据,流式接受完成后返回总数据
 
         Args:
             model (str): 模型名称
@@ -141,7 +148,7 @@ class model_api_basics(ABC):
         self.model_parameters |= new_parameters
     
     async def request_fetch_primary(self, model:str, messages:list[dict] ,tools:list, temperature:int = 0.3)->dict:
-        """向发起请求，返回主要内容
+        """向发起请求,返回主要内容
 
         Args:
             model (str): 模型
@@ -190,13 +197,13 @@ class model_api_basics(ABC):
         output_compression: int | None = None,
         **kwargs,
     ) -> list[str]:
-        """调用图像生成接口(open_ai兼容)，返回图片数据列表
+        """调用图像生成接口(open_ai兼容),返回图片数据列表
 
         Args:
             model: 图像生成模型名称
             prompt: 描述目标图像内容的文本提示词
-            response_format: 返回图片的格式，可选值为 b64_json 或 url,默认 b64_json
-            n: 本次请求生成的图片数量，默认为 1
+            response_format: 返回图片的格式,可选值为 b64_json 或 url,默认 b64_json
+            n: 本次请求生成的图片数量,默认为 1
             size: 图片尺寸
             quality: 图片质量
             style: 图片风格
@@ -208,9 +215,9 @@ class model_api_basics(ABC):
             **kwargs: 传递给底层 API 的其他额外参数
 
         Returns:
-            长度为 n 的字符串列表当 response_format="b64_json" 时，
+            长度为 n 的字符串列表当 response_format="b64_json" 时,
             列表元素为 Base64 编码的图片字符串；当 response_format="url"
-            时，列表元素为可直接访问的图片 URL
+            时,列表元素为可直接访问的图片 URL
 
         Raises:
             ValueError: 当 API 返回错误或响应格式不符合预期时抛出

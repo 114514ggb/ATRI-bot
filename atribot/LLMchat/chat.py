@@ -7,6 +7,7 @@ from logging import Logger
 from typing import Any, Awaitable, Callable, ClassVar, Coroutine, Dict, List
 
 from atribot.common_utils import (
+    derive_chat_api_user_id,
     download_text,
     extract_json_from_text,
     url_to_audio_mp3,
@@ -178,7 +179,7 @@ class ChatBasics(ABC):
         self.visual_sense = bool(model_info.get("visual_sense", False))
         self.audio_sense = bool(model_info.get("audio_sense", False))
         self.video_sense = bool(model_info.get("video_sense", False))
-        self.api_order = list(getattr(self.config.model, "standby_model", None) or [])
+        self.api_order = list(self.config.model.standby_model)
         self.template_request_simplify = GenerationRequestSimplify(
             model_api=self.model_api,
             model=model_name,
@@ -626,9 +627,9 @@ class GroupChat(ChatBasics):
         self._tool_chat_type = "group"
 
     def _on_model_config_applied(self) -> None:
-        """按 model.connect.user_global_context 决定群聊取用的上下文"""
-        connect = getattr(self.config.model, "connect", None)
-        if connect is not None and getattr(connect, "user_global_context", False):
+        """决定群聊取用的上下文与请求 user_id 维度"""
+        self._user_global_context: bool = bool(self.config.model.connect.user_global_context)
+        if self._user_global_context:
             self.get_context = lambda group_id,user_id : self.chat_manager.get_private_context(user_id)
         else:
             self.get_context = lambda group_id,user_id : self.chat_manager.get_group_context(group_id)
@@ -675,6 +676,7 @@ class GroupChat(ChatBasics):
             messages=original_context.get_messages(),
             message_data=event,
             tool_json=round_toolset,
+            user_id=derive_chat_api_user_id(group_id, user_id, self._user_global_context),
         )
         
         response = await self._request_model_with_fallback_(
@@ -802,6 +804,7 @@ class GroupChat(ChatBasics):
             messages=original_context.get_messages(),
             message_data=event,
             tool_json=round_toolset,
+            user_id=derive_chat_api_user_id(group_id, user_id, self._user_global_context),
         )
         
         response = await self._request_model_with_fallback_(

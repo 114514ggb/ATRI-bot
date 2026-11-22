@@ -1,6 +1,7 @@
 # from atribot.common import common
 from typing import overload
 
+from atribot.core.atri_config import atriConfig
 from atribot.core.service_container import container
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.universal_async_llm_api import universal_ai_api
@@ -11,7 +12,7 @@ from atribot.LLMchat.RAG.vector_store import MemoryVectorStore
 class RAGManager:
     
     def __init__(self):
-        self.config = container.get("config")
+        self.config:atriConfig = container.get("config")
         self.supplier: LLMConnectionManager = container.get("LLMSupplier")
         self.embedding_model = self.config.model.RAG.use_embedding_model.model_name
         self.embedding_api:universal_ai_api = self.supplier.get_filtration_connection(
