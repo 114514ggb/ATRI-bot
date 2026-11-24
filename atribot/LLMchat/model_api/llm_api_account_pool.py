@@ -28,10 +28,10 @@ class ai_api_account_pool(universal_ai_api):
 
         self.client:aiohttp.ClientSession|None = None
     
-    async def _client_post(self,data:dict)->dict:
-        max_retries = 3
+    async def _client_post(self,data:dict,max_attempts:int=3)->dict:
+        attempts = max(1, max_attempts)
         retry_delay = 0.5
-        for attempt in range(max_retries):
+        for attempt in range(attempts):
             try:
                 
                 async with self.client.post(
@@ -56,13 +56,13 @@ class ai_api_account_pool(universal_ai_api):
                 if 400 <= e.status < 500 and e.status != 429:
                     self.log.warning(f"client_post请求被拒绝(不重试): {e}")
                     raise
-                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
-                if attempt == max_retries - 1:
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次尝试失败): {e}")
+                if attempt == attempts - 1:
                     raise
                 await asyncio.sleep(retry_delay * attempt)
             except Exception as e:
-                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
-                if attempt == max_retries - 1:
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次尝试失败): {e}")
+                if attempt == attempts - 1:
                     raise e
                 await asyncio.sleep(retry_delay * attempt)
                 

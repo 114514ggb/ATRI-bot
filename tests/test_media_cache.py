@@ -92,6 +92,29 @@ async def test_cache_get_cleans_orphan_data(cache_dir):
 
 
 @pytest.mark.asyncio
+async def test_cache_get_validator_drops_invalid_entry(cache_dir):
+    """validator 校验失败(如历史半截图片)时删除条目并返回 None"""
+    await mc.cache_put("bad-image", b"not-a-complete-image", fmt="jpeg", mime="image/jpeg", converted=True)
+
+    def reject(_data: bytes) -> None:
+        raise OSError("图片数据不完整(truncated)")
+
+    assert await mc.cache_get("bad-image", validator=reject) is None
+    assert not (cache_dir / "bad-image.bin").exists()
+    assert not (cache_dir / "bad-image.json").exists()
+
+
+@pytest.mark.asyncio
+async def test_cache_get_validator_accepts_valid_entry(cache_dir):
+    """validator 通过时正常返回条目"""
+    await mc.cache_put("ok-image", b"complete", fmt="jpeg", mime="image/jpeg", converted=True)
+
+    entry = await mc.cache_get("ok-image", validator=lambda data: None)
+    assert entry is not None
+    assert entry.data == b"complete"
+
+
+@pytest.mark.asyncio
 async def test_cache_put_skips_oversize(cache_dir):
     """超过单文件体积上限不写入"""
     await mc.cache_put("big", b"x" * (mc.MAX_FILE_BYTES + 1), fmt="video/mp4", mime="video/mp4", converted=True)

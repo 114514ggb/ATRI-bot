@@ -15,6 +15,9 @@ class MediaProcessor:
     为不支持多模态输入的 LLM 提供预处理能力
     """
 
+    RECOGNIZE_ATTEMPTS = 1
+    """识别请求的最大尝试次数"""
+
     def __init__(self) -> None:
         config:atriConfig = container.get("config")
         supplier:LLMConnectionManager = container.get("LLMSupplier")
@@ -96,7 +99,8 @@ class MediaProcessor:
                         {"type": "image_url", "image_url": {"url": image_data}},
                         {"type": "text", "text": "请详细描述你看到的东西，上面是什么、有什么、在什么地方，如果上面有文字也要详细说清楚，如果有什么自己的理解可以说出来，如果上面是什么你认识的可以介绍一下"}
                     ]
-                }]
+                }],
+                max_attempts=self.RECOGNIZE_ATTEMPTS,
             )
             return response["choices"][0]["message"]["content"]
         except Exception as e:
@@ -123,7 +127,8 @@ class MediaProcessor:
                         {"type": "input_audio", "input_audio": {"url": audio_url}},
                         {"type": "text", "text": "请将音频内容转录为文字，并描述其中的语气、情绪或背景声音"}
                     ]
-                }]
+                }],
+                max_attempts=self.RECOGNIZE_ATTEMPTS,
             )
             return result["choices"][0]["message"]["content"]
         except Exception as e:
@@ -149,7 +154,8 @@ class MediaProcessor:
                         {"type": "video_url", "video_url": {"url": video_url}},
                         {"type": "text", "text": "请详细描述视频中的内容，包括画面、声音、人物行为和文字信息"}
                     ]
-                }]
+                }],
+                max_attempts=self.RECOGNIZE_ATTEMPTS,
             )
             return result["choices"][0]["message"]["content"]
         except Exception as e:

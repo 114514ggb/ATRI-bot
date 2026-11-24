@@ -600,6 +600,7 @@ class ChatBasics(ABC):
                     result = await url_to_image_jpeg(
                         message.url,
                         file_name=message.file_name,
+                        expected_size=message.file_size or None,
                     )
                     message_builder.add_image_base64(result.data, result.mime)
                 except Exception as e:

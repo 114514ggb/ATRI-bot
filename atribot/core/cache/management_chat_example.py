@@ -443,17 +443,19 @@ class ChatManager(ServiceBase):
         """添加群消息，附带构造
 
         将群聊消息上下文转换为 MessageBuilder 多模态消息
-        支持按类型控制保留的实际多媒体数量（不包括自己账号的多模态消息），超出数量的多模态项转为 CQ 码文本描述
+        目标模型支持该模态时，只发送 ai_chat.history_*_limit 数量的真实媒体，
+        其余同类媒体仅保留 CQ 码占位（不调用识别模型）；
+        目标模型不支持该模态时，全部交由 MediaProcessor 转为文本描述
 
         Args:
             group_id: 群组ID
             builder: 消息构建器
-            including_pictures: True = 按 ai_chat.history_image_limit 保留实际图片；
-                                False = 使用 MediaProcessor 转为文本描述
-            including_audios: True = 按 ai_chat.history_audio_limit 保留实际音频；
-                              False = 使用 MediaProcessor 转为文本描述
-            including_videos: True = 按 ai_chat.history_video_limit 保留实际视频；
-                              False = 使用 MediaProcessor 转为文本描述
+            including_pictures: True = 按 ai_chat.history_image_limit 发送真实图片（超出仅占位）；
+                                False = 全部使用 MediaProcessor 转为文本描述
+            including_audios: True = 按 ai_chat.history_audio_limit 发送真实音频（超出仅占位）；
+                              False = 全部使用 MediaProcessor 转为文本描述
+            including_videos: True = 按 ai_chat.history_video_limit 发送真实视频（超出仅占位）；
+                              False = 全部使用 MediaProcessor 转为文本描述
 
         Returns:
             MessageBuilder: 构造完成的消息构建器
@@ -501,6 +503,11 @@ class ChatManager(ServiceBase):
                             f"[CQ:image,file={segment.file_name or 'unknown'}]"
                         )
                         builder.add_text_left(cq_text)
+                    elif including_pictures:
+                        summary = f",summary:{segment.summary}" if segment.summary else ""
+                        builder.add_text_left(
+                            f"[CQ:image,file={segment.file_name or 'unknown'}{summary}]"
+                        )
                     else:
                         desc = await self._segment_text_description(segment, "image")
                         builder.add_text_left(f"[CQ:image,file={segment.file_name or 'unknown'},summary:{desc}]")
@@ -527,8 +534,13 @@ class ChatManager(ServiceBase):
                                 f"[CQ:record,file={segment.file_name or 'unknown'},summary:{desc}]"
                             )
                     else:
-                        desc = await self._segment_text_description(segment, "audio")
-                        builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{desc}]")
+                        if including_audios:
+                            builder.add_text_left(
+                                f"[CQ:record,file={segment.file_name or 'unknown'}]"
+                            )
+                        else:
+                            desc = await self._segment_text_description(segment, "audio")
+                            builder.add_text_left(f"[CQ:record,file={segment.file_name or 'unknown'},summary:{desc}]")
 
                 elif isinstance(segment, VideoSegment):
                     if remaining_videos != 0:
@@ -545,8 +557,13 @@ class ChatManager(ServiceBase):
                         )
                         builder.add_text_left(cq_text)
                     else:
-                        desc = await self._segment_text_description(segment, "video")
-                        builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{desc}]")
+                        if including_videos:
+                            builder.add_text_left(
+                                f"[CQ:video,file={segment.file_name or 'unknown'}]"
+                            )
+                        else:
+                            desc = await self._segment_text_description(segment, "video")
+                            builder.add_text_left(f"[CQ:video,file={segment.file_name or 'unknown'},summary:{desc}]")
 
                 else:
                     builder.add_text_left(segment.__str__())

@@ -111,9 +111,9 @@ export const SCHEMA = [
       { path: 'ai_chat.ai_max_record', label: '上下文轮数', type: 'number', desc: '上下文保留的对话轮数（1 轮 = 用户 1 条 + AI 回复）' },
       { path: 'ai_chat.group_max_record', label: '群消息缓存', type: 'number', desc: '群消息缓存条数（作为 AI 上下文）' },
       { path: 'ai_chat.private_max_record', label: '私聊上下文轮数', type: 'number' },
-      { path: 'ai_chat.history_image_limit', label: '历史图片保留数', type: 'number', desc: '历史上下文最多保留几张真实图片；0=全部转文字描述，-1=不限制，默认 2' },
-      { path: 'ai_chat.history_audio_limit', label: '历史音频保留数', type: 'number', desc: '历史上下文最多保留几段真实音频；0=全部转文字描述，-1=不限制，默认 1' },
-      { path: 'ai_chat.history_video_limit', label: '历史视频保留数', type: 'number', desc: '历史上下文最多保留几段真实视频；0=全部转文字描述，-1=不限制，默认 1' },
+      { path: 'ai_chat.history_image_limit', label: '历史图片数量上限', type: 'number', desc: '历史上下文最多发送几张真实图片；支持图像识别的模型只接收这么多张，其余只留占位，不支持时全部转文字描述；-1=不限制，默认 2' },
+      { path: 'ai_chat.history_audio_limit', label: '历史音频数量上限', type: 'number', desc: '历史上下文最多发送几段真实音频；支持音频的模型只接收这么多段，其余只留占位，不支持时全部转文字描述；-1=不限制，默认 1' },
+      { path: 'ai_chat.history_video_limit', label: '历史视频数量上限', type: 'number', desc: '历史上下文最多发送几段真实视频；支持视频的模型只接收这么多段，其余只留占位，不支持时全部转文字描述；-1=不限制，默认 1' },
     ],
   },
   {

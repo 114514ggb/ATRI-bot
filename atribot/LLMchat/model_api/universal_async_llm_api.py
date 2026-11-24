@@ -69,10 +69,10 @@ class universal_ai_api(model_api_basics,StreamProcessor):
         """异步关闭客户端"""
         await self.client.close()
 
-    async def _client_post(self,data:Dict)->Dict:
-        max_retries = 3
+    async def _client_post(self,data:Dict,max_attempts:int=3)->Dict:
+        attempts = max(1, max_attempts)
         retry_delay = 0.5
-        for attempt in range(max_retries):
+        for attempt in range(attempts):
             try:
                 async with self.client.post(
                     self.base_url,
@@ -96,13 +96,13 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                 if 400 <= e.status < 500 and e.status != 429:
                     self.log.warning(f"client_post请求被拒绝(不重试): {e}")
                     raise
-                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
-                if attempt == max_retries - 1:
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次尝试失败): {e}")
+                if attempt == attempts - 1:
                     raise
                 await asyncio.sleep(retry_delay * attempt)
             except Exception as e:
-                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次重试): {e}")
-                if attempt == max_retries - 1:
+                self.log.warning(f"client_post内部请求(第 {attempt + 1} 次尝试失败): {e}")
+                if attempt == attempts - 1:
                     raise e
                 await asyncio.sleep(retry_delay * attempt)
     
@@ -203,13 +203,24 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                 else:
                     raise ValueError(f"LLM API请求为空，已重试 {max_retries} 次")
 
-    async def generate_text_lightweight(self, model: str, messages: ChatMessages) -> ChatCompletion:
-        """请求生成文本,轻量参数,无工具调用,返回全部内容"""
+    async def generate_text_lightweight(
+        self,
+        model: str,
+        messages: ChatMessages,
+        max_attempts: int = 3,
+    ) -> ChatCompletion:
+        """请求生成文本,轻量参数,无工具调用,返回全部内容
+
+        Args:
+            model: 模型名
+            messages: 消息列表
+            max_attempts: 最大尝试次数（含首次请求），识别类辅助调用可传 1 关闭重试
+        """
         payload = {
             "model": model,
             "messages": messages,
         }
-        return await self._client_post(payload)
+        return await self._client_post(payload, max_attempts=max_attempts)
     
     async def generate_json_ample(self, model: str, remainder: dict[str, Any]) -> ChatCompletion:
         payload = {"model": model, **remainder}

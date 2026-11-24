@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -100,10 +101,18 @@ def make_cache_key(kind: str, source: str, file_name: str | None, params: str) -
     return hashlib.sha1(raw.encode("utf-8")).hexdigest()
 
 
-async def cache_get(key: str) -> MediaCacheEntry | None:
+async def cache_get(
+    key: str,
+    validator: Callable[[bytes], None] | None = None,
+) -> MediaCacheEntry | None:
     """读取缓存条目
 
-    不存在或损坏(meta 缺失/数据长度不匹配)返回 None
+    不存在或损坏(meta 缺失/数据长度不匹配/validator 校验失败)返回 None
+
+    Args:
+        key: 缓存键
+        validator: 可选的内容校验器，抛异常即判定条目损坏并删除(用于淘汰
+            历史上写入的半截图片等"长度自洽但内容不可用"的条目)
     """
     data_path, meta_path = _cache_paths(key)
     try:
@@ -121,13 +130,16 @@ async def cache_get(key: str) -> MediaCacheEntry | None:
         info = json.loads(meta)
         if info.get("size") != len(data):
             raise ValueError("缓存数据长度不匹配，判定为损坏")
-        return MediaCacheEntry(
+        entry = MediaCacheEntry(
             data=data,
             fmt=info["fmt"],
             mime=info["mime"],
             converted=info["converted"],
         )
-    except (KeyError, json.JSONDecodeError, ValueError):
+        if validator is not None:
+            validator(data)
+        return entry
+    except (KeyError, json.JSONDecodeError, ValueError, OSError):
         await asyncio.to_thread(_remove_entry, data_path, meta_path)
         return None
 

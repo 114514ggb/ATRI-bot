@@ -102,7 +102,8 @@ class AIChatConfig:
     private_max_record: int = 20
     """私聊上下文轮数"""
     history_image_limit: int = 2
-    """历史上下文保留的真实图片数（-1 不限制，0 全部转文字）"""
+    """历史上下文发送的真实图片数量上限；支持图像的模型只接收这么多张，
+    其余仅保留 CQ 占位；不支持图像的模型全部转文字描述（-1 不限制）"""
     history_audio_limit: int = 1
     """同上，音频"""
     history_video_limit: int = 1

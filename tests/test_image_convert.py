@@ -4,13 +4,16 @@
 完全损坏数据抛出异常且不入缓存、尾部截断图片容忍处理、截断重试逻辑。
 """
 
+import base64
 import io
+import threading
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageFile
 
 from atribot.common_utils.file import media_cache as mc
 from atribot.common_utils.file.image_utils import (
+    _assert_image_complete,
     compress_image,
     convert_to_jpeg,
     url_to_image_jpeg,
@@ -183,3 +186,101 @@ async def test_url_to_image_jpeg_retries_on_truncated(image_cache_dir, monkeypat
     assert result.fmt == "jpeg"
     assert result.mime == "image/jpeg"
     assert call_count == 2  # 第一次失败,重试成功
+
+
+def test_convert_to_jpeg_never_touches_global_lenient_flag():
+    """转码不再修改 ImageFile.LOAD_TRUNCATED_IMAGES(并发下会被别的线程还原)"""
+    assert ImageFile.LOAD_TRUNCATED_IMAGES is False
+    convert_to_jpeg(_jpeg_bytes(), max_size_kb=1024)
+    assert ImageFile.LOAD_TRUNCATED_IMAGES is False
+
+
+def test_convert_to_jpeg_rejects_truncated_when_pil_lenient(monkeypatch):
+    """即使外部把 PIL 设为宽容解码,截断图也必须被容器级校验拒绝"""
+    monkeypatch.setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
+    with pytest.raises(OSError) as excinfo:
+        convert_to_jpeg(_truncated_jpeg_bytes(), max_size_kb=1024)
+    assert "truncated" in str(excinfo.value).lower()
+
+
+def test_assert_image_complete_detects_missing_eoi():
+    """缺少 JPEG 结束标记(典型下载截断)会被识别"""
+    raw = _jpeg_bytes(size=512)
+    assert raw.endswith(b"\xff\xd9")
+    with pytest.raises(OSError):
+        _assert_image_complete(raw[:-2])
+
+
+def test_assert_image_complete_accepts_complete_formats():
+    """完整 JPEG/PNG/GIF 不被误判"""
+    _assert_image_complete(_jpeg_bytes())
+    _assert_image_complete(_png_bytes())
+    _assert_image_complete(_animated_gif_bytes())
+
+
+def test_convert_to_jpeg_downscales_long_side_proportionally():
+    """最长边超限时等比例缩小(不裁剪)"""
+    buf = io.BytesIO()
+    Image.new("RGB", (4000, 1000), color="white").save(buf, format="PNG")
+
+    result = convert_to_jpeg(buf.getvalue(), max_size_kb=None, max_side=1000)
+
+    with Image.open(io.BytesIO(result)) as img:
+        assert img.size == (1000, 250)
+
+
+def test_convert_to_jpeg_tiny_budget_returns_valid_jpeg():
+    """体积上限极小、缩到下限时也不能返回空字节"""
+    noise = bytes(range(256)) * (800 * 600 * 3 // 256)
+    buf = io.BytesIO()
+    Image.frombytes("RGB", (800, 600), noise).save(buf, format="PNG")
+
+    result = convert_to_jpeg(buf.getvalue(), max_size_kb=1)
+
+    assert result
+    with Image.open(io.BytesIO(result)) as img:
+        img.verify()
+
+
+def test_truncated_rejected_under_concurrent_conversions():
+    """并发转码时截断图仍必须全部被拒绝"""
+    good = _jpeg_bytes(size=256)
+    bad = _truncated_jpeg_bytes()
+    truncated_errors: list[str] = []
+    unexpected: list[Exception] = []
+
+    def convert(raw: bytes) -> None:
+        try:
+            convert_to_jpeg(raw, max_size_kb=1024)
+        except OSError as exc:
+            truncated_errors.append(str(exc))
+        except Exception as exc:  # pragma: no cover - 不应发生
+            unexpected.append(exc)
+
+    threads = [threading.Thread(target=convert, args=(bad,)) for _ in range(6)]
+    threads += [threading.Thread(target=convert, args=(good,)) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert unexpected == []
+    assert len(truncated_errors) == 6
+    assert ImageFile.LOAD_TRUNCATED_IMAGES is False
+
+
+@pytest.mark.asyncio
+async def test_url_to_image_jpeg_rebuilds_corrupt_cached_entry(image_cache_dir):
+    """命中历史残缺缓存条目时丢弃并从源重新下载/转码"""
+    path = image_cache_dir / "pic.jpg"
+    path.write_bytes(_jpeg_bytes(size=128))
+    source = File.from_local_path(str(path))
+    key = mc.make_cache_key("image", source.file, "pic.jpg", "kb=2048;side=2048")
+    await mc.cache_put(key, _truncated_jpeg_bytes(), "jpeg", "image/jpeg", True)
+
+    result = await url_to_image_jpeg(source, file_name="pic.jpg")
+
+    decoded = base64.b64decode(result.data)
+    _assert_image_complete(decoded)
+    with Image.open(io.BytesIO(decoded)) as img:
+        img.load()

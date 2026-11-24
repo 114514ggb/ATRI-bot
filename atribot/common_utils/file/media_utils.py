@@ -60,18 +60,21 @@ def _source_str(source: str | File) -> str:
 async def _load_with_cache(
     key: str,
     produce: Callable[[], Awaitable[tuple[bytes, MediaConvertResult]]],
+    validator: Callable[[bytes], None] | None = None,
 ) -> MediaConvertResult:
     """取锁→查缓存命中直接返回；未命中调 produce() 生成结果并写入缓存
 
     Args:
         key: 缓存键
         produce: 生成 (待缓存字节, MediaConvertResult) 的异步回调
+        validator: 可选的内容校验器；命中缓存或写入前校验失败都会抛异常，
+            命中失败时会删除损坏条目并重新生成
 
     Returns:
         MediaConvertResult,命中缓存或由 produce() 生成
     """
     async with _get_lock(key):
-        entry = await cache_get(key)
+        entry = await cache_get(key, validator=validator)
         if entry is not None:
             return MediaConvertResult(
                 data=entry.to_base64(),
@@ -80,6 +83,8 @@ async def _load_with_cache(
                 converted=entry.converted,
             )
         cache_bytes, result = await produce()
+        if validator is not None:
+            validator(cache_bytes)
         await cache_put(key, cache_bytes, result.fmt, result.mime, result.converted)
         return result
 
