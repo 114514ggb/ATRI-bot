@@ -188,6 +188,44 @@ async def test_url_to_image_jpeg_retries_on_truncated(image_cache_dir, monkeypat
     assert call_count == 2  # 第一次失败,重试成功
 
 
+@pytest.mark.asyncio
+async def test_url_to_image_jpeg_declared_size_string_matches_no_warning(
+    image_cache_dir, monkeypatch
+):
+    """消息声明的 file_size 是字符串且与实际字节数一致时不应告警
+
+    OneBot 实现常把 file_size 发成 ``"67512"`` 这类字符串,若直接与
+    ``len(data)`` 比较会恒不相等,产生"声明=67512 实际=67512"的假告警。
+    """
+    from atribot.common_utils.file import image_utils
+
+    data = _jpeg_bytes(size=128)
+    path = image_cache_dir / "pic.jpg"
+    path.write_bytes(data)
+    source = File.from_local_path(str(path))
+
+    warnings: list[str] = []
+
+    class _FakeLogger:
+        def getChild(self, name: str) -> "_FakeLogger":
+            return self
+
+        def warning(self, msg: str, *args) -> None:
+            warnings.append(msg % args)
+
+    class _FakeContainer:
+        def get_by_type(self, _cls) -> _FakeLogger:
+            return _FakeLogger()
+
+    monkeypatch.setattr(image_utils, "container", _FakeContainer())
+
+    await url_to_image_jpeg(
+        source, file_name="pic.jpg", expected_size=str(len(data))
+    )
+
+    assert warnings == []
+
+
 def test_convert_to_jpeg_never_touches_global_lenient_flag():
     """转码不再修改 ImageFile.LOAD_TRUNCATED_IMAGES(并发下会被别的线程还原)"""
     assert ImageFile.LOAD_TRUNCATED_IMAGES is False

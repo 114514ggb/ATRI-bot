@@ -15,7 +15,7 @@ from atribot.common_utils.file.media_utils import (
 )
 from atribot.common_utils.http_client import HTTPClient
 from atribot.core.service_container import container
-from atribot.core.type.chat_message_types import File
+from atribot.core.type.chat_message_types import File, to_int
 
 _MAX_DOWNLOAD_RETRIES: int = 2
 IMAGE_MAX_BYTES = 30 * 1024 * 1024
@@ -316,7 +316,7 @@ async def url_to_image_jpeg(
     max_bytes: int = IMAGE_MAX_BYTES,
     file_name: str | None = None,
     max_side: int | None = IMAGE_MAX_SIDE,
-    expected_size: int | None = None,
+    expected_size: int | str | None = None,
 ) -> MediaConvertResult:
     """下载图片并统一转换为 JPEG base64
 
@@ -326,7 +326,7 @@ async def url_to_image_jpeg(
         max_bytes: 最大下载字节数,默认 30MB
         file_name: 文件名(QQ 媒体为内容哈希),作为缓存键
         max_side: 最长边上限(px),超出等比例缩小;None/0 不限制
-        expected_size: 消息声明的原始字节数(仅用于不一致时告警,不作为失败依据)
+        expected_size: 消息声明的原始字节数(仅用于不一致时告警,不作为失败依据);可为字符串
 
     Returns:
         MediaConvertResult
@@ -335,6 +335,7 @@ async def url_to_image_jpeg(
         Exception: 下载失败或图片损坏/截断时抛出,且不入缓存
     """
     src = _source_str(source)
+    declared_size = to_int(expected_size)
     key = make_cache_key(
         "image", src, file_name, f"kb={max_size_kb};side={max_side}"
     )
@@ -356,10 +357,10 @@ async def url_to_image_jpeg(
                 _, data = await resolve_file_to_bytes(
                     source, "image", max_bytes=max_bytes
                 )
-                if expected_size and len(data) != expected_size and logger:
+                if declared_size and len(data) != declared_size and logger:
                     logger.warning(
                         "图片下载字节数与消息声明不一致(声明=%s 实际=%s): %s",
-                        expected_size,
+                        declared_size,
                         len(data),
                         src,
                     )

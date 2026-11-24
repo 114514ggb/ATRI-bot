@@ -632,6 +632,22 @@ class UnknownSegment(MessageSegment):
         return f"[CQ:{self._raw_type},data:{str(self.data)[:1000]}]"
 
 
+def to_int(value: Any, default: int = 0) -> int:
+    """尽力把字符串/数字转换为整数"""
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if value is None:
+        return default
+    try:
+        return int(str(value).strip())
+    except ValueError:
+        return default
+
+
 def parse_onebot_segments(raw_segments: List[Dict[str, Any]]) -> List[MessageSegment]:
     """将 OneBot 原始消息段列表(List[Dict]) 解析为 MessageSegment 对象列表
 
@@ -657,7 +673,7 @@ def parse_onebot_segments(raw_segments: List[Dict[str, Any]]) -> List[MessageSeg
                 file_name=d.get("file"),
                 url=d.get("url"),
                 path=d.get("path"),
-                file_size=d.get("file_size", 0),
+                file_size=to_int(d.get("file_size")),
                 summary=d.get("summary"),
             ))
 
@@ -680,7 +696,7 @@ def parse_onebot_segments(raw_segments: List[Dict[str, Any]]) -> List[MessageSeg
                 file_name=d.get("file"),
                 url=d.get("url"),
                 path=d.get("path"),
-                file_size=d.get("file_size", 0),
+                file_size=to_int(d.get("file_size")),
             ))
 
         elif t == MessageSegmentType.FORWARD.value:
@@ -693,7 +709,7 @@ def parse_onebot_segments(raw_segments: List[Dict[str, Any]]) -> List[MessageSeg
                 file_name=d.get("file"),
                 url=d.get("url"),
                 path=d.get("path"),
-                file_size=d.get("file_size", 0),
+                file_size=to_int(d.get("file_size")),
             ))
 
         elif t == MessageSegmentType.VIDEO.value:
@@ -703,7 +719,7 @@ def parse_onebot_segments(raw_segments: List[Dict[str, Any]]) -> List[MessageSeg
                 file_name=d.get("file"),
                 url=d.get("url"),
                 path=d.get("path"),
-                file_size=d.get("file_size", 0),
+                file_size=to_int(d.get("file_size")),
                 thumb=d.get("thumb"),
             ))
 
