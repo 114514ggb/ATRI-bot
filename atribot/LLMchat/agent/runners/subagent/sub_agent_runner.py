@@ -320,10 +320,10 @@ class SubAgentRunner(BaseAgentRunner):
 
                     current = tool_calls[index]
 
-                    if "id" in tool_call_delta:
+                    if tool_call_delta.get("id"):
                         current["id"] += tool_call_delta["id"]
 
-                    if "type" in tool_call_delta:
+                    if tool_call_delta.get("type"):
                         current["type"] = tool_call_delta["type"]
 
                     if "function" in tool_call_delta:

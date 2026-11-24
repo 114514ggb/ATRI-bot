@@ -156,6 +156,10 @@ class universal_ai_api(model_api_basics,StreamProcessor):
                     return                 
             
             except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if isinstance(e, aiohttp.ClientResponseError) and 400 <= e.status < 500 and e.status != 429:
+                    self.log.warning(f"流式请求被拒绝(不重试): {e}")
+                    raise e
+                
                 if has_yielded:
                     self.log.exception(f"流式请求在传输中途中断: {e}。由于已传输部分数据，停止重试以防数据重复。")
                     raise e

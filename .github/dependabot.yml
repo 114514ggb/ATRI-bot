@@ -23,3 +23,7 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(ci)"
+    groups:
+      all-actions:
+        patterns:
+          - "*"

@@ -81,10 +81,10 @@ class StreamProcessor:
                     })
                 current = tool_calls[index]
 
-            if "id" in tool_call_delta:
+            if tool_call_delta.get("id"):
                 current["id"] = tool_call_delta["id"]
             
-            if "type" in tool_call_delta:
+            if tool_call_delta.get("type"):
                 current["type"] = tool_call_delta["type"]
             
             if "function" in tool_call_delta:
@@ -210,9 +210,9 @@ class StreamProcessor:
                     
                     current = tool_calls[index]
                     
-                    if "id" in tool_call_delta:
+                    if tool_call_delta.get("id"):
                         current["id"] = tool_call_delta["id"]
-                    if "type" in tool_call_delta:
+                    if tool_call_delta.get("type"):
                         current["type"] = tool_call_delta["type"]
                     if "extra_content" in tool_call_delta:
                         current["extra_content"] = tool_call_delta["extra_content"]

@@ -461,6 +461,9 @@ class Context():
 
     def add_assistant_tool_message(self, content: str | None, tool_calls: list[ToolCallDict], reasoning_content: str | None = None) -> None:
         """添加助手调用工具消息"""
+        for tool_call in tool_calls:
+            tool_call["type"] = tool_call.get("type") or "function"
+
         tool_message: AssistantMessage = {
             "role": "assistant",
             "tool_calls": tool_calls
