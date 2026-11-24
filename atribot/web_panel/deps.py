@@ -35,7 +35,7 @@ _log_buffer_lock = Lock()
 
 # 第三方库的 DEBUG/INFO 帧/心跳日志（websockets 的 > TEXT / PING / PONG 等）过于嘈杂，
 # 面板日志流对这类来源只收录 WARNING 及以上；自家日志（atri-bot.* 等）不受影响
-_NOISY_LOGGERS = ("websockets.", "asyncio", "httpx.", "httpcore.", "urllib3", "aiohttp.")
+_NOISY_LOGGERS = ("websockets.", "asyncio", "httpx.", "httpx2.", "httpcore.", "httpcore2.", "urllib3", "aiohttp.")
 
 
 class _PanelLogHandler(logging.Handler):

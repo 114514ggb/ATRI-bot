@@ -558,6 +558,9 @@ async with db as db:
 - **配置变更回调（`atriConfig`）**: `config.on_change(section, callback)` 订阅顶层配置段（回调入参为该段最新值，可返回 awaitable；返回取消订阅函数）、`off_change()` 取消、`notify_change()` 手动触发；`reload_section(key)` 重载后**自动通知**订阅者（schema 内的段会先按 `CONFIG_DEFAULTS` 补齐缺失键再通知；WebUI 保存时也按同样规则规范化两侧后再判断是否变化，用户省略缺省键不算改动）。WebUI `POST /api/config` 与回滚会用 `web_panel/routes/config.py::_hot_reload_main_config()` 对比出变化的顶层段并逐个重载（返回 `hot_reloaded`）。当前订阅者：`ToolCalls`（`tool_presets`）、`initiativeChat`（关键词）、`WhitelistMiddleware`（`group_white_list`/`root_user_id`）、`privateChatTrigger`（`private_chat_white_list`/`root_user_id`）、`GroupChat`/`PrivateChat`（`model`）
 - **群聊/私聊分模型**: `config.get_chat_model("group_chat" | "private_chat")` 返回 `(supplier, model_name)`：`model.group_chat` / `model.private_chat` 覆盖块优先，缺省或空串回退 `model.connect`。`ChatBasics._apply_model_config()` 在初始化和 `model` 段变更时重建 `model_api` / 多模态能力 / `api_order` / `template_request_simplify`；指向未加载的供应商或模型时只告警并保留旧模型（`supplier_config.json` 改动仍需重启）
 - **运行测试**: 项目根目录 `uv run python -m pytest tests/ -q`
+- **依赖升级 / 同步导出**: 改 `pyproject.toml` 依赖后，`uv.lock` 与三份 `requirements-*.txt` 必须一起更新（CI 与 Docker 直接装后者，只改 lock 会留着旧版本被 Dependabot 继续报漏洞）：
+  `uv lock --upgrade` → `uv pip compile pyproject.toml -o requirements-{linux,macos,windows}.txt --python-platform {linux,macos,windows} --upgrade`
+  （`uv pip compile` 默认会沿用输出文件里已有的固定版本，**必须加 `--upgrade`**）。传递依赖的安全下限写在 `[tool.uv] constraint-dependencies`，不要直接改 lock
 
 ````
 环境里面要运行py代码请使用uv

@@ -5,24 +5,24 @@ description = "一个叫ATRI的qq机器人"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "aiohttp[speedups]>=3.13.3",
-    "mcp>=1.26.0",
-    "openai>=1.82.0",
-    "fastapi>=0.115",
-    "aiomysql>=0.3.0",
-    "websockets>=15.0.1",
+    "aiohttp[speedups]>=3.14.5",
+    "mcp>=2.3.0",
+    "openai>=3.58.0",
+    "fastapi>=0.165.0",
+    "aiomysql>=0.3.2",
+    "websockets>=17.4",
     "bs4>=0.0.2",
-    "psutil>=7.0.0",
-    "pyahocorasick>=2.2.0",
-    "asyncpg>=0.30.0",
-    "docker>=7.1.0",
-    "croniter>=6.0.0",
-    "trafilatura>=2.0.0",
+    "psutil>=7.2.2",
+    "pyahocorasick>=2.3.1",
+    "asyncpg>=0.32.0",
+    "docker>=7.2.0",
+    "croniter>=7.0.0",
+    "trafilatura>=2.4.0",
     "strictyaml>=1.7.3",
-    "pyyaml>=6.0",
-    "pillow>=12.1.0",
-    "numpy>=2.4.2",
-    "json-repair>=0.58.3",
+    "pyyaml>=6.0.4",
+    "pillow>=13.0.0",
+    "numpy>=2.5.5",
+    "json-repair>=0.64.9",
 ]
 
 [tool.ruff]
@@ -53,6 +53,19 @@ default = true
 
 [dependency-groups]
 dev = [
-    "ruff>=0.16.0",
-    "pytest-asyncio>=0.25.0",
+    "ruff>=0.17.6",
+    "pytest-asyncio>=1.5.0",
+]
+
+[tool.uv]
+constraint-dependencies = [
+    "brotli>=1.2.1",
+    "certifi>=2026.11.20",
+    "httpcore2>=2.16.2",
+    "httpx2>=2.16.2",
+    "multidict>=6.9.1",
+    "opentelemetry-api>=1.45.2",
+    "pyjwt>=2.15.1",
+    "soupsieve>=4.0.0",
+    "urllib3>=2.8.0",
 ]

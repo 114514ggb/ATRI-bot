@@ -9,7 +9,7 @@ from logging import Logger
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-import httpx
+import httpx2
 import mcp
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import streamable_http_client
@@ -92,7 +92,7 @@ class MCPClient:
                 http_client = await self.exit_stack.enter_async_context(
                     create_mcp_http_client(
                         headers=cfg.get("headers", {}),
-                        timeout=httpx.Timeout(
+                        timeout=httpx2.Timeout(
                             timeout.total_seconds(),
                             read=sse_read_timeout.total_seconds(),
                         ),
