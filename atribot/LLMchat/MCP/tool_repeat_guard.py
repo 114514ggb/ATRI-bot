@@ -25,7 +25,7 @@ def build_repeat_hint(tool_name: str, streak: int) -> str:
     """
     return (
         "<repeat_tool_hint>"
-        f"你已连续 {streak} 次调用工具「{tool_name}」。"
+        f"你已连续多次调用工具「{tool_name}」。"
         "请先确认继续调用是否必要:若已有结果足够完成任务,请立即停止调用工具并直接给出结论;"
         "若确实需要继续,请调整参数或换用其他方式,避免无意义的重复调用。"
         "</repeat_tool_hint>"
