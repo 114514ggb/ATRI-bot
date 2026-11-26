@@ -23,6 +23,14 @@
             },
             "enabled": false,
             "source_name": ""
+        },
+        "luckylillia": {
+            "adapter": "luckylillia",
+            "connection_type": "WebSocket_client",
+            "access_token": "",
+            "url": "127.0.0.1:8094",
+            "enabled": false,
+            "source_name": ""
         }
     },
     "network": {

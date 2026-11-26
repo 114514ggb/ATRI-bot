@@ -271,7 +271,15 @@ class ForwardSegment(MessageSegment):
     def __str__(self) -> str:
         if self.content:
             from atribot.core.type.onebot_event_types import OneBotEvent
-            content_str = "".join(OneBotEvent.from_dict(m).llm_formatted_message for m in self.content)
+
+            parts = []
+            for node in self.content:
+                try:
+                    parts.append(OneBotEvent.from_dict(node).llm_formatted_message)
+                except Exception:
+                    # 节点字段不完整时降级为纯文本，避免整条消息格式化失败
+                    parts.append(str(node.get("content") or node.get("message") or node))
+            content_str = "".join(parts)
             return f"[CQ:转发消息,id={self.id},content={content_str[:5000]}]"
         return f"[CQ:forward,id={self.id}]"
     

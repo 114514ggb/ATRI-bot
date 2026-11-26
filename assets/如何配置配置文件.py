@@ -12,6 +12,16 @@
             "enabled": True,               # 可选,默认 true
             "source_name": ""              # 可选,空=取平台名
         },
+        "luckylillia": {
+            "adapter": "luckylillia",
+            "connection_type": "WebSocket_client",
+            "access_token": "",
+            "url": "127.0.0.1:8094",
+            "enabled": False,
+            "source_name": ""
+        },
+
+        
         #WebSocket_server
         "napcat_server": {
             "adapter": "onebot",
