@@ -31,6 +31,7 @@ from atribot.LLMchat.agent.runners.response import (
 )
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import ToolSet
+from atribot.LLMchat.MCP.tool_repeat_guard import ToolRepeatGuard
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.llm_types import ChatCompletion, ChatCompletionChunk, ChatCompletionMessage
@@ -94,6 +95,9 @@ class SubAgentRunner(BaseAgentRunner):
 
         #当前步的 StepSummary
         self._last_summary: Optional[StepSummary] = None
+
+        #连续重复工具调用检测
+        self._repeat_guard: ToolRepeatGuard = ToolRepeatGuard()
 
     @property
     def _supplier_api(self) -> model_api_basics:
@@ -569,14 +573,20 @@ class SubAgentRunner(BaseAgentRunner):
         Yields:
             ``ToolCallResultChunk`` 事件
         """
+        hint_by_call_id: Dict[str, str] = {}
         for tc in tool_calls:
             function = tc.get("function", {})
             t_name: str = function.get("name", "")
+            arguments_str = function.get("arguments", "{}")
             try:
-                t_args: Dict[str, Any] = json.loads(function.get("arguments", "{}"))
+                t_args: Dict[str, Any] = json.loads(arguments_str)
             except (json.JSONDecodeError, TypeError):
                 t_args = {}
             await self._trigger_on_tool_call(t_name, t_args)
+            if t_name:
+                if hint := self._repeat_guard.observe(t_name):
+                    hint_by_call_id[tc.get("id", t_name)] = hint
+                    self.log.info(f"检测到连续重复工具调用: {t_name}")
 
         for result in await self._executor.execute_batch(
             tool_calls=tool_calls,
@@ -629,6 +639,14 @@ class SubAgentRunner(BaseAgentRunner):
                     else:
                         new_segments.append(seg)
                 tool_msg.content = new_segments
+                tool_msg.refresh_cache()
+
+            # 命中重复调用提示时直接追加到工具结果尾部,不额外插入消息
+            if hint := hint_by_call_id.pop(tool_call_id, None):
+                if isinstance(tool_msg.content, str):
+                    tool_msg.content = f"{tool_msg.content}\n\n{hint}" if tool_msg.content else hint
+                else:
+                    tool_msg.content = [*tool_msg.content, TextSegment(hint)]
                 tool_msg.refresh_cache()
 
             self.log.debug(f"工具 {tool_name} 输出: {str(tool_msg.content)[:300]}...")
@@ -808,6 +826,8 @@ class SubAgentRunner(BaseAgentRunner):
         finish_reason = "completed"
 
         await self._trigger_before_run()
+
+        self._repeat_guard.reset()
 
         try:
             for _turn in range(max_turns):

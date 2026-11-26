@@ -20,6 +20,7 @@ from atribot.core.type.llm_message_types import (
 )
 from atribot.LLMchat.MCP.tool_calls import ToolCalls
 from atribot.LLMchat.MCP.tool_model import ToolSet
+from atribot.LLMchat.MCP.tool_repeat_guard import ToolRepeatGuard, append_hint_to_output
 from atribot.LLMchat.media_processor import MediaProcessor
 from atribot.LLMchat.model_api.ai_connection_manager import LLMConnectionManager
 from atribot.LLMchat.model_api.llm_types import ChatCompletion
@@ -352,13 +353,16 @@ class LLMCoordinator():
         self.log.debug("模型进入工具调用!")
         
         response = request.generation_response or GenerationResponse(model = request.model)
+        repeat_guard = ToolRepeatGuard()
         
         for _ in range(10):#防止无限循环调用
             
             self._update_response(response, assistant_message)
 
             for tool_call in tool_calls:#可能一次里面调用多少工具 
-                
+                tool_name = ""
+                tool_input = "{}"
+
                 try:
                     function = tool_call['function']
                     tool_name = function['name']
@@ -387,6 +391,11 @@ class LLMCoordinator():
                     for part in tool_output:
                         if part.get("type") == "text":
                             part["text"] = part["text"][:20000]
+
+                # 命中重复调用提示时直接追加到工具结果尾部,不额外插入消息
+                if tool_name and (hint := repeat_guard.observe(tool_name)):
+                    tool_output = append_hint_to_output(tool_output, hint)
+                    self.log.info(f"检测到连续重复工具调用: {tool_name}")
 
                 increase_context.add_tool_message(
                     tool_name,
