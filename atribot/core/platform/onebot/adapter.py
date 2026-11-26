@@ -13,6 +13,7 @@ from atribot.core.platform import register_adapter
 from atribot.core.platform.base import PlatformAdapter
 from atribot.core.platform.message_queue import MessageQueue
 from atribot.core.platform.onebot.connection import OneBotHttpServer, OneBotWSClient, OneBotWSServer
+from atribot.core.platform.onebot.forward import fill_forward_content
 from atribot.core.platform.onebot.message_event import OneBotMessageEvent
 from atribot.core.platform.onebot.send import OneBotSendClient
 from atribot.core.platform.send_client import LoginInfo
@@ -48,42 +49,68 @@ class OneBotAdapter(PlatformAdapter):
         self._log = container.get_by_type(logging.Logger).getChild(f"{self._log_name}.{config.source_name}")
         self._started = False
 
+        self._connection, http_base_url = self._build_connection()
+        self._send_client = self._build_send_client(http_base_url)
+
+    def _build_connection(self) -> tuple[Any, str]:
+        """创建底层连接，返回 (连接对象, HTTP 基址)
+
+        子类可覆写此方法以适配不同 OneBot 实现（如 LLBot）
+        """
+        config = self._config
         if isinstance(config, WebSocketClientConfig):
-            self._connection = OneBotWSClient(
-                url=config.url,
-                access_token=config.access_token,
-                log=self._log.getChild("WSClient"),
-                path=config.ws_path or self._default_ws_path,
+            return (
+                OneBotWSClient(
+                    url=config.url,
+                    access_token=config.access_token,
+                    log=self._log.getChild("WSClient"),
+                    path=config.ws_path or self._default_ws_path,
+                ),
+                f"http://{config.url}".rstrip("/"),
             )
-            http_base_url = f"http://{config.url}".rstrip("/")
-        elif isinstance(config, WebSocketServerConfig):
-            self._connection = OneBotWSServer(
-                host=config.host,
-                port=config.port,
-                access_token=config.access_token,
-                log=self._log.getChild("WSServer"),
+        if isinstance(config, WebSocketServerConfig):
+            return (
+                OneBotWSServer(
+                    host=config.host,
+                    port=config.port,
+                    access_token=config.access_token,
+                    log=self._log.getChild("WSServer"),
+                ),
+                f"http://{config.host}:{config.port}".rstrip("/"),
             )
-            http_base_url = f"http://{config.host}:{config.port}".rstrip("/")
-        elif isinstance(config, HttpAdapterConfig):
-            self._connection = OneBotHttpServer(
-                host=config.host,
-                port=config.port,
-                access_token=config.access_token,
-                log=self._log.getChild("HttpServer"),
+        if isinstance(config, HttpAdapterConfig):
+            return (
+                OneBotHttpServer(
+                    host=config.host,
+                    port=config.port,
+                    access_token=config.access_token,
+                    log=self._log.getChild("HttpServer"),
+                ),
+                (config.url or "").rstrip("/"),
             )
-            http_base_url = (config.url or "").rstrip("/")
-        else:
-            raise ValueError(
-                f"不支持的连接类型: {config.connection_type} "
-                f"(平台: {self._source_name})"
-            )
-        self._send_client = self._send_client_cls(
+        raise ValueError(
+            f"不支持的连接类型: {config.connection_type} "
+            f"(平台: {self._source_name})"
+        )
+
+    def _build_send_client(self, http_base_url: str) -> OneBotSendClient:
+        """创建消息发送客户端，子类可覆写以适配不同 OneBot 实现"""
+        config = self._config
+        return self._send_client_cls(
             access_token=config.access_token or "",
             http_base_url=http_base_url,
             connection_type=config.connection_type,
             ws_connection=self._connection,
             log=self._log.getChild("Send"),
         )
+
+    async def _normalize_event(self, data: dict) -> dict:
+        """事件预处理器，子类可覆写以兼容不同实现的事件字段
+
+        基类负责补全合并转发内容（NapCat 自带 content 时只做本地规范化，
+        不发请求；LLBot 等只给 resId 的实现会调用 get_forward_msg 拉取）。
+        """
+        return await fill_forward_content(self._send_client, data, self._log)
 
     @property
     def source_name(self) -> str:
@@ -188,6 +215,7 @@ class OneBotAdapter(PlatformAdapter):
         """
         # self._log.debug(f"事件:{data}")
         try:
+            data = await self._normalize_event(data)
             event = OneBotEvent.from_dict(data)
         except (ValueError, Exception) as e:
             self._log.warning(
